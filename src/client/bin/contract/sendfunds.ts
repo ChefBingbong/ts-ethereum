@@ -7,7 +7,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 // ---- ENV CONFIG ----
 
 // RPC endpoint of your miner node
-const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545'
+const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8001'
 
 // Address to receive funds (0x-prefixed)
 const TO_ADDRESS = process.env.TO_ADDRESS as Hex | undefined

@@ -33,17 +33,25 @@ export type TxValuesArray = AllTypesTxValuesArray[typeof TransactionType.Legacy]
 
 /**
  * Validates tx's `v` value
+ * Accepts both pre-EIP-155 (v = 27 or 28) and EIP-155 (v = chainId * 2 + 35 or 36)
  */
 function validateV(common: Common, _v?: bigint): void {
   const v = _v !== undefined ? Number(_v) : undefined
-  // Check for valid v values in the scope of a signed legacy tx
   if (v !== undefined) {
-    // v must be 27 or 28 for Frontier (no EIP-155)
-    if (v !== 27 && v !== 28) {
-      throw EthereumJSErrorWithoutCode(
-        `Legacy txs need v = 27 or v = 28, got v = ${v}`,
-      )
+    // Pre-EIP-155: v = 27 or 28
+    if (v === 27 || v === 28) {
+      return
     }
+    // EIP-155: v = chainId * 2 + 35 + recovery_id (where recovery_id is 0 or 1)
+    const chainId = common.chainId()
+    const eip155V0 = Number(chainId) * 2 + 35
+    const eip155V1 = Number(chainId) * 2 + 36
+    if (v === eip155V0 || v === eip155V1) {
+      return
+    }
+    throw EthereumJSErrorWithoutCode(
+      `Invalid v value. Expected 27, 28, ${eip155V0}, or ${eip155V1}, got v = ${v}`,
+    )
   }
 }
 
@@ -236,7 +244,8 @@ export class LegacyTx implements TransactionInterface<typeof TransactionType.Leg
   }
 
   /**
-   * Computes a sha3-256 hash which can be used to verify the signature
+   * Computes a sha3-256 hash which can be used to verify the signature.
+   * Handles both pre-EIP-155 and EIP-155 signatures.
    * @returns Hash used when verifying the signature
    */
   getMessageToVerifySignature() {
@@ -244,6 +253,25 @@ export class LegacyTx implements TransactionInterface<typeof TransactionType.Leg
       const msg = Legacy.errorMsg(this, 'This transaction is not signed')
       throw EthereumJSErrorWithoutCode(msg)
     }
+    
+    // Detect if this is an EIP-155 signature by checking v value
+    // Pre-EIP-155: v = 27 or 28
+    // EIP-155: v = chainId * 2 + 35 or chainId * 2 + 36
+    const vNum = Number(this.v!)
+    const isEIP155 = vNum !== 27 && vNum !== 28
+    
+    if (isEIP155) {
+      // For EIP-155, the signed message includes chainId, 0, 0
+      const message = [
+        ...this.getMessageToSign(),
+        bigIntToUnpaddedBytes(this.common.chainId()),
+        new Uint8Array(0),
+        new Uint8Array(0),
+      ]
+      return this.keccakFunction(RLP.encode(message))
+    }
+    
+    // Pre-EIP-155: just use the 6-element message
     return this.getHashedMessageToSign()
   }
 

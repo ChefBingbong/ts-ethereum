@@ -1,7 +1,7 @@
 import debugDefault from 'debug'
 import { createBlock } from '../block'
 import { ConsensusType } from '../chain-config'
-import { type EVM, type EVMInterface } from '../evm'
+import type { EVMInterface } from '../evm'
 import { MerklePatriciaTrie } from '../mpt'
 import * as RLP from '../rlp'
 import { TransactionType } from '../tx'
@@ -9,7 +9,6 @@ import {
   Account,
   Address,
   BIGINT_0,
-  BIGINT_1,
   BIGINT_8,
   EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
@@ -20,7 +19,6 @@ import {
 
 import { runTx } from '.'
 import { Bloom } from './bloom'
-import { emitEVMProfile } from './emitEVMProfile.ts'
 
 import type { Block } from '../block'
 import type { Common } from '../chain-config'
@@ -198,10 +196,6 @@ export async function runBlock(vm: VM, opts: RunBlockOpts): Promise<RunBlockResu
     console.timeEnd(withdrawalsRewardsCommitLabel)
     // eslint-disable-next-line no-console
     console.timeEnd(entireBlockLabel)
-    const logs = (vm.evm as EVM).getPerformanceLogs()
-    emitEVMProfile(logs.precompiles, 'Precompile performance')
-    emitEVMProfile(logs.opcodes, 'Opcode performance')
-    ;(vm.evm as EVM).clearPerformanceLogs()
   }
 
   const runBlockResult: RunBlockResult = {
