@@ -1,22 +1,14 @@
 import debugDefault from 'debug'
 import { createBlockHeader } from '../block'
-import { ConsensusType } from '../chain-config'
-import type { EVM } from '../evm'
 import {
   Account,
-  Address,
   BIGINT_0,
-  BIGINT_1,
   EthereumJSErrorWithoutCode,
-  KECCAK256_NULL,
   bytesToHex,
-  equalsBytes,
-  hexToBytes,
   short,
 } from '../utils'
 
 import { Bloom } from './bloom'
-import { emitEVMProfile } from './emitEVMProfile.ts'
 
 import type { Block } from '../block'
 import type { Common } from '../chain-config'
@@ -39,38 +31,26 @@ const debugGas = debugDefault('vm:tx:gas')
 
 const DEFAULT_HEADER = createBlockHeader()
 
-let enableProfiler = false
-const initLabel = 'EVM journal init, fee validation'
-const balanceNonceLabel = 'Balance/Nonce checks and update'
-const executionLabel = 'Execution'
-const logsGasBalanceLabel = 'Logs, gas usage, account/miner balances'
-const accountsCleanUpLabel = 'Accounts clean up'
-const journalCacheCleanUpLabel = 'Journal/cache cleanup'
-const receiptsLabel = 'Receipts'
-const entireTxLabel = 'Entire tx'
-
 /**
  * Run a transaction (Frontier/Chainstart - Legacy transactions only)
+ * Value transfers only - contract creation is NOT supported.
  * @ignore
  */
 export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
-  if (vm['_opts'].profilerOpts?.reportAfterTx === true) {
-    enableProfiler = true
-  }
-
-  if (enableProfiler) {
-    const title = `Profiler run - Tx ${bytesToHex(opts.tx.hash())}`
-    // eslint-disable-next-line no-console
-    console.log(title)
-    // eslint-disable-next-line no-console
-    console.time(initLabel)
-    // eslint-disable-next-line no-console
-    console.time(entireTxLabel)
-  }
-
   const gasLimit = opts.block?.header.gasLimit ?? DEFAULT_HEADER.gasLimit
   if (opts.skipBlockGasLimitValidation !== true && gasLimit < opts.tx.gasLimit) {
     const msg = _errorMsg('tx has a higher gas limit than the block', vm, opts.block, opts.tx)
+    throw EthereumJSErrorWithoutCode(msg)
+  }
+
+  // Reject contract creation transactions
+  if (opts.tx.to === undefined) {
+    const msg = _errorMsg(
+      'Contract creation is not supported. This blockchain only supports value transfers.',
+      vm,
+      opts.block,
+      opts.tx,
+    )
     throw EthereumJSErrorWithoutCode(msg)
   }
 
@@ -87,8 +67,6 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     debug(`tx checkpoint`)
   }
 
-  // Frontier - only legacy transactions, no typed transaction handling needed
-
   try {
     const result = await _runTx(vm, opts)
     await vm.evm.journal.commit()
@@ -96,7 +74,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       debug(`tx checkpoint committed`)
     }
     return result
-  } catch (e: any) {
+  } catch (e: unknown) {
     await vm.evm.journal.revert()
     if (vm.DEBUG) {
       debug(`tx checkpoint reverted`)
@@ -104,18 +82,6 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     throw e
   } finally {
     vm.evm.stateManager.originalStorageCache.clear()
-    if (enableProfiler) {
-      // eslint-disable-next-line no-console
-      console.timeEnd(entireTxLabel)
-      const logs = (vm.evm as EVM).getPerformanceLogs()
-      if (logs.precompiles.length === 0 && logs.opcodes.length === 0) {
-        // eslint-disable-next-line no-console
-        console.log('No precompile or opcode execution.')
-      }
-      emitEVMProfile(logs.precompiles, 'Precompile performance')
-      emitEVMProfile(logs.opcodes, 'Opcodes performance')
-      ;(vm.evm as EVM).clearPerformanceLogs()
-    }
   }
 }
 
@@ -142,7 +108,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     )
   }
 
-  // Validate gas limit against tx base fee (DataFee + TxFee + Creation Fee)
+  // Validate gas limit against tx base fee (DataFee + TxFee)
   const intrinsicGas = tx.getIntrinsicGas()
 
   let gasLimit = tx.gasLimit
@@ -162,13 +128,6 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     debugGas(`Subtracting base fee (${intrinsicGas}) from gasLimit (-> ${gasLimit})`)
   }
 
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.timeEnd(initLabel)
-    // eslint-disable-next-line no-console
-    console.time(balanceNonceLabel)
-  }
-
   // Check from account's balance and nonce
   let fromAccount = await state.getAccount(caller)
   if (fromAccount === undefined) {
@@ -178,9 +137,6 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   if (vm.DEBUG) {
     debug(`Sender's pre-tx balance is ${balance}`)
   }
-
-  // Frontier - no EIP-3607 check (reject transactions from senders with deployed code)
-  // In Frontier, contracts can send transactions
 
   // Check balance against upfront tx cost
   const upFrontCost = tx.getUpfrontCost()
@@ -245,15 +201,9 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   if (vm.DEBUG) {
     debug(`Update fromAccount (caller) balance (-> ${fromAccount.balance}))`)
   }
-  let executionTimerPrecise: number
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.timeEnd(balanceNonceLabel)
-    executionTimerPrecise = performance.now()
-  }
 
   /*
-   * Execute message
+   * Execute message (value transfer only)
    */
   const { value, data, to } = tx
 
@@ -277,36 +227,27 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     data,
   })) as RunTxResult
 
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.log(`${executionLabel}: ${performance.now() - executionTimerPrecise!}ms`)
-    // eslint-disable-next-line no-console
-    console.log('[ For execution details see table output ]')
-    // eslint-disable-next-line no-console
-    console.time(logsGasBalanceLabel)
-  }
-
   if (vm.DEBUG) {
     debug(`Update fromAccount (caller) nonce (-> ${fromAccount.nonce})`)
   }
 
   if (vm.DEBUG) {
-    const { executionGasUsed, exceptionError, returnValue } = results.execResult
+    const { executionGasUsed, exceptionError } = results.execResult
     debug('-'.repeat(100))
     debug(
       `Received tx execResult: [ executionGasUsed=${executionGasUsed} exceptionError=${
         exceptionError !== undefined ? `'${exceptionError.error}'` : 'none'
-      } returnValue=${short(returnValue)} gasRefund=${results.gasRefund ?? 0} ]`,
+      } gasRefund=${results.gasRefund ?? 0} ]`,
     )
   }
 
   /*
    * Parse results
    */
-  // Generate the bloom for the tx
-  results.bloom = txLogsBloom(results.execResult.logs, vm.common)
+  // Generate the bloom for the tx (empty for value transfers)
+  results.bloom = txLogsBloom(undefined, vm.common)
   if (vm.DEBUG) {
-    debug(`Generated tx bloom with logs=${results.execResult.logs?.length}`)
+    debug(`Generated tx bloom with logs=0`)
   }
 
   // Calculate the total gas used
@@ -365,33 +306,6 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     debug(`tx update miner account (${miner}) balance (-> ${minerAccount.balance})`)
   }
 
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.timeEnd(logsGasBalanceLabel)
-    // eslint-disable-next-line no-console
-    console.time(accountsCleanUpLabel)
-  }
-
-  /*
-   * Cleanup accounts
-   */
-  if (results.execResult.selfdestruct !== undefined) {
-    for (const addressToSelfdestructHex of results.execResult.selfdestruct) {
-      const address = new Address(hexToBytes(addressToSelfdestructHex))
-      await vm.evm.journal.deleteAccount(address)
-      if (vm.DEBUG) {
-        debug(`tx selfdestruct on address=${address}`)
-      }
-    }
-  }
-
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.timeEnd(accountsCleanUpLabel)
-    // eslint-disable-next-line no-console
-    console.time(journalCacheCleanUpLabel)
-  }
-
   if (opts.reportPreimages === true && vm.evm.journal.preimages !== undefined) {
     results.preimages = vm.evm.journal.preimages
   }
@@ -399,22 +313,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   await vm.evm.journal.cleanup()
   state.originalStorageCache.clear()
 
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.timeEnd(journalCacheCleanUpLabel)
-    // eslint-disable-next-line no-console
-    console.time(receiptsLabel)
-  }
-
   // Generate the tx receipt
   const gasUsed = opts.blockGasUsed ?? block?.header.gasUsed ?? DEFAULT_HEADER.gasUsed
   const cumulativeGasUsed = gasUsed + results.totalGasSpent
   results.receipt = await generateTxReceipt(vm, tx, results, cumulativeGasUsed)
-
-  if (enableProfiler) {
-    // eslint-disable-next-line no-console
-    console.timeEnd(receiptsLabel)
-  }
 
   /**
    * The `afterTx` event
@@ -440,21 +342,9 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
  * @method txLogsBloom
  * @private
  */
-function txLogsBloom(logs?: any[], common?: Common): Bloom {
-  const bloom = new Bloom(undefined, common)
-  if (logs) {
-    for (let i = 0; i < logs.length; i++) {
-      const log = logs[i]
-      // add the address
-      bloom.add(log[0])
-      // add the topics
-      const topics = log[1]
-      for (let q = 0; q < topics.length; q++) {
-        bloom.add(topics[q])
-      }
-    }
-  }
-  return bloom
+function txLogsBloom(_logs?: unknown[], common?: Common): Bloom {
+  // For value-transfer-only blockchain, there are no logs
+  return new Bloom(undefined, common)
 }
 
 /**
@@ -473,7 +363,7 @@ export async function generateTxReceipt(
   const baseReceipt: BaseTxReceipt = {
     cumulativeBlockGasUsed: cumulativeGasUsed,
     bitvector: txResult.bloom.bitvector,
-    logs: txResult.execResult.logs ?? [],
+    logs: [], // No logs in value-transfer-only blockchain
   }
 
   if (vm.DEBUG) {
@@ -482,7 +372,7 @@ export async function generateTxReceipt(
         tx.type
       } cumulativeBlockGasUsed=${cumulativeGasUsed} bitvector=${short(baseReceipt.bitvector)} (${
         baseReceipt.bitvector.length
-      } bytes) logs=${baseReceipt.logs.length}`,
+      } bytes) logs=0`,
     )
   }
 

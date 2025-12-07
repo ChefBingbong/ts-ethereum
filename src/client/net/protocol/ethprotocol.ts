@@ -22,8 +22,10 @@ import { encodeReceipt, type PostByzantiumTxReceipt, type PreByzantiumTxReceipt,
 
 import { Protocol } from './protocol.ts'
 
-import type { Log } from '../../../evm'
 import type { Chain } from '../../blockchain'
+
+// Log type for receipts (simplified - logs are always empty in value-transfer-only mode)
+type Log = [address: Uint8Array, topics: Uint8Array[], data: Uint8Array]
 import type { TxReceiptWithType } from '../../execution/receipt.ts'
 import type { Message, ProtocolOptions } from './protocol.ts'
 

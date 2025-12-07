@@ -13,8 +13,10 @@ import { Bloom, PostByzantiumTxReceipt, PreByzantiumTxReceipt, TxReceipt } from 
 import { DBKey, MetaDBManager } from '../util/metaDBManager.ts'
 
 import type { Block } from '../../block'
-import type { Log } from '../../evm'
 import type { TransactionType, TypedTransaction } from '../../tx'
+
+// Log type for receipts (simplified - logs are always empty in value-transfer-only mode)
+type Log = [address: Uint8Array, topics: Uint8Array[], data: Uint8Array]
 import type { TxHashIndex } from './txIndex.ts'
 
 /**

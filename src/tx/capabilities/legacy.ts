@@ -71,24 +71,13 @@ export function getDataGas(tx: LegacyTxInterface): bigint {
 
 /**
  * The minimum gas limit which the tx to have to be valid.
- * This covers costs as the standard fee (21000 gas), the data fee (paid for each calldata byte),
- * and the optional creation fee (if the transaction creates a contract).
+ * This covers costs as the standard fee (21000 gas) and the data fee (paid for each calldata byte).
+ * Note: Contract creation is not supported, so no creation fee is added.
  */
 export function getIntrinsicGas(tx: LegacyTxInterface): bigint {
   const txFee = tx.common.param('txGas')
   let fee = tx.getDataGas()
   if (txFee) fee += txFee
-  let isContractCreation = false
-  try {
-    isContractCreation = tx.toCreationAddress()
-  } catch {
-    isContractCreation = false
-  }
-  // Contract creation fee (from Frontier)
-  if (isContractCreation) {
-    const txCreationFee = tx.common.param('txCreationGas')
-    if (txCreationFee) fee += txCreationFee
-  }
   return fee
 }
 

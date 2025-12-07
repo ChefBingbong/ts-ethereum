@@ -5,7 +5,6 @@ import type {
   EVMMockBlockchainInterface,
   EVMOpts,
   EVMResult,
-  Log,
 } from '../evm'
 import type { TypedTransaction } from '../tx'
 import type {
@@ -20,6 +19,7 @@ export type TxReceipt = PreByzantiumTxReceipt | PostByzantiumTxReceipt | EIP4844
 
 /**
  * Abstract interface with common transaction receipt fields
+ * Note: logs are always empty in value-transfer-only mode
  */
 export interface BaseTxReceipt {
   /**
@@ -31,9 +31,9 @@ export interface BaseTxReceipt {
    */
   bitvector: Uint8Array
   /**
-   * Logs emitted
+   * Logs emitted (always empty in value-transfer-only mode)
    */
-  logs: Log[]
+  logs: []
 }
 
 /**

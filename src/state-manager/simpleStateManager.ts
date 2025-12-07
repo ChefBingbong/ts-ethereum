@@ -1,4 +1,3 @@
-import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { Account, EthereumJSErrorWithoutCode, bytesToHex } from '../utils'
 
 import { OriginalStorageCache } from './cache/originalStorageCache.ts'
@@ -82,23 +81,32 @@ export class SimpleStateManager implements StateManagerInterface {
     await modifyAccountFields(this, address, accountFields)
   }
 
-  async getCode(address: Address): Promise<Uint8Array> {
-    return this.topCodeStack().get(address.toString()) ?? new Uint8Array(0)
+  /**
+   * getCode always returns empty bytes - this blockchain only supports value transfers.
+   * @param _address - Address (ignored)
+   * @returns Empty Uint8Array
+   */
+  async getCode(_address: Address): Promise<Uint8Array> {
+    return new Uint8Array(0)
   }
 
-  async putCode(address: Address, value: Uint8Array): Promise<void> {
-    this.topCodeStack().set(address.toString(), value)
-    if ((await this.getAccount(address)) === undefined) {
-      await this.putAccount(address, new Account())
-    }
-    await this.modifyAccountFields(address, {
-      codeHash: (this.common?.customCrypto.keccak256 ?? keccak256)(value),
-    })
+  /**
+   * putCode is not supported - this blockchain only supports value transfers.
+   * This method is a no-op for compatibility.
+   * @param _address - Address (ignored)
+   * @param _value - Code value (ignored)
+   */
+  async putCode(_address: Address, _value: Uint8Array): Promise<void> {
+    // No-op: Contract code storage is not supported in value-transfer-only mode
   }
 
-  async getCodeSize(address: Address): Promise<number> {
-    const contractCode = await this.getCode(address)
-    return contractCode.length
+  /**
+   * getCodeSize always returns 0 - this blockchain only supports value transfers.
+   * @param _address - Address (ignored)
+   * @returns 0
+   */
+  async getCodeSize(_address: Address): Promise<number> {
+    return 0
   }
 
   async getStorage(address: Address, key: Uint8Array): Promise<Uint8Array> {

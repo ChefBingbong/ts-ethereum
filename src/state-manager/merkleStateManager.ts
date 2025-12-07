@@ -193,61 +193,35 @@ export class MerkleStateManager implements StateManagerInterface {
   }
 
   /**
-   * Adds `value` to the state trie as code, and sets `codeHash` on the account
-   * corresponding to `address` to reference this.
-   * @param address - Address of the `account` to add the `code` for
-   * @param value - The value of the `code`
+   * putCode is not supported - this blockchain only supports value transfers.
+   * This method is a no-op for compatibility.
+   * @param _address - Address (ignored)
+   * @param _value - Code value (ignored)
    */
-  async putCode(address: Address, value: Uint8Array): Promise<void> {
-    const codeHash = this.keccakFunction(value)
-
-    if (this._caches?.code !== undefined) {
-      this._caches!.code!.put(address, value)
-    } else {
-      const key = this._prefixCodeHashes ? concatBytes(CODEHASH_PREFIX, codeHash) : codeHash
-      await this._getCodeDB().put(key, value)
-    }
-
+  async putCode(_address: Address, _value: Uint8Array): Promise<void> {
+    // No-op: Contract code storage is not supported in value-transfer-only mode
     if (this.DEBUG) {
-      this._debug(`Update codeHash (-> ${short(codeHash)}) for account ${address}`)
+      this._debug(`putCode called but ignored - contracts not supported`)
     }
-
-    if ((await this.getAccount(address)) === undefined) {
-      await this.putAccount(address, new Account())
-    }
-    await this.modifyAccountFields(address, { codeHash })
   }
 
   /**
-   * Gets the code corresponding to the provided `address`.
-   * @param address - Address to get the `code` for
-   * @returns {Promise<Uint8Array>} -  Resolves with the code corresponding to the provided address.
-   * Returns an empty `Uint8Array` if the account has no associated code.
+   * getCode always returns empty bytes - this blockchain only supports value transfers.
+   * @param _address - Address (ignored)
+   * @returns Empty Uint8Array
    */
-  async getCode(address: Address): Promise<Uint8Array> {
-    const elem = this._caches?.code?.get(address)
-    if (elem !== undefined) {
-      return elem.code ?? new Uint8Array(0)
-    }
-    const account = await this.getAccount(address)
-    if (!account) {
-      return new Uint8Array(0)
-    }
-    if (!account.isContract()) {
-      return new Uint8Array(0)
-    }
-    const key = this._prefixCodeHashes
-      ? concatBytes(CODEHASH_PREFIX, account.codeHash)
-      : account.codeHash
-    const code = (await this._trie.database().get(key)) ?? new Uint8Array(0)
-
-    this._caches?.code?.put(address, code)
-    return code
+  async getCode(_address: Address): Promise<Uint8Array> {
+    // Always return empty - no contracts supported
+    return new Uint8Array(0)
   }
 
-  async getCodeSize(address: Address): Promise<number> {
-    const contractCode = await this.getCode(address)
-    return contractCode.length
+  /**
+   * getCodeSize always returns 0 - this blockchain only supports value transfers.
+   * @param _address - Address (ignored)
+   * @returns 0
+   */
+  async getCodeSize(_address: Address): Promise<number> {
+    return 0
   }
 
   /**

@@ -1,19 +1,18 @@
 import { createBlock } from '../../../block/index.ts'
 import { MerkleStateManager, getMerkleStateProof } from '../../../state-manager/index.ts'
 import {
-  LegacyTx,
-  TypedTransaction,
+  type LegacyTx,
+  type TypedTransaction,
   createTx,
   createTxFromRLP,
 } from '../../../tx/index.ts'
 import {
-  Address,
+  type Address,
+  type PrefixedHexString,
   BIGINT_0,
   BIGINT_1,
   EthereumJSErrorWithoutCode,
-  PrefixedHexString,
   TypeOutput,
-  bigIntMax,
   bigIntToHex,
   bytesToHex,
   createAddressFromString,
@@ -34,14 +33,13 @@ import {
   runTx,
 } from '../../../vm/index.ts'
 
-import { INTERNAL_ERROR, INVALID_HEX_STRING, INVALID_PARAMS, PARSE_ERROR } from '../error-code.ts'
+import { INTERNAL_ERROR, INVALID_PARAMS, PARSE_ERROR } from '../error-code.ts'
 import { callWithStackTrace, getBlockByOption, toJSONRPCTx } from '../helpers.ts'
 import { middleware, validators } from '../validation.ts'
 
 import type { EthereumClient } from '../..'
 import type { Block, JSONRPCBlock } from '../../../block/index.ts'
 import type { Proof } from '../../../state-manager/index.ts'
-import type { Log } from '../../../evm'
 import type { Chain } from '../../blockchain'
 import type { ReceiptsManager } from '../../execution/receipt.ts'
 import type { TxIndex } from '../../execution/txIndex.ts'
@@ -49,52 +47,23 @@ import type { EthProtocol } from '../../net/protocol'
 import type { FullEthereumService, Service } from '../../service'
 import type { RPCTx } from '../types.ts'
 
-const EMPTY_SLOT = `0x${'00'.repeat(32)}`
-
-type GetLogsParams = {
-  fromBlock?: string // QUANTITY, block number or "earliest" or "latest" (default: "latest")
-  toBlock?: string // QUANTITY, block number or "latest" (default: "latest")
-  address?: PrefixedHexString // DATA, 20 Bytes, contract address from which logs should originate
-  topics?: PrefixedHexString[] // DATA, array, topics are order-dependent
-  blockHash?: PrefixedHexString // DATA, 32 Bytes. With the addition of EIP-234,
-  // blockHash restricts the logs returned to the single block with
-  // the 32-byte hash blockHash. Using blockHash is equivalent to
-  // fromBlock = toBlock = the block number with hash blockHash.
-  // If blockHash is present in in the filter criteria, then
-  // neither fromBlock nor toBlock are allowed.
-}
-
 type JSONRPCReceipt = {
   transactionHash: string // DATA, 32 Bytes - hash of the transaction.
   transactionIndex: string // QUANTITY - integer of the transactions index position in the block.
   blockHash: string // DATA, 32 Bytes - hash of the block where this transaction was in.
   blockNumber: string // QUANTITY - block number where this transaction was in.
   from: string // DATA, 20 Bytes - address of the sender.
-  to: string | null // DATA, 20 Bytes - address of the receiver. null when it's a contract creation transaction.
+  to: string | null // DATA, 20 Bytes - address of the receiver.
   cumulativeGasUsed: string // QUANTITY  - The total amount of gas used when this transaction was executed in the block.
   effectiveGasPrice: string // QUANTITY - The final gas price per gas paid by the sender in wei.
   gasUsed: string // QUANTITY - The amount of gas used by this specific transaction alone.
-  contractAddress: string | null // DATA, 20 Bytes - The contract address created, if the transaction was a contract creation, otherwise null.
-  logs: JSONRPCLog[] // Array - Array of log objects, which this transaction generated.
+  contractAddress: null // Always null - contract creation not supported
+  logs: [] // Always empty - no logs in value-transfer-only mode
   logsBloom: string // DATA, 256 Bytes - Bloom filter for light clients to quickly retrieve related logs.
   // It also returns either:
   root?: string // DATA, 32 bytes of post-transaction stateroot (pre Byzantium)
   status?: string // QUANTITY, either 1 (success) or 0 (failure)
   type: string // QUANTITY, transaction type
-}
-type JSONRPCLog = {
-  removed: boolean // TAG - true when the log was removed, due to a chain reorganization. false if it's a valid log.
-  logIndex: string | null // QUANTITY - integer of the log index position in the block. null when it's pending.
-  transactionIndex: string | null // QUANTITY - integer of the transactions index position log was created from. null when it's pending.
-  transactionHash: string | null // DATA, 32 Bytes - hash of the transactions this log was created from. null when it's pending.
-  blockHash: string | null // DATA, 32 Bytes - hash of the block where this log was in. null when it's pending.
-  blockNumber: string | null // QUANTITY - the block number where this log was in. null when it's pending.
-  blockTimestamp: string | null // QUANTITY - the block timestamp where this log was in. null when it's pending.
-  address: string // DATA, 20 Bytes - address from which this log originated.
-  data: string // DATA - contains one or more 32 Bytes non-indexed arguments of the log.
-  topics: string[] // Array of DATA - Array of 0 to 4 32 Bytes DATA of indexed log arguments.
-  // (In solidity: The first topic is the hash of the signature of the event
-  // (e.g. Deposit(address,bytes32,uint256)), except you declared the event with the anonymous specifier.)
 }
 
 /**
@@ -136,29 +105,8 @@ const toJSONRPCBlock = async (
 }
 
 /**
- * Returns log formatted to the standard JSON-RPC fields
- */
-const toJSONRPCLog = async (
-  log: Log,
-  block?: Block,
-  tx?: TypedTransaction,
-  txIndex?: number,
-  logIndex?: number,
-): Promise<JSONRPCLog> => ({
-  removed: false, // TODO implement
-  logIndex: logIndex !== undefined ? intToHex(logIndex) : null,
-  transactionIndex: txIndex !== undefined ? intToHex(txIndex) : null,
-  transactionHash: tx !== undefined ? bytesToHex(tx.hash()) : null,
-  blockHash: block ? bytesToHex(block.hash()) : null,
-  blockNumber: block ? bigIntToHex(block.header.number) : null,
-  blockTimestamp: block ? bigIntToHex(block.header.timestamp) : null,
-  address: bytesToHex(log[0]),
-  topics: log[1].map(bytesToHex),
-  data: bytesToHex(log[2]),
-})
-
-/**
  * Returns receipt formatted to the standard JSON-RPC fields
+ * Note: logs and contractAddress are always empty/null in value-transfer-only mode
  */
 const toJSONRPCReceipt = async (
   receipt: TxReceipt,
@@ -167,8 +115,8 @@ const toJSONRPCReceipt = async (
   block: Block,
   tx: TypedTransaction,
   txIndex: number,
-  logIndex: number,
-  contractAddress?: Address,
+  _logIndex: number,
+  _contractAddress?: Address,
 ): Promise<JSONRPCReceipt> => ({
   transactionHash: bytesToHex(tx.hash()),
   transactionIndex: intToHex(txIndex),
@@ -179,10 +127,8 @@ const toJSONRPCReceipt = async (
   cumulativeGasUsed: bigIntToHex(receipt.cumulativeBlockGasUsed),
   effectiveGasPrice: bigIntToHex(effectiveGasPrice),
   gasUsed: bigIntToHex(gasUsed),
-  contractAddress: contractAddress?.toString() ?? null,
-  logs: await Promise.all(
-    receipt.logs.map((l, i) => toJSONRPCLog(l, block, tx, txIndex, logIndex + i)),
-  ),
+  contractAddress: null, // Always null - contract creation not supported
+  logs: [], // Always empty - no logs in value-transfer-only mode
   logsBloom: bytesToHex(receipt.bitvector),
   root:
     (receipt as PreByzantiumTxReceipt).stateRoot instanceof Uint8Array
@@ -227,10 +173,7 @@ export class Eth {
 
     this.blockNumber = callWithStackTrace(this.blockNumber.bind(this), this._rpcDebug)
 
-    this.call = middleware(callWithStackTrace(this.call.bind(this), this._rpcDebug), 2, [
-      [validators.transaction()],
-      [validators.blockOption],
-    ])
+    // Note: eth_call removed - smart contracts not supported
 
     this.chainId = callWithStackTrace(this.chainId.bind(this), this._rpcDebug)
 
@@ -266,10 +209,7 @@ export class Eth {
       [[validators.hex, validators.blockHash]],
     )
 
-    this.getCode = middleware(callWithStackTrace(this.getCode.bind(this), this._rpcDebug), 2, [
-      [validators.address],
-      [validators.blockOption],
-    ])
+    // Note: eth_getCode removed - smart contracts not supported
 
     this.getUncleCountByBlockNumber = middleware(
       callWithStackTrace(this.getUncleCountByBlockNumber.bind(this), this._rpcDebug),
@@ -277,11 +217,7 @@ export class Eth {
       [[validators.hex]],
     )
 
-    this.getStorageAt = middleware(
-      callWithStackTrace(this.getStorageAt.bind(this), this._rpcDebug),
-      3,
-      [[validators.address], [validators.hex], [validators.blockOption]],
-    )
+    // Note: eth_getStorageAt removed - smart contracts not supported
 
     this.getTransactionByBlockHashAndIndex = middleware(
       callWithStackTrace(this.getTransactionByBlockHashAndIndex.bind(this), this._rpcDebug),
@@ -324,25 +260,7 @@ export class Eth {
       [[validators.hex]],
     )
 
-    this.getLogs = middleware(callWithStackTrace(this.getLogs.bind(this), this._rpcDebug), 1, [
-      [
-        validators.object({
-          fromBlock: validators.optional(validators.blockOption),
-          toBlock: validators.optional(validators.blockOption),
-          address: validators.optional(
-            validators.either(validators.array(validators.address), validators.address),
-          ),
-          topics: validators.optional(
-            validators.array(
-              validators.optional(
-                validators.either(validators.hex, validators.array(validators.hex)),
-              ),
-            ),
-          ),
-          blockHash: validators.optional(validators.blockHash),
-        }),
-      ],
-    ])
+    // Note: eth_getLogs removed - smart contracts not supported
 
     this.sendRawTransaction = middleware(
       callWithStackTrace(this.sendRawTransaction.bind(this), this._rpcDebug),
@@ -374,54 +292,6 @@ export class Eth {
    */
   async blockNumber() {
     return bigIntToHex(this._chain.headers.latest?.number ?? BIGINT_0)
-  }
-
-  /**
-   * Executes a new message call immediately without creating a transaction on the block chain.
-   * @param params An array of two parameters:
-   *   1. The transaction object
-   *       * from (optional) - The address the transaction is sent from
-   *       * to - The address the transaction is directed to
-   *       * gas (optional) - Integer of the gas provided for the transaction execution
-   *       * gasPrice (optional) - Integer of the gasPrice used for each paid gas
-   *       * value (optional) - Integer of the value sent with this transaction
-   *       * data (optional) - Hash of the method signature and encoded parameters.
-   *   2. integer block number, or the string "latest", "earliest" or "pending"
-   * @returns The return value of the executed contract.
-   */
-  async call(params: [RPCTx, string]) {
-    const [transaction, blockOpt] = params
-    const block = await getBlockByOption(blockOpt, this._chain)
-
-    if (this._vm === undefined) {
-      throw EthereumJSErrorWithoutCode('missing vm')
-    }
-
-    const vm = await this._vm.shallowCopy()
-    await vm.stateManager.setStateRoot(block.header.stateRoot)
-
-    const { from, to, gas: gasLimit, gasPrice, value } = transaction
-
-    const data = transaction.data ?? transaction.input
-
-    const runCallOpts = {
-      caller: from !== undefined ? createAddressFromString(from) : undefined,
-      to: to !== undefined ? createAddressFromString(to) : undefined,
-      gasLimit: toType(gasLimit, TypeOutput.BigInt),
-      gasPrice: toType(gasPrice, TypeOutput.BigInt),
-      value: toType(value, TypeOutput.BigInt),
-      data: data !== undefined ? hexToBytes(data) : undefined,
-      block,
-    }
-    const { execResult } = await vm.evm.runCall(runCallOpts)
-    if (execResult.exceptionError !== undefined) {
-      throw {
-        code: 3,
-        data: bytesToHex(execResult.returnValue),
-        message: execResult.exceptionError.error,
-      }
-    }
-    return bytesToHex(execResult.returnValue)
   }
 
   /**
@@ -599,76 +469,6 @@ export class Eth {
   }
 
   /**
-   * Returns code of the account at the given address.
-   * @param params An array of two parameters:
-   *   1. address of the account
-   *   2. integer block number, or the string "latest", "earliest" or "pending"
-   */
-  async getCode(params: [string, string]) {
-    const [addressHex, blockOpt] = params
-    const block = await getBlockByOption(blockOpt, this._chain)
-
-    if (this._vm === undefined) {
-      throw EthereumJSErrorWithoutCode('missing vm')
-    }
-
-    const vm = await this._vm.shallowCopy()
-    await vm.stateManager.setStateRoot(block.header.stateRoot)
-
-    const address = createAddressFromString(addressHex)
-    const code = await vm.stateManager.getCode(address)
-    return bytesToHex(code)
-  }
-
-  /**
-   * Returns the value from a storage position at a given address.
-   * @param params An array of three parameters:
-   *   1. address of the storage
-   *   2. integer of the position in the storage
-   *   3. integer block number, or the string "latest", "earliest" or "pending"
-   */
-  async getStorageAt(params: [string, PrefixedHexString, string]) {
-    const [addressHex, keyHex, blockOpt] = params
-    if (!/^[0-9a-fA-F]+$/.test(keyHex.slice(2))) {
-      throw {
-        code: INVALID_HEX_STRING,
-        message: `unable to decode storage key: hex string invalid`,
-      }
-    }
-    if (keyHex.length > 66) {
-      throw {
-        code: INVALID_HEX_STRING,
-        message: `unable to decode storage key: hex string too long, want at most 32 bytes`,
-      }
-    }
-    if (blockOpt === 'pending') {
-      throw {
-        code: INVALID_PARAMS,
-        message: '"pending" is not yet supported',
-      }
-    }
-    if (this._vm === undefined) {
-      throw EthereumJSErrorWithoutCode('missing vm')
-    }
-
-    const vm = await this._vm.shallowCopy()
-    // TODO: this needs more thought, keep on latest for now
-    const block = await getBlockByOption(blockOpt, this._chain)
-    await vm.stateManager.setStateRoot(block.header.stateRoot)
-
-    const address = createAddressFromString(addressHex)
-    const account = await vm.stateManager.getAccount(address)
-    if (account === undefined) {
-      return EMPTY_SLOT
-    }
-    const key = setLengthLeft(hexToBytes(keyHex), 32)
-    const storage = await vm.stateManager.getStorage(address, key)
-    return storage !== null && storage !== undefined
-      ? bytesToHex(setLengthLeft(Uint8Array.from(storage) as Uint8Array, 32))
-      : EMPTY_SLOT
-  }
-
-  /**
    * Returns information about a transaction given a block hash and a transaction's index position.
    * @param params An array of two parameter:
    *   1. a block hash
@@ -819,7 +619,7 @@ export class Eth {
     const parentBlock = await this._chain.getBlock(block.header.parentHash)
     const vmCopy = await this._vm!.shallowCopy()
     vmCopy.common.setHardfork(block.common.hardfork())
-    // Run tx through copied vm to get tx gasUsed and createdAddress
+    // Run tx through copied vm to get tx gasUsed
     const runBlockResult = await runBlock(vmCopy, {
       block,
       root: parentBlock.header.stateRoot,
@@ -829,9 +629,10 @@ export class Eth {
     const receipts = await Promise.all(
       result.map(async (r, i) => {
         const tx = block.transactions[i]
-        const { totalGasSpent, createdAddress } = runBlockResult.results[i]
+        const { totalGasSpent } = runBlockResult.results[i]
         const effectiveGasPrice = (tx as LegacyTx).gasPrice
 
+        // No createdAddress - contract creation not supported
         return toJSONRPCReceipt(
           r,
           totalGasSpent,
@@ -840,7 +641,7 @@ export class Eth {
           tx,
           i,
           i,
-          createdAddress,
+          undefined,
         )
       }),
     )
@@ -879,14 +680,15 @@ export class Eth {
 
     const vmCopy = await this._vm!.shallowCopy()
     vmCopy.common.setHardfork(tx.common.hardfork())
-    // Run tx through copied vm to get tx gasUsed and createdAddress
+    // Run tx through copied vm to get tx gasUsed
     const runBlockResult = await runBlock(vmCopy, {
       block,
       root: parentBlock.header.stateRoot,
       skipBlockValidation: true,
     })
 
-    const { totalGasSpent, createdAddress } = runBlockResult.results[txIndex]
+    const { totalGasSpent } = runBlockResult.results[txIndex]
+    // No createdAddress - contract creation not supported
     return toJSONRPCReceipt(
       receipt,
       totalGasSpent,
@@ -895,97 +697,7 @@ export class Eth {
       tx,
       txIndex,
       logIndex,
-      createdAddress,
-    )
-  }
-
-  /**
-   * Returns an array of all logs matching a given filter object.
-   * Only available with `--saveReceipts` enabled
-   * @param params An object of the filter options {@link GetLogsParams}
-   */
-  async getLogs(params: [GetLogsParams]) {
-    const { fromBlock, toBlock, blockHash, address, topics } = params[0]
-    if (!this.receiptsManager) throw EthereumJSErrorWithoutCode('missing receiptsManager')
-    if (blockHash !== undefined && (fromBlock !== undefined || toBlock !== undefined)) {
-      throw {
-        code: INVALID_PARAMS,
-        message: `Can only specify a blockHash if fromBlock or toBlock are not provided`,
-      }
-    }
-
-    let from: Block, to: Block
-    if (blockHash !== undefined) {
-      try {
-        from = to = await this._chain.getBlock(hexToBytes(blockHash))
-      } catch {
-        throw {
-          code: INVALID_PARAMS,
-          message: 'unknown blockHash',
-        }
-      }
-    } else {
-      if (fromBlock === 'earliest') {
-        from = await this._chain.getBlock(BIGINT_0)
-      } else if (fromBlock === 'latest' || fromBlock === undefined) {
-        from = this._chain.blocks.latest!
-      } else {
-        const blockNum = BigInt(fromBlock)
-        if (blockNum > this._chain.headers.height) {
-          throw {
-            code: INVALID_PARAMS,
-            message: 'specified `fromBlock` greater than current height',
-          }
-        }
-        from = await this._chain.getBlock(blockNum)
-      }
-      if (toBlock === fromBlock) {
-        to = from
-      } else if (toBlock === 'latest' || toBlock === undefined) {
-        to = this._chain.blocks.latest!
-      } else {
-        const blockNum = BigInt(toBlock)
-        if (blockNum > this._chain.headers.height) {
-          throw {
-            code: INVALID_PARAMS,
-            message: 'specified `toBlock` greater than current height',
-          }
-        }
-        to = await this._chain.getBlock(blockNum)
-      }
-    }
-    if (
-      to.header.number - from.header.number >
-      BigInt(this.receiptsManager.GET_LOGS_BLOCK_RANGE_LIMIT)
-    ) {
-      throw {
-        code: INVALID_PARAMS,
-        message: `block range limit is ${this.receiptsManager.GET_LOGS_BLOCK_RANGE_LIMIT} blocks`,
-      }
-    }
-
-    const formattedTopics = topics?.map((t) => {
-      if (t === null) {
-        return null
-      } else if (Array.isArray(t)) {
-        return t.map((x) => hexToBytes(x))
-      } else {
-        return hexToBytes(t)
-      }
-    })
-    let addressBytes: Uint8Array[] | undefined
-    if (address !== undefined && address !== null) {
-      if (Array.isArray(address)) {
-        addressBytes = address.map((a) => hexToBytes(a))
-      } else {
-        addressBytes = [hexToBytes(address)]
-      }
-    }
-    const logs = await this.receiptsManager.getLogs(from, to, addressBytes, formattedTopics)
-    return Promise.all(
-      logs.map(({ log, block, tx, txIndex, logIndex }) =>
-        toJSONRPCLog(log, block, tx, txIndex, logIndex),
-      ),
+      undefined,
     )
   }
 

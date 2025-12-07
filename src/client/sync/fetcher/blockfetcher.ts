@@ -74,11 +74,9 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
       )
     const blocks: Block[] = []
     for (const [i, [txsData, unclesData]] of bodies.entries()) {
-    for (const [i, [txsData, unclesData]] of bodies.entries()) {
       const header = headers[i]
       if (
         (!equalsBytes(header.transactionsTrie, KECCAK256_RLP) && txsData.length === 0) ||
-        (!equalsBytes(header.uncleHash, KECCAK256_RLP_ARRAY) && unclesData.length === 0)
         (!equalsBytes(header.uncleHash, KECCAK256_RLP_ARRAY) && unclesData.length === 0)
       ) {
         this.DEBUG &&

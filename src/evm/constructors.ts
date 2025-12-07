@@ -8,7 +8,7 @@ import type { EVMOpts } from '.'
 
 /**
  * Use this async static constructor for the initialization
- * of an EVM object
+ * of an EVM object (simplified for value transfers only)
  *
  * @param createOpts The EVM options
  * @returns A new EVM
