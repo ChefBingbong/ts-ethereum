@@ -157,7 +157,7 @@ export class Service {
       return false
     }
     await this.pool.start()
-    void this.synchronizer?.start()
+    await this.synchronizer?.start()
     if (this.v8Engine === null) {
       this.v8Engine = await getV8Engine()
     }
