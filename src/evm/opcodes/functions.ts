@@ -628,54 +628,22 @@ export const handlers: Map<number, OpHandler> = new Map([
   ],
   // '0x40' range - block operations
   // 0x40: BLOCKHASH
+  // Frontier: simple block hash lookup from blockchain (no EIP-7709 history storage)
   [
     0x40,
-    async function (runState, common) {
+    async function (runState) {
       const number = runState.stack.pop()
 
-      if (common.isActivatedEIP(7709)) {
-        if (number >= runState.interpreter.getBlockNumber()) {
-          runState.stack.push(BIGINT_0)
-          return
-        }
-
-        const diff = runState.interpreter.getBlockNumber() - number
-        // block lookups must be within the original window even if historyStorageAddress's
-        // historyServeWindow is much greater than 256
-        if (diff > BIGINT_256 || diff <= BIGINT_0) {
-          runState.stack.push(BIGINT_0)
-          return
-        }
-
-        const historyAddress = new Address(
-          bigIntToAddressBytes(common.param('historyStorageAddress')),
-        )
-        const historyServeWindow = common.param('historyServeWindow')
-        const key = setLengthLeft(bigIntToBytes(number % historyServeWindow), 32)
-
-        if (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) {
-          // create witnesses and charge gas
-          const statelessGas = runState.env.accessWitness!.readAccountStorage(
-            historyAddress,
-            number,
-          )
-          runState.interpreter.useGas(statelessGas, `BLOCKHASH`)
-        }
-        const storage = await runState.stateManager.getStorage(historyAddress, key)
-
-        runState.stack.push(bytesToBigInt(storage))
-      } else {
-        const diff = runState.interpreter.getBlockNumber() - number
-        // block lookups must be within the past 256 blocks
-        if (diff > BIGINT_256 || diff <= BIGINT_0) {
-          runState.stack.push(BIGINT_0)
-          return
-        }
-
-        const block = await runState.blockchain.getBlock(Number(number))
-
-        runState.stack.push(bytesToBigInt(block.hash()))
+      const diff = runState.interpreter.getBlockNumber() - number
+      // block lookups must be within the past 256 blocks
+      if (diff > BIGINT_256 || diff <= BIGINT_0) {
+        runState.stack.push(BIGINT_0)
+        return
       }
+
+      const block = await runState.blockchain.getBlock(Number(number))
+
+      runState.stack.push(bytesToBigInt(block.hash()))
     },
   ],
   // 0x41: COINBASE
@@ -891,25 +859,11 @@ export const handlers: Map<number, OpHandler> = new Map([
     },
   ],
   // 0x60: PUSH
+  // Frontier: no Verkle witness charges (EIP-6800/7864 came later)
   [
     0x60,
-    function (runState, common) {
+    function (runState) {
       const numToPush = runState.opCode - 0x5f
-
-      if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
-        runState.env.chargeCodeAccesses === true
-      ) {
-        const contract = runState.interpreter.getAddress()
-        const startOffset = Math.min(runState.code.length, runState.programCounter + 1)
-        const endOffset = Math.min(runState.code.length, startOffset + numToPush - 1)
-        const statelessGas = runState.env.accessWitness!.readAccountCodeChunks(
-          contract,
-          startOffset,
-          endOffset,
-        )
-        runState.interpreter.useGas(statelessGas, `PUSH`)
-      }
 
       if (!runState.shouldDoJumpAnalysis) {
         runState.stack.push(runState.cachedPushes[runState.programCounter])
@@ -1310,18 +1264,11 @@ export const handlers: Map<number, OpHandler> = new Map([
   ],
   // '0xf0' range - closures
   // 0xf0: CREATE
+  // Frontier: no initcode size limit (EIP-3860), no EOF check
   [
     0xf0,
-    async function (runState, common) {
+    async function (runState) {
       const [value, offset, length] = runState.stack.popN(3)
-
-      if (
-        common.isActivatedEIP(3860) &&
-        length > Number(common.param('maxInitCodeSize')) &&
-        !runState.interpreter._evm.allowUnlimitedInitCodeSize
-      ) {
-        trap(EVMError.errorMessages.INITCODE_SIZE_VIOLATION)
-      }
 
       const gasLimit = runState.messageGasLimit!
       runState.messageGasLimit = undefined
@@ -1329,12 +1276,6 @@ export const handlers: Map<number, OpHandler> = new Map([
       let data = new Uint8Array(0)
       if (length !== BIGINT_0) {
         data = runState.memory.read(Number(offset), Number(length), true)
-      }
-
-      if (isEOF(data)) {
-        // Legacy cannot deploy EOF code
-        runState.stack.push(BIGINT_0)
-        return
       }
 
       const ret = await runState.interpreter.create(gasLimit, value, data)
@@ -1342,22 +1283,15 @@ export const handlers: Map<number, OpHandler> = new Map([
     },
   ],
   // 0xf5: CREATE2
+  // Frontier: no initcode size limit (EIP-3860), no EOF check
   [
     0xf5,
-    async function (runState, common) {
+    async function (runState) {
       if (runState.interpreter.isStatic()) {
         trap(EVMError.errorMessages.STATIC_STATE_CHANGE)
       }
 
       const [value, offset, length, salt] = runState.stack.popN(4)
-
-      if (
-        common.isActivatedEIP(3860) &&
-        length > Number(common.param('maxInitCodeSize')) &&
-        !runState.interpreter._evm.allowUnlimitedInitCodeSize
-      ) {
-        trap(EVMError.errorMessages.INITCODE_SIZE_VIOLATION)
-      }
 
       const gasLimit = runState.messageGasLimit!
       runState.messageGasLimit = undefined
@@ -1365,12 +1299,6 @@ export const handlers: Map<number, OpHandler> = new Map([
       let data = new Uint8Array(0)
       if (length !== BIGINT_0) {
         data = runState.memory.read(Number(offset), Number(length), true)
-      }
-
-      if (isEOF(data)) {
-        // Legacy cannot deploy EOF code
-        runState.stack.push(BIGINT_0)
-        return
       }
 
       const ret = await runState.interpreter.create2(

@@ -1,12 +1,10 @@
 import { MemoryLevel } from "memory-level";
-import type { BlockHeader } from "../../block";
-import { ConsensusType } from "../../chain-config";
-import { Ethash, Miner as EthashMiner, Solution } from "../../eth-hash";
+import type { Block, BlockHeader } from "../../block";
+import { Ethash, type Miner as EthashMiner, type Solution } from "../../eth-hash";
 import {
 	BIGINT_0,
 	BIGINT_1,
 	bytesToHex,
-	equalsBytes,
 } from "../../utils";
 import { buildBlock, type TxReceipt } from "../../vm";
 import type { Config } from "../config.ts";
@@ -48,8 +46,7 @@ export class Miner {
 	private assembling: boolean;
 	private period: number;
 	private ethash: Ethash | undefined;
-	private ethashMiner: EthashMiner | undefined;
-	private nextSolution: Solution | undefined;
+	private currentEthashMiner: EthashMiner | undefined;
 	private skipHardForkValidation?: boolean;
 	public running: boolean;
 
@@ -64,6 +61,9 @@ export class Miner {
 		this.running = false;
 		this.assembling = false;
 		this.skipHardForkValidation = options.skipHardForkValidation;
+		// PoW only - use default period
+		this.period = this.DEFAULT_PERIOD * 1000; // defined in ms for setTimeout use
+		this.ethash = new Ethash(new LevelDB(new MemoryLevel()) as any);
 		// PoW only - use default period
 		this.period = this.DEFAULT_PERIOD * 1000; // defined in ms for setTimeout use
 		this.ethash = new Ethash(new LevelDB(new MemoryLevel()) as any);
@@ -94,28 +94,22 @@ export class Miner {
 			this.assembleBlock.bind(this),
 			timeout,
 		);
-
-		// PoW only - find next solution while waiting for next block assembly to start
-		void this.findNextSolution();
 	}
 
 	/**
-	 * Finds the next PoW solution.
+	 * Finds PoW solution for a specific block.
+	 * The solution must be computed for the actual block being mined, not the parent.
 	 */
-	private async findNextSolution() {
+	private async findSolutionForBlock(block: Block): Promise<Solution | undefined> {
 		if (typeof this.ethash === "undefined") {
-			return;
+			return undefined;
 		}
-		this.config.logger?.info("Miner: Finding next PoW solution 🔨");
-		const header = this.latestBlockHeader();
-		this.ethashMiner = this.ethash.getMiner(header);
-		const solution = await this.ethashMiner.iterate(-1);
-		if (!equalsBytes(header.hash(), this.latestBlockHeader().hash())) {
-			// New block was inserted while iterating so we will discard solution
-			return;
-		}
-		this.nextSolution = solution;
-		this.config.logger?.info("Miner: Found PoW solution 🔨");
+		this.config.logger?.info(`Miner: Finding PoW solution for block ${block.header.number} (difficulty: ${block.header.difficulty}) 🔨`);
+		const startTime = Date.now();
+		this.currentEthashMiner = this.ethash.getMiner(block);
+		const solution = await this.currentEthashMiner.iterate(-1);
+		const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+		this.config.logger?.info(`Miner: Found PoW solution in ${elapsed}s 🔨`);
 		return solution;
 	}
 
@@ -123,7 +117,7 @@ export class Miner {
 	 * Sets the next block assembly to latestBlock.timestamp + period
 	 */
 	private async chainUpdated() {
-		this.ethashMiner?.stop();
+		this.currentEthashMiner?.stop();
 		const latestBlockHeader = this.latestBlockHeader();
 		const target =
 			Number(latestBlockHeader.timestamp) * 1000 + this.period - Date.now();
@@ -134,6 +128,20 @@ export class Miner {
 			}. Queuing next block assembly in ${Math.round(timeout / 1000)}s`,
 		);
 		await this.queueNextAssembly(timeout);
+	}
+
+	/**
+	 * Pre-warm the ethash cache for the current epoch.
+	 * This is CPU-intensive and takes 1-2 minutes on first run.
+	 */
+	private async warmupEthashCache() {
+		if (!this.ethash) return;
+		const blockNumber = this.latestBlockHeader().number + BIGINT_1;
+		this.config.logger?.info(`Miner: Warming up ethash cache for block ${blockNumber} (this may take 1-2 minutes on first run)...`);
+		const startTime = Date.now();
+		await this.ethash.loadEpoc(blockNumber);
+		const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+		this.config.logger?.info(`Miner: Ethash cache ready (took ${elapsed}s)`);
 	}
 
 	/**
@@ -149,6 +157,8 @@ export class Miner {
 		this.config.logger?.info(
 			`Miner started. Assembling next block in ${this.period / 1000}s`,
 		);
+		// Pre-warm the ethash cache in the background
+		void this.warmupEthashCache();
 		void this.queueNextAssembly();
 		return true;
 	}
@@ -181,13 +191,7 @@ export class Miner {
 		const parentBlock = this.service.chain.blocks.latest!;
 
 		const number = parentBlock.header.number + BIGINT_1;
-		let { gasLimit } = parentBlock.header;
-
-		// PoW only - wait for solution
-		while (this.nextSolution === undefined) {
-			this.config.logger?.info(`Miner: Waiting to find next PoW solution 🔨`);
-			await new Promise((r) => setTimeout(r, 1000));
-		}
+		const { gasLimit } = parentBlock.header;
 
 		// Use a copy of the vm to not modify the existing state.
 		// The state will be updated when the newly assembled block
@@ -259,8 +263,30 @@ export class Miner {
 			index++;
 		}
 		if (interrupt) return;
-		// Build block, sealing it
-		const { block } = await blockBuilder.build(this.nextSolution);
+		
+		// Build the block first (without PoW seal)
+		const { block: unsealedBlock } = await blockBuilder.build();
+		
+		if (interrupt) return;
+		
+		// Now mine the PoW for the assembled block
+		// The PoW must be computed for THIS block's header, not the parent
+		const solution = await this.findSolutionForBlock(unsealedBlock);
+		if (!solution) {
+			this.config.logger?.error("Miner: Failed to find PoW solution");
+			this.assembling = false;
+			return;
+		}
+		
+		if (interrupt) return;
+		
+		// Create the final sealed block with the PoW solution
+		const { createBlock } = await import("../../block");
+		const sealedBlockData = unsealedBlock.toJSON();
+		sealedBlockData.header!.nonce = bytesToHex(solution.nonce);
+		sealedBlockData.header!.mixHash = bytesToHex(solution.mixHash);
+		const block = createBlock(sealedBlockData, { common: unsealedBlock.common });
+		
 		if (this.config.saveReceipts) {
 			await this.execution.receiptsManager?.saveReceipts(block, receipts);
 		}

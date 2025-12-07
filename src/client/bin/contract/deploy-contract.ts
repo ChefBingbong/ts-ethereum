@@ -11,7 +11,7 @@ import { customChainConfig } from "../test-network.ts";
 import { AccountInfo } from "../types.ts";
 import { getChainId, getBalance, getTransactionCount, getGasPrice, estimateGas, sendRawTransaction, getTransactionReceipt } from "./utils.ts";
 
-const ACCOUNTS_FILE = "./test-network-data/accounts.json";
+const ACCOUNTS_FILE = "../../test-network-data/accounts.json";
 const DEFAULT_RPC = "http://127.0.0.1:8545";
 
 // Simple Storage Contract Bytecode
@@ -210,7 +210,7 @@ async function deployContract(options: {
 
 async function main() {
 	let rpc = DEFAULT_RPC;
-	let accountIndex = 1;
+	let accountIndex = 0;
 	let bytecode = SIMPLE_STORAGE_BYTECODE;
 
 	try {

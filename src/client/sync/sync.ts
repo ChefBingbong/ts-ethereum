@@ -7,7 +7,7 @@ import type { Chain } from '../blockchain'
 import type { Config } from '../config.ts'
 import type { Peer } from '../net/peer/peer.ts'
 import type { PeerPool } from '../net/peerpool.ts'
-import type { AccountFetcher, BlockFetcher, ReverseBlockFetcher } from './fetcher'
+import type { AccountFetcher, BlockFetcher } from './fetcher'
 
 export interface SynchronizerOptions {
   /* Config */
@@ -36,7 +36,7 @@ export abstract class Synchronizer {
   protected interval: number
   protected forceSync: boolean
 
-  public _fetcher: AccountFetcher | BlockFetcher | ReverseBlockFetcher | null
+  public _fetcher: AccountFetcher | BlockFetcher | null
   public opened: boolean
   public running: boolean
   public startingBlock: bigint
@@ -79,11 +79,11 @@ export abstract class Synchronizer {
     return 'sync'
   }
 
-  get fetcher(): AccountFetcher | BlockFetcher | ReverseBlockFetcher | null {
+  get fetcher(): AccountFetcher | BlockFetcher | null {
     return this._fetcher
   }
 
-  set fetcher(fetcher: AccountFetcher | BlockFetcher | ReverseBlockFetcher | null) {
+  set fetcher(fetcher: AccountFetcher | BlockFetcher | null) {
     this._fetcher = fetcher
   }
 

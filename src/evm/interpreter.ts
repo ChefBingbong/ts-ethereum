@@ -14,10 +14,6 @@ import {
     setLengthRight,
 } from '../utils'
 
-import { FORMAT, MAGIC, VERSION } from './eof/constants.ts'
-import { EOFContainerMode, validateEOF } from './eof/container.ts'
-import { setupEOF } from './eof/setup.ts'
-import { ContainerSectionType } from './eof/verify.ts'
 import { EVMError, EVMErrorTypeString } from './errors.ts'
 import { type EVMPerformanceLogger, type Timer } from './logger.ts'
 import { Memory } from './memory.ts'
@@ -216,56 +212,9 @@ export class Interpreter {
   }
 
   async run(code: Uint8Array, opts: InterpreterOpts = {}): Promise<InterpreterResult> {
-    if (!this.common.isActivatedEIP(3540) || code[0] !== FORMAT) {
-      // EIP-3540 isn't active and first byte is not 0xEF - treat as legacy bytecode
-      this._runState.code = code
-    } else if (this.common.isActivatedEIP(3540)) {
-      if (code[1] !== MAGIC) {
-        // Bytecode contains invalid EOF magic byte
-        return {
-          runState: this._runState,
-          exceptionError: new EVMError(EVMError.errorMessages.INVALID_BYTECODE_RESULT),
-        }
-      }
-      if (code[2] !== VERSION) {
-        // Bytecode contains invalid EOF version number
-        return {
-          runState: this._runState,
-          exceptionError: new EVMError(EVMError.errorMessages.INVALID_EOF_FORMAT),
-        }
-      }
-      this._runState.code = code
-
-      const isTxCreate = this._env.isCreate && this._env.depth === 0
-      const eofMode = isTxCreate ? EOFContainerMode.TxInitmode : EOFContainerMode.Default
-
-      try {
-        setupEOF(this._runState, eofMode)
-      } catch {
-        return {
-          runState: this._runState,
-          exceptionError: new EVMError(EVMError.errorMessages.INVALID_EOF_FORMAT), // TODO: verify if all gas should be consumed
-        }
-      }
-
-      if (isTxCreate) {
-        // Tx tries to deploy container
-        try {
-          validateEOF(
-            this._runState.code,
-            this._evm,
-            ContainerSectionType.InitCode,
-            EOFContainerMode.TxInitmode,
-          )
-        } catch {
-          // Trying to deploy an invalid EOF container
-          return {
-            runState: this._runState,
-            exceptionError: new EVMError(EVMError.errorMessages.INVALID_EOF_FORMAT), // TODO: verify if all gas should be consumed
-          }
-        }
-      }
-    }
+    // Frontier: no EOF support (EIP-3540 came later)
+    // Treat all code as legacy bytecode
+    this._runState.code = code
     this._runState.programCounter = opts.pc ?? this._runState.programCounter
     // Check that the programCounter is in range
     const pc = this._runState.programCounter
@@ -307,22 +256,7 @@ export class Interpreter {
         opCode = opCodeObj.opcodeInfo.code
       }
 
-      // if its an invalid opcode with binary activated, then check if its because of a missing code
-      // chunk in the witness, and throw appropriate error to distinguish from an actual invalid opcode
-      if (
-        opCode === 0xfe &&
-        this.common.isActivatedEIP(7864) &&
-        // is this a code loaded from state using witnesses
-        this._runState.env.chargeCodeAccesses === true
-      ) {
-        const contract = this._runState.interpreter.getAddress()
-
-        if (
-          !(await this._runState.stateManager.checkChunkWitnessPresent!(contract, programCounter))
-        ) {
-          throw Error(`Invalid witness with missing codeChunk for pc=${programCounter}`)
-        }
-      }
+      // Frontier: no Verkle/Binary Tree witness checks (EIP-7864 came later)
 
       this._runState.opCode = opCode
 
@@ -395,19 +329,7 @@ export class Interpreter {
         await this._runStepHook(gas, this.getGasLeft(), memorySizeCache)
       }
 
-      if (
-        (this.common.isActivatedEIP(6800) || this.common.isActivatedEIP(7864)) &&
-        this._env.chargeCodeAccesses === true
-      ) {
-        const contract = this._runState.interpreter.getAddress()
-        const statelessGas = this._runState.env.accessWitness!.readAccountCodeChunks(
-          contract,
-          this._runState.programCounter,
-          this._runState.programCounter,
-        )
-        gas += statelessGas
-        debugGas(`codechunk accessed statelessGas=${statelessGas} (-> ${gas})`)
-      }
+      // Frontier: no Verkle code chunk access charges (EIP-6800/7864 came later)
 
       // Check for invalid opcode
       if (opInfo.isInvalid) {
@@ -992,14 +914,8 @@ export class Interpreter {
 
     // empty the return data Uint8Array
     this._runState.returnBytes = new Uint8Array(0)
-    let createdAddresses: Set<PrefixedHexString>
-    if (this.common.isActivatedEIP(6780)) {
-      createdAddresses = new Set(this._result.createdAddresses)
-      msg.createdAddresses = createdAddresses
-    }
 
-    // empty the return data Uint8Array
-    this._runState.returnBytes = new Uint8Array(0)
+    // Frontier: no EIP-6780 createdAddresses tracking
 
     // Check if account has enough ether and max depth not exceeded
     if (
@@ -1030,12 +946,6 @@ export class Interpreter {
     if (!results.execResult.exceptionError) {
       for (const addressToSelfdestructHex of selfdestruct) {
         this._result.selfdestruct.add(addressToSelfdestructHex)
-      }
-      if (this.common.isActivatedEIP(6780)) {
-        // copy over the items to result via iterator
-        for (const item of createdAddresses!) {
-          this._result.createdAddresses!.add(item)
-        }
       }
       // update stateRoot on current contract
       const account = await this._stateManager.getAccount(this._env.address)
@@ -1082,14 +992,7 @@ export class Interpreter {
     this._env.contract.nonce += BIGINT_1
     await this.journal.putAccount(this._env.address, this._env.contract)
 
-    if (this.common.isActivatedEIP(3860)) {
-      if (
-        codeToRun.length > Number(this.common.param('maxInitCodeSize')) &&
-        this._evm.allowUnlimitedInitCodeSize === false
-      ) {
-        return BIGINT_0
-      }
-    }
+    // Frontier: no initcode size limit (EIP-3860 came in Shanghai)
 
     const message = new Message({
       caller,
@@ -1104,11 +1007,7 @@ export class Interpreter {
       accessWitness: this._env.accessWitness,
     })
 
-    let createdAddresses: Set<PrefixedHexString>
-    if (this.common.isActivatedEIP(6780)) {
-      createdAddresses = new Set(this._result.createdAddresses)
-      message.createdAddresses = createdAddresses
-    }
+    // Frontier: no EIP-6780 createdAddresses tracking
 
     const results = await this._evm.runCall({ message })
 
@@ -1133,12 +1032,6 @@ export class Interpreter {
     ) {
       for (const addressToSelfdestructHex of selfdestruct) {
         this._result.selfdestruct.add(addressToSelfdestructHex)
-      }
-      if (this.common.isActivatedEIP(6780)) {
-        // copy over the items to result via iterator
-        for (const item of createdAddresses!) {
-          this._result.createdAddresses!.add(item)
-        }
       }
       // update stateRoot on current contract
       const account = await this._stateManager.getAccount(this._env.address)
@@ -1213,27 +1106,10 @@ export class Interpreter {
       await this.journal.putAccount(toAddress, toAccount)
     }
 
-    // Modify the account (set balance to 0) flag
-    let doModify = !this.common.isActivatedEIP(6780) // Always do this if 6780 is not active
-
-    if (!doModify) {
-      // If 6780 is active, check if current address is being created. If so
-      // old behavior of SELFDESTRUCT exists and balance should be set to 0 of this account
-      // (i.e. burn the ETH in current account)
-      doModify = this._env.createdAddresses!.has(this._env.address.toString())
-      // If contract is not being created in this tx...
-      if (!doModify) {
-        // Check if ETH being sent to another account (thus set balance to 0)
-        doModify = !toSelf
-      }
-    }
-
-    // Set contract balance to 0
-    if (doModify) {
-      await this._stateManager.modifyAccountFields(this._env.address, {
-        balance: BIGINT_0,
-      })
-    }
+    // Frontier: SELFDESTRUCT always sets balance to 0 (no EIP-6780 restrictions)
+    await this._stateManager.modifyAccountFields(this._env.address, {
+      balance: BIGINT_0,
+    })
 
     trap(EVMError.errorMessages.STOP)
   }

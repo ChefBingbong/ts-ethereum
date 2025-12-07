@@ -10,7 +10,6 @@ import { FullSynchronizer } from '../sync'
 import { Event } from '../types.ts'
 
 import { Service } from './service.ts'
-import { Skeleton } from './skeleton.ts'
 import { TxPool } from './txpool.ts'
 
 import type { Block } from '../../block'
@@ -27,7 +26,6 @@ export class FullEthereumService extends Service {
   public declare synchronizer?: FullSynchronizer
   public miner: Miner | undefined
   public txPool: TxPool
-  public skeleton?: Skeleton
 
   public execution: VMExecution
 
@@ -43,14 +41,6 @@ export class FullEthereumService extends Service {
     this.config.logger?.info('Full sync mode')
 
     const { metaDB } = options
-    if (metaDB !== undefined) {
-      this.skeleton = new Skeleton({
-        config: this.config,
-        chain: this.chain,
-        metaDB,
-      })
-    }
-
     this.execution = new VMExecution({
       config: options.config,
       stateDB: options.stateDB,
@@ -104,9 +94,6 @@ export class FullEthereumService extends Service {
       if (txs[0].length > 0) this.txPool.sendNewTxHashes(txs, [peer])
     })
 
-    // skeleton needs to be opened before synchronizers are opened
-    // but after chain is opened, which skeleton.open() does internally
-    await this.skeleton?.open()
     await super.open()
 
     await this.execution.open()

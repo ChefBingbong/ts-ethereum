@@ -18,8 +18,8 @@ const debug = debugDefault("blockchain:#");
 
 export async function createBlockchain(opts: BlockchainOptions = {}) {
 	const blockchain = new Blockchain(opts);
-
 	await blockchain.consensus?.setup({ blockchain });
+
 
 	let stateRoot = opts.genesisBlock?.header.stateRoot ?? opts.genesisStateRoot;
 	if (stateRoot === undefined) {
@@ -101,6 +101,7 @@ export async function createBlockchain(opts: BlockchainOptions = {}) {
 
 	DEBUG &&
 		debug(`genesis block initialized with hash ${bytesToHex(genesisHash!)}`);
+
 
 	return blockchain;
 }
