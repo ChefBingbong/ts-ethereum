@@ -97,7 +97,7 @@ type AddPrecompile = {
 type CustomPrecompile = AddPrecompile | DeletePrecompile
 
 function getActivePrecompiles(
-  common: Common,
+  _common: Common,
   customPrecompiles?: CustomPrecompile[],
 ): Map<string, PrecompileFunc> {
   const precompileMap = new Map()
@@ -109,14 +109,12 @@ function getActivePrecompiles(
       )
     }
   }
+  // Frontier: all 4 precompiles (01-04) are always active
   for (const entry of precompileEntries) {
     if (precompileMap.has(entry.address)) {
       continue
     }
-    // Simplified: all precompiles are from Chainstart
-    if (common.gteHardfork(entry.check.param)) {
-      precompileMap.set(entry.address, entry.precompile)
-    }
+    precompileMap.set(entry.address, entry.precompile)
   }
   return precompileMap
 }

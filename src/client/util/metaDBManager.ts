@@ -11,11 +11,7 @@ export type DBKey = (typeof DBKey)[keyof typeof DBKey]
 export const DBKey = {
   Receipts: 0,
   TxHash: 1,
-  SkeletonBlock: 2,
-  SkeletonBlockHashToNumber: 3,
-  SkeletonStatus: 4,
-  SkeletonUnfinalizedBlockByHash: 5,
-  Preimage: 6,
+  Preimage: 2,
 } as const
 
 export interface MetaDBManagerOptions {

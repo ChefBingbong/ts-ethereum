@@ -14,7 +14,7 @@ export const paramsBlock: ParamsDict = {
 		// format
 		maxExtraDataSize: 32, // Maximum size extra data may be after Genesis
 		// pow
-		minimumDifficulty: 131072, // The minimum that the difficulty may ever be
+		minimumDifficulty: 1000, // The minimum that the difficulty may ever be
 		difficultyBoundDivisor: 2048, // The bound divisor of the difficulty, used in the update calculations
 		durationLimit: 13, // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not
 		difficultyBombDelay: 0, // the amount of blocks to delay the difficulty bomb with

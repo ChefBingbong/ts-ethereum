@@ -176,49 +176,19 @@ export class ETH extends Protocol {
 
   /**
    * Eth 64 Fork ID validation (EIP-2124)
+   * Simplified for Chainstart-only: just verify the fork hash matches
    * @param forkId Remote fork ID
    */
   _validateForkId(forkId: Uint8Array[]) {
-    const c = this._peer.common
-
     const peerForkHash = bytesToHex(forkId[0])
-    const peerNextFork = bytesToBigInt(forkId[1])
 
-    if (this._forkHash === peerForkHash) {
-      // There is a known next fork
-      if (peerNextFork > BIGINT_0) {
-        if (this._latestBlock >= peerNextFork) {
-          const msg = 'Remote is advertising a future fork that passed locally'
-          if (this.DEBUG) {
-            this.debug('STATUS', msg)
-          }
-          throw new Error(msg)
-        }
-      }
-    }
-
-    const peerFork = c.hardforkForForkHash(peerForkHash)
-    if (peerFork === null) {
-      const msg = 'Unknown fork hash'
+    // Chainstart-only: just verify the fork hash matches ours
+    if (this._forkHash !== peerForkHash) {
+      const msg = 'Fork hash mismatch - incompatible chain'
       if (this.DEBUG) {
         this.debug('STATUS', msg)
       }
       throw new Error(msg)
-    }
-
-    if (!c.hardforkGteHardfork(peerFork.name, this._hardfork)) {
-      const nextHardforkBlock = c.nextHardforkBlockOrTimestamp(peerFork.name)
-      if (
-        peerNextFork === null ||
-        nextHardforkBlock === null ||
-        nextHardforkBlock !== peerNextFork
-      ) {
-        const msg = 'Outdated fork status, remote needs software update'
-        if (this.DEBUG) {
-          this.debug('STATUS', msg)
-        }
-        throw new Error(msg)
-      }
     }
   }
 

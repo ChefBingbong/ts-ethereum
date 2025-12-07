@@ -30,6 +30,7 @@ import type { FullEthereumService } from "../service/fullethereumservice.ts";
 import { Event } from "../types.ts";
 import { setupMetrics } from "../util/metrics.ts";
 import { type RPCArgs, startRPCServers } from "./startRPC.ts";
+import { MemoryLevel } from "memory-level";
 
 
 export type Account = [address: Address, privateKey: Uint8Array];
@@ -79,7 +80,7 @@ export const customChainConfig: ChainConfig = {
 			"0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
 	},
 	hardforks: [
-		{ name: "chainstart", block: 0 },
+		{ name: "chainstart", block: 0, },
 	],
 	bootstrapNodes: [],
 };
@@ -291,7 +292,7 @@ async function startClient() {
 		maxFetcherJobs: 100,
 		maxPeers: 25,
 		maxPerRequest: 100,
-		mine: true, // Only bootnode mines initially
+		mine: port === BOOTNODE_PORT ? true : false, // Only bootnode mines initially
 		minerCoinbase: nodeAccount[0], // Mining rewards go to this node's account
 		minPeers: 1,
 		multiaddrs: [],
@@ -332,7 +333,7 @@ async function startClient() {
 
 	// Create consensus with Ethash
 	const consensusDict: ConsensusDict = {
-		[ConsensusAlgorithm.Ethash]: new EthashConsensus(new Ethash()),
+		[ConsensusAlgorithm.Ethash]: new EthashConsensus(new Ethash(new LevelDB() as any)),
 	};
 
 	// Create blockchain with genesis state using our chainDB
@@ -341,7 +342,7 @@ async function startClient() {
 		common,
 		hardforkByHeadBlockNumber: true,
 		validateBlocks: true,
-		validateConsensus: false, // Skip PoW validation for local testing
+		validateConsensus: true, // Skip PoW validation for local testing
 		consensusDict,
 		genesisState,
 	});
