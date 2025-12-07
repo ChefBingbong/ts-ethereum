@@ -64,6 +64,9 @@ export class Miner {
 		// PoW only - use default period
 		this.period = this.DEFAULT_PERIOD * 1000; // defined in ms for setTimeout use
 		this.ethash = new Ethash(new LevelDB(new MemoryLevel()) as any);
+		// PoW only - use default period
+		this.period = this.DEFAULT_PERIOD * 1000; // defined in ms for setTimeout use
+		this.ethash = new Ethash(new LevelDB(new MemoryLevel()) as any);
 	}
 
 	/**
