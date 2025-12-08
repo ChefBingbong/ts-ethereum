@@ -1,8 +1,7 @@
-import { parseKey, parseMultiaddrs } from "../../util/parse.ts";
-
 import type { Multiaddr } from "@multiformats/multiaddr";
 import type { Config } from "../../config.ts";
-import type { DnsNetwork, KeyLike, MultiaddrLike } from "../../types.ts";
+import type { KeyLike, MultiaddrLike } from "../../types.ts";
+import { parseKey, parseMultiaddrs } from "../../util/parse.ts";
 import type { Protocol } from "../protocol/protocol.ts";
 
 export interface ServerOptions {
@@ -17,9 +16,6 @@ export interface ServerOptions {
 
 	/* List of bootnodes to use for discovery */
 	bootnodes?: MultiaddrLike;
-
-	/* DNS record tree to search for discovery */
-	dnsNetworks?: DnsNetwork[];
 }
 
 /**
@@ -30,7 +26,6 @@ export class Server {
 	public config: Config;
 	public key: Uint8Array;
 	public bootnodes: Multiaddr[] = [];
-	public dnsNetworks: DnsNetwork[];
 
 	protected refreshInterval: number;
 	protected protocols: Set<Protocol>;
@@ -46,7 +41,6 @@ export class Server {
 			options.key !== undefined ? parseKey(options.key) : this.config.key;
 		this.bootnodes =
 			options.bootnodes !== undefined ? parseMultiaddrs(options.bootnodes) : [];
-		this.dnsNetworks = options.dnsNetworks ?? [];
 		this.refreshInterval = options.refreshInterval ?? 30000;
 
 		this.protocols = new Set();

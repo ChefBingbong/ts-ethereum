@@ -20,7 +20,6 @@ import {
 	bytesToBigInt,
 	bytesToHex,
 	bytesToInt,
-	EthereumJSErrorWithoutCode,
 	hexToBytes,
 	intToUnpaddedBytes,
 	isNestedUint8Array,
@@ -32,13 +31,12 @@ import {
 	type PreByzantiumTxReceipt,
 	type TxReceipt,
 } from "../../../vm";
-
-import { Protocol } from "./protocol.ts";
-
 import type { Chain } from "../../blockchain";
+import { Protocol } from "./protocol.ts";
 
 // Log type for receipts (simplified - logs are always empty in value-transfer-only mode)
 type Log = [address: Uint8Array, topics: Uint8Array[], data: Uint8Array];
+
 import type { TxReceiptWithType } from "../../execution/receipt.ts";
 import type { Message, ProtocolOptions } from "./protocol.ts";
 

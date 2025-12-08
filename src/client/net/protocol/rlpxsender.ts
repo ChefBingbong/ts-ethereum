@@ -1,6 +1,5 @@
+import type { ETH as Devp2pETH } from "../../../devp2p";
 import { Sender } from "./sender.ts";
-
-import type { ETH as Devp2pETH, SNAP as Devp2pSNAP } from "../../../devp2p";
 
 /**
  * DevP2P/RLPx protocol sender
@@ -9,13 +8,13 @@ import type { ETH as Devp2pETH, SNAP as Devp2pSNAP } from "../../../devp2p";
  * @memberof module:net/protocol
  */
 export class RlpxSender extends Sender {
-	private sender: Devp2pETH | Devp2pSNAP;
+	private sender: Devp2pETH;
 
 	/**
 	 * Creates a new DevP2P/Rlpx protocol sender
 	 * @param rlpxProtocol protocol object from @ethereumjs/devp2p
 	 */
-	constructor(rlpxProtocol: Devp2pETH | Devp2pSNAP) {
+	constructor(rlpxProtocol: Devp2pETH) {
 		super();
 
 		this.sender = rlpxProtocol;

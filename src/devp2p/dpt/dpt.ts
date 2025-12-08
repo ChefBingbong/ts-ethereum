@@ -8,7 +8,6 @@ import {
 	EthereumJSErrorWithoutCode,
 	randomBytes,
 } from "../../utils/index.ts";
-import { DNS } from "../dns/index.ts";
 import type { DPTEvent, DPTOptions, PeerInfo } from "../types.ts";
 import { devp2pDebug, pk2id } from "../util.ts";
 import { BanList } from "./ban-list.ts";
@@ -21,7 +20,6 @@ export class DPT {
 	public events: EventEmitter<DPTEvent>;
 	protected _privateKey: Uint8Array;
 	protected _banlist: BanList;
-	protected _dns: DNS;
 	private _debug: Debugger;
 
 	public readonly id: Uint8Array | undefined;
@@ -30,10 +28,6 @@ export class DPT {
 	protected _refreshIntervalId: NodeJS.Timeout;
 	protected _refreshIntervalSelectionCounter: number = 0;
 	protected _shouldFindNeighbours: boolean;
-	protected _shouldGetDnsPeers: boolean;
-	protected _dnsRefreshQuantity: number;
-	protected _dnsNetworks: string[];
-	protected _dnsAddr: string;
 
 	protected _onlyConfirmed: boolean;
 	protected _confirmedPeers: Set<string>;
@@ -47,18 +41,7 @@ export class DPT {
 		this._privateKey = privateKey;
 		this.id = pk2id(secp256k1.getPublicKey(this._privateKey, false));
 		this._shouldFindNeighbours = options.shouldFindNeighbours ?? true;
-		this._shouldGetDnsPeers = options.shouldGetDnsPeers ?? false;
-		// By default, tries to connect to 12 new peers every 3s
-		this._dnsRefreshQuantity = Math.floor(
-			(options.dnsRefreshQuantity ?? 25) / 2,
-		);
-		this._dnsNetworks = options.dnsNetworks ?? [];
-		this._dnsAddr = options.dnsAddr ?? "8.8.8.8";
 
-		this._dns = new DNS({
-			dnsServerAddress: this._dnsAddr,
-			common: options.common,
-		});
 		this._banlist = new BanList();
 
 		this._onlyConfirmed = options.onlyConfirmed ?? false;
@@ -285,10 +268,6 @@ export class DPT {
 		this._kbucket.remove(obj);
 	}
 
-	async getDnsPeers(): Promise<PeerInfo[]> {
-		return this._dns.getPeers(this._dnsRefreshQuantity, this._dnsNetworks);
-	}
-
 	async refresh(): Promise<void> {
 		if (this._shouldFindNeighbours) {
 			// Rotating selection counter going in loop from 0..9
@@ -318,20 +297,6 @@ export class DPT {
 					this._server.findneighbours(peer, randomBytes(64));
 				}
 			}
-		}
-
-		if (this._shouldGetDnsPeers) {
-			const dnsPeers = await this.getDnsPeers();
-
-			if (this.DEBUG) {
-				this._debug(
-					`.refresh() Adding ${dnsPeers.length} from DNS tree, (${
-						this.getPeers().length
-					} current peers in table)`,
-				);
-			}
-
-			this._addPeerBatch(dnsPeers);
 		}
 	}
 }

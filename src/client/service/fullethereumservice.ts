@@ -1,20 +1,17 @@
+import type { Block } from "../../block";
 import { concatBytes } from "../../utils";
 import { encodeReceipt } from "../../vm";
-
 import { SyncMode } from "../config.ts";
 import { VMExecution } from "../execution";
 import { Miner } from "../miner";
+import type { Peer } from "../net/peer/peer.ts";
+import type { Protocol } from "../net/protocol";
 import { EthProtocol } from "../net/protocol/ethprotocol.ts";
 import { FullSynchronizer } from "../sync";
 import { Event } from "../types.ts";
-
+import type { ServiceOptions } from "./service.ts";
 import { Service } from "./service.ts";
 import { TxPool } from "./txpool.ts";
-
-import type { Block } from "../../block";
-import type { Peer } from "../net/peer/peer.ts";
-import type { Protocol } from "../net/protocol";
-import type { ServiceOptions } from "./service.ts";
 
 /**
  * Full Ethereum service
@@ -239,6 +236,8 @@ export class FullEthereumService extends Service {
 				break;
 			}
 			case "NewBlockHashes": {
+				console.log(message);
+
 				if (this.synchronizer instanceof FullSynchronizer) {
 					this.synchronizer.handleNewBlockHashes(message.data);
 				}
@@ -250,6 +249,7 @@ export class FullEthereumService extends Service {
 			}
 			case "NewBlock": {
 				if (this.synchronizer instanceof FullSynchronizer) {
+					console.log(message);
 					await this.synchronizer.handleNewBlock(message.data[0], peer);
 				}
 				break;

@@ -32,9 +32,7 @@ export function getNetConfig(ma: Multiaddr): NetConfig {
 	}
 
 	if (config.type == null || config.host == null) {
-		throw new Error(
-			`Multiaddr ${ma} was not an IPv4, IPv6, DNS, DNS4, DNS6 or DNSADDR address`,
-		);
+		throw new Error(`Multiaddr ${ma} was not an IPv4, IPv6, address`);
 	}
 
 	if (

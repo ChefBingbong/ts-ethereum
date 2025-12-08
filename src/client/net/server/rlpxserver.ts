@@ -68,7 +68,7 @@ export class RlpxServer extends Server {
 		// As of now, the devp2p dpt server listens on the ip4 protocol by default and hence the ip in the
 		// bootnode needs to be of ip4 by default
 		this.ip = options.config.extIP ?? "127.0.0.1";
-		this.discovery = options.config.discV4 || options.config.discDns;
+		this.discovery = options.config.discV4;
 		this.clientFilter = options.clientFilter ?? [
 			"go1.5",
 			"go1.6",
@@ -135,12 +135,9 @@ export class RlpxServer extends Server {
 	}
 
 	/**
-	 * Bootstrap bootnode and DNS mapped peers from the network
+	 * Bootstrap bootnode from the network
 	 */
 	async bootstrap(): Promise<void> {
-		// eslint-disable-next-line @typescript-eslint/no-this-alias
-		const self = this;
-
 		// Bootnodes
 		let promises = this.bootnodes.map((ma) => {
 			const { host, port } = getHostPortFromMultiaddr(ma);
@@ -151,14 +148,6 @@ export class RlpxServer extends Server {
 			};
 			return this.dpt!.bootstrap(bootnode);
 		});
-
-		// DNS peers
-		if (this.config.discDns) {
-			const dnsPeers = (await this.dpt?.getDnsPeers()) ?? [];
-			promises = promises.concat(
-				dnsPeers.map((node) => self.dpt!.bootstrap(node)),
-			);
-		}
 
 		for (const promise of promises) {
 			try {
@@ -223,10 +212,6 @@ export class RlpxServer extends Server {
 				},
 				onlyConfirmed: false,
 				shouldFindNeighbours: this.config.discV4,
-				shouldGetDnsPeers: this.config.discDns,
-				dnsRefreshQuantity: this.config.maxPeers,
-				dnsNetworks: this.dnsNetworks,
-				dnsAddr: this.config.dnsAddr,
 				common: this.config.chainCommon,
 			});
 
@@ -248,7 +233,7 @@ export class RlpxServer extends Server {
 				this.dpt.bind(this.config.port, "127.0.0.1");
 			}
 			this.config.logger?.info(
-				`Started discovery service discV4=${this.config.discV4} dns=${this.config.discDns} refreshInterval=${this.refreshInterval}`,
+				`Started discovery service discV4=${this.config.discV4}  refreshInterval=${this.refreshInterval}`,
 			);
 		});
 	}

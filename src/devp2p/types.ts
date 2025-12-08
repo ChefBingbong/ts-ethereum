@@ -4,7 +4,6 @@ import type { NestedUint8Array } from "../rlp";
 import type { DPT } from "./dpt/index.ts";
 import type { EthMessageCodes } from "./protocol/eth.ts";
 import type { Protocol } from "./protocol/protocol.ts";
-import type { SnapMessageCodes } from "./protocol/snap.ts";
 import type { Peer } from "./rlpx/peer.ts";
 
 export interface RLPxEvent {
@@ -23,10 +22,7 @@ export interface PeerEvent {
 }
 
 export interface ProtocolEvent {
-	message: [
-		code: SnapMessageCodes | EthMessageCodes,
-		payload: Uint8Array | NestedUint8Array,
-	];
+	message: [code: EthMessageCodes, payload: Uint8Array | NestedUint8Array];
 	status: {
 		chainId: Uint8Array | Uint8Array[];
 		td: Uint8Array;
@@ -98,21 +94,6 @@ export const DisconnectReasonNames: { [key in DISCONNECT_REASON]: string } =
 		{} as { [key in DISCONNECT_REASON]: string },
 	);
 
-export type DNSOptions = {
-	/**
-	 * ipv4 or ipv6 address of server to pass to native dns.setServers()
-	 * Sets the IP address of servers to be used when performing
-	 * DNS resolution.
-	 * @type {string}
-	 */
-	dnsServerAddress?: string;
-
-	/**
-	 * Common instance to allow for crypto primitive (e.g. keccak) replacement
-	 */
-	common?: Common;
-};
-
 export interface DPTOptions {
 	/**
 	 * Timeout for peer requests
@@ -163,33 +144,6 @@ export interface DPTOptions {
 	onlyConfirmed?: boolean;
 
 	/**
-	 * Toggles whether or not peers should be discovered by querying EIP-1459 DNS lists
-	 *
-	 * Default: false
-	 */
-	shouldGetDnsPeers?: boolean;
-
-	/**
-	 * Max number of candidate peers to retrieve from DNS records when
-	 * attempting to discover new nodes
-	 *
-	 * Default: 25
-	 */
-	dnsRefreshQuantity?: number;
-
-	/**
-	 * EIP-1459 ENR tree urls to query for peer discovery
-	 *
-	 * Default: (network dependent)
-	 */
-	dnsNetworks?: string[];
-
-	/**
-	 * DNS server to query DNS TXT records from for peer discovery
-	 */
-	dnsAddr?: string;
-
-	/**
 	 * Common instance to allow for crypto primitive (e.g. keccak) replacement
 	 */
 	common?: Common;
@@ -227,7 +181,6 @@ export type ProtocolType = (typeof ProtocolType)[keyof typeof ProtocolType];
 
 export const ProtocolType = {
 	ETH: "eth",
-	SNAP: "snap",
 } as const;
 
 export interface KBucketOptions {

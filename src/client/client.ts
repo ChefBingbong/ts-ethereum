@@ -1,13 +1,12 @@
-import { Chain } from "./blockchain";
-import { FullEthereumService } from "./service";
-import { Event } from "./types.ts";
-import { getPackageJSON } from "./util";
-
 import type { AbstractLevel } from "abstract-level";
 import type { Blockchain } from "../blockchain";
 import type { GenesisState } from "../chain-config";
+import { Chain } from "./blockchain";
 import type { Config } from "./config.ts";
+import { FullEthereumService } from "./service";
 import type { MultiaddrLike } from "./types.ts";
+import { Event } from "./types.ts";
+import { getPackageJSON } from "./util";
 
 export interface EthereumClientOptions {
 	/** Client configuration */
@@ -152,9 +151,6 @@ export class EthereumClient {
 			this.config.server.started &&
 			(await this.config.server.bootstrap());
 
-		setInterval(() => {
-			this.config.updateSynchronizedState(this.chain.headers.latest);
-		}, 15000);
 		this.started = true;
 	}
 

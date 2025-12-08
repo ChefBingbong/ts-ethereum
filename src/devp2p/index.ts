@@ -1,4 +1,3 @@
-export * from "./dns";
 export * from "./dpt/index.ts";
 export * from "./protocol";
 export * from "./rlpx";
