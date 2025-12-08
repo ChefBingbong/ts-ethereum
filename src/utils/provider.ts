@@ -1,9 +1,9 @@
-import { EthereumJSErrorWithoutCode } from "./helpers"
+import { EthereumJSErrorWithoutCode } from "./helpers";
 
 type rpcParams = {
-  method: string
-  params: (string | string[] | boolean | number)[]
-}
+	method: string;
+	params: (string | string[] | boolean | number)[];
+};
 
 /**
  * Makes a simple RPC call to a remote Ethereum JSON-RPC provider and passes through the response.
@@ -24,39 +24,39 @@ type rpcParams = {
  * ```
  */
 export const fetchFromProvider = async (url: string, params: rpcParams) => {
-  const data = JSON.stringify({
-    method: params.method,
-    params: params.params,
-    jsonrpc: '2.0',
-    id: 1,
-  })
+	const data = JSON.stringify({
+		method: params.method,
+		params: params.params,
+		jsonrpc: "2.0",
+		id: 1,
+	});
 
-  const res = await fetch(url, {
-    headers: {
-      'content-type': 'application/json',
-    },
-    method: 'POST',
-    body: data,
-  })
-  if (!res.ok) {
-    throw EthereumJSErrorWithoutCode(
-      `JSONRPCError: ${JSON.stringify(
-        {
-          method: params.method,
-          status: res.status,
-          message: await res.text().catch(() => {
-            return 'Could not parse error message likely because of a network error'
-          }),
-        },
-        null,
-        2,
-      )}`,
-    )
-  }
-  const json = await res.json() as any
-  // TODO we should check json.error here
-  return json.result
-}
+	const res = await fetch(url, {
+		headers: {
+			"content-type": "application/json",
+		},
+		method: "POST",
+		body: data,
+	});
+	if (!res.ok) {
+		throw EthereumJSErrorWithoutCode(
+			`JSONRPCError: ${JSON.stringify(
+				{
+					method: params.method,
+					status: res.status,
+					message: await res.text().catch(() => {
+						return "Could not parse error message likely because of a network error";
+					}),
+				},
+				null,
+				2,
+			)}`,
+		);
+	}
+	const json = (await res.json()) as any;
+	// TODO we should check json.error here
+	return json.result;
+};
 
 /**
  *
@@ -64,14 +64,19 @@ export const fetchFromProvider = async (url: string, params: rpcParams) => {
  * @returns the extracted URL string for the JSON-RPC Provider
  */
 export const getProvider = (provider: string | EthersProvider) => {
-  if (typeof provider === 'string') {
-    return provider
-  } else if (typeof provider === 'object' && provider._getConnection !== undefined) {
-    return provider._getConnection().url
-  } else {
-    throw EthereumJSErrorWithoutCode('Must provide valid provider URL or Web3Provider')
-  }
-}
+	if (typeof provider === "string") {
+		return provider;
+	} else if (
+		typeof provider === "object" &&
+		provider._getConnection !== undefined
+	) {
+		return provider._getConnection().url;
+	} else {
+		throw EthereumJSErrorWithoutCode(
+			"Must provide valid provider URL or Web3Provider",
+		);
+	}
+};
 
 /**
  * A partial interface for an `ethers` `JSONRPCProvider`
@@ -79,7 +84,7 @@ export const getProvider = (provider: string | EthersProvider) => {
  * retrieve the necessary data
  */
 export interface EthersProvider {
-  _getConnection: () => {
-    url: string
-  }
+	_getConnection: () => {
+		url: string;
+	};
 }

@@ -1,4 +1,4 @@
-import type { Block } from '..'
+import type { Block } from "..";
 
 /**
  * Returns the canonical difficulty for this block.
@@ -6,6 +6,9 @@ import type { Block } from '..'
  * @param block - the block whose difficulty should be calculated
  * @param parentBlock - the parent of this `Block`
  */
-export function ethashCanonicalDifficulty(block: Block, parentBlock: Block): bigint {
-  return block.header.ethashCanonicalDifficulty(parentBlock.header)
+export function ethashCanonicalDifficulty(
+	block: Block,
+	parentBlock: Block,
+): bigint {
+	return block.header.ethashCanonicalDifficulty(parentBlock.header);
 }

@@ -1,16 +1,20 @@
-import { EthereumJSErrorWithoutCode, fetchFromProvider, getProvider } from '../utils'
+import {
+	EthereumJSErrorWithoutCode,
+	fetchFromProvider,
+	getProvider,
+} from "../utils";
 
 import {
-  createLegacyTx,
-  createLegacyTxFromBytesArray,
-  createLegacyTxFromRLP,
-} from './legacy/constructors.ts'
-import { TransactionType } from './types.ts'
-import { normalizeTxParams } from './util/general.ts'
+	createLegacyTx,
+	createLegacyTxFromBytesArray,
+	createLegacyTxFromRLP,
+} from "./legacy/constructors.ts";
+import { TransactionType } from "./types.ts";
+import { normalizeTxParams } from "./util/general.ts";
 
-import type { EthersProvider } from '../utils'
-import type { LegacyTx } from './legacy/tx.ts'
-import type { LegacyTxData, TxOptions } from './types.ts'
+import type { EthersProvider } from "../utils";
+import type { LegacyTx } from "./legacy/tx.ts";
+import type { LegacyTxData, TxOptions } from "./types.ts";
 
 /**
  * Create a transaction from a `txData` object
@@ -20,10 +24,10 @@ import type { LegacyTxData, TxOptions } from './types.ts'
  * @param txOptions - Options to pass on to the constructor of the transaction
  */
 export function createTx(
-  txData: LegacyTxData,
-  txOptions: TxOptions = {},
+	txData: LegacyTxData,
+	txOptions: TxOptions = {},
 ): LegacyTx {
-  return createLegacyTx(txData, txOptions)
+	return createLegacyTx(txData, txOptions);
 }
 
 /**
@@ -34,16 +38,16 @@ export function createTx(
  * @param txOptions - The transaction options
  */
 export function createTxFromRLP(
-  data: Uint8Array,
-  txOptions: TxOptions = {},
+	data: Uint8Array,
+	txOptions: TxOptions = {},
 ): LegacyTx {
-  if (data[0] <= 0x7f) {
-    // Typed transactions are not supported
-    throw EthereumJSErrorWithoutCode(
-      `Typed transactions are not supported. Only legacy transactions (type 0) are allowed.`,
-    )
-  }
-  return createLegacyTxFromRLP(data, txOptions)
+	if (data[0] <= 0x7f) {
+		// Typed transactions are not supported
+		throw EthereumJSErrorWithoutCode(
+			`Typed transactions are not supported. Only legacy transactions (type 0) are allowed.`,
+		);
+	}
+	return createLegacyTxFromRLP(data, txOptions);
 }
 
 /**
@@ -56,23 +60,25 @@ export function createTxFromRLP(
  * @param txOptions - The transaction options
  */
 export function createTxFromBlockBodyData(
-  data: Uint8Array | Uint8Array[],
-  txOptions: TxOptions = {},
+	data: Uint8Array | Uint8Array[],
+	txOptions: TxOptions = {},
 ): LegacyTx {
-  if (data instanceof Uint8Array) {
-    // Check if it might be a typed transaction
-    if (data[0] <= 0x7f) {
-      throw EthereumJSErrorWithoutCode(
-        `Typed transactions are not supported. Only legacy transactions (type 0) are allowed.`,
-      )
-    }
-    return createTxFromRLP(data, txOptions)
-  } else if (Array.isArray(data)) {
-    // It is a legacy transaction
-    return createLegacyTxFromBytesArray(data, txOptions)
-  } else {
-    throw EthereumJSErrorWithoutCode('Cannot decode transaction: unknown type input')
-  }
+	if (data instanceof Uint8Array) {
+		// Check if it might be a typed transaction
+		if (data[0] <= 0x7f) {
+			throw EthereumJSErrorWithoutCode(
+				`Typed transactions are not supported. Only legacy transactions (type 0) are allowed.`,
+			);
+		}
+		return createTxFromRLP(data, txOptions);
+	} else if (Array.isArray(data)) {
+		// It is a legacy transaction
+		return createLegacyTxFromBytesArray(data, txOptions);
+	} else {
+		throw EthereumJSErrorWithoutCode(
+			"Cannot decode transaction: unknown type input",
+		);
+	}
 }
 
 /**
@@ -83,17 +89,20 @@ export function createTxFromBlockBodyData(
  * @returns A promise that resolves with the instantiated transaction
  */
 export async function createTxFromRPC(
-  txData: LegacyTxData,
-  txOptions: TxOptions = {},
+	txData: LegacyTxData,
+	txOptions: TxOptions = {},
 ): Promise<LegacyTx> {
-  const normalizedData = normalizeTxParams(txData)
-  // Verify it's a legacy transaction
-  if (normalizedData.type !== undefined && normalizedData.type !== TransactionType.Legacy) {
-    throw EthereumJSErrorWithoutCode(
-      `Only legacy transactions (type 0) are supported. Got type: ${normalizedData.type}`,
-    )
-  }
-  return createTx(normalizedData, txOptions)
+	const normalizedData = normalizeTxParams(txData);
+	// Verify it's a legacy transaction
+	if (
+		normalizedData.type !== undefined &&
+		normalizedData.type !== TransactionType.Legacy
+	) {
+		throw EthereumJSErrorWithoutCode(
+			`Only legacy transactions (type 0) are supported. Got type: ${normalizedData.type}`,
+		);
+	}
+	return createTx(normalizedData, txOptions);
 }
 
 /**
@@ -104,17 +113,17 @@ export async function createTxFromRPC(
  * @returns the transaction specified by `txHash`
  */
 export async function createTxFromJSONRPCProvider(
-  provider: string | EthersProvider,
-  txHash: string,
-  txOptions?: TxOptions,
+	provider: string | EthersProvider,
+	txHash: string,
+	txOptions?: TxOptions,
 ): Promise<LegacyTx> {
-  const prov = getProvider(provider)
-  const txData = await fetchFromProvider(prov, {
-    method: 'eth_getTransactionByHash',
-    params: [txHash],
-  })
-  if (txData === null) {
-    throw EthereumJSErrorWithoutCode('No data returned from provider')
-  }
-  return createTxFromRPC(txData, txOptions)
+	const prov = getProvider(provider);
+	const txData = await fetchFromProvider(prov, {
+		method: "eth_getTransactionByHash",
+		params: [txHash],
+	});
+	if (txData === null) {
+		throw EthereumJSErrorWithoutCode("No data returned from provider");
+	}
+	return createTxFromRPC(txData, txOptions);
 }

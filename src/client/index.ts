@@ -1,2 +1,2 @@
-export { EthereumClient } from './client.ts'
-export * from './config.ts'
+export { EthereumClient } from "./client.ts";
+export * from "./config.ts";

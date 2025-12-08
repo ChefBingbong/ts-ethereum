@@ -1,1 +1,1 @@
-declare module 'multiaddr/src/convert.ts'
+declare module "multiaddr/src/convert.ts";

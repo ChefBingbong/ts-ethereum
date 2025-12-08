@@ -70,4 +70,3 @@ export function incrementNonce(
 		nonce: account.nonce + BigInt(1),
 	});
 }
-

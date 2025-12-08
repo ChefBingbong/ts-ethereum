@@ -1,33 +1,43 @@
-import type { PrefixedHexString } from '../utils'
-import type { BinaryStemAccessEvent, BinaryStemMeta } from './binaryTreeAccessWitness.ts'
+import type { PrefixedHexString } from "../utils";
+import type {
+	BinaryStemAccessEvent,
+	BinaryStemMeta,
+} from "./binaryTreeAccessWitness.ts";
 
 /**
  * Simple cache for binary tree stem access events.
  * Used by BinaryTreeAccessWitness for Verkle tree stateless Ethereum.
  */
 export class StemCache {
-  private cache: Map<PrefixedHexString, BinaryStemAccessEvent & BinaryStemMeta> = new Map()
+	private cache: Map<
+		PrefixedHexString,
+		BinaryStemAccessEvent & BinaryStemMeta
+	> = new Map();
 
-  get(key: PrefixedHexString): (BinaryStemAccessEvent & BinaryStemMeta) | undefined {
-    return this.cache.get(key)
-  }
+	get(
+		key: PrefixedHexString,
+	): (BinaryStemAccessEvent & BinaryStemMeta) | undefined {
+		return this.cache.get(key);
+	}
 
-  set(key: PrefixedHexString, value: BinaryStemAccessEvent & BinaryStemMeta): void {
-    this.cache.set(key, value)
-  }
+	set(
+		key: PrefixedHexString,
+		value: BinaryStemAccessEvent & BinaryStemMeta,
+	): void {
+		this.cache.set(key, value);
+	}
 
-  commit(): Map<PrefixedHexString, BinaryStemAccessEvent & BinaryStemMeta> {
-    const committed = new Map(this.cache)
-    this.cache.clear()
-    return committed
-  }
+	commit(): Map<PrefixedHexString, BinaryStemAccessEvent & BinaryStemMeta> {
+		const committed = new Map(this.cache);
+		this.cache.clear();
+		return committed;
+	}
 
-  clear(): void {
-    this.cache.clear()
-  }
+	clear(): void {
+		this.cache.clear();
+	}
 
-  size(): number {
-    return this.cache.size
-  }
+	size(): number {
+		return this.cache.size;
+	}
 }
-

@@ -1,4 +1,4 @@
-import type { Nibbles } from '../types.ts'
+import type { Nibbles } from "../types.ts";
 
 /**
  * Prepends hex prefix to an array of nibbles.
@@ -6,20 +6,20 @@ import type { Nibbles } from '../types.ts'
  * @returns returns buffer of encoded data
  **/
 export function addHexPrefix(key: Nibbles, terminator: boolean): Nibbles {
-  // odd
-  if (key.length % 2) {
-    key.unshift(1)
-  } else {
-    // even
-    key.unshift(0)
-    key.unshift(0)
-  }
+	// odd
+	if (key.length % 2) {
+		key.unshift(1);
+	} else {
+		// even
+		key.unshift(0);
+		key.unshift(0);
+	}
 
-  if (terminator) {
-    key[0] += 2
-  }
+	if (terminator) {
+		key[0] += 2;
+	}
 
-  return key
+	return key;
 }
 
 /**
@@ -28,13 +28,13 @@ export function addHexPrefix(key: Nibbles, terminator: boolean): Nibbles {
  * @private
  */
 export function removeHexPrefix(val: Nibbles): Nibbles {
-  if (val[0] % 2) {
-    val = val.slice(1)
-  } else {
-    val = val.slice(2)
-  }
+	if (val[0] % 2) {
+		val = val.slice(1);
+	} else {
+		val = val.slice(2);
+	}
 
-  return val
+	return val;
 }
 
 /**
@@ -43,5 +43,5 @@ export function removeHexPrefix(val: Nibbles): Nibbles {
  * @private
  */
 export function isTerminator(key: Nibbles): boolean {
-  return key[0] > 1
+	return key[0] > 1;
 }

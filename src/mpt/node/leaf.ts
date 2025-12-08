@@ -1,13 +1,13 @@
-import { ExtensionOrLeafMPTNodeBase } from './extensionOrLeafNodeBase.ts'
+import { ExtensionOrLeafMPTNodeBase } from "./extensionOrLeafNodeBase.ts";
 
-import type { Nibbles, RawLeafMPTNode } from '../types.ts'
+import type { Nibbles, RawLeafMPTNode } from "../types.ts";
 
 export class LeafMPTNode extends ExtensionOrLeafMPTNodeBase {
-  constructor(nibbles: Nibbles, value: Uint8Array) {
-    super(nibbles, value, true)
-  }
+	constructor(nibbles: Nibbles, value: Uint8Array) {
+		super(nibbles, value, true);
+	}
 
-  override raw(): RawLeafMPTNode {
-    return super.raw()
-  }
+	override raw(): RawLeafMPTNode {
+		return super.raw();
+	}
 }

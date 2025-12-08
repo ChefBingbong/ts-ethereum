@@ -2,11 +2,7 @@ import * as RLP from "../rlp/index.ts";
 
 import type { TypedTransaction } from "../tx/types.ts";
 import type { PrefixedHexString } from "../utils/index.ts";
-import {
-  isHexString,
-  toType,
-  TypeOutput,
-} from "../utils/index.ts";
+import { isHexString, toType, TypeOutput } from "../utils/index.ts";
 import type { BlockHeaderBytes, HeaderData } from "./types.ts";
 
 /**

@@ -118,7 +118,9 @@ export class Miner {
 		const headerHash = this.headerHash;
 		const { number, difficulty } = this.blockHeader;
 
-		console.log(`[Miner] Starting PoW search for block ${number}, difficulty: ${difficulty}`);
+		console.log(
+			`[Miner] Starting PoW search for block ${number}, difficulty: ${difficulty}`,
+		);
 		await this.ethash.loadEpoc(number);
 		console.log(`[Miner] Epoch loaded, starting nonce iteration...`);
 
@@ -159,8 +161,12 @@ export class Miner {
 			// Log progress every 10 seconds
 			const now = Date.now();
 			if (now - lastLogTime >= 10000) {
-				const hashesPerSecond = Number(this.currentNonce - lastLogNonce) / ((now - lastLogTime) / 1000);
-				console.log(`[Miner] Mining progress: ${this.currentNonce} nonces tried (${hashesPerSecond.toFixed(0)} H/s)`);
+				const hashesPerSecond =
+					Number(this.currentNonce - lastLogNonce) /
+					((now - lastLogTime) / 1000);
+				console.log(
+					`[Miner] Mining progress: ${this.currentNonce} nonces tried (${hashesPerSecond.toFixed(0)} H/s)`,
+				);
 				lastLogNonce = this.currentNonce;
 				lastLogTime = now;
 			}
@@ -350,17 +356,23 @@ export class Ethash {
 			};
 		}
 		if (!data) {
-			console.log(`[Ethash] No cached data found, generating cache for epoch ${epoc}...`);
+			console.log(
+				`[Ethash] No cached data found, generating cache for epoch ${epoc}...`,
+			);
 			const startTime = Date.now();
 			this.cacheSize = await getCacheSize(epoc);
 			this.fullSize = await getFullSize(epoc);
-			console.log(`[Ethash] Cache size: ${this.cacheSize}, Full size: ${this.fullSize}`);
+			console.log(
+				`[Ethash] Cache size: ${this.cacheSize}, Full size: ${this.fullSize}`,
+			);
 
 			const [seed, foundEpoc] = await findLastSeed(epoc);
 			this.seed = getSeed(seed, foundEpoc, epoc);
 			console.log(`[Ethash] Generating cache (this may take 1-2 minutes)...`);
 			const cache = this.mkcache(this.cacheSize!, this.seed!);
-			console.log(`[Ethash] Cache generated in ${((Date.now() - startTime) / 1000).toFixed(1)}s, saving to DB...`);
+			console.log(
+				`[Ethash] Cache generated in ${((Date.now() - startTime) / 1000).toFixed(1)}s, saving to DB...`,
+			);
 			// store the generated cache
 			await this.cacheDB!.put(
 				epoc,

@@ -1,9 +1,9 @@
-import { bytesToHex } from '../../utils'
+import { bytesToHex } from "../../utils";
 
-import { DataDirectory } from '..'
+import { DataDirectory } from "..";
 
-import type { Block } from '../../block'
-import type { VMExecution } from '../execution'
+import type { Block } from "../../block";
+import type { VMExecution } from "../execution";
 
 /**
  * Generates a code snippet which can be used to replay an erroneous block
@@ -11,8 +11,11 @@ import type { VMExecution } from '../execution'
  *
  * @param block
  */
-export async function debugCodeReplayBlock(execution: VMExecution, block: Block) {
-  const code = `
+export async function debugCodeReplayBlock(
+	execution: VMExecution,
+	block: Block,
+) {
+	const code = `
 /**
  * Script for locally executing a block in the EthereumJS VM,
  * meant to be used from packages/vm directory within the
@@ -35,8 +38,8 @@ import { Blockchain } from '../../blockchain'
 
 const main = async () => {
   const common = new Common({ chain: '${execution.config.execCommon.chainName()}', hardfork: '${
-    execution.hardfork
-  }' })
+		execution.hardfork
+	}' })
   const block = createBlockFromRLP(hexToBytes('${bytesToHex(block.serialize())}'), { common })
 
   const stateDB = new Level('${execution.config.getDataDirectory(DataDirectory.State)}')
@@ -44,8 +47,8 @@ const main = async () => {
   const stateManager = new MerkleStateManager({ trie, common })
   // Ensure we run on the right root
   stateManager.setStateRoot(hexToBytes('${bytesToHex(
-    await execution.vm.stateManager.getStateRoot(),
-  )}'))
+		await execution.vm.stateManager.getStateRoot(),
+	)}'))
 
 
   const chainDB = new Level('${execution.config.getDataDirectory(DataDirectory.Chain)}')
@@ -61,6 +64,6 @@ const main = async () => {
 }
 
 main()
-    `
-  execution.config.logger?.info(code)
+    `;
+	execution.config.logger?.info(code);
 }

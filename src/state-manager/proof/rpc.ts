@@ -1,7 +1,7 @@
-import { bytesToHex, fetchFromProvider } from '../../utils'
+import { bytesToHex, fetchFromProvider } from "../../utils";
 
-import type { Proof, RPCStateManager } from '..'
-import type { Address } from '../../utils'
+import type { Proof, RPCStateManager } from "..";
+import type { Address } from "../../utils";
 
 /**
  * Get an EIP-1186 proof from the provider
@@ -10,15 +10,16 @@ import type { Address } from '../../utils'
  * @returns an EIP-1186 formatted proof
  */
 export async function getRPCStateProof(
-  sm: RPCStateManager,
-  address: Address,
-  storageSlots: Uint8Array[] = [],
+	sm: RPCStateManager,
+	address: Address,
+	storageSlots: Uint8Array[] = [],
 ): Promise<Proof> {
-  if (sm['DEBUG']) sm['_debug'](`retrieving proof from provider for ${address.toString()}`)
-  const proof = await fetchFromProvider(sm['_provider'], {
-    method: 'eth_getProof',
-    params: [address.toString(), storageSlots.map(bytesToHex), sm['_blockTag']],
-  })
+	if (sm["DEBUG"])
+		sm["_debug"](`retrieving proof from provider for ${address.toString()}`);
+	const proof = await fetchFromProvider(sm["_provider"], {
+		method: "eth_getProof",
+		params: [address.toString(), storageSlots.map(bytesToHex), sm["_blockTag"]],
+	});
 
-  return proof
+	return proof;
 }

@@ -88,14 +88,14 @@ export function stringifyWithBigInt(value: unknown, space?: number) {
 
 export function parseWithBigInt(jsonString: string): unknown {
 	return JSON.parse(jsonString, (_key, value) => {
-	  if (typeof value === 'string' && /^\d+$/.test(value)) {
-		try {
-		  const num = BigInt(value);
-		  if (num > Number.MAX_SAFE_INTEGER || num < Number.MIN_SAFE_INTEGER) {
-			return num;
-		  }
-		} catch {}
-	  }
-	  return value;
+		if (typeof value === "string" && /^\d+$/.test(value)) {
+			try {
+				const num = BigInt(value);
+				if (num > Number.MAX_SAFE_INTEGER || num < Number.MIN_SAFE_INTEGER) {
+					return num;
+				}
+			} catch {}
+		}
+		return value;
 	});
-  }
+}

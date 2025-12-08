@@ -1,5 +1,5 @@
 /**
  * @module sync
  */
-export * from './fullsync.ts'
-export * from './sync.ts'
+export * from "./fullsync.ts";
+export * from "./sync.ts";

@@ -1,3 +1,3 @@
-'use strict'
+"use strict";
 
-export * from './qheap.ts'
+export * from "./qheap.ts";

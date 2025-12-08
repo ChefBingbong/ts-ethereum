@@ -1,3 +1,3 @@
-'use strict'
+"use strict";
 
-export * from './kbucket.ts'
+export * from "./kbucket.ts";

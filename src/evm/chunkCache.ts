@@ -1,33 +1,32 @@
-import type { PrefixedHexString } from '../utils'
-import type { BinaryChunkAccessEvent } from './binaryTreeAccessWitness.ts'
+import type { PrefixedHexString } from "../utils";
+import type { BinaryChunkAccessEvent } from "./binaryTreeAccessWitness.ts";
 
 /**
  * Simple cache for binary tree chunk access events.
  * Used by BinaryTreeAccessWitness for Verkle tree stateless Ethereum.
  */
 export class ChunkCache {
-  private cache: Map<PrefixedHexString, BinaryChunkAccessEvent> = new Map()
+	private cache: Map<PrefixedHexString, BinaryChunkAccessEvent> = new Map();
 
-  get(key: PrefixedHexString): BinaryChunkAccessEvent | undefined {
-    return this.cache.get(key)
-  }
+	get(key: PrefixedHexString): BinaryChunkAccessEvent | undefined {
+		return this.cache.get(key);
+	}
 
-  set(key: PrefixedHexString, value: BinaryChunkAccessEvent): void {
-    this.cache.set(key, value)
-  }
+	set(key: PrefixedHexString, value: BinaryChunkAccessEvent): void {
+		this.cache.set(key, value);
+	}
 
-  commit(): Map<PrefixedHexString, BinaryChunkAccessEvent> {
-    const committed = new Map(this.cache)
-    this.cache.clear()
-    return committed
-  }
+	commit(): Map<PrefixedHexString, BinaryChunkAccessEvent> {
+		const committed = new Map(this.cache);
+		this.cache.clear();
+		return committed;
+	}
 
-  clear(): void {
-    this.cache.clear()
-  }
+	clear(): void {
+		this.cache.clear();
+	}
 
-  size(): number {
-    return this.cache.size
-  }
+	size(): number {
+		return this.cache.size;
+	}
 }
-

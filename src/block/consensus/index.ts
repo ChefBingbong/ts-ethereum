@@ -1,1 +1,1 @@
-export * from './ethash.ts'
+export * from "./ethash.ts";

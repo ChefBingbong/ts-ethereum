@@ -5,10 +5,10 @@ import { numberToHex, valuesArrayToHeaderData } from "../helpers.ts";
 import { BlockHeader } from "../index.ts";
 
 import type {
-  BlockHeaderBytes,
-  BlockOptions,
-  HeaderData,
-  JSONRPCBlock,
+	BlockHeaderBytes,
+	BlockOptions,
+	HeaderData,
+	JSONRPCBlock,
 } from "../types.ts";
 
 /**
@@ -17,8 +17,11 @@ import type {
  * @param headerData
  * @param opts
  */
-export function createBlockHeader(headerData: HeaderData = {}, opts: BlockOptions = {}) {
-  return new BlockHeader(headerData, opts)
+export function createBlockHeader(
+	headerData: HeaderData = {},
+	opts: BlockOptions = {},
+) {
+	return new BlockHeader(headerData, opts);
 }
 
 /**
@@ -27,9 +30,12 @@ export function createBlockHeader(headerData: HeaderData = {}, opts: BlockOption
  * @param values
  * @param opts
  */
-export function createBlockHeaderFromBytesArray(values: BlockHeaderBytes, opts: BlockOptions = {}) {
-  const headerData = valuesArrayToHeaderData(values)
-  return createBlockHeader(headerData, opts)
+export function createBlockHeaderFromBytesArray(
+	values: BlockHeaderBytes,
+	opts: BlockOptions = {},
+) {
+	const headerData = valuesArrayToHeaderData(values);
+	return createBlockHeader(headerData, opts);
 }
 
 /**
@@ -39,14 +45,16 @@ export function createBlockHeaderFromBytesArray(values: BlockHeaderBytes, opts: 
  * @param opts
  */
 export function createBlockHeaderFromRLP(
-  serializedHeaderData: Uint8Array,
-  opts: BlockOptions = {},
+	serializedHeaderData: Uint8Array,
+	opts: BlockOptions = {},
 ) {
-  const values = RLP.decode(serializedHeaderData)
-  if (!Array.isArray(values)) {
-    throw EthereumJSErrorWithoutCode('Invalid serialized header input. Must be array')
-  }
-  return createBlockHeaderFromBytesArray(values as Uint8Array[], opts)
+	const values = RLP.decode(serializedHeaderData);
+	if (!Array.isArray(values)) {
+		throw EthereumJSErrorWithoutCode(
+			"Invalid serialized header input. Must be array",
+		);
+	}
+	return createBlockHeaderFromBytesArray(values as Uint8Array[], opts);
 }
 
 /**
@@ -55,45 +63,48 @@ export function createBlockHeaderFromRLP(
  * @param blockParams - Ethereum JSON RPC of block (eth_getBlockByNumber)
  * @param options - An object describing the blockchain
  */
-export function createBlockHeaderFromRPC(blockParams: JSONRPCBlock, options?: BlockOptions) {
-  const {
-    parentHash,
-    sha3Uncles,
-    miner,
-    stateRoot,
-    transactionsRoot,
-    receiptsRoot,
-    logsBloom,
-    difficulty,
-    number,
-    gasLimit,
-    gasUsed,
-    timestamp,
-    extraData,
-    mixHash,
-    nonce,
-  } = blockParams
+export function createBlockHeaderFromRPC(
+	blockParams: JSONRPCBlock,
+	options?: BlockOptions,
+) {
+	const {
+		parentHash,
+		sha3Uncles,
+		miner,
+		stateRoot,
+		transactionsRoot,
+		receiptsRoot,
+		logsBloom,
+		difficulty,
+		number,
+		gasLimit,
+		gasUsed,
+		timestamp,
+		extraData,
+		mixHash,
+		nonce,
+	} = blockParams;
 
-  const blockHeader = new BlockHeader(
-    {
-      parentHash,
-      uncleHash: sha3Uncles,
-      coinbase: miner,
-      stateRoot,
-      transactionsTrie: transactionsRoot,
-      receiptTrie: receiptsRoot,
-      logsBloom,
-      difficulty: numberToHex(difficulty),
-      number,
-      gasLimit,
-      gasUsed,
-      timestamp,
-      extraData,
-      mixHash,
-      nonce,
-    },
-    options,
-  )
+	const blockHeader = new BlockHeader(
+		{
+			parentHash,
+			uncleHash: sha3Uncles,
+			coinbase: miner,
+			stateRoot,
+			transactionsTrie: transactionsRoot,
+			receiptTrie: receiptsRoot,
+			logsBloom,
+			difficulty: numberToHex(difficulty),
+			number,
+			gasLimit,
+			gasUsed,
+			timestamp,
+			extraData,
+			mixHash,
+			nonce,
+		},
+		options,
+	);
 
-  return blockHeader
+	return blockHeader;
 }

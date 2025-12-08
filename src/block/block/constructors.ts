@@ -1,32 +1,32 @@
 import * as RLP from "../../rlp/index.ts";
 import {
-  createTx,
-  createTxFromBlockBodyData,
-  normalizeTxParams,
-  type TxOptions,
-  type TypedTransaction,
+	createTx,
+	createTxFromBlockBodyData,
+	normalizeTxParams,
+	type TxOptions,
+	type TypedTransaction,
 } from "../../tx/index.ts";
 import type { EthersProvider } from "../../utils/index.ts";
 import {
-  bigIntToHex,
-  EthereumJSErrorWithoutCode,
-  fetchFromProvider,
-  getProvider,
-  intToHex,
-  isHexString,
+	bigIntToHex,
+	EthereumJSErrorWithoutCode,
+	fetchFromProvider,
+	getProvider,
+	intToHex,
+	isHexString,
 } from "../../utils/index.ts";
 import {
-  Block,
-  createBlockHeader,
-  createBlockHeaderFromBytesArray,
-  createBlockHeaderFromRPC,
+	Block,
+	createBlockHeader,
+	createBlockHeaderFromBytesArray,
+	createBlockHeaderFromRPC,
 } from "../index.ts";
 import type {
-  BlockBytes,
-  BlockData,
-  BlockOptions,
-  HeaderData,
-  JSONRPCBlock,
+	BlockBytes,
+	BlockData,
+	BlockOptions,
+	HeaderData,
+	JSONRPCBlock,
 } from "../types.ts";
 
 /**
@@ -36,41 +36,44 @@ import type {
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createBlock(blockData: BlockData = {}, opts?: BlockOptions): Block {
-  const {
-    header: headerData,
-    transactions: txsData,
-    uncleHeaders: uhsData,
-  } = blockData
+export function createBlock(
+	blockData: BlockData = {},
+	opts?: BlockOptions,
+): Block {
+	const {
+		header: headerData,
+		transactions: txsData,
+		uncleHeaders: uhsData,
+	} = blockData;
 
-  const header = createBlockHeader(headerData, opts)
+	const header = createBlockHeader(headerData, opts);
 
-  // parse transactions
-  const transactions = []
-  for (const txData of txsData ?? []) {
-    const tx = createTx(txData, {
-      ...opts,
-      // Use header common in case of setHardfork being activated
-      common: header.common,
-    } as TxOptions)
-    transactions.push(tx)
-  }
+	// parse transactions
+	const transactions = [];
+	for (const txData of txsData ?? []) {
+		const tx = createTx(txData, {
+			...opts,
+			// Use header common in case of setHardfork being activated
+			common: header.common,
+		} as TxOptions);
+		transactions.push(tx);
+	}
 
-  // parse uncle headers
-  const uncleHeaders = []
-  const uncleOpts: BlockOptions = {
-    ...opts,
-    // Use header common in case of setHardfork being activated
-    common: header.common,
-    // Disable this option here (all other options carried over), since this overwrites the provided Difficulty to an incorrect value
-    calcDifficultyFromHeader: undefined,
-  }
-  for (const uhData of uhsData ?? []) {
-    const uh = createBlockHeader(uhData, uncleOpts)
-    uncleHeaders.push(uh)
-  }
+	// parse uncle headers
+	const uncleHeaders = [];
+	const uncleOpts: BlockOptions = {
+		...opts,
+		// Use header common in case of setHardfork being activated
+		common: header.common,
+		// Disable this option here (all other options carried over), since this overwrites the provided Difficulty to an incorrect value
+		calcDifficultyFromHeader: undefined,
+	};
+	for (const uhData of uhsData ?? []) {
+		const uh = createBlockHeader(uhData, uncleOpts);
+		uncleHeaders.push(uh);
+	}
 
-  return new Block(header, transactions, uncleHeaders, opts)
+	return new Block(header, transactions, uncleHeaders, opts);
 }
 
 /**
@@ -81,9 +84,12 @@ export function createBlock(blockData: BlockData = {}, opts?: BlockOptions): Blo
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createEmptyBlock(headerData: HeaderData, opts?: BlockOptions): Block {
-  const header = createBlockHeader(headerData, opts)
-  return new Block(header)
+export function createEmptyBlock(
+	headerData: HeaderData,
+	opts?: BlockOptions,
+): Block {
+	const header = createBlockHeader(headerData, opts);
+	return new Block(header);
 }
 
 /**
@@ -93,43 +99,48 @@ export function createEmptyBlock(headerData: HeaderData, opts?: BlockOptions): B
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createBlockFromBytesArray(values: BlockBytes, opts?: BlockOptions): Block {
-  if (values.length > 3) {
-    throw EthereumJSErrorWithoutCode(
-      `invalid. More values=${values.length} than expected were received (at most 3 for Frontier)`,
-    )
-  }
+export function createBlockFromBytesArray(
+	values: BlockBytes,
+	opts?: BlockOptions,
+): Block {
+	if (values.length > 3) {
+		throw EthereumJSErrorWithoutCode(
+			`invalid. More values=${values.length} than expected were received (at most 3 for Frontier)`,
+		);
+	}
 
-  // First try to load header so that we can use its common
-  const [headerData, txsData, uhsData] = values
-  const header = createBlockHeaderFromBytesArray(headerData, opts)
+	// First try to load header so that we can use its common
+	const [headerData, txsData, uhsData] = values;
+	const header = createBlockHeaderFromBytesArray(headerData, opts);
 
-  // parse transactions
-  const transactions = []
-  for (const txData of txsData ?? []) {
-    transactions.push(
-      createTxFromBlockBodyData(txData, {
-        ...opts,
-        // Use header common
-        common: header.common,
-      }),
-    )
-  }
+	// parse transactions
+	const transactions = [];
+	for (const txData of txsData ?? []) {
+		transactions.push(
+			createTxFromBlockBodyData(txData, {
+				...opts,
+				// Use header common
+				common: header.common,
+			}),
+		);
+	}
 
-  // parse uncle headers
-  const uncleHeaders = []
-  const uncleOpts: BlockOptions = {
-    ...opts,
-    // Use header common
-    common: header.common,
-    // Disable this option here (all other options carried over), since this overwrites the provided Difficulty to an incorrect value
-    calcDifficultyFromHeader: undefined,
-  }
-  for (const uncleHeaderData of uhsData ?? []) {
-    uncleHeaders.push(createBlockHeaderFromBytesArray(uncleHeaderData, uncleOpts))
-  }
+	// parse uncle headers
+	const uncleHeaders = [];
+	const uncleOpts: BlockOptions = {
+		...opts,
+		// Use header common
+		common: header.common,
+		// Disable this option here (all other options carried over), since this overwrites the provided Difficulty to an incorrect value
+		calcDifficultyFromHeader: undefined,
+	};
+	for (const uncleHeaderData of uhsData ?? []) {
+		uncleHeaders.push(
+			createBlockHeaderFromBytesArray(uncleHeaderData, uncleOpts),
+		);
+	}
 
-  return new Block(header, transactions, uncleHeaders, opts)
+	return new Block(header, transactions, uncleHeaders, opts);
 }
 
 /**
@@ -139,14 +150,19 @@ export function createBlockFromBytesArray(values: BlockBytes, opts?: BlockOption
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createBlockFromRLP(serialized: Uint8Array, opts?: BlockOptions): Block {
-  const values = RLP.decode(Uint8Array.from(serialized)) as BlockBytes
+export function createBlockFromRLP(
+	serialized: Uint8Array,
+	opts?: BlockOptions,
+): Block {
+	const values = RLP.decode(Uint8Array.from(serialized)) as BlockBytes;
 
-  if (!Array.isArray(values)) {
-    throw EthereumJSErrorWithoutCode('Invalid serialized block input. Must be array')
-  }
+	if (!Array.isArray(values)) {
+		throw EthereumJSErrorWithoutCode(
+			"Invalid serialized block input. Must be array",
+		);
+	}
 
-  return createBlockFromBytesArray(values, opts)
+	return createBlockFromBytesArray(values, opts);
 }
 
 /**
@@ -158,26 +174,25 @@ export function createBlockFromRLP(serialized: Uint8Array, opts?: BlockOptions):
  * @returns a new {@link Block} object
  */
 export function createBlockFromRPC(
-  blockParams: JSONRPCBlock,
-  uncles: any[] = [],
-  options?: BlockOptions,
+	blockParams: JSONRPCBlock,
+	uncles: any[] = [],
+	options?: BlockOptions,
 ): Block {
-  const header = createBlockHeaderFromRPC(blockParams, options)
+	const header = createBlockHeaderFromRPC(blockParams, options);
 
-  const transactions: TypedTransaction[] = []
-  const opts = { common: header.common }
-  for (const _txParams of blockParams.transactions ?? []) {
-    const txParams = normalizeTxParams(_txParams)
-    const tx = createTx(txParams, opts)
-    transactions.push(tx)
-  }
+	const transactions: TypedTransaction[] = [];
+	const opts = { common: header.common };
+	for (const _txParams of blockParams.transactions ?? []) {
+		const txParams = normalizeTxParams(_txParams);
+		const tx = createTx(txParams, opts);
+		transactions.push(tx);
+	}
 
-  const uncleHeaders = uncles.map((uh) => createBlockHeaderFromRPC(uh, options))
+	const uncleHeaders = uncles.map((uh) =>
+		createBlockHeaderFromRPC(uh, options),
+	);
 
-  return createBlock(
-    { header, transactions, uncleHeaders },
-    options,
-  )
+	return createBlock({ header, transactions, uncleHeaders }, options);
 }
 
 /**
@@ -188,55 +203,55 @@ export function createBlockFromRPC(
  * @returns a new {@link Block} object specified by `blockTag`
  */
 export const createBlockFromJSONRPCProvider = async (
-  provider: string | EthersProvider,
-  blockTag: string | bigint,
-  opts: BlockOptions,
+	provider: string | EthersProvider,
+	blockTag: string | bigint,
+	opts: BlockOptions,
 ): Promise<Block> => {
-  let blockData
-  const providerUrl = getProvider(provider)
+	let blockData;
+	const providerUrl = getProvider(provider);
 
-  if (typeof blockTag === 'string' && blockTag.length === 66) {
-    blockData = await fetchFromProvider(providerUrl, {
-      method: 'eth_getBlockByHash',
-      params: [blockTag, true],
-    })
-  } else if (typeof blockTag === 'bigint') {
-    blockData = await fetchFromProvider(providerUrl, {
-      method: 'eth_getBlockByNumber',
-      params: [bigIntToHex(blockTag), true],
-    })
-  } else if (
-    isHexString(blockTag) ||
-    blockTag === 'latest' ||
-    blockTag === 'earliest' ||
-    blockTag === 'pending' ||
-    blockTag === 'finalized' ||
-    blockTag === 'safe'
-  ) {
-    blockData = await fetchFromProvider(providerUrl, {
-      method: 'eth_getBlockByNumber',
-      params: [blockTag, true],
-    })
-  } else {
-    throw EthereumJSErrorWithoutCode(
-      `expected blockTag to be block hash, bigint, hex prefixed string, or earliest/latest/pending; got ${blockTag}`,
-    )
-  }
+	if (typeof blockTag === "string" && blockTag.length === 66) {
+		blockData = await fetchFromProvider(providerUrl, {
+			method: "eth_getBlockByHash",
+			params: [blockTag, true],
+		});
+	} else if (typeof blockTag === "bigint") {
+		blockData = await fetchFromProvider(providerUrl, {
+			method: "eth_getBlockByNumber",
+			params: [bigIntToHex(blockTag), true],
+		});
+	} else if (
+		isHexString(blockTag) ||
+		blockTag === "latest" ||
+		blockTag === "earliest" ||
+		blockTag === "pending" ||
+		blockTag === "finalized" ||
+		blockTag === "safe"
+	) {
+		blockData = await fetchFromProvider(providerUrl, {
+			method: "eth_getBlockByNumber",
+			params: [blockTag, true],
+		});
+	} else {
+		throw EthereumJSErrorWithoutCode(
+			`expected blockTag to be block hash, bigint, hex prefixed string, or earliest/latest/pending; got ${blockTag}`,
+		);
+	}
 
-  if (blockData === null) {
-    throw EthereumJSErrorWithoutCode('No block data returned from provider')
-  }
+	if (blockData === null) {
+		throw EthereumJSErrorWithoutCode("No block data returned from provider");
+	}
 
-  const uncleHeaders = []
-  if (blockData.uncles.length > 0) {
-    for (let x = 0; x < blockData.uncles.length; x++) {
-      const headerData = await fetchFromProvider(providerUrl, {
-        method: 'eth_getUncleByBlockHashAndIndex',
-        params: [blockData.hash, intToHex(x)],
-      })
-      uncleHeaders.push(headerData)
-    }
-  }
+	const uncleHeaders = [];
+	if (blockData.uncles.length > 0) {
+		for (let x = 0; x < blockData.uncles.length; x++) {
+			const headerData = await fetchFromProvider(providerUrl, {
+				method: "eth_getUncleByBlockHashAndIndex",
+				params: [blockData.hash, intToHex(x)],
+			});
+			uncleHeaders.push(headerData);
+		}
+	}
 
-  return createBlockFromRPC(blockData, uncleHeaders, opts)
-}
+	return createBlockFromRPC(blockData, uncleHeaders, opts);
+};
