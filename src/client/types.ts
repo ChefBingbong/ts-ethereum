@@ -69,11 +69,6 @@ export type KeyLike = string | Key;
 
 export type MultiaddrLike = string | string[] | Multiaddr | Multiaddr[];
 
-/**
- * DNS
- */
-export type DnsNetwork = string;
-
 export interface ClientOpts {
 	network?: string;
 	chainId?: number;
@@ -110,17 +105,14 @@ export interface ClientOpts {
 	maxFetcherJobs?: number;
 	minPeers?: number;
 	maxPeers?: number;
-	dnsAddr?: string;
 	execution?: boolean;
 	numBlocksPerIteration?: number;
 	accountCache?: number;
 	storageCache?: number;
 	codeCache?: number;
 	trieCache?: number;
-	dnsNetworks?: string[];
 	executeBlocks?: string;
 	debugCode?: boolean;
-	discDns?: boolean;
 	discV4?: boolean;
 	mine?: boolean;
 	unlock?: string;

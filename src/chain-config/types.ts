@@ -38,7 +38,6 @@ export interface ChainConfig {
 	genesis: GenesisBlockConfig;
 	hardforks: HardforkTransitionConfig[];
 	bootstrapNodes: BootstrapNodeConfig[];
-	dnsNetworks?: string[];
 	consensus: ConsensusConfig;
 }
 

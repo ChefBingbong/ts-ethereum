@@ -62,10 +62,6 @@ export class Common {
 		return this._chainParams.bootstrapNodes;
 	}
 
-	dnsNetworks() {
-		return this._chainParams.dnsNetworks!;
-	}
-
 	hardfork() {
 		return this._hardfork;
 	}

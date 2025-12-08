@@ -6,30 +6,32 @@ import { createHash } from "crypto";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { Level } from "level";
-import type { ConsensusDict } from "../../blockchain/index.ts";
-import { createBlockchain, EthashConsensus } from "../../blockchain/index.ts";
-import type { ChainConfig } from "../../chain-config";
-import type { GenesisState } from "../../chain-config/index.ts";
+import type { ConsensusDict } from "../../../blockchain/index.ts";
+import {
+	createBlockchain,
+	EthashConsensus,
+} from "../../../blockchain/index.ts";
+import type { ChainConfig, GenesisState } from "../../../chain-config/index.ts";
 import {
 	Common,
 	ConsensusAlgorithm,
 	Hardfork,
-} from "../../chain-config/index.ts";
-import { Ethash } from "../../eth-hash/index.ts";
+} from "../../../chain-config/index.ts";
+import { Ethash } from "../../../eth-hash/index.ts";
 import {
 	Address,
 	bytesToHex,
 	bytesToUnprefixedHex,
 	createAddressFromPrivateKey,
-} from "../../utils/index.ts";
-import { EthereumClient } from "../client.ts";
-import { Config, DataDirectory, SyncMode } from "../config.ts";
-import { LevelDB } from "../execution/level.ts";
-import { getLogger, type Logger } from "../logging.ts";
-import type { FullEthereumService } from "../service/fullethereumservice.ts";
-import { Event } from "../types.ts";
-import { setupMetrics } from "../util/metrics.ts";
-import { type RPCArgs, startRPCServers } from "../util/rpc.ts";
+} from "../../../utils/index.ts";
+import { EthereumClient } from "../../client.ts";
+import { Config, DataDirectory, SyncMode } from "../../config.ts";
+import { LevelDB } from "../../execution/level.ts";
+import { getLogger, type Logger } from "../../logging.ts";
+import type { FullEthereumService } from "../../service/fullethereumservice.ts";
+import { Event } from "../../types.ts";
+import { setupMetrics } from "../../util/metrics.ts";
+import { type RPCArgs, startRPCServers } from "../../util/rpc.ts";
 
 export type Account = [address: Address, privateKey: Uint8Array];
 
@@ -371,7 +373,7 @@ async function startClient() {
 	await client.open();
 
 	// Update sync status
-	client.config.updateSynchronizedState(client.chain.headers.latest, true);
+	client.config.updateSynchronizedState(client.chain.headers.latest);
 
 	// Ensure txPool is running
 	const fullService = client.service as FullEthereumService;

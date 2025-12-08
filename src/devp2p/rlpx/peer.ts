@@ -1,6 +1,9 @@
+import type { Debugger } from "debug";
 import debugDefault from "debug";
 import { EventEmitter } from "eventemitter3";
+import type { Socket } from "net";
 import * as snappy from "snappyjs";
+import type { Common } from "../../chain-config";
 import * as RLP from "../../rlp";
 import {
 	bytesToHex,
@@ -12,17 +15,11 @@ import {
 	intToBytes,
 	utf8ToBytes,
 } from "../../utils";
-
-import { DISCONNECT_REASON, DisconnectReasonNames } from "../types.ts";
-import { devp2pDebug, formatLogData } from "../util.ts";
-
-import { ECIES } from "./ecies.ts";
-
-import type { Debugger } from "debug";
-import type { Socket } from "net";
-import type { Common } from "../../chain-config";
 import type { Protocol } from "../protocol/protocol.ts";
 import type { Capabilities, PeerOptions } from "../types.ts";
+import { DISCONNECT_REASON, DisconnectReasonNames } from "../types.ts";
+import { devp2pDebug, formatLogData } from "../util.ts";
+import { ECIES } from "./ecies.ts";
 
 const DEBUG_BASE_NAME = "rlpx:peer";
 const verbose = debugDefault("verbose").enabled;
@@ -160,10 +157,7 @@ export class Peer {
 		if (this._remoteId !== null) {
 			this._sendAuth();
 		}
-		this.DEBUG =
-			typeof window === "undefined"
-				? (process?.env?.DEBUG?.includes("ethjs") ?? false)
-				: false;
+		this.DEBUG = true;
 	}
 
 	/**
@@ -247,9 +241,6 @@ export class Peer {
 				}  protocolVersion=${BASE_PROTOCOL_VERSION} capabilities=${(
 					this._capabilities ?? []
 				)
-					// Filter out snap because we can't yet provide snap endpoints to the peers
-					// TODO: Remove when we can also serve snap requests from other peers
-					.filter((c) => c.name !== "snap")
 					.map((c) => `${c.name}${c.version}`)
 					.join(",")} clientId=${bytesToUtf8(this.clientId)}`,
 			);

@@ -122,13 +122,13 @@ export class FullSynchronizer extends Synchronizer {
 		if (peers.length < this.config.minPeers && !this.forceSync) return;
 
 		// For PoW (Ethash) chains we want to select the peer with the highest TD
-		let best;
+		let best: Peer | undefined;
 		for (const peer of peers) {
 			if (peer.eth?.status !== undefined) {
 				const td = peer.eth.status.td;
 				if (
 					(!best && td >= this.chain.blocks.td) ||
-					(best && best.eth && best.eth.status.td < td)
+					(best?.eth?.status.td !== undefined && best.eth.status.td < td)
 				) {
 					best = peer;
 				}
@@ -284,7 +284,12 @@ export class FullSynchronizer extends Synchronizer {
 			this.addToKnownByPeer(block.hash(), peer);
 		}
 		if (block.header.number > this.chain.headers.height + BIGINT_1) {
-			// If the block number exceeds one past our height we cannot validate it
+			// Block is too far ahead - we need to fetch missing blocks first
+			this.config.logger?.debug(
+				`Block ${block.header.number} is ahead of chain height ${this.chain.headers.height}, fetching missing blocks`,
+			);
+			// Request the missing blocks via handleNewBlockHashes
+			this.handleNewBlockHashes([[block.hash(), block.header.number]]);
 			return;
 		}
 		try {
@@ -300,12 +305,14 @@ export class FullSynchronizer extends Synchronizer {
 		}
 		// Send NEW_BLOCK to square root of total number of peers in pool
 		// https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-propagation
-		const numPeersToShareWith = Math.floor(Math.sqrt(this.pool.peers.length));
+		const numPeersToShareWith = this.pool.peers.length;
+
 		await this.sendNewBlock(
 			block,
 			this.pool.peers.slice(0, numPeersToShareWith),
 		);
 		const latestBlockHash = this.chain.blocks.latest?.hash();
+
 		if (
 			latestBlockHash !== undefined &&
 			equalsBytes(latestBlockHash, block.header.parentHash) === true
@@ -339,7 +346,8 @@ export class FullSynchronizer extends Synchronizer {
 	 * @param data new block hash announcements
 	 */
 	handleNewBlockHashes(data: [Uint8Array, bigint][]) {
-		if (!data.length || !this.fetcher || this.fetcher.syncErrored) return;
+		if (!data.length) return;
+
 		let min = BigInt(-1);
 		let newSyncHeight: [Uint8Array, bigint] | undefined;
 		const blockNumberList: bigint[] = [];
@@ -366,6 +374,33 @@ export class FullSynchronizer extends Synchronizer {
 		this.config.logger?.info(
 			`New sync target height=${height} hash=${short(hash)}`,
 		);
+
+		// Create fetcher if it doesn't exist or has errored
+		if (!this.fetcher || this.fetcher.syncErrored) {
+			// Calculate range to fetch: from current height + 1 to the announced height
+			const first = this.chain.blocks.height + BIGINT_1;
+			const count = height - first + BIGINT_1;
+			if (count > BIGINT_0) {
+				this.config.logger?.info(
+					`Creating new fetcher to sync blocks ${first} to ${height}`,
+				);
+				this.fetcher = new BlockFetcher({
+					config: this.config,
+					pool: this.pool,
+					chain: this.chain,
+					interval: this.interval,
+					first,
+					count,
+					destroyWhenDone: false,
+				});
+				// Start the fetcher
+				this.fetcher.fetch().catch((e) => {
+					this.config.logger?.error(`Block fetcher error`, {}, e);
+				});
+			}
+			return;
+		}
+
 		// Enqueue if we are close enough to chain head
 		if (min < this.chain.headers.height + BigInt(3000)) {
 			this.fetcher.enqueueByNumberList(blockNumberList, min, height);

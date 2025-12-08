@@ -165,18 +165,6 @@ export interface ConfigOptions {
 	maxPeers?: number;
 
 	/**
-	 * DNS server to query DNS TXT records from for peer discovery
-	 *
-	 * Default `8.8.8.8` (Google)
-	 */
-	dnsAddr?: string;
-
-	/**
-	 * EIP-1459 ENR Tree urls to query via DNS for peer discovery
-	 */
-	dnsNetworks?: string[];
-
-	/**
 	 * Start continuous VM execution (pre-Merge setting)
 	 */
 	execution?: boolean;
@@ -214,13 +202,6 @@ export interface ConfigOptions {
 	 * (meant to be used internally for the most part)
 	 */
 	debugCode?: boolean;
-
-	/**
-	 * Query EIP-1459 DNS TXT records for peer discovery
-	 *
-	 * Default: `true` for testnets, false for mainnet
-	 */
-	discDns?: boolean;
 
 	/**
 	 * Use v4 ("findneighbour" node requests) for peer discovery
@@ -303,8 +284,6 @@ export interface ConfigOptions {
 	 */
 	maxInvalidBlocksErrorCache?: number;
 	pruneEngineCache?: boolean;
-	snapAvailabilityDepth?: bigint;
-	snapTransitionSafeDepth?: bigint;
 
 	/**
 	 * Save account keys preimages in the meta db (default: false)
@@ -337,7 +316,6 @@ export class Config {
 	public static readonly MAXFETCHERREQUESTS_DEFAULT = 5;
 	public static readonly MINPEERS_DEFAULT = 1;
 	public static readonly MAXPEERS_DEFAULT = 25;
-	public static readonly DNSADDR_DEFAULT = "8.8.8.8";
 	public static readonly EXECUTION = true;
 	public static readonly NUM_BLOCKS_PER_ITERATION = 100;
 	public static readonly ACCOUNT_CACHE = 400000;
@@ -363,10 +341,6 @@ export class Config {
 	public static readonly ENGINE_PARENT_LOOKUP_MAX_DEPTH = 128;
 	public static readonly ENGINE_NEWPAYLOAD_MAX_EXECUTE = 2;
 	public static readonly ENGINE_NEWPAYLOAD_MAX_TXS_EXECUTE = 200;
-	public static readonly SNAP_AVAILABILITY_DEPTH = BigInt(128);
-	// distance from head at which we can safely transition from a synced snapstate to vmexecution
-	// randomly kept it at 5 for fast testing purposes but ideally should be >=32 slots
-	public static readonly SNAP_TRANSITION_SAFE_DEPTH = BigInt(5);
 
 	// support blobs and proofs cache for CL getBlobs for upto 1 epoch of data
 	public static readonly BLOBS_AND_PROOFS_CACHE_BLOCKS = 32;
@@ -387,7 +361,6 @@ export class Config {
 	public readonly maxFetcherRequests: number;
 	public readonly minPeers: number;
 	public readonly maxPeers: number;
-	public readonly dnsAddr: string;
 	public readonly execution: boolean;
 	public readonly numBlocksPerIteration: number;
 	public readonly accountCache: number;
@@ -395,7 +368,6 @@ export class Config {
 	public readonly codeCache: number;
 	public readonly trieCache: number;
 	public readonly debugCode: boolean;
-	public readonly discDns: boolean;
 	public readonly discV4: boolean;
 	public readonly mine: boolean;
 	public readonly isSingleNode: boolean;
@@ -413,8 +385,6 @@ export class Config {
 	public readonly engineParentLookupMaxDepth: number;
 	public readonly engineNewpayloadMaxExecute: number;
 	public readonly engineNewpayloadMaxTxsExecute: number;
-	public readonly snapAvailabilityDepth: bigint;
-	public readonly snapTransitionSafeDepth: bigint;
 
 	public readonly prefixStorageTrieKeys: boolean;
 	public readonly useStringValueTrieDB: boolean;
@@ -458,7 +428,6 @@ export class Config {
 			options.maxFetcherRequests ?? Config.MAXFETCHERREQUESTS_DEFAULT;
 		this.minPeers = options.minPeers ?? Config.MINPEERS_DEFAULT;
 		this.maxPeers = options.maxPeers ?? Config.MAXPEERS_DEFAULT;
-		this.dnsAddr = options.dnsAddr ?? Config.DNSADDR_DEFAULT;
 		this.execution = options.execution ?? Config.EXECUTION;
 		this.numBlocksPerIteration =
 			options.numBlocksPerIteration ?? Config.NUM_BLOCKS_PER_ITERATION;
@@ -508,10 +477,6 @@ export class Config {
 		this.engineNewpayloadMaxTxsExecute =
 			options.engineNewpayloadMaxTxsExecute ??
 			Config.ENGINE_NEWPAYLOAD_MAX_TXS_EXECUTE;
-		this.snapAvailabilityDepth =
-			options.snapAvailabilityDepth ?? Config.SNAP_AVAILABILITY_DEPTH;
-		this.snapTransitionSafeDepth =
-			options.snapTransitionSafeDepth ?? Config.SNAP_TRANSITION_SAFE_DEPTH;
 
 		this.prefixStorageTrieKeys = options.prefixStorageTrieKeys ?? true;
 		this.useStringValueTrieDB = options.useStringValueTrieDB ?? false;
@@ -529,7 +494,6 @@ export class Config {
 		this.blobsAndProofsCacheBlocks =
 			options.blobsAndProofsCacheBlocks ?? Config.BLOBS_AND_PROOFS_CACHE_BLOCKS;
 
-		this.discDns = this.getDnsDiscovery(options.discDns);
 		this.discV4 = options.discV4 ?? true;
 
 		this.logger = options.logger;
@@ -542,9 +506,7 @@ export class Config {
 				// Otherwise start server
 				const bootnodes: MultiaddrLike =
 					this.bootnodes ?? (this.chainCommon.bootstrapNodes() as any);
-				const dnsNetworks =
-					options.dnsNetworks ?? this.chainCommon.dnsNetworks();
-				this.server = new RlpxServer({ config: this, bootnodes, dnsNetworks });
+				this.server = new RlpxServer({ config: this, bootnodes });
 			}
 		}
 
@@ -696,12 +658,11 @@ export class Config {
 	}
 
 	/**
-	 * Returns specified option or the default setting for whether DNS-based peer discovery
+	 * Returns specified option or the default setting for whether v4 peer discovery
 	 * is enabled based on chainName.
 	 */
-	getDnsDiscovery(option: boolean | undefined): boolean {
+	getDiscV4(option: boolean | undefined): boolean {
 		if (option !== undefined) return option;
-		const dnsNets = ["sepolia", "holesky", "hoodi"];
-		return dnsNets.includes(this.chainCommon.chainName());
+		return true;
 	}
 }
