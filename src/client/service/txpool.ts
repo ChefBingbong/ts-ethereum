@@ -135,6 +135,11 @@ export class TxPool {
 	private REBROADCAST_INTERVAL = 60 * 1000;
 
 	/**
+	 * Number of peers to rebroadcast to
+	 */
+	public NUM_PEERS_REBROADCAST_QUOTIENT = 1;
+
+	/**
 	 * Log pool statistics on the given interval
 	 */
 	private LOG_STATISTICS_INTERVAL = 20000; // ms
@@ -273,10 +278,10 @@ export class TxPool {
 			);
 			if (existingTxn) {
 				if (equalsBytes(existingTxn.tx.hash(), tx.hash())) {
-					// throw EthereumJSErrorWithoutCode(
-					// 	`${bytesToHex(tx.hash())}: this transaction is already in the TxPool`,
-					// );
-					this.removeByHash(bytesToUnprefixedHex(tx.hash()), tx);
+					throw EthereumJSErrorWithoutCode(
+						`${bytesToHex(tx.hash())}: this transaction is already in the TxPool`,
+					);
+					// this.removeByHash(bytesToUnprefixedHex(tx.hash()), tx);
 				}
 
 				this.validateTxGasBump(existingTxn.tx, tx);
@@ -355,16 +360,16 @@ export class TxPool {
 	 * @returns Array of tx objects
 	 */
 	getByHash(txHashes: Uint8Array[]): TypedTransaction[] {
-		const found: TypedTransaction[] = [];
+		const found = [];
 		for (const txHash of txHashes) {
 			const txHashStr = bytesToUnprefixedHex(txHash);
 			const handled = this.handled.get(txHashStr);
-			if (!handled || handled.error !== undefined) continue;
-			const inPool = this.pool.get(handled.address);
-			if (!inPool) continue;
-			const match = inPool.find((poolObj) => poolObj.hash === txHashStr);
-			if (match) {
-				found.push(match.tx);
+			if (!handled) continue;
+			const inPool = this.pool
+				.get(handled.address)
+				?.filter((poolObj) => poolObj.hash === txHashStr);
+			if (inPool && inPool.length === 1) {
+				found.push(inPool[0].tx);
 			}
 		}
 		return found;
@@ -401,32 +406,38 @@ export class TxPool {
 	 * Broadcast transactions to peers
 	 */
 	sendTransactions(txs: TypedTransaction[], peers: Peer[]) {
-		if (txs.length === 0 || !this.running) return;
-
-		// Serialize legacy txs
-		const sendable = txs;
-
-		for (const peer of peers) {
-			// Make sure this is a peer with an `eth` sub-protocol
-
-			const added = Date.now();
-			const toSend: TypedTransaction[] = [];
-			for (const tx of sendable) {
-				const hash: UnprefixedHash = bytesToUnprefixedHex(tx.hash());
-				if (
-					this.knownByPeer.get(peer.id)?.find((o) => o.hash === hash) !==
-					undefined
-				) {
-					continue;
-				}
-				toSend.push(tx);
-				const newKnown: SentObject = { hash, added };
-				const newKnownByPeer = this.knownByPeer.get(peer.id) ?? [];
-				newKnownByPeer.push(newKnown);
-				this.knownByPeer.set(peer.id, newKnownByPeer);
+		if (txs.length > 0) {
+			const hashes = txs.map((tx) => tx.hash());
+			for (const peer of peers) {
+				// This is used to avoid re-sending along pooledTxHashes
+				// announcements/re-broadcasts
+				const newHashes = this.addToKnownByPeer(hashes, peer);
+				const newHashesHex = newHashes.map((txHash) =>
+					bytesToUnprefixedHex(txHash),
+				);
+				const newTxs = txs.filter((tx) =>
+					newHashesHex.includes(bytesToUnprefixedHex(tx.hash())),
+				);
+				peer.eth?.request("Transactions", newTxs).catch((e) => {
+					this.markFailedSends(peer, newHashes, e as Error);
+				});
 			}
-			if (toSend.length > 0) {
-				peer.eth.send("Transactions", toSend);
+		}
+	}
+
+	private markFailedSends(
+		peer: Peer,
+		failedHashes: Uint8Array[],
+		e: Error,
+	): void {
+		for (const txHash of failedHashes) {
+			const sendobject = this.knownByPeer
+				.get(peer.id)
+				?.filter(
+					(sendObject) => sendObject.hash === bytesToUnprefixedHex(txHash),
+				)[0];
+			if (sendobject) {
+				sendobject.error = e;
 			}
 		}
 	}
@@ -434,64 +445,133 @@ export class TxPool {
 	/**
 	 * Broadcast new tx hashes to peers
 	 */
-	sendNewTxHashes(
-		newTxHashes: [types: number[], sizes: number[], hashes: Uint8Array[]],
-		peers: Peer[],
-	) {
-		if (!this.running) return;
-
+	sendNewTxHashes(txs: [number[], number[], Uint8Array[]], peers: Peer[]) {
+		const txHashes = txs[2];
 		for (const peer of peers) {
-			// Make sure this is a peer with an `eth` sub-protocol
-			if (!peer.eth) continue;
-
-			const added = Date.now();
-			const types: number[] = [];
-			const sizes: number[] = [];
-			const hashes: Uint8Array[] = [];
-
-			for (const [idx, txHash] of newTxHashes[2].entries()) {
-				const hash: UnprefixedHash = bytesToUnprefixedHex(txHash);
-				if (
-					this.knownByPeer.get(peer.id)?.find((o) => o.hash === hash) !==
-					undefined
-				) {
-					continue;
-				}
-				types.push(newTxHashes[0][idx]);
-				sizes.push(newTxHashes[1][idx]);
-				hashes.push(txHash);
-				const newKnown: SentObject = { hash, added };
-				const newKnownByPeer = this.knownByPeer.get(peer.id) ?? [];
-				newKnownByPeer.push(newKnown);
-				this.knownByPeer.set(peer.id, newKnownByPeer);
+			// Make sure data structure is initialized
+			if (!this.knownByPeer.has(peer.id)) {
+				this.knownByPeer.set(peer.id, []);
 			}
-			if (hashes.length > 0) {
-				if ((peer.eth as any).versions?.includes(68)) {
-					peer.eth.send("NewPooledTransactionHashes", [types, sizes, hashes]);
-				} else {
-					peer.eth.send("NewPooledTransactionHashes", hashes);
+			// Add to known tx hashes and get hashes still to send to peer
+			const hashesToSend = this.addToKnownByPeer(txHashes, peer);
+
+			// Broadcast to peer if at least 1 new tx hash to announce
+			if (hashesToSend.length > 0) {
+				if (
+					peer.eth !== undefined &&
+					peer.eth["versions"] !== undefined &&
+					peer.eth["versions"].includes(68)
+				) {
+					// If peer supports eth/68, send eth/68 formatted message (tx_types[], tx_sizes[], hashes[])
+					const txsToSend: [number[], number[], Uint8Array[]] = [[], [], []];
+					for (const hash of hashesToSend) {
+						const index = txs[2].findIndex((el) => equalsBytes(el, hash));
+						txsToSend[0].push(txs[0][index]);
+						txsToSend[1].push(txs[1][index]);
+						txsToSend[2].push(hash);
+					}
+
+					try {
+						peer.eth?.send(
+							"NewPooledTransactionHashes",
+							txsToSend.slice(0, 4096),
+						);
+					} catch (e) {
+						this.markFailedSends(peer, hashesToSend, e as Error);
+					}
 				}
+				// If peer doesn't support eth/68, just send tx hashes
+				else
+					try {
+						// We `send` this directly instead of using devp2p's async `request` since NewPooledTransactionHashes has no response and is just sent to peers
+						// and this requires no tracking of a peer's response
+						peer.eth?.send(
+							"NewPooledTransactionHashes",
+							hashesToSend.slice(0, 4096),
+						);
+					} catch (e) {
+						this.markFailedSends(peer, hashesToSend, e as Error);
+					}
 			}
 		}
+	}
+
+	async handleAnnouncedTxs(
+		txs: TypedTransaction[],
+		peer: Peer,
+		peerPool: PeerPool,
+	) {
+		if (!this.running || txs.length === 0) return;
+		this.config.logger?.debug(
+			`TxPool: received new transactions number=${txs.length}`,
+		);
+		this.addToKnownByPeer(
+			txs.map((tx) => tx.hash()),
+			peer,
+		);
+
+		const newTxHashes: [number[], number[], Uint8Array[]] = [] as any;
+		for (const tx of txs) {
+			try {
+				await this.add(tx);
+				newTxHashes[0].push(tx.type);
+				newTxHashes[1].push(tx.serialize().byteLength);
+				newTxHashes[2].push(tx.hash());
+			} catch (error: any) {
+				this.config.logger?.debug(
+					`Error adding tx to TxPool: ${error.message} (tx hash: ${bytesToHex(tx.hash())})`,
+				);
+			}
+		}
+		const peers = peerPool.peers;
+		const numPeers = peers.length;
+		const sendFull = Math.max(
+			1,
+			Math.floor(numPeers / this.NUM_PEERS_REBROADCAST_QUOTIENT),
+		);
+		this.sendTransactions(txs, peers.slice(0, sendFull));
+		this.sendNewTxHashes(newTxHashes, peers.slice(sendFull));
+	}
+
+	addToKnownByPeer(txHashes: Uint8Array[], peer: Peer): Uint8Array[] {
+		// Make sure data structure is initialized
+		if (!this.knownByPeer.has(peer.id)) {
+			this.knownByPeer.set(peer.id, []);
+		}
+
+		const newHashes: Uint8Array[] = [];
+		for (const hash of txHashes) {
+			const inSent = this.knownByPeer
+				.get(peer.id)!
+				.filter(
+					(sentObject) => sentObject.hash === bytesToUnprefixedHex(hash),
+				).length;
+			if (inSent === 0) {
+				const added = Date.now();
+				const add = {
+					hash: bytesToUnprefixedHex(hash),
+					added,
+				};
+				this.knownByPeer.get(peer.id)!.push(add);
+				newHashes.push(hash);
+			}
+		}
+		return newHashes;
 	}
 
 	/**
 	 * Handle new tx hashes
 	 */
-	async handleNewTxHashes(
-		data:
-			| Uint8Array[]
-			| [types: Uint8Array, sizes: bigint[], hashes: Uint8Array[]],
+	async handleAnnouncedTxHashes(
+		txHashes: Uint8Array[],
 		peer: Peer,
 		peerPool: PeerPool,
 	) {
-		if (!this.running || !this.config.synchronized) return;
-		const reqHashes: Uint8Array[] = [];
-		// eth68 params [type[], sizes[], hashes[]]
-		const txHashes =
-			Array.isArray(data) && Array.isArray(data[2])
-				? data[2]
-				: (data as Uint8Array[]);
+		if (!this.running || txHashes === undefined || txHashes.length === 0)
+			return;
+		this.addToKnownByPeer(txHashes, peer);
+
+		const reqHashes = [];
 		for (const txHash of txHashes) {
 			const txHashStr: UnprefixedHash = bytesToUnprefixedHex(txHash);
 			if (this.pending.includes(txHashStr) || this.handled.has(txHashStr)) {

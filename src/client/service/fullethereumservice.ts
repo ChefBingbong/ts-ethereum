@@ -244,7 +244,7 @@ export class FullEthereumService extends Service {
 				break;
 			}
 			case "Transactions": {
-				await this.txPool.handleNewTxHashes(message.data, peer, this.pool);
+				await this.txPool.handleAnnouncedTxs(message.data, peer, this.pool);
 				break;
 			}
 			case "NewBlock": {
@@ -267,7 +267,7 @@ export class FullEthereumService extends Service {
 				} else {
 					hashes = message.data;
 				}
-				await this.txPool.handleNewTxHashes(hashes, peer, this.pool);
+				await this.txPool.handleAnnouncedTxHashes(hashes, peer, this.pool);
 				break;
 			}
 			case "GetPooledTransactions": {
