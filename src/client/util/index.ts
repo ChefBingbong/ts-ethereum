@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import { bytesToHex } from "../../utils";
 
 export * from "./parse.ts";
-export * from "./rpc.ts";
+
 // See: https://stackoverflow.com/a/50053801
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

@@ -1,82 +1,42 @@
-import { INTERNAL_ERROR } from "./error-code.ts";
-import * as modules from "./modules";
-
+import { serve, ServerType } from "@hono/node-server";
+import { Env, Hono } from "hono";
+import { requestId } from "hono/request-id";
 import type { EthereumClient } from "../client.ts";
-import type { Config } from "../config.ts";
+import { createRpcHandlers } from "./modules/index.ts";
+import { rpcRequestSchema } from "./types.ts";
+import { rpcValidator } from "./validation.ts";
 
-export const saveReceiptsMethods = [
-	"getLogs",
-	"getTransactionReceipt",
-	"getTransactionByHash",
-];
+export type RPCArgs = {
+	rpc: boolean;
+	rpcAddr: string;
+	rpcPort: number;
+};
 
-/**
- * @module rpc
- */
+export const createRpcManager = (
+	ethClient: EthereumClient,
+	rpcArgs: RPCArgs,
+) => {
+	const createKadApi = () => {
+		const { rpcHandlers, methods } = createRpcHandlers(ethClient, true);
+		const namespaces = methods.map((m) => m.split("_")[0]);
 
-/**
- * RPC server manager
- * @memberof module:rpc
- */
-export class RPCManager {
-	private _config: Config;
-	private _client: EthereumClient;
-	private _modules: Record<string, any> = {};
+		const client = new Hono<Env>()
+			.use("*", requestId({ generator: () => Date.now().toString() }))
+			.post("/", rpcValidator(rpcRequestSchema), rpcHandlers);
 
-	constructor(client: EthereumClient, config: Config) {
-		this._config = config;
-		this._client = client;
-	}
-
-	/**
-	 * Returns bound methods for modules concat with underscore `_`
-	 * @param engine Pass true to return only `engine_` API endpoints (default: false)
-	 * @param rpcDebug Pass true to include stack traces on errors (default: false)
-	 */
-	getMethods(engine = false, rpcDebug = false) {
-		const methods: { [key: string]: Function } = {};
-		const mods = modules.list.filter((name: string) =>
-			engine ? name === "Engine" : name !== "Engine",
+		const server = serve(
+			{
+				fetch: client.fetch,
+				port: rpcArgs.rpcPort,
+				hostname: rpcArgs.rpcAddr,
+			},
+			(i) => console.log(`Rpc listening on ${i?.address}`),
 		);
-		for (const modName of mods) {
-			const mod = new (modules as any)[modName](this._client, rpcDebug);
-			this._modules[modName] = mod;
-			const rpcMethods = RPCManager.getMethodNames((modules as any)[modName]);
-			for (const methodName of rpcMethods) {
-				if (
-					!this._config.saveReceipts &&
-					saveReceiptsMethods.includes(methodName)
-				) {
-					continue;
-				}
-				const concatenatedMethodName = `${modName.toLowerCase()}_${methodName}`;
-				methods[concatenatedMethodName] = mod[methodName].bind(
-					(...params: any[]) => {
-						try {
-							mod(...params);
-						} catch (error: any) {
-							throw {
-								code: INTERNAL_ERROR,
-								message: error.message ?? error,
-							};
-						}
-					},
-				);
-			}
-		}
-		this._config.logger?.debug(
-			`RPC Initialized ${Object.keys(methods).join(", ")}`,
-		);
-		return methods;
-	}
+		return { server, client, methods, namespaces };
+	};
 
-	/**
-	 * Returns all methods in a module
-	 */
-	static getMethodNames(mod: object): string[] {
-		const methodNames = Object.getOwnPropertyNames(
-			(mod as any).prototype,
-		).filter((methodName: string) => methodName !== "constructor");
-		return methodNames;
-	}
-}
+	const servers: ServerType[] = [];
+	const manager = createKadApi();
+	servers.push(manager.server);
+	return servers;
+};

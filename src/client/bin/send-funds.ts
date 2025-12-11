@@ -275,7 +275,7 @@ async function main() {
 		console.log("Waiting for receipt...");
 
 		const receipt = await client.waitForTransactionReceipt({ hash });
-
+		console.log(receipt);
 		console.log(`  Block:   ${receipt.blockNumber}`);
 		console.log(`  Status:  ${receipt.status}`);
 		console.log(`  Gas Used: ${receipt.gasUsed}`);
