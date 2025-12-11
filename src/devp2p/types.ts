@@ -1,7 +1,7 @@
 import type { Socket } from "net";
 import type { Common } from "../chain-config";
 import type { NestedUint8Array } from "../rlp";
-import type { DPT } from "./dpt/index.ts";
+import type { DPT } from "./dpt-1/index.ts";
 import type { EthMessageCodes } from "./protocol/eth.ts";
 import type { Protocol } from "./protocol/protocol.ts";
 import type { Peer } from "./rlpx/peer.ts";

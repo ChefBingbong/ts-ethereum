@@ -14,7 +14,7 @@ import {
 	unprefixedHexToBytes,
 	utf8ToBytes,
 } from "../../utils";
-import type { DPT } from "../dpt/index.ts";
+import type { DPT } from "../dpt-1/index.ts";
 import type {
 	Capabilities,
 	PeerInfo,

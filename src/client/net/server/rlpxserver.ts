@@ -1,5 +1,6 @@
 import type { Peer as Devp2pRLPxPeer } from "../../../devp2p";
-import { DPT as Devp2pDPT, RLPx as Devp2pRLPx } from "../../../devp2p";
+import { RLPx as Devp2pRLPx } from "../../../devp2p";
+import { DPT as Devp2pDPT } from "../../../devp2p/dpt-1/index.ts";
 import {
 	bytesToUnprefixedHex,
 	unprefixedHexToBytes,
@@ -287,7 +288,7 @@ export class RlpxServer extends Server {
 							tcpPort: listeningPort,
 						};
 						// Add verified peer directly (skip UDP ping since we have RLPx connection)
-						const added = this.dpt.addVerifiedPeer(peerInfo);
+						const added = this.dpt.kademlia.addPeer(peerInfo);
 						if (added) {
 							this.config.logger?.info(
 								`Added inbound peer to DPT: ${remoteAddress}:${listeningPort} (DPT size: ${this.dpt.numPeers()})`,
