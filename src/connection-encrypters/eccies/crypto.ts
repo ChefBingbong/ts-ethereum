@@ -11,7 +11,6 @@ import { concatBytes } from "../../utils";
 const SHA256_BLOCK_SIZE = 64;
 
 export function ecdhX(publicKey: Uint8Array, privateKey: Uint8Array) {
-	// return (publicKey * privateKey).x
 	function hashfn(x: Uint8Array, y: Uint8Array) {
 		const pubKey = new Uint8Array(33);
 		pubKey[0] = (y[31] & 1) === 0 ? 0x02 : 0x03;
@@ -19,54 +18,63 @@ export function ecdhX(publicKey: Uint8Array, privateKey: Uint8Array) {
 		return pubKey.subarray(1);
 	}
 
-	console.log("ecdhX", { publicKey, privateKey });
 	return ecdh(publicKey, privateKey, { hashfn }, new Uint8Array(32));
 }
 
 export function concatKDF(keyMaterial: Uint8Array, keyLength: number) {
-	const tmp = new Uint8Array(4);
 	const reps = ((keyLength + 7) * 8) / (SHA256_BLOCK_SIZE * 8);
 
-	const bytes = Array.from({ length: reps }, (_, i) => {
-		new DataView(tmp.buffer).setUint32(0, i + 1);
-		const sha256 = crypto.createHash("sha256").update(tmp);
-		return Uint8Array.from(sha256.update(keyMaterial).digest());
-	});
+	const bytes = [];
+	for (let counter = 0, tmp = new Uint8Array(4); counter <= reps; ) {
+		counter += 1;
+		new DataView(tmp.buffer).setUint32(0, counter);
+		bytes.push(
+			Uint8Array.from(
+				crypto.createHash("sha256").update(tmp).update(keyMaterial).digest(),
+			),
+		);
+	}
 
 	return concatBytes(...bytes).subarray(0, keyLength);
 }
-
 export const eccieEncryptMessage = (
 	data: Uint8Array,
 	remotePubKey: Uint8Array,
 	sharedMacData: Uint8Array | null = null,
 ): Uint8Array | undefined => {
 	const privateKey = genPrivateKey();
-	const ecdhXPoint = ecdhX(remotePubKey, privateKey);
-	const ecciesKey = concatKDF(ecdhXPoint, 32);
-
-	const eccieKeyCompact = ecciesKey.subarray(0, 16);
-	const macKey = crypto
-		.createHash("sha256")
-		.update(ecciesKey.subarray(16, 32))
-		.digest();
+	if (!remotePubKey) return
+	const x = ecdhX(remotePubKey, privateKey);
+		const key = concatKDF(x, 32);
+		const ekey = key.subarray(0, 16); // encryption key
+		const mKey = crypto
+			.createHash("sha256")
+			.update(key.subarray(16, 32))
+			.digest(); // MAC key
 
 	const cipherInitVector = getRandomBytesSync(16);
 	const cipher = crypto.createCipheriv(
 		"aes-128-ctr",
-		eccieKeyCompact,
+		ekey,
 		cipherInitVector,
 	);
 
 	const encryptedData = Uint8Array.from(cipher.update(data));
-	const dataIV = concatBytes(cipherInitVector, encryptedData);
-	const ecciesData = concatBytes(dataIV, sharedMacData ?? Uint8Array.from([]));
+		const dataIV = concatBytes(cipherInitVector, encryptedData);
 
-	const tag = new Uint8Array(
-		crypto.createHmac("sha256", macKey).update(ecciesData).digest(),
-	);
+		// create tag
+		if (!sharedMacData) {
+			sharedMacData = Uint8Array.from([]);
+		}
+		const tag = Uint8Array.from(
+			crypto
+				.createHmac("sha256", mKey)
+				.update(concatBytes(dataIV, sharedMacData))
+				.digest(),
+		);
 
-	return concatBytes(secp256k1.getPublicKey(privateKey, false), dataIV, tag);
+		const publicKey = secp256k1.getPublicKey(privateKey, false);
+		return concatBytes(publicKey, dataIV, tag);
 };
 
 export const decryptMessage = (
@@ -84,27 +92,28 @@ export const decryptMessage = (
 	const dataIV = data.subarray(65, -32);
 	const tag = data.subarray(-32);
 
-	const ecciesKey = concatKDF(ecdhX(publicKey, privateKey), 32);
-	const eccieKeyCompact = ecciesKey.subarray(0, 16);
+	const x = ecdhX(publicKey, privateKey);
+		const key = concatKDF(x, 32);
+		const ekey = key.subarray(0, 16); // encryption key
+		const mKey = Uint8Array.from(
+			crypto.createHash("sha256").update(key.subarray(16, 32)).digest(),
+		); // MAC key
 
-	const macKey = new Uint8Array(
-		crypto.createHash("sha256").update(ecciesKey.subarray(16, 32)).digest(),
-	);
-	const _tag = crypto
-		.createHmac("sha256", macKey)
-		.update(concatBytes(dataIV, sharedMacData ?? Uint8Array.from([])))
-		.digest();
+		// check the tag
+		if (!sharedMacData) {
+			sharedMacData = Uint8Array.from([]);
+		}
+		const _tag = crypto
+			.createHmac("sha256", mKey)
+			.update(concatBytes(dataIV, sharedMacData))
+			.digest();
+		assertEq(_tag, tag, "should have valid tag", debug);
 
-	assertEq(_tag, tag, "should have valid tag", debug);
-
-	const initVector = dataIV.subarray(0, 16);
-	const encryptedData = dataIV.subarray(16);
-	const decipher = crypto.createDecipheriv(
-		"aes-128-ctr",
-		eccieKeyCompact,
-		initVector,
-	);
-	return new Uint8Array(decipher.update(encryptedData));
+		// decrypt data
+		const IV = dataIV.subarray(0, 16);
+		const encryptedData = dataIV.subarray(16);
+		const decipher = crypto.createDecipheriv("aes-128-ctr", ekey, IV);
+		return Uint8Array.from(decipher.update(encryptedData));
 };
 
 export const setupFrame = (

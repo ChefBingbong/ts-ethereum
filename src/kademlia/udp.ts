@@ -238,7 +238,6 @@ export class UdpTransport implements KademliaTransport {
 			return;
 		}
 
-		console.log("decoded", decoded);
 		const { typename, data, publicKey } = decoded;
 		const peerId = pk2id(publicKey);
 

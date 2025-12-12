@@ -31,7 +31,6 @@ export class TransportListener {
 	private onSocket = async (sock: Socket) => {
 		let connection: MuxedConnection;
 
-		console.log("New inbound connection received");
 		if (this.status.code !== "ACTIVE") {
 			sock.destroy();
 			throw new Error("Server is not listening yet");
@@ -44,7 +43,7 @@ export class TransportListener {
 				this.status.listeningAddr.decapsulateCode(4),
 			);
 			const [error, upgraded] = await safeTry(() =>
-				this.context.upgrader.encryptInBound(sock),
+				this.context.upgrader.encryptInBound(sock, null),
 			);
 			if (error) throw error;
 			connection = new MuxedConnection(upgraded.socket, {
@@ -56,6 +55,7 @@ export class TransportListener {
 				this.context.streamOpenHandler(protocol, stream),
 			);
 		} catch (err) {
+			console.log(err)
 			log(`Error handling socket: ${err}`);
 			sock.destroy();
 		}

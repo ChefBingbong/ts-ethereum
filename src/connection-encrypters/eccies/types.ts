@@ -6,6 +6,6 @@ export interface ConnectionEncrypter {
 	encryptInBound(raw: net.Socket): Promise<EncrypterResult>;
 	encryptOutBound(
 		raw: net.Socket,
-		peerId: Uint8Array,
+		peerId?: Uint8Array,
 	): Promise<EncrypterResult>;
 }

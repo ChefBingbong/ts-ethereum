@@ -1,9 +1,9 @@
-import { keccak224, keccak256 } from "ethereum-cryptography/keccak";
+import { keccak256 } from "ethereum-cryptography/keccak";
 import { getRandomBytesSync } from "ethereum-cryptography/random.js";
 import { ecdsaRecover } from "ethereum-cryptography/secp256k1-compat";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
+import { assertEq } from "../../devp2p/index.ts";
 import { id2pk, pk2id, unstrictDecode, xor } from "../../devp2p/util.ts";
-import { assertEq } from "../../kademlia/message.ts";
 import * as RLP from "../../rlp/index.ts";
 import {
 	bigIntToBytes,
@@ -16,14 +16,21 @@ import { decryptMessage, eccieEncryptMessage, ecdhX } from "./crypto.ts";
 
 const OVERHEAD_LENGTH = 113;
 
+export type AuthResult = {
+	remoteInitMsg: Uint8Array;
+	remotePublicKey: Uint8Array;
+	remoteNonce: Uint8Array;
+	ephemeralSharedSecret: Uint8Array;
+	remoteEphemeralPublicKey: Uint8Array;
+};
+
 export const createAuthEIP8 = (
-	remotePubKey: Uint8Array,
+	remotePubKey: Uint8Array | null,
 	privateKey: Uint8Array,
 	nonce: Uint8Array,
 	ephemeralPrivateKey: Uint8Array,
 	publicKey: Uint8Array,
-) => {
-	console.log("createAuthEIP8", { remotePubKey, privateKey, nonce });
+): Uint8Array | undefined => {
 	if (!remotePubKey) return;
 	const x = ecdhX(remotePubKey, privateKey);
 	const sig = secp256k1.sign(xor(x, nonce), ephemeralPrivateKey);
@@ -42,7 +49,8 @@ export const createAuthEIP8 = (
 	const authMsg = concatBytes(RLP.encode(data), pad);
 
 	const sharedMacData = intToBytes(authMsg.length + OVERHEAD_LENGTH);
-	const encryptedMsg = eccieEncryptMessage(authMsg, remotePubKey);
+	const encryptedMsg = eccieEncryptMessage(authMsg, remotePubKey, sharedMacData);
+	if (!encryptedMsg) return;
 	return concatBytes(sharedMacData, encryptedMsg);
 };
 
@@ -54,99 +62,109 @@ export const createAuthNonEIP8 = (
 	ephemeralPublicKey: Uint8Array,
 	publicKey: Uint8Array,
 ): Uint8Array | undefined => {
-	const ecciesEcdh = xor(ecdhX(remotePubKey, privateKey), nonce);
-	const sig = secp256k1.sign(ecciesEcdh, ephemeralPrivateKey);
+	if (!remotePubKey) return;
+	const x = ecdhX(remotePubKey, privateKey);
+	const sig = secp256k1.sign(xor(x, nonce), ephemeralPrivateKey);
 
-	return eccieEncryptMessage(
-		concatBytes(
-			bigIntToBytes(sig.r),
-			bigIntToBytes(sig.s),
-			Uint8Array.from([sig.recovery]),
-			keccak224(pk2id(ephemeralPublicKey)),
-			pk2id(publicKey),
-			nonce,
-			Uint8Array.from([0x00]),
-		),
-		remotePubKey,
+	const data = concatBytes(
+		setLengthLeft(bigIntToBytes(sig.r), 32),
+		setLengthLeft(bigIntToBytes(sig.s), 32),
+		Uint8Array.from([sig.recovery]),
+		keccak256(pk2id(ephemeralPublicKey)),
+		pk2id(publicKey),
+		nonce,
+		Uint8Array.from([0x00]),
 	);
+
+	return eccieEncryptMessage(data, remotePubKey);
 };
 
 export const parseAuthPlain = (
 	data: Uint8Array,
-	remoteInitMsg: Uint8Array,
 	privateKey: Uint8Array,
 	ephemeralPrivateKey: Uint8Array,
 	gotEIP8Auth: boolean,
 	sharedMacData: Uint8Array | null = null,
-) => {
-	const prefix = sharedMacData ?? new Uint8Array();
-	remoteInitMsg = concatBytes(prefix, data);
-	const decrypted = decryptMessage(data, sharedMacData);
+): AuthResult | null => {
+	try {
+		const prefix = sharedMacData ?? new Uint8Array();
+		const remoteInitMsg = concatBytes(prefix, data);
+		const decrypted = decryptMessage(data, privateKey, sharedMacData);
 
-	let signature = null;
-	let recoveryId = null;
-	let heId = null;
-	let remotePublicKey = null;
-	let nonce = null;
+		let signature: Uint8Array;
+		let recoveryId: number;
+		let heId: Uint8Array | null = null;
+		let remotePublicKey: Uint8Array;
+		let remoteNonce: Uint8Array;
 
-	if (!gotEIP8Auth) {
-		signature = decrypted.subarray(0, 64);
-		recoveryId = decrypted[64];
-		heId = decrypted.subarray(65, 97); // 32 bytes
-		remotePublicKey = id2pk(decrypted.subarray(97, 161));
-		nonce = decrypted.subarray(161, 193);
-	} else {
-		const decoded = unstrictDecode(decrypted) as Uint8Array[];
-		signature = decoded[0].subarray(0, 64);
-		recoveryId = decoded[0][64];
-		remotePublicKey = id2pk(decoded[1]);
-		nonce = decoded[2];
-	}
+		if (!gotEIP8Auth) {
+			assertEq(decrypted.length, 194, "invalid packet length", console.log);
 
-	const x = ecdhX(remotePublicKey, privateKey);
+			signature = decrypted.subarray(0, 64);
+			recoveryId = decrypted[64];
+			heId = decrypted.subarray(65, 97); // 32 bytes
+			remotePublicKey = id2pk(decrypted.subarray(97, 161));
+			remoteNonce = decrypted.subarray(161, 193);
+		} else {
+			const decoded = unstrictDecode(decrypted) as Uint8Array[];
+			signature = decoded[0].subarray(0, 64);
+			recoveryId = decoded[0][64];
+			remotePublicKey = id2pk(decoded[1]);
+			remoteNonce = decoded[2];
+		}
 
-	if (nonce === null) {
-		return;
-	}
-	const remoteEphemeralPublicKey = ecdsaRecover(
-		signature,
-		recoveryId,
-		xor(x, nonce),
-		false,
-	);
-
-	const ephemeralSharedSecret = ecdhX(
-		remoteEphemeralPublicKey,
-		ephemeralPrivateKey,
-	);
-	if (heId !== null && remoteEphemeralPublicKey !== null) {
-		assertEq(
-			keccak256(pk2id(remoteEphemeralPublicKey)),
-			heId,
-			"the hash of the ephemeral key should match",
-			console.log,
+		const x = ecdhX(remotePublicKey, privateKey);
+		const remoteEphemeralPublicKey = ecdsaRecover(
+			signature,
+			recoveryId,
+			xor(x, remoteNonce),
+			false,
 		);
+
+		if (remoteEphemeralPublicKey === null) return null;
+
+		const ephemeralSharedSecret = ecdhX(
+			remoteEphemeralPublicKey,
+			ephemeralPrivateKey,
+		);
+
+		if (heId !== null) {
+			assertEq(
+				keccak256(pk2id(remoteEphemeralPublicKey)),
+				heId,
+				"the hash of the ephemeral key should match",
+				console.log,
+			);
+		}
+
+		return {
+			remoteInitMsg,
+			remotePublicKey,
+			remoteNonce,
+			ephemeralSharedSecret,
+			remoteEphemeralPublicKey,
+		};
+	} catch (error) {
+		console.error("parseAuthPlain error:", error);
+		return null;
 	}
-	return { ephemeralSharedSecret, remotePublicKey, remoteEphemeralPublicKey };
 };
 
 export const parseAuthEIP8 = (
 	data: Uint8Array,
-	remoteInitMsg: Uint8Array,
 	privateKey: Uint8Array,
 	ephemeralPrivateKey: Uint8Array,
 	gotEIP8Auth: boolean,
-): void => {
+): AuthResult | null => {
 	const size = bytesToInt(data.subarray(0, 2)) + 2;
 	assertEq(
 		data.length,
 		size,
-		"message length different from specified size (EIP8)",
+		`message length different from specified size (EIP8) parseAuthEIP8: expected ${size}, got ${data.length}`,
 		console.log,
 	);
-	parseAuthPlain(
+	return parseAuthPlain(
 		data.subarray(2),
-		remoteInitMsg,
 		privateKey,
 		ephemeralPrivateKey,
 		gotEIP8Auth,

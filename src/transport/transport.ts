@@ -4,6 +4,7 @@ import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
 import { ConnectionEncrypter } from "../connection-encrypters/eccies/types";
 import { MuxedConnection } from "../connection/connection";
+import { pk2id } from "../kademlia";
 import {
 	type SafeError,
 	type SafePromise,
@@ -32,18 +33,18 @@ export class Transport {
 		this.dialOpts = dialOpts;
 	}
 
-	async dial(peerId: Multiaddr, timeoutMs = 60_000) {
-		const peerIdStr = peerId.toString();
-		const netOptions = multiaddrToNetConfig(peerId) as TcpSocketConnectOpts;
+	async dial(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000) {
+		const peerAddrStr = peerAddr.toString();
+		const netOptions = multiaddrToNetConfig(peerAddr) as TcpSocketConnectOpts;
 
-		const existingConn = this.checkAndReturnExistingConnection(peerId);
+		const existingConn = this.checkAndReturnExistingConnection(peerAddr);
 		if (existingConn) return existingConn;
 
 		const dialPromise = this.scheduleDial(async () => {
 			const sock = net.createConnection(netOptions);
 
 			sock.on("error", (err) => {
-				log(`dial socket error to ${peerId.toString()}: ${err.message}`);
+				log(`dial socket error to ${peerAddr.toString()}: ${err.message}`);
 				try {
 					sock.destroy();
 				} catch {}
@@ -65,7 +66,7 @@ export class Transport {
 						resolve(safeError(err));
 					};
 					const onConnect = async () => {
-						const [error, res] = await this.onConnect(sock, peerId);
+						const [error, res] = await this.onConnect(sock, peerAddr, remotePeerId);
 						cleanup();
 						if (error) onError(error);
 						resolve(safeResult(res));
@@ -87,9 +88,9 @@ export class Transport {
 			);
 		});
 
-		this.inFlightDials.set(peerIdStr, dialPromise);
+		this.inFlightDials.set(peerAddrStr, dialPromise);
 		const [error, dialResult] = await dialPromise;
-		this.inFlightDials.delete(peerIdStr);
+		this.inFlightDials.delete(peerAddrStr);
 
 		if (error) return safeError(error);
 		return safeResult(dialResult);
@@ -109,22 +110,21 @@ export class Transport {
 		return dialError ? safeError(dialError) : safeResult(result);
 	}
 
-	private onConnect = async (socket: net.Socket, peerId: Multiaddr) => {
-		console.log("jeyyyyyyyyyy");
+	private onConnect = async (socket: net.Socket, peerAddr: Multiaddr, remotePeerId?: Uint8Array) => {
 		const [encryptionError, result] = await safeSyncTry(() =>
-			this.encrypter.encryptOutBound(socket, peerId.bytes),
+			this.encrypter.encryptOutBound(socket, pk2id(remotePeerId)),
 		);
 		if (encryptionError) {
 			return safeError(encryptionError);
 		}
 		const [connectionError, connection] = safeSyncTry(
-			() => new MuxedConnection(result.socket, { remoteAddr: peerId }),
+			() => new MuxedConnection(result.socket, { remoteAddr: peerAddr }),
 		);
 
 		if (connectionError) {
 			return safeError(connectionError);
 		}
-		this.connectionCache.set(peerId.toString(), connection);
+		this.connectionCache.set(peerAddr.toString(), connection);
 
 		return safeResult(connection);
 	};
