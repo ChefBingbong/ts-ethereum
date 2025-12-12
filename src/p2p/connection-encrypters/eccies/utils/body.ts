@@ -1,7 +1,7 @@
 import type crypto from "node:crypto";
-import type { MAC } from "../../../devp2p";
-import { zfill } from "../../../devp2p";
-import { concatBytes } from "../../../utils";
+import type { MAC } from "../../../../devp2p";
+import { zfill } from "../../../../devp2p";
+import { concatBytes } from "../../../../utils";
 import type { BodyResult } from "./types";
 
 type Decipher = crypto.DecipherGCM;

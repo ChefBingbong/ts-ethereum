@@ -5,8 +5,8 @@ import { secp256k1 } from "ethereum-cryptography/secp256k1";
 import { ecdh } from "ethereum-cryptography/secp256k1-compat.js";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import crypto from "node:crypto";
-import { assertEq, genPrivateKey, MAC, xor } from "../../../devp2p";
-import { concatBytes } from "../../../utils";
+import { assertEq, genPrivateKey, MAC, xor } from "../../../../devp2p";
+import { concatBytes } from "../../../../utils";
 
 const SHA256_BLOCK_SIZE = 64;
 

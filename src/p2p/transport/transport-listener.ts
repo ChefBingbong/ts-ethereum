@@ -1,10 +1,10 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import net, { type Server, type Socket } from "node:net";
+import type { NetConfig } from "../../utils/getNetConfig";
+import { safeTry } from "../../utils/safe";
+import { multiaddrToNetConfig } from "../../utils/utils";
 import { MuxedConnection } from "../connection/connection";
-import type { NetConfig } from "../utils/getNetConfig";
-import { safeTry } from "../utils/safe";
-import { multiaddrToNetConfig } from "../utils/utils";
 import type { Context, Status } from "./types";
 
 const log = debug("p2p:transport");

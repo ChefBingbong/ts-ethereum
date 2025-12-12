@@ -1,4 +1,4 @@
-import { bytesToInt, concatBytes } from "../../../utils";
+import { bytesToInt, concatBytes } from "../../../../utils";
 
 export class BufferAccumulator {
 	private buffer = new Uint8Array(0);

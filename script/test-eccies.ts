@@ -1,8 +1,8 @@
 import { multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
-import type { ProtocolStream } from "../src/connection/protocol-stream";
 import { createNode } from "../src/node/createNode";
 import type { PeerNode } from "../src/node/node";
+import type { ProtocolStream } from "../src/p2p/connection/protocol-stream";
 
 debug.enable("p2p*");
 

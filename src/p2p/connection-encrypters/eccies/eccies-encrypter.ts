@@ -3,14 +3,14 @@ import { getRandomBytesSync } from "ethereum-cryptography/random";
 import { secp256k1 } from "ethereum-cryptography/secp256k1";
 import crypto from "node:crypto";
 import type { Socket } from "node:net";
+import { genPrivateKey, id2pk, MAC } from "../../../devp2p";
+import { concatBytes } from "../../../utils";
 import type { SecureConnection } from "../../connection/types";
-import { genPrivateKey, id2pk, MAC } from "../../devp2p";
-import { concatBytes } from "../../utils";
 import { sendAuthGetAck, waitAuthSendAck } from "./handlers";
 import type { ConnectionEncrypter } from "./types";
 import {
-	setupFrame,
-	type HandlerContext
+    setupFrame,
+    type HandlerContext
 } from "./utils";
 
 const log = debug("p2p:encrypter");

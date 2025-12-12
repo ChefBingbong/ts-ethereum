@@ -1,9 +1,9 @@
 import { getRandomBytesSync } from "ethereum-cryptography/random";
-import { assertEq } from "../../../devp2p/index.ts";
-import { id2pk, pk2id, unstrictDecode } from "../../../devp2p/util.ts";
-import { concatBytes } from "../../../rlp";
-import * as RLP from "../../../rlp/index.ts";
-import { bytesToInt, intToBytes } from "../../../utils/index.ts";
+import { assertEq } from "../../../../devp2p/index.ts";
+import { id2pk, pk2id, unstrictDecode } from "../../../../devp2p/util.ts";
+import * as RLP from "../../../../rlp/index.ts";
+import { concatBytes } from "../../../../rlp/index.ts";
+import { bytesToInt, intToBytes } from "../../../../utils/index.ts";
 import { decryptMessage, eccieEncryptMessage, ecdhX } from "./crypto.ts";
 import type { AckResult } from "./types.ts";
 

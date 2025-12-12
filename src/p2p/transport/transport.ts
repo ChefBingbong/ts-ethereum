@@ -2,19 +2,19 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
+import { pk2id } from "../../kademlia";
+import {
+    type SafeError,
+    type SafePromise,
+    type SafeResult,
+    safeError,
+    safeResult,
+    safeSyncTry,
+    safeTry,
+} from "../../utils/safe";
+import { multiaddrToNetConfig } from "../../utils/utils";
 import { ConnectionEncrypter } from "../connection-encrypters/eccies/types";
 import { MuxedConnection } from "../connection/connection";
-import { pk2id } from "../kademlia";
-import {
-	type SafeError,
-	type SafePromise,
-	type SafeResult,
-	safeError,
-	safeResult,
-	safeSyncTry,
-	safeTry,
-} from "../utils/safe";
-import { multiaddrToNetConfig } from "../utils/utils";
 import { TransportListener } from "./transport-listener";
 import type { CreateTransportOptions, TransportDialOpts } from "./types";
 

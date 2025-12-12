@@ -4,13 +4,13 @@
 import { multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
-import { EcciesEncrypter } from "../../connection-encrypters/eccies/eccies-encrypter.ts";
-import type { MuxedConnection } from "../../connection/connection.ts";
-import type { ProtocolStream } from "../../connection/protocol-stream.ts";
 import { genPrivateKey, pk2id } from "../../devp2p/index.ts";
 import { KademliaNode, type PeerInfo } from "../../kademlia/index.ts";
-import { TransportListener } from "../../transport/transport-listener.ts";
-import { Transport } from "../../transport/transport.ts";
+import { EcciesEncrypter } from "../../p2p/connection-encrypters/eccies/eccies-encrypter.ts";
+import type { MuxedConnection } from "../../p2p/connection/connection.ts";
+import type { ProtocolStream } from "../../p2p/connection/protocol-stream.ts";
+import { TransportListener } from "../../p2p/transport/transport-listener.ts";
+import { Transport } from "../../p2p/transport/transport.ts";
 import { bytesToUnprefixedHex } from "../../utils/index.ts";
 
 debug.enable("p2p:*,kad:*");

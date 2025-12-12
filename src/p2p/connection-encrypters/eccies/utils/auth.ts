@@ -2,10 +2,10 @@ import { keccak256 } from "ethereum-cryptography/keccak";
 import { getRandomBytesSync } from "ethereum-cryptography/random.js";
 import { ecdsaRecover } from "ethereum-cryptography/secp256k1-compat";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
-import { assertEq } from "../../../devp2p/index.ts";
-import { id2pk, pk2id, unstrictDecode, xor } from "../../../devp2p/util.ts";
-import * as RLP from "../../../rlp/index.ts";
-import { bigIntToBytes, bytesToInt, concatBytes, intToBytes, setLengthLeft } from "../../../utils/index.ts";
+import { assertEq } from "../../../../devp2p/index.ts";
+import { id2pk, pk2id, unstrictDecode, xor } from "../../../../devp2p/util.ts";
+import * as RLP from "../../../../rlp/index.ts";
+import { bigIntToBytes, bytesToInt, concatBytes, intToBytes, setLengthLeft } from "../../../../utils/index.ts";
 import { decryptMessage, eccieEncryptMessage, ecdhX } from "./crypto.ts";
 import type { AuthResult } from "./types.ts";
 

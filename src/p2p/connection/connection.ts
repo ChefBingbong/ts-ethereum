@@ -3,13 +3,13 @@ import { Unix } from "@multiformats/multiaddr-matcher";
 import debug from "debug";
 import EventEmitter from "node:events";
 import net from "node:net";
-import { multiaddrFromIp } from "../utils/utils";
+import { multiaddrFromIp } from "../../utils/utils";
 import { ProtocolStream } from "./protocol-stream";
 import type {
-	FrameHandler,
-	MuxedConnectionOptions,
-	StreamOpenHandler,
-	StreamPacket,
+    FrameHandler,
+    MuxedConnectionOptions,
+    StreamOpenHandler,
+    StreamPacket,
 } from "./types";
 
 const log = debug("p2p:muxer");

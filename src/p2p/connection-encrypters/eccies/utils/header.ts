@@ -1,8 +1,8 @@
 import type crypto from "node:crypto";
-import type { MAC } from "../../../devp2p";
-import { zfill } from "../../../devp2p";
-import * as RLP from "../../../rlp";
-import { bytesToInt, concatBytes, intToBytes } from "../../../utils";
+import type { MAC } from "../../../../devp2p";
+import { zfill } from "../../../../devp2p";
+import * as RLP from "../../../../rlp";
+import { bytesToInt, concatBytes, intToBytes } from "../../../../utils";
 import type { HeaderResult } from "./types";
 
 type Decipher = crypto.DecipherGCM;

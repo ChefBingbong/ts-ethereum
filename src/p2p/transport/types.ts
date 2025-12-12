@@ -1,7 +1,7 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
+import type { NetConfig } from "../../utils/getNetConfig";
 import { ConnectionEncrypter } from "../connection-encrypters/eccies/types";
 import type { ConnectionHandler, StreamOpenHandler } from "../connection/types";
-import type { NetConfig } from "../utils/getNetConfig";
 
 export interface TCPSocketOptions {
 	noDelay?: boolean;

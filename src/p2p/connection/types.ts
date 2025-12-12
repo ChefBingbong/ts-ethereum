@@ -1,6 +1,8 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
 import type { TLSSocket } from "node:tls";
+import { PeerInfo } from "../../kademlia";
 import type { MuxedConnection } from "./connection";
+import { ProtocolHandler } from "./protocol-manager";
 import type { ProtocolStream } from "./protocol-stream";
 
 export type ConnectionHandler = (mc: MuxedConnection, f: any) => Promise<void>;
@@ -53,3 +55,30 @@ export type SecureConnection = {
 		remoteNonce: Uint8Array;
 	};
 };
+
+export interface NetworkEvents {
+	'peer:update': CustomEvent<PeerInfo>
+	'peer:connect': CustomEvent<PeerInfo>
+	'peer:disconnect': CustomEvent<PeerInfo>
+  
+  }
+
+  export type ServiceMap = Record<string, unknown>
+
+  export interface AbortOptions {
+	signal?: AbortSignal
+  }
+  
+  export interface StreamHandlerOptions extends AbortOptions {
+	maxInboundStreams?: number
+  
+	maxOutboundStreams?: number
+	runOnLimitedConnection?: boolean
+	force?: true
+  }
+
+  export type StreamProtocolHandler = { handler: ProtocolHandler, options?: StreamHandlerOptions }
+
+  export interface AbortOptions {
+	signal?: AbortSignal
+  }
