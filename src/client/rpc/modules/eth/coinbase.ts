@@ -11,4 +11,3 @@ export const coinbase = (client: EthereumClient) =>
 		}
 		return safeResult(cb.toString());
 	});
-

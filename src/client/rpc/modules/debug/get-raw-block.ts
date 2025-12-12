@@ -14,4 +14,3 @@ export const getRawBlock = (client: EthereumClient) => {
 		return safeResult(bytesToHex(block.serialize()));
 	});
 };
-

@@ -6,13 +6,17 @@ import {
 	type TLSSocketOptions,
 	connect as tlsConnect,
 } from "node:tls";
-import { safeError, safeResult } from "../utils/safe";
+import type {
+	EncrypterResult,
+	EncryptionCredentials,
+} from "../../connection/types";
+import { safeError, safeResult } from "../../utils/safe";
+import { ConnectionEncrypter } from "../eccies/types";
 import { generateBoundCertificate, verifyPeerCertificate } from "./cert";
-import type { EncrypterResult, EncryptionCredentials } from "./types";
 
 const log = debug("p2p:encrypter");
 
-export class Encrypter {
+export class Encrypter implements ConnectionEncrypter {
 	private trustedCache: Map<string, any> = new Map();
 
 	constructor(private keyPair: Uint8Array) {}

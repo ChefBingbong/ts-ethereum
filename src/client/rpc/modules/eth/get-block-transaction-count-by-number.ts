@@ -17,4 +17,3 @@ export const getBlockTransactionCountByNumber = (client: EthereumClient) => {
 		},
 	);
 };
-

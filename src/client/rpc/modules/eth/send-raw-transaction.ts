@@ -1,4 +1,9 @@
-import { BIGINT_0, BIGINT_1, bytesToHex, hexToBytes } from "../../../../utils/index.ts";
+import {
+	BIGINT_0,
+	BIGINT_1,
+	bytesToHex,
+	hexToBytes,
+} from "../../../../utils/index.ts";
 import { createTxFromRLP } from "../../../../tx/index.ts";
 import type { TypedTransaction } from "../../../../tx/index.ts";
 import { safeError, safeResult } from "../../../../utils/safe.ts";
@@ -67,4 +72,3 @@ export const sendRawTransaction = (client: EthereumClient) => {
 		},
 	);
 };
-

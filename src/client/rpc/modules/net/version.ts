@@ -10,4 +10,3 @@ export const version = (client: EthereumClient) => {
 		return safeResult(chain.config.chainCommon.chainId().toString());
 	});
 };
-

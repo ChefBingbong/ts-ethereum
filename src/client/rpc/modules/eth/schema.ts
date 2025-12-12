@@ -24,4 +24,3 @@ export const getBlockReceiptsSchema = z.any();
 export const getTransactionReceiptSchema = z.any();
 export const sendRawTransactionSchema = z.any();
 export const getProofSchema = z.any();
-

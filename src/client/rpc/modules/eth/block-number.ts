@@ -11,4 +11,3 @@ export const blockNumber = (client: EthereumClient) => {
 		return safeResult(bigIntToHex(chain.headers.latest?.number ?? BIGINT_0));
 	});
 };
-

@@ -8,4 +8,3 @@ export const clientVersion = (_client: EthereumClient) =>
 	createRpcMethod(clientVersionSchema, async (_params, _c) => {
 		return safeResult(getClientVersion());
 	});
-

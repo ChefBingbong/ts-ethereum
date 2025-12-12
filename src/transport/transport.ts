@@ -2,7 +2,7 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
-import { Encrypter } from "../connection";
+import { ConnectionEncrypter } from "../connection-encrypters/eccies/types";
 import { MuxedConnection } from "../connection/connection";
 import {
 	type SafeError,
@@ -19,7 +19,7 @@ import type { CreateTransportOptions, TransportDialOpts } from "./types";
 const log = debug("p2p:transport");
 
 export class Transport {
-	private encrypter: Encrypter;
+	private encrypter: ConnectionEncrypter;
 	private connectionCache: Map<string, MuxedConnection> = new Map();
 	private inFlightDials = new Map<string, SafePromise<MuxedConnection>>();
 
@@ -27,8 +27,8 @@ export class Transport {
 	private dialQueue: Array<() => void> = [];
 	private activeDials = 0;
 
-	constructor(privateKey: Uint8Array, dialOpts: TransportDialOpts) {
-		this.encrypter = new Encrypter(privateKey);
+	constructor(dialOpts: TransportDialOpts, encrypter: ConnectionEncrypter) {
+		this.encrypter = encrypter;
 		this.dialOpts = dialOpts;
 	}
 
@@ -110,9 +110,9 @@ export class Transport {
 	}
 
 	private onConnect = async (socket: net.Socket, peerId: Multiaddr) => {
-		const [encryptionError, result] = await this.encrypter.encrypt(
-			socket,
-			false,
+		console.log("jeyyyyyyyyyy");
+		const [encryptionError, result] = await safeSyncTry(() =>
+			this.encrypter.encryptOutBound(socket, peerId.bytes),
 		);
 		if (encryptionError) {
 			return safeError(encryptionError);

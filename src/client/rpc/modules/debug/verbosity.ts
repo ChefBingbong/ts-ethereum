@@ -9,4 +9,3 @@ export const verbosity = (client: EthereumClient) =>
 		client.config.logger?.configure({ level: logLevels[level] });
 		return safeResult(`level: ${client.config.logger?.level}`);
 	});
-

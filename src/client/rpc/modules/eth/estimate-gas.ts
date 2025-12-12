@@ -1,6 +1,10 @@
 import { createBlock } from "../../../../block/index.ts";
 import { createTx } from "../../../../tx/index.ts";
-import { BIGINT_1, createAddressFromString, createZeroAddress } from "../../../../utils/index.ts";
+import {
+	BIGINT_1,
+	createAddressFromString,
+	createZeroAddress,
+} from "../../../../utils/index.ts";
 import { EthereumJSErrorWithoutCode } from "../../../../utils/index.ts";
 import { safeResult } from "../../../../utils/safe.ts";
 import type { VM } from "../../../../vm/index.ts";
@@ -68,4 +72,3 @@ export const estimateGas = (client: EthereumClient) => {
 		},
 	);
 };
-

@@ -14,4 +14,3 @@ export const getRawHeader = (client: EthereumClient) => {
 		return safeResult(bytesToHex(block.header.serialize()));
 	});
 };
-

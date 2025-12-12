@@ -7,4 +7,3 @@ export const listening = (client: EthereumClient) =>
 	createRpcMethod(listeningSchema, async (_params, _c) => {
 		return safeResult(client.opened);
 	});
-

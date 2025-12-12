@@ -9,7 +9,9 @@
 		"test:run": "vitest run -c",
 		"examples": "tsx examples/simple.ts",
 		"local-network": "tsx script/local-network.ts",
-		"test-network": "tsx script/test-network.ts"
+		"test-network": "tsx script/test-network.ts",
+		"test:eccies": "tsx script/test-eccies.ts",
+		"peer": "tsx script/createPeer.ts"
 	},
 	"devDependencies": {
 		"@paulmillr/trusted-setups": "0.2.0",

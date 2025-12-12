@@ -12,4 +12,3 @@ export const chainId = (client: EthereumClient) => {
 		return safeResult(bigIntToHex(chainId));
 	});
 };
-

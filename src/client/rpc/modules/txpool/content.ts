@@ -20,7 +20,7 @@ export const content = (client: EthereumClient) => {
 				pending.set("0x" + addr, Object.fromEntries(pendingForAcct));
 			}
 		}
-		
+
 		const queued = new Map();
 		for (const [addr, txs] of txpool.queued.entries()) {
 			const queuedForAcct = new Map<bigint, any>();
@@ -31,11 +31,10 @@ export const content = (client: EthereumClient) => {
 				queued.set("0x" + addr, Object.fromEntries(queuedForAcct));
 			}
 		}
-		
+
 		return safeResult({
 			pending: Object.fromEntries(pending),
 			queued: Object.fromEntries(queued),
 		});
 	});
 };
-

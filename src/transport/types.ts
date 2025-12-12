@@ -1,5 +1,5 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
-import type { Encrypter } from "../connection";
+import { ConnectionEncrypter } from "../connection-encrypters/eccies/types";
 import type { ConnectionHandler, StreamOpenHandler } from "../connection/types";
 import type { NetConfig } from "../utils/getNetConfig";
 
@@ -10,7 +10,7 @@ export interface TCPSocketOptions {
 	signal?: AbortSignal;
 }
 export interface CreateListenerOptions {
-	upgrader: Encrypter;
+	upgrader: ConnectionEncrypter;
 }
 export interface TCPCreateListenerOptions
 	extends CreateListenerOptions,

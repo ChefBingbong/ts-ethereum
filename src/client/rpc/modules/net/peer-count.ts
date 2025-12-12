@@ -11,4 +11,3 @@ export const peerCount = (client: EthereumClient) => {
 		return safeResult(addHexPrefix(peerPool.peers.length.toString(16)));
 	});
 };
-

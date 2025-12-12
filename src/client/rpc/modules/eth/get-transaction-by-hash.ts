@@ -27,4 +27,3 @@ export const getTransactionByHash = (client: EthereumClient) => {
 		},
 	);
 };
-

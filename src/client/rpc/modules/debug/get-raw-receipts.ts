@@ -21,7 +21,8 @@ export const getRawReceipts = (client: EthereumClient) => {
 			true,
 			true,
 		);
-		return safeResult(receipts.map((r) => bytesToHex(encodeReceipt(r, r.txType))));
+		return safeResult(
+			receipts.map((r) => bytesToHex(encodeReceipt(r, r.txType))),
+		);
 	});
 };
-

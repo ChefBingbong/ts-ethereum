@@ -24,4 +24,3 @@ export const getBlockByHash = (client: EthereumClient) => {
 		},
 	);
 };
-

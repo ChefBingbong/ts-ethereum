@@ -1,6 +1,13 @@
 import type { Proof } from "../../../../state-manager/index.ts";
-import { getMerkleStateProof, MerkleStateManager } from "../../../../state-manager/index.ts";
-import { createAddressFromString, hexToBytes, setLengthLeft } from "../../../../utils/index.ts";
+import {
+	getMerkleStateProof,
+	MerkleStateManager,
+} from "../../../../state-manager/index.ts";
+import {
+	createAddressFromString,
+	hexToBytes,
+	setLengthLeft,
+} from "../../../../utils/index.ts";
 import { EthereumJSErrorWithoutCode } from "../../../../utils/index.ts";
 import { safeError, safeResult } from "../../../../utils/safe.ts";
 import type { VM } from "../../../../vm/index.ts";
@@ -37,11 +44,7 @@ export const getProof = (client: EthereumClient) => {
 			);
 			let proof: Proof;
 			if (vmCopy.stateManager instanceof MerkleStateManager) {
-				proof = await getMerkleStateProof(
-					vmCopy.stateManager,
-					address,
-					slots,
-				);
+				proof = await getMerkleStateProof(vmCopy.stateManager, address, slots);
 			} else {
 				return safeError(
 					EthereumJSErrorWithoutCode(
@@ -54,4 +57,3 @@ export const getProof = (client: EthereumClient) => {
 		},
 	);
 };
-

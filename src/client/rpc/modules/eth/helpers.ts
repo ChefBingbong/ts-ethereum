@@ -1,10 +1,6 @@
 import type { Block, JSONRPCBlock } from "../../../../block/index.ts";
 import type { TypedTransaction } from "../../../../tx/index.ts";
-import {
-	bigIntToHex,
-	bytesToHex,
-	intToHex,
-} from "../../../../utils/index.ts";
+import { bigIntToHex, bytesToHex, intToHex } from "../../../../utils/index.ts";
 import type {
 	PostByzantiumTxReceipt,
 	PreByzantiumTxReceipt,
@@ -107,4 +103,3 @@ export const toJSONRPCReceipt = async (
 			: undefined,
 	type: intToHex(tx.type),
 });
-

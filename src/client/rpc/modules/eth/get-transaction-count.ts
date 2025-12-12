@@ -1,4 +1,8 @@
-import { BIGINT_0, bigIntToHex, createAddressFromString } from "../../../../utils/index.ts";
+import {
+	BIGINT_0,
+	bigIntToHex,
+	createAddressFromString,
+} from "../../../../utils/index.ts";
 import { safeError, safeResult } from "../../../../utils/safe.ts";
 import type { VM } from "../../../../vm/index.ts";
 import type { EthereumClient } from "../../../client.ts";
@@ -46,4 +50,3 @@ export const getTransactionCount = (client: EthereumClient) => {
 		},
 	);
 };
-

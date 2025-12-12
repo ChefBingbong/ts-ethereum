@@ -23,9 +23,7 @@ export const peers = (client: EthereumClient) =>
 								head:
 									peer.eth?.updatedBestHeader !== undefined
 										? bytesToHex(peer.eth.updatedBestHeader.hash())
-										: bytesToHex(
-												peer.eth?.status.bestHash ?? new Uint8Array(),
-											),
+										: bytesToHex(peer.eth?.status.bestHash ?? new Uint8Array()),
 								difficulty: peer.eth?.status.td.toString(10),
 								version: peer.eth?.["versions"].slice(-1)[0] ?? null,
 							},
@@ -41,4 +39,3 @@ export const peers = (client: EthereumClient) =>
 			return safeError(error);
 		}
 	});
-

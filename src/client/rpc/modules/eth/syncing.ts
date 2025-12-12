@@ -24,17 +24,12 @@ export const syncing = (client: EthereumClient) => {
 		const startingBlock = bigIntToHex(synchronizer.startingBlock);
 
 		let highestBlock: string | undefined;
-		if (
-			typeof syncTargetHeight === "bigint" &&
-			syncTargetHeight !== BIGINT_0
-		) {
+		if (typeof syncTargetHeight === "bigint" && syncTargetHeight !== BIGINT_0) {
 			highestBlock = bigIntToHex(syncTargetHeight);
 		} else {
 			const bestPeer = await synchronizer.best();
 			if (!bestPeer) {
-				return safeError(
-					new Error("no peer available for synchronization"),
-				);
+				return safeError(new Error("no peer available for synchronization"));
 			}
 			const highestBlockHeader = await bestPeer.latest();
 			if (!highestBlockHeader) {
@@ -46,4 +41,3 @@ export const syncing = (client: EthereumClient) => {
 		return safeResult({ startingBlock, currentBlock, highestBlock });
 	});
 };
-

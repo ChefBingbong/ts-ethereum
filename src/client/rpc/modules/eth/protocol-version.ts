@@ -16,4 +16,3 @@ export const protocolVersion = (client: EthereumClient) => {
 		return safeResult(intToHex(ethVersion));
 	});
 };
-

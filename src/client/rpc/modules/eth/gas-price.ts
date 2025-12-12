@@ -38,4 +38,3 @@ export const gasPrice = (client: EthereumClient) => {
 		return safeResult(bigIntToHex(gasPrice));
 	});
 };
-

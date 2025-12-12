@@ -28,4 +28,3 @@ export const getTransactionByBlockHashAndIndex = (client: EthereumClient) => {
 		},
 	);
 };
-

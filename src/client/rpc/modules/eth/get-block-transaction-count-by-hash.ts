@@ -21,4 +21,3 @@ export const getBlockTransactionCountByHash = (client: EthereumClient) => {
 		},
 	);
 };
-

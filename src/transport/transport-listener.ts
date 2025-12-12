@@ -3,6 +3,7 @@ import debug from "debug";
 import net, { type Server, type Socket } from "node:net";
 import { MuxedConnection } from "../connection/connection";
 import type { NetConfig } from "../utils/getNetConfig";
+import { safeTry } from "../utils/safe";
 import { multiaddrToNetConfig } from "../utils/utils";
 import type { Context, Status } from "./types";
 
@@ -30,12 +31,21 @@ export class TransportListener {
 	private onSocket = async (sock: Socket) => {
 		let connection: MuxedConnection;
 
+		console.log("New inbound connection received");
 		if (this.status.code !== "ACTIVE") {
 			sock.destroy();
 			throw new Error("Server is not listening yet");
 		}
 		try {
-			const [error, upgraded] = await this.context.upgrader.encrypt(sock, true);
+			// Use factory if available, otherwise fall back to shared upgrader
+
+			console.log(
+				"Upgrading inbound connection to encrypted connection",
+				this.status.listeningAddr.decapsulateCode(4),
+			);
+			const [error, upgraded] = await safeTry(() =>
+				this.context.upgrader.encryptInBound(sock),
+			);
 			if (error) throw error;
 			connection = new MuxedConnection(upgraded.socket, {
 				localAddr: this.status.listeningAddr,
