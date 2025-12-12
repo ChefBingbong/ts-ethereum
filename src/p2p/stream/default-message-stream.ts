@@ -256,7 +256,8 @@ export abstract class AbstractMessageStream extends TypedEventEmitter<MessageStr
     this.dispatchReadBuffer()
   }
 
-  addEventListener(type: keyof MessageStreamEvents, listener?: EventHandler<keyof MessageStreamEvents>, options?: boolean | AddEventListenerOptions): void
+  addEventListener<K extends keyof MessageStreamEvents>(type: K, listener: EventHandler<MessageStreamEvents[K]> , options?: boolean | AddEventListenerOptions): void
+  addEventListener(type: MessageStreamEvents[keyof MessageStreamEvents], listener?: EventHandler<MessageStreamEvents[keyof MessageStreamEvents]>, options?: boolean | AddEventListenerOptions): void
   addEventListener (type: string, listener: EventHandler<Event>, options?: boolean | AddEventListenerOptions): void
   addEventListener (...args: any[]): void {
     super.addEventListener.apply(this, args)

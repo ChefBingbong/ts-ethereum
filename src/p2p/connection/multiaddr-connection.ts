@@ -1,22 +1,28 @@
-import type { AbortOptions, MultiaddrConnection } from '@libp2p/interface'
-import { InvalidParametersError, TimeoutError } from '@libp2p/interface'
-import type { SendResult } from '@libp2p/utils'
-import { AbstractMultiaddrConnection, ipPortToMultiaddr } from '@libp2p/utils'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { Unix } from '@multiformats/multiaddr-matcher'
+import debug from 'debug'
 import type { Socket } from 'net'
-import { pEvent } from 'p-event'
+import { pEvent, TimeoutError } from 'p-event'
 import type { Uint8ArrayList } from 'uint8arraylist'
+import { ipPortToMultiaddr } from '../../utils/multi-addr'
+import { MessageStreamDirection, SendResult } from '../stream/types'
+import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
+import { AbortOptions } from './types'
+
+const log = debug('p2p:connection:multiaddr-connection')
 
 export interface MultiAddressConnectionOptions {
   socket: Socket
-  remoteAddr?: Multiaddr
+  remoteAddr: Multiaddr
+  direction: MessageStreamDirection
+  inactivityTimeout?: number
+  localAddr?: Multiaddr
 }
 
 class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
   private socket: Socket
 
-  constructor (options: MultiAddressConnectionOptions) {
+  constructor (init: MultiAddressConnectionOptions) {
     let remoteAddr = init.remoteAddr
 
     // check if we are connected on a unix path
@@ -24,9 +30,7 @@ class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
       remoteAddr = init.localAddr
     } else if (remoteAddr == null) {
       if (init.socket.remoteAddress == null || init.socket.remotePort == null) {
-        // this can be undefined if the socket is destroyed (for example, if the client disconnected)
-        // https://nodejs.org/dist/latest-v16.x/docs/api/net.html#socketremoteaddress
-        throw new InvalidParametersError('Could not determine remote address or port')
+        throw new Error('Could not determine remote address or port')
       }
 
       remoteAddr = ipPortToMultiaddr(init.socket.remoteAddress, init.socket.remotePort)
@@ -39,43 +43,30 @@ class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
 
     this.socket = init.socket
 
-    // handle incoming data
     this.socket.on('data', buf => {
       this.onData(buf)
     })
 
-    // handle socket errors
     this.socket.on('error', err => {
-      this.log('tcp error', remoteAddr, err)
+      log('tcp error', remoteAddr, err)
 
       this.abort(err)
     })
 
-    // by default there is no timeout
-    // https://nodejs.org/dist/latest-v16.x/docs/api/net.html#socketsettimeouttimeout-callback
     this.socket.setTimeout(init.inactivityTimeout ?? (2 * 60 * 1_000))
 
     this.socket.once('timeout', () => {
-      this.log('tcp timeout', remoteAddr)
-      // if the socket times out due to inactivity we must manually close the connection
-      // https://nodejs.org/dist/latest-v16.x/docs/api/net.html#event-timeout
+      log('tcp timeout', remoteAddr)
       this.abort(new TimeoutError())
     })
 
     this.socket.once('end', () => {
-      this.log('tcp end', remoteAddr)
-
-      // the remote sent a FIN packet which means no more data will be sent
-      // https://nodejs.org/dist/latest-v16.x/docs/api/net.html#event-end
-      // half open TCP sockets are disabled by default so Node.js should send a
-      // FIN in response to this event and then emit a 'close' event, during
-      // which we tear down the MultiaddrConnection so there is nothing to do
-      // until that occurs
+      log('tcp end', remoteAddr)
       this.onTransportClosed()
     })
 
     this.socket.once('close', hadError => {
-      this.log('tcp close', remoteAddr)
+      log('tcp close', remoteAddr)
 
       if (hadError) {
         this.abort(new Error('TCP transmission error'))
@@ -85,9 +76,8 @@ class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
       this.onTransportClosed()
     })
 
-    // the socket can accept more data
     this.socket.on('drain', () => {
-      this.log('tcp drain')
+      log('tcp drain')
 
       this.safeDispatchEvent('drain')
     })
@@ -135,10 +125,6 @@ class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
   }
 }
 
-/**
- * Convert a socket into a MultiaddrConnection
- * https://github.com/libp2p/interface-transport#multiaddrconnection
- */
-export const toMultiaddrConnection = (init: TCPSocketMultiaddrConnectionInit): MultiaddrConnection => {
+export const toMultiaddrConnection = (init: MultiAddressConnectionOptions): AbstractMultiaddrConnection => {
   return new TCPSocketMultiaddrConnection(init)
 }

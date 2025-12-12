@@ -5,7 +5,7 @@ import { AbortOptions, NetworkEvents, StreamHandlerOptions, StreamProtocolHandle
 export const DEFAULT_MAX_INBOUND_STREAMS = 32
 export const DEFAULT_MAX_OUTBOUND_STEAMS = 64
 
-type PeerId = Uint8Array
+export type PeerId = Uint8Array
 
 export interface RegistrarOptions {
   peerId: PeerId
