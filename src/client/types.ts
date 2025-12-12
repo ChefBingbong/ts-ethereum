@@ -30,6 +30,7 @@ export const Event = {
 	POOL_PEER_BANNED: "pool:peer:banned",
 	PROTOCOL_ERROR: "protocol:error",
 	PROTOCOL_MESSAGE: "protocol:message",
+	CHAIN_REORG: "blockchain:chain:reorg",
 } as const;
 
 export interface EventParams {
@@ -45,6 +46,7 @@ export interface EventParams {
 		task: unknown,
 		peer: Peer | null | undefined,
 	];
+	[Event.CHAIN_REORG]: [oldBlocks: Block[], newBlocks: Block[]];
 	[Event.PEER_CONNECTED]: [connectedPeer: Peer];
 	[Event.PEER_DISCONNECTED]: [disconnectedPeer: Peer];
 	[Event.PEER_ERROR]: [error: Error, peerCausingError: Peer];

@@ -338,7 +338,7 @@ export class ECIES {
 		assertEq(
 			data.length,
 			size,
-			"message length different from specified size (EIP8)",
+			"message length different from specified size (EIP8) ",
 			debug,
 		);
 		this.parseAuthPlain(data.subarray(2), data.subarray(0, 2));
@@ -420,7 +420,7 @@ export class ECIES {
 		assertEq(
 			data.length,
 			size,
-			"message length different from specified size (EIP8)",
+			"message length different from specified size (EIP8) parseAckEIP8",
 			debug,
 		);
 		this.parseAckPlain(data.subarray(2), data.subarray(0, 2));

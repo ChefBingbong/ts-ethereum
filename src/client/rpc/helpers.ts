@@ -1,41 +1,11 @@
-import { BIGINT_0, bigIntToHex, bytesToHex, intToHex } from "../../utils";
-
-import { INTERNAL_ERROR, INVALID_BLOCK, INVALID_PARAMS } from "./error-code.ts";
-
+import { Context } from "hono";
+import { ContentfulStatusCode } from "hono/utils/http-status.js";
 import type { Block } from "../../block";
 import type { JSONRPCTx, TypedTransaction } from "../../tx";
+import { BIGINT_0, bigIntToHex, bytesToHex, intToHex } from "../../utils";
 import type { Chain } from "../blockchain";
-import type { RPCMethod } from "./types.ts";
-
-type RPCError = {
-	code: number;
-	message: string;
-	trace?: string;
-	data?: string;
-};
-
-export function callWithStackTrace(
-	handler: Function,
-	debug: boolean,
-): RPCMethod {
-	return async (...args: any) => {
-		try {
-			const res = await handler(...args);
-			return res;
-		} catch (error: any) {
-			const e: RPCError = {
-				code: error.code ?? INTERNAL_ERROR,
-				message: error.message,
-				data: error.data,
-			};
-			if (debug === true) {
-				e["trace"] = error.stack;
-			}
-
-			throw e;
-		}
-	};
-}
+import { INVALID_BLOCK, INVALID_PARAMS } from "./error-code.ts";
+import { RPCError, RpcApiEnv } from "./types.ts";
 
 /**
  * Returns tx formatted to the standard JSON-RPC fields (legacy transactions only)
@@ -123,4 +93,38 @@ export const getBlockByOption = async (blockOpt: string, chain: Chain) => {
 		}
 	}
 	return block;
+};
+
+export const getRpcResponse = (
+	c: Context<RpcApiEnv>,
+	result: any,
+	status?: ContentfulStatusCode,
+) => {
+	const jsonrpc = c.get("jsonrpc");
+	const id = c.get("rpcId");
+	return c.json(
+		{
+			jsonrpc,
+			id,
+			result,
+		},
+		status,
+	);
+};
+
+export const getRpcErrorResponse = (
+	c: Context<RpcApiEnv>,
+	error: RPCError,
+	status?: ContentfulStatusCode,
+) => {
+	const jsonrpc = c.get("jsonrpc");
+	const id = c.get("rpcId");
+	return c.json(
+		{
+			jsonrpc,
+			id,
+			error,
+		},
+		status,
+	);
 };

@@ -97,6 +97,33 @@ async function getBalance(rpcUrl: string, address: string): Promise<bigint> {
 	return BigInt(json.result || "0x0");
 }
 
+export async function getNonce(
+	rpcUrl: string,
+	address: string,
+): Promise<bigint> {
+	const response = await fetch(rpcUrl, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			jsonrpc: "2.0",
+			method: "eth_getTransactionCount",
+			params: [address, "latest"],
+			id: Date.now(),
+		}),
+	});
+
+	const json = (await response.json()) as {
+		result?: string;
+		error?: { message: string };
+	};
+
+	if (json.error) {
+		throw new Error(`RPC Error: ${json.error.message}`);
+	}
+
+	return BigInt(json.result || "0x0");
+}
+
 async function main() {
 	const args = parseArgs();
 
@@ -231,12 +258,14 @@ async function main() {
 	console.log("-".repeat(60));
 
 	try {
+		const currentNonce = await getNonce(rpcUrl, fromAccount.address);
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const hash = await client.sendTransaction({
 			account,
 			to: toAccount.address as Hex,
+			nonce: currentNonce,
 			value: amountWei,
-			gasPrice: 1500000000,
+			gasPrice: 2500000000,
 			gas: 21000,
 			type: "legacy",
 		} as any);
@@ -246,11 +275,12 @@ async function main() {
 		console.log("Waiting for receipt...");
 
 		const receipt = await client.waitForTransactionReceipt({ hash });
-
+		console.log(receipt);
 		console.log(`  Block:   ${receipt.blockNumber}`);
 		console.log(`  Status:  ${receipt.status}`);
 		console.log(`  Gas Used: ${receipt.gasUsed}`);
 	} catch (error) {
+		console.error(error);
 		console.error(`Transaction failed: ${error}`);
 		process.exit(1);
 	}

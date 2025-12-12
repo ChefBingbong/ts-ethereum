@@ -14,7 +14,7 @@ import {
 	unprefixedHexToBytes,
 	utf8ToBytes,
 } from "../../utils";
-import type { DPT } from "../dpt/index.ts";
+import type { DPT } from "../dpt-1/index.ts";
 import type {
 	Capabilities,
 	PeerInfo,
@@ -108,6 +108,7 @@ export class RLPx {
 		this._server.on("error", (err) => this.events.emit("error", err));
 		this._server.on("connection", (socket) => this._onConnect(socket, null));
 		const serverAddress = this._server.address();
+
 		this._debug =
 			serverAddress !== null
 				? devp2pDebug.extend(DEBUG_BASE_NAME).extend(serverAddress as string)

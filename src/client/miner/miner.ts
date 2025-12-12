@@ -321,6 +321,16 @@ export class Miner {
 		await (this.service.synchronizer as FullSynchronizer).handleNewBlock(block);
 		// Remove included txs from TxPool
 		this.service.txPool.removeNewBlockTxs([block]);
+
+		// Clear nonce cache for affected addresses and promote queued txs
+		for (const tx of block.transactions) {
+			const addr = tx.getSenderAddress().toString().slice(2);
+			this.service.txPool.clearNonceCache(addr);
+		}
+		// Re-evaluate pool state after block is mined
+		await this.service.txPool.demoteUnexecutables();
+		await this.service.txPool.promoteExecutables();
+
 		this.config.events.removeListener(
 			Event.CHAIN_UPDATED,
 			_boundSetInterruptHandler,

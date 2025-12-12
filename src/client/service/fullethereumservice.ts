@@ -8,6 +8,7 @@ import type { Peer } from "../net/peer/peer.ts";
 import type { Protocol } from "../net/protocol";
 import { EthProtocol } from "../net/protocol/ethprotocol.ts";
 import { FullSynchronizer } from "../sync";
+import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
 import type { ServiceOptions } from "./service.ts";
 import { Service } from "./service.ts";
@@ -27,6 +28,8 @@ export class FullEthereumService extends Service {
 
 	/** building head state via vmexecution */
 	private building = false;
+
+	public txFetcher: TxFetcher;
 
 	/**
 	 * Create new ETH service
@@ -67,6 +70,12 @@ export class FullEthereumService extends Service {
 				});
 			}
 		}
+
+		this.txFetcher = new TxFetcher({
+			config: this.config,
+			pool: this.pool,
+			txPool: this.txPool,
+		});
 	}
 
 	override async open() {
@@ -81,15 +90,49 @@ export class FullEthereumService extends Service {
 		this.config.events.on(Event.POOL_PEER_ADDED, (peer) => {
 			// TODO: Should we do this if the txPool isn't started?
 			const txs: [number[], number[], Uint8Array[]] = [[], [], []];
-			for (const addr of this.txPool.pool) {
-				for (const tx of addr[1]) {
-					const rawTx = tx.tx;
+			// Iterate over pending pool (executable txs)
+			for (const [_addr, txObjs] of this.txPool.pending) {
+				for (const txObj of txObjs) {
+					const rawTx = txObj.tx;
 					txs[0].push(rawTx.type);
 					txs[1].push(rawTx.serialize().byteLength);
-					txs[2].push(new Uint8Array(Buffer.from(tx.hash, "hex")));
+					txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
+				}
+			}
+			// Also include queued pool txs
+			for (const [_addr, txObjs] of this.txPool.queued) {
+				for (const txObj of txObjs) {
+					const rawTx = txObj.tx;
+					txs[0].push(rawTx.type);
+					txs[1].push(rawTx.serialize().byteLength);
+					txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
 				}
 			}
 			if (txs[0].length > 0) this.txPool.sendNewTxHashes(txs, [peer]);
+		});
+
+		this.config.events.on(
+			Event.SYNC_FETCHED_BLOCKS,
+			async (blocks: Block[]) => {
+				// Remove mined txs
+				this.txPool.removeNewBlockTxs(blocks);
+
+				// Clear nonce cache for affected addresses
+				for (const block of blocks) {
+					for (const tx of block.transactions) {
+						const addr = tx.getSenderAddress().toString().slice(2);
+						this.txPool.clearNonceCache(addr);
+					}
+				}
+
+				// Re-evaluate pool state
+				await this.txPool.demoteUnexecutables();
+				await this.txPool.promoteExecutables();
+			},
+		);
+
+		this.config.events.on(Event.CHAIN_REORG, async (oldBlocks, newBlocks) => {
+			await this.txPool.handleReorg(oldBlocks, newBlocks);
 		});
 
 		await super.open();
@@ -115,6 +158,7 @@ export class FullEthereumService extends Service {
 		this.miner?.start();
 		await this.execution.start();
 		void this.buildHeadState();
+		this.txFetcher.start();
 		return true;
 	}
 
@@ -156,6 +200,7 @@ export class FullEthereumService extends Service {
 		await this.execution.stop();
 
 		await super.stop();
+		this.txFetcher.stop();
 		return true;
 	}
 

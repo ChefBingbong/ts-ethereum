@@ -1,9 +1,10 @@
 import type { Block } from "../../block";
-import { isLegacyTx, LegacyTx, type TypedTransaction } from "../../tx";
+import { isLegacyTx, type LegacyTx, type TypedTransaction } from "../../tx";
 import {
 	Account,
 	Address,
 	BIGINT_0,
+	BIGINT_1,
 	bytesToHex,
 	bytesToUnprefixedHex,
 	equalsBytes,
@@ -20,10 +21,14 @@ import type { FullEthereumService } from "./fullethereumservice.ts";
 
 // Configuration constants
 const MIN_GAS_PRICE_BUMP_PERCENT = 10;
-const MIN_GAS_PRICE = BigInt(100000000); // .1 GWei
 const TX_MAX_DATA_SIZE = 128 * 1024; // 128KB
-const MAX_POOL_SIZE = 5000;
 const MAX_TXS_PER_ACCOUNT = 100;
+
+// Pool limits (matching Geth defaults)
+const GLOBAL_SLOTS = 4096; // Max pending tx slots globally
+const GLOBAL_QUEUE = 1024; // Max queued tx slots globally
+const ACCOUNT_SLOTS = 16; // Max pending per account
+const ACCOUNT_QUEUE = 64; // Max queued per account
 
 export interface TxPoolOptions {
 	/* Config */
@@ -82,18 +87,6 @@ export class TxPool {
 	private _logInterval: NodeJS.Timeout | undefined;
 
 	/**
-	 * The central pool dataset.
-	 *
-	 * Maps an address to a `TxPoolObject`
-	 */
-	public pool: Map<UnprefixedAddress, TxPoolObject[]>;
-
-	/**
-	 * The number of txs currently in the pool
-	 */
-	public txsInPool: number;
-
-	/**
 	 * Map for handled tx hashes
 	 * (have been added to the pool at some point)
 	 *
@@ -135,9 +128,9 @@ export class TxPool {
 	private REBROADCAST_INTERVAL = 60 * 1000;
 
 	/**
-	 * Number of peers to rebroadcast to
+	 * Minimum number of peers to send full transactions to
 	 */
-	public NUM_PEERS_REBROADCAST_QUOTIENT = 1;
+	private MIN_BROADCAST_PEERS = 2;
 
 	/**
 	 * Log pool statistics on the given interval
@@ -145,9 +138,29 @@ export class TxPool {
 	private LOG_STATISTICS_INTERVAL = 20000; // ms
 
 	/**
-	 * Transactions waiting for retrieval
+	 * Transaction hashes currently being fetched from peers
 	 */
-	private pending: UnprefixedHash[] = [];
+	private fetchingHashes: UnprefixedHash[] = [];
+
+	// Pending: executable transactions (nonce matches account nonce)
+	public pending: Map<UnprefixedAddress, TxPoolObject[]>;
+
+	// Queued: future transactions (nonce > account nonce, waiting for gaps to fill)
+	public queued: Map<UnprefixedAddress, TxPoolObject[]>;
+
+	// Track expected nonce for each address (cache to avoid repeated DB lookups)
+	private accountNonces: Map<UnprefixedAddress, bigint>;
+
+	// Local transactions get priority and eviction protection
+	private locals: Set<UnprefixedHash>;
+
+	// Price-sorted index for eviction (all txs from both pools)
+	private priced: QHeap<TxPoolObject>;
+
+	// Counts for each pool
+	public pendingCount: number;
+	public queuedCount: number;
+	private rebroadcastInterval: NodeJS.Timeout | undefined;
 
 	/**
 	 * Create new tx pool
@@ -157,13 +170,107 @@ export class TxPool {
 		this.config = options.config;
 		this.service = options.service;
 
-		this.pool = new Map<UnprefixedAddress, TxPoolObject[]>();
-		this.txsInPool = 0;
+		// Dual pool structure
+		this.pending = new Map<UnprefixedAddress, TxPoolObject[]>();
+		this.queued = new Map<UnprefixedAddress, TxPoolObject[]>();
+		this.pendingCount = 0;
+		this.queuedCount = 0;
+
+		// Supporting structures
+		this.accountNonces = new Map<UnprefixedAddress, bigint>();
+		this.locals = new Set<UnprefixedHash>();
+		this.priced = new Heap({
+			comparBefore: (a: TxPoolObject, b: TxPoolObject) =>
+				this.txGasPrice(a.tx).tip < this.txGasPrice(b.tx).tip,
+		}) as QHeap<TxPoolObject>;
+
 		this.handled = new Map<UnprefixedHash, HandledObject>();
 		this.knownByPeer = new Map<PeerId, SentObject[]>();
 
 		this.opened = false;
 		this.running = false;
+	}
+
+	/**
+	 * Rebroadcasts pending transactions to peers.
+	 * Uses sqrt(peers) propagation as per Geth.
+	 */
+	private rebroadcast(): void {
+		if (!this.running) return;
+
+		const peers = this.service.pool.peers;
+		if (peers.length === 0) return;
+
+		// Collect all pending tx hashes
+		const txHashes: [number[], number[], Uint8Array[]] = [[], [], []];
+		for (const txObjs of this.pending.values()) {
+			for (const txObj of txObjs) {
+				txHashes[0].push(txObj.tx.type);
+				txHashes[1].push(txObj.tx.serialize().byteLength);
+				txHashes[2].push(hexToBytes(`0x${txObj.hash}`));
+			}
+		}
+
+		if (txHashes[2].length === 0) return;
+
+		// Send to sqrt(peers) for efficiency
+		const numPeers = Math.max(1, Math.floor(Math.sqrt(peers.length)));
+		const targetPeers = peers.slice(0, numPeers);
+
+		this.sendNewTxHashes(txHashes, targetPeers);
+
+		this.config.logger?.debug(
+			`Rebroadcast ${txHashes[2].length} tx hashes to ${targetPeers.length} peers`,
+		);
+	}
+
+	/**
+	 * Determines which pool a transaction belongs to based on nonce
+	 * @param tx The transaction to classify
+	 * @param senderAddress The sender's address (unprefixed)
+	 * @returns 'pending' if executable, 'queued' if future
+	 */
+	private async classifyTransaction(
+		tx: TypedTransaction,
+		senderAddress: UnprefixedAddress,
+	): Promise<"pending" | "queued"> {
+		// Get account nonce from cache or state
+		let accountNonce = this.accountNonces.get(senderAddress);
+
+		if (accountNonce === undefined) {
+			// Fetch from state
+			const block = await this.service.chain.getCanonicalHeadHeader();
+			const vmCopy = await this.service.execution.vm.shallowCopy();
+			await vmCopy.stateManager.setStateRoot(block.stateRoot);
+			const address = new Address(hexToBytes(`0x${senderAddress}`));
+			let account = await vmCopy.stateManager.getAccount(address);
+			if (account === undefined) {
+				account = new Account();
+			}
+			accountNonce = account.nonce;
+			this.accountNonces.set(senderAddress, accountNonce);
+		}
+
+		// Check pending pool for the highest nonce we already have
+		const pendingTxs = this.pending.get(senderAddress);
+		if (pendingTxs && pendingTxs.length > 0) {
+			const maxPendingNonce = pendingTxs.reduce(
+				(max, obj) => (obj.tx.nonce > max ? obj.tx.nonce : max),
+				pendingTxs[0].tx.nonce,
+			);
+			// If this tx fills the next slot after pending, it's pending
+			if (tx.nonce === maxPendingNonce + BIGINT_1) {
+				return "pending";
+			}
+		}
+
+		// If nonce matches account nonce, it's immediately executable
+		if (tx.nonce === accountNonce) {
+			return "pending";
+		}
+
+		// Otherwise it's a future transaction
+		return "queued";
 	}
 
 	/**
@@ -192,6 +299,12 @@ export class TxPool {
 			this._logPoolStats.bind(this),
 			this.LOG_STATISTICS_INTERVAL,
 		);
+		// In start():
+		this.rebroadcastInterval = setInterval(
+			() => this.rebroadcast(),
+			this.REBROADCAST_INTERVAL,
+		);
+
 		this.running = true;
 		this.config.logger?.info("TxPool started.");
 		return true;
@@ -230,6 +343,58 @@ export class TxPool {
 	}
 
 	/**
+	 * Handles chain reorganization by re-injecting transactions from orphaned blocks.
+	 * @param oldBlocks Blocks that were orphaned (removed from canonical chain)
+	 * @param newBlocks Blocks that became canonical
+	 */
+	async handleReorg(oldBlocks: Block[], newBlocks: Block[]): Promise<void> {
+		this.config.logger?.info(
+			`TxPool handling reorg: ${oldBlocks.length} old blocks, ${newBlocks.length} new blocks`,
+		);
+
+		// Collect tx hashes from new blocks (these are now mined)
+		const newBlockTxHashes = new Set<string>();
+		for (const block of newBlocks) {
+			for (const tx of block.transactions) {
+				newBlockTxHashes.add(bytesToUnprefixedHex(tx.hash()));
+			}
+		}
+
+		// Re-inject transactions from old blocks that aren't in new blocks
+		for (const block of oldBlocks) {
+			for (const tx of block.transactions) {
+				const txHash = bytesToUnprefixedHex(tx.hash());
+
+				// Skip if tx is in the new canonical chain
+				if (newBlockTxHashes.has(txHash)) continue;
+
+				// Skip if tx is already in pool
+				if (this.handled.has(txHash)) continue;
+
+				try {
+					// Re-add as local to protect from immediate eviction
+					await this.add(tx, true);
+					this.config.logger?.debug(`Re-injected orphaned tx: ${txHash}`);
+				} catch (error: any) {
+					this.config.logger?.debug(
+						`Failed to re-inject orphaned tx ${txHash}: ${error.message}`,
+					);
+				}
+			}
+		}
+
+		// Clear all nonce caches since state has changed
+		this.accountNonces.clear();
+
+		// Remove txs that are in new blocks
+		this.removeNewBlockTxs(newBlocks);
+
+		// Re-evaluate all transactions
+		await this.demoteUnexecutables();
+		await this.promoteExecutables();
+	}
+
+	/**
 	 * Validates a transaction against the pool and other constraints
 	 * @param tx The tx to validate
 	 */
@@ -250,30 +415,39 @@ export class TxPool {
 		const currentGasPrice = this.txGasPrice(tx);
 		// This is the tip which the miner receives: miner does not want
 		// to mine underpriced txs where miner gets almost no fees
-		const currentTip = currentGasPrice.tip;
+		// Check if tx is underpriced when pool is near capacity
 		if (!isLocalTransaction) {
-			const txsInPool = this.txsInPool;
-			if (txsInPool >= MAX_POOL_SIZE) {
-				throw EthereumJSErrorWithoutCode("Cannot add tx: pool is full");
-			}
-			// Local txs are not checked against MIN_GAS_PRICE
-			if (currentTip < MIN_GAS_PRICE) {
-				throw EthereumJSErrorWithoutCode(
-					`Tx does not pay the minimum gas price of ${MIN_GAS_PRICE}`,
-				);
+			const totalTxs = this.pendingCount + this.queuedCount;
+			if (totalTxs >= (GLOBAL_SLOTS + GLOBAL_QUEUE) * 0.9) {
+				// Pool is >90% full, check if tx can compete
+				const minPrice = this.getMinPrice();
+				const txPrice = this.txGasPrice(tx).tip;
+				if (txPrice <= minPrice) {
+					throw EthereumJSErrorWithoutCode(
+						`Transaction underpriced: ${txPrice} <= pool minimum ${minPrice}`,
+					);
+				}
 			}
 		}
 		const senderAddress = tx.getSenderAddress();
 		const sender: UnprefixedAddress = senderAddress.toString().slice(2);
-		const inPool = this.pool.get(sender);
-		if (inPool) {
-			if (!isLocalTransaction && inPool.length >= MAX_TXS_PER_ACCOUNT) {
+
+		// Check both pending and queued pools
+		const pendingTxs = this.pending.get(sender) ?? [];
+		const queuedTxs = this.queued.get(sender) ?? [];
+		const allTxsForSender = [...pendingTxs, ...queuedTxs];
+
+		if (allTxsForSender.length > 0) {
+			if (
+				!isLocalTransaction &&
+				allTxsForSender.length >= MAX_TXS_PER_ACCOUNT
+			) {
 				throw EthereumJSErrorWithoutCode(
 					`Cannot add tx for ${senderAddress}: already have max amount of txs for this account`,
 				);
 			}
-			// Replace pooled txs with the same nonce
-			const existingTxn = inPool.find(
+			// Check for existing tx with same nonce in either pool
+			const existingTxn = allTxsForSender.find(
 				(poolObj) => poolObj.tx.nonce === tx.nonce,
 			);
 			if (existingTxn) {
@@ -281,7 +455,6 @@ export class TxPool {
 					throw EthereumJSErrorWithoutCode(
 						`${bytesToHex(tx.hash())}: this transaction is already in the TxPool`,
 					);
-					// this.removeByHash(bytesToUnprefixedHex(tx.hash()), tx);
 				}
 
 				this.validateTxGasBump(existingTxn.tx, tx);
@@ -331,27 +504,323 @@ export class TxPool {
 			.getSenderAddress()
 			.toString()
 			.slice(2);
+
 		try {
 			await this.validate(tx, isLocalTransaction);
-			let add: TxPoolObject[] = this.pool.get(address) ?? [];
-			const inPool = this.pool.get(address);
-			if (inPool) {
-				// Replace pooled txs with the same nonce
-				add = inPool.filter((poolObj) => poolObj.tx.nonce !== tx.nonce);
+
+			const pool = await this.classifyTransaction(tx, address);
+			const targetPool = pool === "pending" ? this.pending : this.queued;
+
+			// Get existing txs for this address
+			let existingTxs = targetPool.get(address) ?? [];
+
+			// Check for replacement (same nonce)
+			const existingIdx = existingTxs.findIndex(
+				(obj) => obj.tx.nonce === tx.nonce,
+			);
+			if (existingIdx !== -1) {
+				// Remove old tx from priced heap
+				this.removeFromPriced(existingTxs[existingIdx]);
+				existingTxs = existingTxs.filter((_, idx) => idx !== existingIdx);
+				if (pool === "pending") this.pendingCount--;
+				else this.queuedCount--;
 			}
-			add.push({ tx, added, hash });
-			this.pool.set(address, add);
+
+			// Check pool limits
+			const accountLimit = pool === "pending" ? ACCOUNT_SLOTS : ACCOUNT_QUEUE;
+			if (!isLocalTransaction && existingTxs.length >= accountLimit) {
+				throw EthereumJSErrorWithoutCode(
+					`Cannot add tx: account ${address} exceeds ${pool} limit of ${accountLimit}`,
+				);
+			}
+
+			const txObj: TxPoolObject = { tx, added, hash };
+			existingTxs.push(txObj);
+			existingTxs.sort((a, b) => Number(a.tx.nonce - b.tx.nonce));
+			targetPool.set(address, existingTxs);
+
+			// Track in priced heap
+			this.priced.insert(txObj);
+
+			// Track as local if applicable
+			if (isLocalTransaction) {
+				this.locals.add(hash);
+			}
+
+			// Update counts
+			if (pool === "pending") this.pendingCount++;
+			else this.queuedCount++;
+
 			this.handled.set(hash, { address, added });
 
-			this.txsInPool++;
-
-			if (isLegacyTx(tx)) {
-				this.config.metrics?.legacyTxGauge?.inc();
+			// Try to promote queued txs if we added to pending
+			if (pool === "pending") {
+				await this.promoteExecutables(address);
 			}
+
+			// Enforce global limits
+			this.enforcePoolLimits();
 		} catch (e) {
 			this.handled.set(hash, { address, added, error: e as Error });
 			throw e;
 		}
+	}
+
+	/**
+	 * Promotes transactions from queued to pending when they become executable.
+	 * Called after new blocks are processed or new transactions are added.
+	 * @param address Optional specific address to check (undefined = all addresses)
+	 */
+	async promoteExecutables(address?: UnprefixedAddress): Promise<void> {
+		const addresses = address ? [address] : Array.from(this.queued.keys());
+
+		for (const addr of addresses) {
+			const queuedTxs = this.queued.get(addr);
+			if (!queuedTxs || queuedTxs.length === 0) continue;
+
+			// Get current account nonce
+			let accountNonce = this.accountNonces.get(addr);
+			if (accountNonce === undefined) {
+				const block = await this.service.chain.getCanonicalHeadHeader();
+				const vmCopy = await this.service.execution.vm.shallowCopy();
+				await vmCopy.stateManager.setStateRoot(block.stateRoot);
+				const addrObj = new Address(hexToBytes(`0x${addr}`));
+				const account =
+					(await vmCopy.stateManager.getAccount(addrObj)) ?? new Account();
+				accountNonce = account.nonce;
+				this.accountNonces.set(addr, accountNonce);
+			}
+
+			// Determine the next expected nonce (account nonce or highest pending + 1)
+			const pendingTxs = this.pending.get(addr) ?? [];
+			let nextExpectedNonce = accountNonce;
+			if (pendingTxs.length > 0) {
+				const maxPendingNonce = pendingTxs.reduce(
+					(max, obj) => (obj.tx.nonce > max ? obj.tx.nonce : max),
+					pendingTxs[0].tx.nonce,
+				);
+				nextExpectedNonce = maxPendingNonce + BIGINT_1;
+			}
+
+			// Sort queued by nonce
+			queuedTxs.sort((a, b) => Number(a.tx.nonce - b.tx.nonce));
+
+			// Promote consecutive executable txs
+			const toPromote: TxPoolObject[] = [];
+			const remaining: TxPoolObject[] = [];
+
+			for (const txObj of queuedTxs) {
+				if (txObj.tx.nonce === nextExpectedNonce) {
+					toPromote.push(txObj);
+					nextExpectedNonce = txObj.tx.nonce + BIGINT_1;
+				} else if (txObj.tx.nonce < accountNonce) {
+					// Stale tx - remove it entirely
+					this.queuedCount--;
+					this.removeFromPriced(txObj);
+					this.handled.delete(txObj.hash);
+				} else {
+					// Still has a gap - keep in queued
+					remaining.push(txObj);
+				}
+			}
+
+			// Move promoted txs to pending
+			if (toPromote.length > 0) {
+				const newPending = [...pendingTxs, ...toPromote];
+				newPending.sort((a, b) => Number(a.tx.nonce - b.tx.nonce));
+				this.pending.set(addr, newPending);
+				this.pendingCount += toPromote.length;
+				this.queuedCount -= toPromote.length;
+
+				this.config.logger?.debug(
+					`Promoted ${toPromote.length} txs from queued to pending for ${addr}`,
+				);
+			}
+
+			// Update queued
+			if (remaining.length === 0) {
+				this.queued.delete(addr);
+			} else {
+				this.queued.set(addr, remaining);
+			}
+		}
+	}
+
+	/**
+	 * Demotes transactions from pending to queued when they become non-executable.
+	 * Called after chain reorgs or when account state changes.
+	 */
+	async demoteUnexecutables(): Promise<void> {
+		const block = await this.service.chain.getCanonicalHeadHeader();
+		const vmCopy = await this.service.execution.vm.shallowCopy();
+
+		try {
+			await vmCopy.stateManager.setStateRoot(block.stateRoot);
+		} catch (error) {
+			this.config.logger?.error(`Error setting state root: ${error}`);
+			return;
+		}
+
+		for (const [addr, pendingTxs] of this.pending) {
+			const addrObj = new Address(hexToBytes(`0x${addr}`));
+			const account =
+				(await vmCopy.stateManager.getAccount(addrObj)) ?? new Account();
+			const accountNonce = account.nonce;
+			const accountBalance = account.balance;
+
+			// Update nonce cache
+			this.accountNonces.set(addr, accountNonce);
+
+			const stillPending: TxPoolObject[] = [];
+			const toDemote: TxPoolObject[] = [];
+			const toRemove: TxPoolObject[] = [];
+
+			// Sort by nonce first
+			pendingTxs.sort((a, b) => Number(a.tx.nonce - b.tx.nonce));
+
+			let lastValidNonce = accountNonce - BIGINT_1;
+
+			for (const txObj of pendingTxs) {
+				const tx = txObj.tx;
+				const gasPrice = this.txGasPrice(tx);
+				const cost = tx.value + gasPrice.maxFee * tx.gasLimit;
+
+				if (tx.nonce < accountNonce) {
+					// Already mined - remove
+					toRemove.push(txObj);
+				} else if (accountBalance < cost) {
+					// Insufficient balance - demote to queued
+					toDemote.push(txObj);
+				} else if (tx.nonce !== lastValidNonce + BIGINT_1) {
+					// Nonce gap - demote to queued
+					toDemote.push(txObj);
+				} else {
+					// Still valid
+					stillPending.push(txObj);
+					lastValidNonce = tx.nonce;
+				}
+			}
+
+			// Remove stale txs
+			for (const txObj of toRemove) {
+				this.pendingCount--;
+				this.removeFromPriced(txObj);
+				this.handled.delete(txObj.hash);
+				this.locals.delete(txObj.hash);
+			}
+
+			// Demote to queued
+			if (toDemote.length > 0) {
+				const existingQueued = this.queued.get(addr) ?? [];
+				const newQueued = [...existingQueued, ...toDemote];
+				newQueued.sort((a, b) => Number(a.tx.nonce - b.tx.nonce));
+				this.queued.set(addr, newQueued);
+				this.pendingCount -= toDemote.length;
+				this.queuedCount += toDemote.length;
+
+				this.config.logger?.debug(
+					`Demoted ${toDemote.length} txs from pending to queued for ${addr}`,
+				);
+			}
+
+			// Update pending
+			if (stillPending.length === 0) {
+				this.pending.delete(addr);
+			} else {
+				this.pending.set(addr, stillPending);
+			}
+		}
+	}
+
+	/**
+	 * Removes a transaction from the priced heap.
+	 * Note: QHeap doesn't support arbitrary removal, so we need to rebuild.
+	 */
+	private removeFromPriced(txObj: TxPoolObject): void {
+		const newHeap = new Heap({
+			comparBefore: (a: TxPoolObject, b: TxPoolObject) =>
+				this.txGasPrice(a.tx).tip < this.txGasPrice(b.tx).tip,
+		}) as QHeap<TxPoolObject>;
+
+		while (this.priced.length > 0) {
+			const item = this.priced.remove();
+			if (item && item.hash !== txObj.hash) {
+				newHeap.insert(item);
+			}
+		}
+		this.priced = newHeap;
+	}
+
+	/**
+	 * Gets the minimum gas price in the pool (for underpriced detection).
+	 */
+	getMinPrice(): bigint {
+		const lowest = this.priced.peek();
+		if (!lowest) return BIGINT_0;
+		return this.txGasPrice(lowest.tx).tip;
+	}
+
+	clearNonceCache(address?: UnprefixedAddress): void {
+		if (address) {
+			this.accountNonces.delete(address);
+		} else {
+			this.accountNonces.clear();
+		}
+	}
+
+	/**
+	 * Enforces global pool size limits by evicting lowest-priced transactions.
+	 * Local transactions are protected from eviction.
+	 */
+	private enforcePoolLimits(): void {
+		// Enforce pending limit
+		while (this.pendingCount > GLOBAL_SLOTS) {
+			const evicted = this.evictLowestPriced("pending");
+			if (!evicted) break; // No more evictable txs
+		}
+
+		// Enforce queued limit
+		while (this.queuedCount > GLOBAL_QUEUE) {
+			const evicted = this.evictLowestPriced("queued");
+			if (!evicted) break;
+		}
+	}
+
+	/**
+	 * Evicts the lowest-priced non-local transaction from a pool.
+	 * @returns true if a tx was evicted, false if none could be evicted
+	 */
+	private evictLowestPriced(pool: "pending" | "queued"): boolean {
+		const targetPool = pool === "pending" ? this.pending : this.queued;
+
+		// Find lowest priced non-local tx
+		let lowestPrice = BigInt(Number.MAX_SAFE_INTEGER);
+		let lowestTx: TxPoolObject | null = null;
+		let lowestAddr: UnprefixedAddress | null = null;
+
+		for (const [addr, txObjs] of targetPool) {
+			for (const txObj of txObjs) {
+				// Skip local transactions
+				if (this.locals.has(txObj.hash)) continue;
+
+				const price = this.txGasPrice(txObj.tx).tip;
+				if (price < lowestPrice) {
+					lowestPrice = price;
+					lowestTx = txObj;
+					lowestAddr = addr;
+				}
+			}
+		}
+
+		if (!lowestTx || !lowestAddr) return false;
+
+		// Remove the tx
+		this.removeByHash(lowestTx.hash, lowestTx.tx);
+		this.config.logger?.debug(
+			`Evicted underpriced tx ${lowestTx.hash} (price: ${lowestPrice}) from ${pool}`,
+		);
+
+		return true;
 	}
 
 	/**
@@ -360,16 +829,23 @@ export class TxPool {
 	 * @returns Array of tx objects
 	 */
 	getByHash(txHashes: Uint8Array[]): TypedTransaction[] {
-		const found = [];
+		const found: TypedTransaction[] = [];
 		for (const txHash of txHashes) {
 			const txHashStr = bytesToUnprefixedHex(txHash);
 			const handled = this.handled.get(txHashStr);
-			if (!handled) continue;
-			const inPool = this.pool
-				.get(handled.address)
-				?.filter((poolObj) => poolObj.hash === txHashStr);
-			if (inPool && inPool.length === 1) {
-				found.push(inPool[0].tx);
+			if (!handled || handled.error !== undefined) continue;
+
+			// Search pending first (more likely)
+			let inPool = this.pending.get(handled.address);
+			if (!inPool) {
+				// Try queued
+				inPool = this.queued.get(handled.address);
+			}
+			if (!inPool) continue;
+
+			const match = inPool.find((poolObj) => poolObj.hash === txHashStr);
+			if (match) {
+				found.push(match.tx);
 			}
 		}
 		return found;
@@ -383,41 +859,97 @@ export class TxPool {
 		const handled = this.handled.get(txHash);
 		if (!handled) return;
 		const { address } = handled;
-		const poolObjects = this.pool.get(address);
-		if (!poolObjects) return;
-		const newPoolObjects = poolObjects.filter(
-			(poolObj) => poolObj.hash !== txHash,
-		);
-		this.txsInPool--;
-		if (newPoolObjects.length === 0) {
-			// List of txs for address is now empty, can delete
-			this.pool.delete(address);
-		} else {
-			// There are more txs from this address
-			this.pool.set(address, newPoolObjects);
+
+		// Try pending first
+		let poolObjects = this.pending.get(address);
+		let pool: "pending" | "queued" = "pending";
+
+		if (!poolObjects || !poolObjects.find((obj) => obj.hash === txHash)) {
+			// Try queued
+			poolObjects = this.queued.get(address);
+			pool = "queued";
 		}
 
-		if (isLegacyTx(tx)) {
-			this.config.metrics?.legacyTxGauge?.dec();
+		if (!poolObjects) return;
+
+		const txObj = poolObjects.find((obj) => obj.hash === txHash);
+		if (!txObj) return;
+
+		const newPoolObjects = poolObjects.filter((obj) => obj.hash !== txHash);
+
+		// Update the correct pool
+		const targetPool = pool === "pending" ? this.pending : this.queued;
+		if (newPoolObjects.length === 0) {
+			targetPool.delete(address);
+		} else {
+			targetPool.set(address, newPoolObjects);
+		}
+
+		// Update counts
+		if (pool === "pending") this.pendingCount--;
+		else this.queuedCount--;
+
+		// Remove from priced heap
+		this.removeFromPriced(txObj);
+
+		// Remove from locals if present
+		this.locals.delete(txHash);
+	}
+
+	/**
+	 * Broadcast transactions to peers using Geth-style sqrt propagation.
+	 * Full transactions go to sqrt(n) peers, hashes to the rest.
+	 * @param txs Transactions to broadcast
+	 * @param peers Optional peer list (defaults to all connected peers)
+	 */
+	broadcastTransactions(txs: TypedTransaction[], peers?: Peer[]) {
+		if (txs.length === 0) return;
+
+		const targetPeers = peers ?? this.service.pool.peers;
+		const numPeers = targetPeers.length;
+		if (numPeers === 0) return;
+
+		// Calculate sqrt(n) peers for full tx broadcast
+		const numFullBroadcast = Math.max(
+			this.MIN_BROADCAST_PEERS,
+			Math.floor(Math.sqrt(numPeers)),
+		);
+
+		// Prepare hash announcement data
+		const txHashes: [number[], number[], Uint8Array[]] = [[], [], []];
+		for (const tx of txs) {
+			txHashes[0].push(tx.type);
+			txHashes[1].push(tx.serialize().byteLength);
+			txHashes[2].push(tx.hash());
+		}
+
+		// Send full transactions to sqrt(n) peers
+		this.sendTransactions(txs, targetPeers.slice(0, numFullBroadcast));
+
+		// Send only hashes to remaining peers
+		if (numFullBroadcast < numPeers) {
+			this.sendNewTxHashes(txHashes, targetPeers.slice(numFullBroadcast));
 		}
 	}
 
 	/**
-	 * Broadcast transactions to peers
+	 * Send full transactions to specific peers (internal use)
 	 */
 	sendTransactions(txs: TypedTransaction[], peers: Peer[]) {
-		if (txs.length > 0) {
-			const hashes = txs.map((tx) => tx.hash());
-			for (const peer of peers) {
-				// This is used to avoid re-sending along pooledTxHashes
-				// announcements/re-broadcasts
-				const newHashes = this.addToKnownByPeer(hashes, peer);
-				const newHashesHex = newHashes.map((txHash) =>
-					bytesToUnprefixedHex(txHash),
-				);
-				const newTxs = txs.filter((tx) =>
-					newHashesHex.includes(bytesToUnprefixedHex(tx.hash())),
-				);
+		if (txs.length === 0 || peers.length === 0) return;
+
+		const hashes = txs.map((tx) => tx.hash());
+		for (const peer of peers) {
+			// This is used to avoid re-sending along pooledTxHashes
+			// announcements/re-broadcasts
+			const newHashes = this.addToKnownByPeer(hashes, peer);
+			const newHashesHex = newHashes.map((txHash) =>
+				bytesToUnprefixedHex(txHash),
+			);
+			const newTxs = txs.filter((tx) =>
+				newHashesHex.includes(bytesToUnprefixedHex(tx.hash())),
+			);
+			if (newTxs.length > 0) {
 				peer.eth?.request("Transactions", newTxs).catch((e) => {
 					this.markFailedSends(peer, newHashes, e as Error);
 				});
@@ -510,7 +1042,7 @@ export class TxPool {
 			peer,
 		);
 
-		const newTxHashes: [number[], number[], Uint8Array[]] = [] as any;
+		const newTxHashes: [number[], number[], Uint8Array[]] = [[], [], []];
 		for (const tx of txs) {
 			try {
 				await this.add(tx);
@@ -523,14 +1055,23 @@ export class TxPool {
 				);
 			}
 		}
+
+		// Geth-style sqrt propagation:
+		// - Send full transactions to sqrt(n) peers (minimum MIN_BROADCAST_PEERS)
+		// - Send only hashes to remaining peers
 		const peers = peerPool.peers;
 		const numPeers = peers.length;
-		const sendFull = Math.max(
-			1,
-			Math.floor(numPeers / this.NUM_PEERS_REBROADCAST_QUOTIENT),
+		const numFullBroadcast = Math.max(
+			this.MIN_BROADCAST_PEERS,
+			Math.floor(Math.sqrt(numPeers)),
 		);
-		this.sendTransactions(txs, peers.slice(0, sendFull));
-		this.sendNewTxHashes(newTxHashes, peers.slice(sendFull));
+
+		// Send full transactions to sqrt(n) peers
+		this.sendTransactions(txs, peers.slice(0, numFullBroadcast));
+		// Send only hashes to remaining peers
+		if (numFullBroadcast < numPeers) {
+			this.sendNewTxHashes(newTxHashes, peers.slice(numFullBroadcast));
+		}
 	}
 
 	addToKnownByPeer(txHashes: Uint8Array[], peer: Peer): Uint8Array[] {
@@ -574,7 +1115,11 @@ export class TxPool {
 		const reqHashes = [];
 		for (const txHash of txHashes) {
 			const txHashStr: UnprefixedHash = bytesToUnprefixedHex(txHash);
-			if (this.pending.includes(txHashStr) || this.handled.has(txHashStr)) {
+			// Skip if already being fetched or already handled
+			if (
+				this.fetchingHashes.includes(txHashStr) ||
+				this.handled.has(txHashStr)
+			) {
 				continue;
 			}
 			reqHashes.push(txHash);
@@ -587,16 +1132,18 @@ export class TxPool {
 		);
 
 		const reqHashesStr: UnprefixedHash[] = reqHashes.map(bytesToUnprefixedHex);
-		this.pending = this.pending.concat(reqHashesStr);
+		this.fetchingHashes = this.fetchingHashes.concat(reqHashesStr);
 		this.config.logger?.debug(
-			`TxPool: requesting txs number=${reqHashes.length} pending=${this.pending.length}`,
+			`TxPool: requesting txs number=${reqHashes.length} fetching=${this.fetchingHashes.length}`,
 		);
 		const getPooledTxs = await peer.eth?.getPooledTransactions({
 			hashes: reqHashes.slice(0, this.TX_RETRIEVAL_LIMIT),
 		});
 
-		// Remove from pending list regardless if tx is in result
-		this.pending = this.pending.filter((hash) => !reqHashesStr.includes(hash));
+		// Remove from fetching list regardless if tx is in result
+		this.fetchingHashes = this.fetchingHashes.filter(
+			(hash) => !reqHashesStr.includes(hash),
+		);
 
 		if (getPooledTxs === undefined) {
 			return;
@@ -639,28 +1186,71 @@ export class TxPool {
 	 * Regular tx pool cleanup
 	 */
 	cleanup() {
-		// Remove txs older than POOLED_STORAGE_TIME_LIMIT from the pool
-		// as well as the list of txs being known by a peer
-		let compDate = Date.now() - this.POOLED_STORAGE_TIME_LIMIT * 1000 * 60;
-		for (const [i, mapToClean] of [this.pool, this.knownByPeer].entries()) {
-			for (const [key, objects] of mapToClean) {
-				const updatedObjects = objects.filter((obj) => obj.added >= compDate);
-				if (updatedObjects.length < objects.length) {
-					if (i === 0) this.txsInPool -= objects.length - updatedObjects.length;
-					if (updatedObjects.length === 0) {
-						mapToClean.delete(key);
-					} else {
-						mapToClean.set(key, updatedObjects);
+		// Remove txs older than POOLED_STORAGE_TIME_LIMIT from the pools
+		const compDate = Date.now() - this.POOLED_STORAGE_TIME_LIMIT * 1000 * 60;
+
+		// Cleanup pending pool
+		for (const [address, txObjs] of this.pending) {
+			const updatedObjects = txObjs.filter((obj) => obj.added >= compDate);
+			const removedCount = txObjs.length - updatedObjects.length;
+			if (removedCount > 0) {
+				this.pendingCount -= removedCount;
+				// Remove from priced heap for each removed tx
+				for (const txObj of txObjs) {
+					if (txObj.added < compDate) {
+						this.removeFromPriced(txObj);
+						this.handled.delete(txObj.hash);
+						this.locals.delete(txObj.hash);
 					}
+				}
+				if (updatedObjects.length === 0) {
+					this.pending.delete(address);
+				} else {
+					this.pending.set(address, updatedObjects);
+				}
+			}
+		}
+
+		// Cleanup queued pool
+		for (const [address, txObjs] of this.queued) {
+			const updatedObjects = txObjs.filter((obj) => obj.added >= compDate);
+			const removedCount = txObjs.length - updatedObjects.length;
+			if (removedCount > 0) {
+				this.queuedCount -= removedCount;
+				// Remove from priced heap for each removed tx
+				for (const txObj of txObjs) {
+					if (txObj.added < compDate) {
+						this.removeFromPriced(txObj);
+						this.handled.delete(txObj.hash);
+						this.locals.delete(txObj.hash);
+					}
+				}
+				if (updatedObjects.length === 0) {
+					this.queued.delete(address);
+				} else {
+					this.queued.set(address, updatedObjects);
+				}
+			}
+		}
+
+		// Cleanup knownByPeer
+		for (const [peerId, sentObjects] of this.knownByPeer) {
+			const updatedObjects = sentObjects.filter((obj) => obj.added >= compDate);
+			if (updatedObjects.length < sentObjects.length) {
+				if (updatedObjects.length === 0) {
+					this.knownByPeer.delete(peerId);
+				} else {
+					this.knownByPeer.set(peerId, updatedObjects);
 				}
 			}
 		}
 
 		// Cleanup handled txs
-		compDate = Date.now() - this.HANDLED_CLEANUP_TIME_LIMIT * 1000 * 60;
-		for (const [address, handleObj] of this.handled) {
-			if (handleObj.added < compDate) {
-				this.handled.delete(address);
+		const handledCompDate =
+			Date.now() - this.HANDLED_CLEANUP_TIME_LIMIT * 1000 * 60;
+		for (const [hash, handleObj] of this.handled) {
+			if (handleObj.added < handledCompDate) {
+				this.handled.delete(hash);
 			}
 		}
 	}
@@ -704,27 +1294,26 @@ export class TxPool {
 		{ baseFee, allowedBlobs }: { baseFee?: bigint; allowedBlobs?: number } = {},
 	) {
 		const txs: TypedTransaction[] = [];
-		// Separate the transactions by account and sort by nonce
 		const byNonce = new Map<string, TypedTransaction[]>();
-		const skippedStats = { byNonce: 0, byPrice: 0 };
+		let skippedByNonce = 0;
 
-		for (const [address, poolObjects] of this.pool) {
-			let txsSortedByNonce = poolObjects
+		// Only iterate over pending pool - these are executable
+		for (const [address, poolObjects] of this.pending) {
+			const txsSortedByNonce = poolObjects
 				.map((obj) => obj.tx)
 				.sort((a, b) => Number(a.nonce - b.nonce));
 
-			// Check if the account nonce matches the lowest known tx nonce
+			// Verify account nonce matches lowest tx nonce
 			let account = await vm.stateManager.getAccount(
 				new Address(hexToBytes(`0x${address}`)),
 			);
 			if (account === undefined) {
 				account = new Account();
 			}
-			const { nonce } = account;
-			if (txsSortedByNonce[0].nonce !== nonce) {
-				// Account nonce does not match the lowest known tx nonce,
-				// therefore no txs from this address are currently executable
-				skippedStats.byNonce += txsSortedByNonce.length;
+
+			if (txsSortedByNonce[0].nonce !== account.nonce) {
+				// Shouldn't happen if promoteExecutables works correctly
+				skippedByNonce += txsSortedByNonce.length;
 				continue;
 			}
 			byNonce.set(address, txsSortedByNonce);
@@ -758,7 +1347,7 @@ export class TxPool {
 			txs.push(best);
 		}
 		this.config.logger?.info(
-			`txsByPriceAndNonce selected txs=${txs.length}, skipped byNonce=${skippedStats.byNonce} byPrice=${skippedStats.byPrice}`,
+			`txsByPriceAndNonce selected txs=${txs.length}, skipped byNonce=${skippedByNonce}`,
 		);
 		return txs;
 	}
@@ -770,6 +1359,11 @@ export class TxPool {
 		if (!this.running) return false;
 		clearInterval(this._cleanupInterval as NodeJS.Timeout);
 		clearInterval(this._logInterval as NodeJS.Timeout);
+		// In stop():
+		if (this.rebroadcastInterval) {
+			clearInterval(this.rebroadcastInterval);
+			this.rebroadcastInterval = undefined;
+		}
 		this.running = false;
 		this.config.logger?.info("TxPool stopped.");
 		return true;
@@ -779,9 +1373,22 @@ export class TxPool {
 	 * Close pool
 	 */
 	close() {
-		this.pool.clear();
+		this.pending.clear();
+		this.queued.clear();
 		this.handled.clear();
-		this.txsInPool = 0;
+		this.accountNonces.clear();
+		this.locals.clear();
+		this.knownByPeer.clear();
+		this.fetchingHashes = [];
+		this.pendingCount = 0;
+		this.queuedCount = 0;
+
+		// Rebuild empty priced heap
+		this.priced = new Heap({
+			comparBefore: (a: TxPoolObject, b: TxPoolObject) =>
+				this.txGasPrice(a.tx).tip < this.txGasPrice(b.tx).tip,
+		}) as QHeap<TxPoolObject>;
+
 		if (this.config.metrics !== undefined) {
 			// TODO: Only clear the metrics related to the transaction pool here
 			for (const [_, metric] of Object.entries(this.config.metrics)) {
@@ -802,14 +1409,18 @@ export class TxPool {
 			).length;
 			knownpeers++;
 		}
+
+		const totalTxs = this.pendingCount + this.queuedCount;
+		const totalSenders = this.pending.size + this.queued.size;
+
 		// Get average
 		if (knownpeers > 0) {
 			broadcasts = broadcasts / knownpeers;
 			broadcasterrors = broadcasterrors / knownpeers;
 		}
-		if (this.txsInPool > 0) {
-			broadcasts = broadcasts / this.txsInPool;
-			broadcasterrors = broadcasterrors / this.txsInPool;
+		if (totalTxs > 0) {
+			broadcasts = broadcasts / totalTxs;
+			broadcasterrors = broadcasterrors / totalTxs;
 		}
 
 		let handledadds = 0;
@@ -822,7 +1433,7 @@ export class TxPool {
 			}
 		}
 		this.config.logger?.info(
-			`TxPool Statistics txs=${this.txsInPool} senders=${this.pool.size} peers=${this.service.pool.peers.length}`,
+			`TxPool Statistics pending=${this.pendingCount} queued=${this.queuedCount} senders=${totalSenders} peers=${this.service.pool.peers.length}`,
 		);
 		this.config.logger?.info(
 			`TxPool Statistics broadcasts=${broadcasts}/tx/peer broadcasterrors=${broadcasterrors}/tx/peer knownpeers=${knownpeers} since minutes=${this.POOLED_STORAGE_TIME_LIMIT}`,

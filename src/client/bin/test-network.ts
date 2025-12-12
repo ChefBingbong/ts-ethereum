@@ -26,10 +26,10 @@ import { EthereumClient } from "../client.ts";
 import { Config, DataDirectory, SyncMode } from "../config.ts";
 import { LevelDB } from "../execution/level.ts";
 import { getLogger, type Logger } from "../logging.ts";
+import { createRpcManager, RPCArgs } from "../rpc/index.ts";
 import type { FullEthereumService } from "../service/fullethereumservice.ts";
 import { Event } from "../types.ts";
 import { setupMetrics } from "../util/metrics.ts";
-import { type RPCArgs, startRPCServers } from "../util/rpc.ts";
 
 export type Account = [address: Address, privateKey: Uint8Array];
 
@@ -415,22 +415,9 @@ async function startClient() {
 		rpc: true,
 		rpcAddr: "127.0.0.1",
 		rpcPort,
-		ws: false,
-		wsPort: rpcPort + 100,
-		wsAddr: "127.0.0.1",
-		rpcEngine: true,
-		rpcEngineAddr: "127.0.0.1",
-		rpcEnginePort: rpcPort + 200,
-		wsEngineAddr: "127.0.0.1",
-		wsEnginePort: rpcPort + 300,
-		rpcDebug: "",
-		rpcDebugVerbose: "",
-		helpRPC: true,
-		rpcEngineAuth: true,
-		rpcCors: "*",
 	};
 
-	startRPCServers(client, rpcArgs);
+	createRpcManager(client, rpcArgs);
 
 	console.log("\n" + "=".repeat(60));
 	console.log("✅ Node started successfully!");
