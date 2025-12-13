@@ -13,6 +13,7 @@ dist
 .env.send
 
 test-network-data/
+test-network-data-p2p/
 keys/
 # code coverage
 coverage

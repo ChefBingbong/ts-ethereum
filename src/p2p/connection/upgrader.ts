@@ -6,6 +6,7 @@ import * as mss from '../multi-stream-select'
 import { MplexStreamMuxer, StreamMuxerFactory } from '../muxer'
 import { AbstractMessageStream } from '../stream/default-message-stream'
 import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
+import { BasicConnection, createBasicConnection } from './basic-connection'
 import { Connection, createConnection } from './connection'
 import { Registrar } from './registrar'
 import { AbortOptions, PeerId } from './types'
@@ -98,6 +99,26 @@ export class Upgrader {
 
   async upgradeOutbound (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<Connection> {
     return await this._performUpgrade(maConn, 'outbound', opts)
+  }
+
+  /**
+   * Upgrade inbound connection to BasicConnection (no muxing, RLPx compatible)
+   */
+  async upgradeInboundBasic (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<BasicConnection> {
+    const signal = this.createInboundAbortSignal(opts.signal)
+    
+    try {
+      return await this._performBasicUpgrade(maConn, 'inbound', { signal })
+    } finally {
+      signal.clear()
+    }
+  }
+
+  /**
+   * Upgrade outbound connection to BasicConnection (no muxing, RLPx compatible)
+   */
+  async upgradeOutboundBasic (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<BasicConnection> {
+    return await this._performBasicUpgrade(maConn, 'outbound', opts)
   }
 
   private async _performUpgrade (
@@ -295,6 +316,54 @@ export class Upgrader {
 
   getStreamMuxerFactory (): StreamMuxerFactory {
     return this.streamMuxerFactory
+  }
+
+  /**
+   * Perform basic upgrade (encryption only, no muxing)
+   * Creates a BasicConnection compatible with RLPx
+   */
+  private async _performBasicUpgrade(
+    maConn: AbstractMultiaddrConnection,
+    direction: 'inbound' | 'outbound',
+    opts: AbortOptions = {}
+  ): Promise<BasicConnection> {
+    let stream: AbstractMessageStream = maConn
+    let remotePeer: PeerId
+    let cryptoProtocol: string
+
+    const id = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`
+
+    try {
+      // Encrypt if encrypter configured
+      if (this.connectionEncrypter) {
+        const encrypted = direction === 'inbound'
+          ? await this._encryptInboundDirect(stream, opts)
+          : await this._encryptOutboundDirect(stream, opts)
+
+        stream = encrypted.connection
+        remotePeer = encrypted.remotePeer
+        cryptoProtocol = encrypted.protocol
+      } else {
+        // No encryption - use peer ID from connection options
+        const maConnAny = maConn as any
+        remotePeer = maConnAny.remotePeerId || this.id
+        cryptoProtocol = 'none'
+        maConn.log('skipping encryption (testing mode), remote peer: %s', Buffer.from(remotePeer).toString('hex').slice(0, 16))
+      }
+
+      return createBasicConnection({
+        id,
+        cryptoProtocol,
+        direction,
+        maConn,
+        stream,
+        remotePeer,
+        closeTimeout: this.connectionCloseTimeout
+      })
+    } catch (err: any) {
+      maConn.log.error('failed to upgrade %s basic connection: %s', direction, err.message)
+      throw err
+    }
   }
 }
 

@@ -1,12 +1,12 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_P2P } from '@multiformats/multiaddr'
-import { TypedEventEmitter, setMaxListeners } from 'main-event'
-import { bytesToUnprefixedHex } from '../../utils'
+import { setMaxListeners } from 'main-event'
 import * as mss from '../multi-stream-select'
 import { MplexStreamMuxer } from '../muxer'
 import { AbstractMessageStream } from '../stream/default-message-stream'
-import { MessageStreamDirection, MessageStreamEvents, StreamCloseEvent } from '../stream/types'
+import { MessageStreamDirection } from '../stream/types'
 import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
+import { BasicConnection } from './basic-connection'
 import { DEFAULT_MAX_INBOUND_STREAMS, DEFAULT_MAX_OUTBOUND_STREAMS, Registrar } from './registrar'
 import { AbortOptions, NewStreamOptions, PeerId } from './types'
 
@@ -34,37 +34,29 @@ const isDirect = (multiaddr: Multiaddr): boolean => {
   return multiaddr.getComponents().find(component => component.code === CODE_P2P) != null
 }
 
-export class Connection extends TypedEventEmitter<MessageStreamEvents> {
-  public readonly id: string
-  public readonly remoteAddr: Multiaddr
-  public readonly remotePeer: PeerId
-  public direction: MessageStreamDirection
+export class Connection extends BasicConnection {
   public direct: boolean
-  public multiplexer?: string
-  public encryption?: string
 
-  private readonly maConn: AbstractMultiaddrConnection
   private readonly muxer?: MplexStreamMuxer
   private readonly components: ConnectionComponents
   private readonly outboundStreamProtocolNegotiationTimeout: number
   private readonly inboundStreamProtocolNegotiationTimeout: number
-  private readonly closeTimeout: number
 
   constructor (components: ConnectionComponents, init: ConnectionInit) {
-    super()
+    super({
+      id: init.id,
+      maConn: init.maConn,
+      stream: init.stream,
+      remotePeer: init.remotePeer,
+      direction: init.direction,
+      cryptoProtocol: init.cryptoProtocol,
+      closeTimeout: init.closeTimeout
+    })
 
     this.components = components
-
-    this.id = init.id
-    this.remoteAddr = init.maConn.remoteAddr
-    this.remotePeer = init.remotePeer
-    this.direction = init.direction ?? 'outbound'
-    this.encryption = init.cryptoProtocol
-    this.maConn = init.maConn
     this.muxer = init.muxer
     this.outboundStreamProtocolNegotiationTimeout = init.outboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
     this.inboundStreamProtocolNegotiationTimeout = init.inboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
-    this.closeTimeout = init.closeTimeout ?? CONNECTION_CLOSE_TIMEOUT
     this.direct = isDirect(init.maConn.remoteAddr)
 
     this.onIncomingStream = this.onIncomingStream.bind(this)
@@ -73,25 +65,13 @@ export class Connection extends TypedEventEmitter<MessageStreamEvents> {
       this.multiplexer = init.muxer.protocol
       this.muxer.addEventListener('stream', this.onIncomingStream)
     }
-
-    this.maConn.addEventListener('close', (evt) => {
-      this.dispatchEvent(new StreamCloseEvent(evt.local, evt.error))
-    })
   }
 
-  get status (): string {
-    return this.maConn.status
-  }
-
-  get streams () {
+  override get streams () {
     return this.muxer?.streams ?? []
   }
 
-  get log () {
-    return this.maConn.log
-  }
-
-  async newStream (protocols: string | string[], options: NewStreamOptions = {}): Promise<any> {
+  override async newStream (protocols: string | string[], options: NewStreamOptions = {}): Promise<any> {
     if (this.muxer == null) {
       throw new Error('Connection is not multiplexed')
     }
@@ -242,7 +222,7 @@ export class Connection extends TypedEventEmitter<MessageStreamEvents> {
   /**
    * Close the connection
    */
-  async close (options: AbortOptions = {}): Promise<void> {
+  override async close (options: AbortOptions = {}): Promise<void> {
     this.log('closing connection to %s', this.remoteAddr.toString())
 
     if (options.signal == null) {
@@ -256,19 +236,12 @@ export class Connection extends TypedEventEmitter<MessageStreamEvents> {
     }
 
     await this.muxer?.close(options)
-    await this.maConn.close(options)
+    await super.close(options)
   }
 
-  abort (err: Error): void {
+  override abort (err: Error): void {
     this.muxer?.abort(err)
-    this.maConn.abort(err)
-  }
-
-  /**
-   * Get remote peer ID as hex string
-   */
-  getRemotePeerIdString (): string {
-    return bytesToUnprefixedHex(this.remotePeer)
+    super.abort(err)
   }
 }
 
