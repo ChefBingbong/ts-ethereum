@@ -265,7 +265,7 @@ async function main() {
 			to: toAccount.address as Hex,
 			nonce: currentNonce,
 			value: amountWei,
-			gasPrice: 2500000000,
+			gasPrice: 2750000000,
 			gas: 21000,
 			type: "legacy",
 		} as any);

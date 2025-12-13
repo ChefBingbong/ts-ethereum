@@ -30,12 +30,14 @@ export interface SecuredConnection {
 export interface UpgraderInit {
   privateKey: Uint8Array
   id: Uint8Array
-  connectionEncrypter: ConnectionEncrypter
+  connectionEncrypter: ConnectionEncrypter | null
   streamMuxerFactory: StreamMuxerFactory
   inboundUpgradeTimeout?: number
   inboundStreamProtocolNegotiationTimeout?: number
   outboundStreamProtocolNegotiationTimeout?: number
   connectionCloseTimeout?: number
+  skipEncryptionNegotiation?: boolean  // Skip multi-stream-select for encryption (use direct)
+  skipMuxerNegotiation?: boolean       // Skip multi-stream-select for muxer (use direct)
 }
 
 export interface UpgraderComponents {
@@ -47,7 +49,7 @@ export const PROTOCOL_NEGOTIATION_TIMEOUT = 10_000
 export const CONNECTION_CLOSE_TIMEOUT = 1_000
 
 export class Upgrader {
-  private readonly connectionEncrypter: ConnectionEncrypter
+  private readonly connectionEncrypter: ConnectionEncrypter | null
   private readonly streamMuxerFactory: StreamMuxerFactory
   private readonly inboundUpgradeTimeout: number
   private readonly inboundStreamProtocolNegotiationTimeout: number
@@ -56,6 +58,8 @@ export class Upgrader {
   private readonly components: UpgraderComponents
   private readonly privateKey: Uint8Array
   private readonly id: Uint8Array
+  private readonly skipEncryptionNegotiation: boolean
+  private readonly skipMuxerNegotiation: boolean
 
   constructor (components: UpgraderComponents, init: UpgraderInit) {
     this.components = components
@@ -63,6 +67,8 @@ export class Upgrader {
     this.id = init.id
     this.connectionEncrypter = init.connectionEncrypter
     this.streamMuxerFactory = init.streamMuxerFactory
+    this.skipEncryptionNegotiation = init.skipEncryptionNegotiation ?? false
+    this.skipMuxerNegotiation = init.skipMuxerNegotiation ?? false
 
     this.inboundUpgradeTimeout = init.inboundUpgradeTimeout ?? INBOUND_UPGRADE_TIMEOUT
     this.inboundStreamProtocolNegotiationTimeout = init.inboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
@@ -133,9 +139,19 @@ export class Upgrader {
       // For now we trust the encrypted connection's peer ID
 
       // Multiplex the connection
-      const muxerFactory = await (direction === 'inbound'
-        ? this._multiplexInbound(stream, opts)
-        : this._multiplexOutbound(stream, opts))
+      let muxerFactory: StreamMuxerFactory
+      
+      if (this.skipMuxerNegotiation) {
+        // Skip multi-stream-select, use muxer directly
+        // This is necessary when ECIES encryption is used because the socket is in frame mode
+        maConn.log('skipping muxer negotiation, using %s directly', this.streamMuxerFactory.protocol)
+        muxerFactory = this.streamMuxerFactory
+      } else {
+        // Standard libp2p flow with multi-stream-select
+        muxerFactory = await (direction === 'inbound'
+          ? this._multiplexInbound(stream, opts)
+          : this._multiplexOutbound(stream, opts))
+      }
 
       maConn.log('create muxer %s', muxerFactory.protocol)
       muxer = muxerFactory.createStreamMuxer(stream)

@@ -13,26 +13,27 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { Level } from "level";
 import type { ConsensusDict } from "../../blockchain/index.ts";
 import {
-    createBlockchain,
-    EthashConsensus,
+	createBlockchain,
+	EthashConsensus,
 } from "../../blockchain/index.ts";
 import type { ChainConfig } from "../../chain-config/index.ts";
 import {
-    Common,
-    ConsensusAlgorithm,
-    Hardfork,
+	Common,
+	ConsensusAlgorithm,
+	Hardfork,
 } from "../../chain-config/index.ts";
 import { Ethash } from "../../eth-hash/index.ts";
 import {
-    Address,
-    bytesToHex,
-    bytesToUnprefixedHex,
-    createAddressFromPrivateKey,
+	Address,
+	bytesToHex,
+	bytesToUnprefixedHex,
+	createAddressFromPrivateKey,
 } from "../../utils/index.ts";
 import { EthereumClient } from "../client.ts";
 import { Config, DataDirectory, SyncMode } from "../config.ts";
 import { LevelDB } from "../execution/level.ts";
 import { getLogger, type Logger } from "../logging.ts";
+import { createRpcManager, RPCArgs } from "../rpc/index.ts";
 import type { FullEthereumService } from "../service/fullethereumservice.ts";
 import { Event } from "../types.ts";
 
@@ -433,6 +434,14 @@ async function startClient() {
 	const service = client.service;
 	await service.execution.open();
 	await service.execution.run();
+	const rpcPort = RPC_BASE_PORT + (port - BOOTNODE_PORT);
+	console.log(`Starting RPC server on port ${rpcPort}`);
+	const rpcArgs: RPCArgs = {
+		rpc: true,
+		rpcAddr: "127.0.0.1",
+		rpcPort,
+	};
+	createRpcManager(client, rpcArgs);
 
 	console.log("\n" + "=".repeat(60));
 	console.log("✅ Node started successfully!");

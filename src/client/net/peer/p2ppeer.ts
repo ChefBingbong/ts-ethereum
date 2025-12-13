@@ -1,8 +1,6 @@
 import { Connection } from "../../../p2p/connection/connection.ts";
 import { Registrar } from "../../../p2p/connection/registrar.ts";
 import { MplexStream } from "../../../p2p/muxer/index.ts";
-import * as RLP from "../../../rlp";
-import { bytesToBigInt, bytesToInt } from "../../../utils";
 import { BoundStreamEthProtocol } from "../protocol/boundstreamethprotocol.ts";
 import { StreamEthProtocol } from "../protocol/streamethprotocol.ts";
 import { Peer } from "./peer.ts";
@@ -30,6 +28,7 @@ export class P2PPeer extends Peer {
 	public registrar: Registrar;
 	public connected: boolean;
 	private streams: Map<string, MplexStream> = new Map();
+	private ethStream?: MplexStream;  // Persistent ETH protocol stream
 
 	/**
 	 * Create new P2P peer
@@ -96,88 +95,58 @@ export class P2PPeer extends Peer {
 						`✅ StreamEthProtocol opened for peer ${this.id.slice(0, 8)}...`,
 					);
 
-					// CRITICAL: Create BoundStreamEthProtocol and attach it to this.eth
-					// This is what the Synchronizer expects!
-					const boundProtocol = new BoundStreamEthProtocol(
-						this.connection,
-						protocol,
-						this.id,
-						this.config,
-					);
-					this.eth = boundProtocol as any;
-					
-					this.config.logger?.info(
-						`✅ Created BoundStreamEthProtocol - peer.eth now available for Synchronizer`,
-					);
-					
-					// Try to open a status stream to initiate handshake
+					// Open ONE persistent ETH stream for all communication with this peer
 					try {
 						const ethProtocols = protocol.getProtocolStrings();
 						this.config.logger?.info(
-							`🤝 Opening status stream for protocols: ${ethProtocols.join(", ")}`,
+							`🔗 Opening persistent ETH stream for protocols: ${ethProtocols.join(", ")}`,
 						);
-						const stream = await this.connection.newStream(ethProtocols);
+						
+						// Increase timeout for debugging
+						this.ethStream = await this.connection.newStream(ethProtocols, { 
+							signal: AbortSignal.timeout(30000)  // 30s timeout instead of default 10s
+						});
+						this.streams.set(this.ethStream.id, this.ethStream);
+						
 						this.config.logger?.info(
-							`✅ Status stream opened: ${stream.id} using protocol ${stream.protocol}`,
+							`✅ Persistent ETH stream opened: ${this.ethStream.id} using protocol ${this.ethStream.protocol}`,
+						);
+
+						// CRITICAL: Create BoundStreamEthProtocol with the persistent stream
+						// This is what the Synchronizer expects!
+						const boundProtocol = new BoundStreamEthProtocol(
+							this.connection,
+							protocol,
+							this.id,
+							this.config,
+							this.ethStream,  // Pass the persistent stream!
+							this,  // Pass peer reference for event emission
+						);
+						this.eth = boundProtocol as any;
+						
+						// Set peer reference after assignment (circular reference)
+						boundProtocol.setPeer(this);
+						
+						this.config.logger?.info(
+							`✅ Created BoundStreamEthProtocol with persistent stream - peer.eth ready`,
 						);
 						
-						// Track this stream
-						this.streams.set(stream.id, stream);
-						
-						// Send status message
-						await protocol.sendStatus(stream);
+						// Send initial STATUS on the persistent stream
+						await protocol.sendStatus(this.ethStream);
 						this.config.logger?.info(
 							`📤 Sent STATUS message to peer ${this.id.slice(0, 8)}...`,
 						);
 
-						// Listen for STATUS response on this specific stream
-						const handleStatusResponse = async (evt: any) => {
-							try {
-								// Extract data
-								let data: Uint8Array;
-								if (typeof evt.data?.subarray === 'function') {
-									data = evt.data.subarray();
-								} else if (evt.data instanceof Uint8Array) {
-									data = evt.data;
-								} else {
-									return;
-								}
-
-								// Parse STATUS response
-								const code = data[0];
-								if (code === 0x00) {  // STATUS
-									const payload = data.slice(1);
-									const decoded = RLP.decode(payload);
-									
-									if (Array.isArray(decoded) && decoded.length >= 5) {
-										const [version, chainId, td, bestHash, genesisHash] = decoded as any[];
-										const status = {
-											version: bytesToInt(version),
-											chainId: bytesToBigInt(chainId),
-											td: bytesToBigInt(td),
-											bestHash: bestHash,
-											genesisHash: genesisHash,
-										};
-
-										this.config.logger?.info(
-											`✅ Received STATUS response: chainId=${status.chainId}, td=${status.td}`,
-										);
-
-										// Set status on boundProtocol so Synchronizer can use it
-										boundProtocol.status = status;
-									}
-								}
-							} catch (err: any) {
-								this.config.logger?.error(
-									`Error parsing STATUS response: ${err.message}`,
-								);
-							}
-						};
-
-						stream.addEventListener("message", handleStatusResponse);
+						// BoundStreamEthProtocol will handle all messages on this stream
+						// including STATUS response, block headers/bodies responses, announcements, etc.
+						
+						// DON'T close this stream - it stays open until peer disconnects!
 					} catch (err: any) {
 						this.config.logger?.error(
-							`❌ Failed to open status stream: ${err.message}`,
+							`❌ Failed to open persistent ETH stream: ${err.message}`,
+						);
+						this.config.logger?.error(
+							`   Debug: connection status=${this.connection?.status}, muxer status=${(this.connection as any)?.muxer?.status}`,
 						);
 					}
 				} else {

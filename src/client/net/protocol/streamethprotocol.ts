@@ -1,27 +1,30 @@
 import {
-    type BlockBodyBytes,
-    type BlockHeader
+	type BlockBodyBytes,
+	type BlockBytes,
+	type BlockHeader,
+	createBlockFromBytesArray
 } from "../../../block";
 import type { Registrar } from "../../../p2p/connection/registrar.ts";
 import type { MplexStream } from "../../../p2p/muxer/index.ts";
 import * as RLP from "../../../rlp";
 import {
-    isLegacyTx,
-    type TypedTransaction
+	isLegacyTx,
+	type TypedTransaction
 } from "../../../tx";
 import {
-    BIGINT_0,
-    bigIntToUnpaddedBytes,
-    bytesToBigInt,
-    bytesToHex,
-    bytesToInt,
-    intToUnpaddedBytes
+	BIGINT_0,
+	bigIntToUnpaddedBytes,
+	bytesToBigInt,
+	bytesToHex,
+	bytesToInt,
+	intToUnpaddedBytes
 } from "../../../utils";
 import {
-    encodeReceipt
+	encodeReceipt
 } from "../../../vm";
 import type { Chain } from "../../blockchain";
 import type { TxReceiptWithType } from "../../execution/receipt.ts";
+import { Event } from "../../types.ts";
 import { Protocol, type ProtocolOptions } from "./protocol.ts";
 
 // Log type for receipts
@@ -172,87 +175,60 @@ export class StreamEthProtocol extends Protocol {
 	}
 
 	/**
-	 * Handle incoming stream
+	 * Handle incoming stream (persistent - don't close!)
 	 */
 	private async handleStream(stream: MplexStream) {
 		this.config.logger?.info(
-			`📨 ETH protocol stream opened: ${stream.id} (protocol: ${stream.protocol}), read buffer: ${(stream as any).readBufferLength || 0} bytes`,
+			`📨 Inbound ETH stream opened: ${stream.id} (protocol: ${stream.protocol}) - keeping alive for persistent communication`,
 		);
 
-		// IMPORTANT: Attach message listener IMMEDIATELY to catch any buffered data
+		// IMPORTANT: Attach message listener IMMEDIATELY
 		stream.addEventListener("message", async (evt: any) => {
 			try {
-				// StreamMessageEvent has .data property containing Uint8Array or Uint8ArrayList
+				// Extract data
 				if (!evt.data) {
-					this.config.logger?.error(
-						`❌ Message event has no .data property! Event: ${JSON.stringify(evt)}`,
-					);
 					return;
 				}
 
-				// Convert Uint8ArrayList to Uint8Array
-				// Uint8ArrayList has subarray() method that returns all bytes as Uint8Array
 				let data: Uint8Array;
 				if (typeof evt.data.subarray === 'function') {
 					data = evt.data.subarray();
 				} else if (evt.data instanceof Uint8Array) {
 					data = evt.data;
 				} else {
-					this.config.logger?.error(
-						`❌ evt.data has unexpected type: ${evt.data.constructor?.name || typeof evt.data}`,
-					);
-					return;
-				}
-
-				this.config.logger?.info(
-					`📥 Received message on stream ${stream.id}: ${data.length} bytes, hex: ${bytesToHex(data).slice(0, 40)}...`,
-				);
-
-				if (data.length === 0) {
-					this.config.logger?.warn(
-						`⚠️  Received empty message`,
-					);
 					return;
 				}
 
 				if (data.length < 2) {
-					this.config.logger?.warn(
-						`⚠️  Message too short (${data.length} bytes), expected at least 2 bytes (code + payload)`,
-					);
 					return;
 				}
+
+				this.config.logger?.info(
+					`📥 Received message on stream ${stream.id}: ${data.length} bytes`,
+				);
 
 				await this.handleMessage(stream, data);
 			} catch (err: any) {
 				this.config.logger?.error(
-					`❌ Error handling ETH message: ${err.message}, stack: ${err.stack}`,
+					`❌ Error handling message: ${err.message}`,
 				);
 			}
 		});
 
 		stream.addEventListener("close", () => {
 			this.config.logger?.info(
-				`📪 ETH protocol stream closed: ${stream.id}`,
+				`📪 ETH stream closed: ${stream.id}`,
 			);
 		});
 
 		stream.addEventListener("error", (evt: any) => {
 			this.config.logger?.error(
-				`❌ ETH protocol stream error: ${evt.error?.message || "unknown"}`,
+				`❌ ETH stream error on ${stream.id}: ${evt.error?.message || "unknown"}`,
 			);
 		});
 
-		// Check if there's already data in the read buffer and manually trigger processing
-		const streamAny = stream as any;
-		if (streamAny.readBufferLength && streamAny.readBufferLength > 0) {
-			this.config.logger?.info(
-				`⚡ Stream ${stream.id} has ${streamAny.readBufferLength} bytes already buffered, triggering dispatch...`,
-			);
-			// Try to trigger a read to dispatch buffered data
-			if (typeof streamAny.processReadBuffer === 'function') {
-				streamAny.processReadBuffer();
-			}
-		}
+		// DON'T close this stream - it stays open for ongoing requests/responses!
+		// The peer will manage its lifecycle
 	}
 
 	/**
@@ -313,19 +289,67 @@ export class StreamEthProtocol extends Protocol {
 			case StreamEthProtocol.MSG_GET_RECEIPTS:
 				await this.handleGetReceipts(stream, decoded);
 				break;
+			case StreamEthProtocol.MSG_NEW_BLOCK:
+				// NewBlock announcement - needs to be handled by FullSynchronizer
+				await this.handleNewBlock(stream, decoded);
+				break;
 			case StreamEthProtocol.MSG_NEW_BLOCK_HASHES:
 			case StreamEthProtocol.MSG_TRANSACTIONS:
-			case StreamEthProtocol.MSG_NEW_BLOCK:
 			case StreamEthProtocol.MSG_NEW_POOLED_TX_HASHES:
-				// These are announcements - emit PROTOCOL_MESSAGE event for FullSynchronizer
+				// Other announcements
 				this.config.logger?.info(
 					`📢 Received announcement: ${messageNames[code]}`,
 				);
-				// The event should be emitted with message details
-				// For now, just log it
 				break;
 			default:
 				this.config.logger?.warn(`❓ Unknown ETH message code: 0x${code.toString(16)}`);
+		}
+	}
+
+	/**
+	 * Handle NEW_BLOCK announcement
+	 * Format: [block, td]
+	 * NOTE: This is called on inbound streams where we don't have direct peer context
+	 * We need to find the peer and emit PROTOCOL_MESSAGE event
+	 */
+	private async handleNewBlock(stream: MplexStream, decoded: any) {
+		try {
+			const [blockRaw, tdBytes] = decoded as [BlockBytes, Uint8Array];
+			
+			// Parse block
+			const block = createBlockFromBytesArray(blockRaw, {
+				common: this.config.chainCommon,
+			});
+			
+			const td = bytesToBigInt(tdBytes);
+			
+			this.config.logger?.info(
+				`📦 NEW_BLOCK received: height=${block.header.number}, hash=${bytesToHex(block.hash()).slice(0, 18)}..., td=${td}`,
+			);
+			
+			// CRITICAL: Emit PROTOCOL_MESSAGE event so FullSynchronizer can handle it
+			// The event handler in FullEthereumService will process it
+			const eventEmitted = this.config.events.emit(
+				Event.PROTOCOL_MESSAGE,
+				{ name: 'NewBlock', data: [block, td] },
+				'eth',
+				null  // Peer context not available on inbound stream
+			);
+			
+			this.config.logger?.info(
+				`✅ Emitted PROTOCOL_MESSAGE event for NewBlock at height=${block.header.number}, listeners=${this.config.events.listenerCount(Event.PROTOCOL_MESSAGE)}`,
+			);
+			
+			if (!eventEmitted) {
+				this.config.logger?.error(
+					`❌ PROTOCOL_MESSAGE event NOT emitted - no listeners!`,
+				);
+			}
+			
+		} catch (err: any) {
+			this.config.logger?.error(
+				`Error handling NewBlock: ${err.message}`,
+			);
 		}
 	}
 
@@ -390,9 +414,62 @@ export class StreamEthProtocol extends Protocol {
 			reverse: bytesToInt(reverse) === 0 ? false : true,
 		};
 
-		// TODO: Implement actual block header retrieval
-		// For now, return empty response
+		this.config.logger?.info(
+			`📨 GetBlockHeaders request: reqId=${request.reqId}, block=${request.block}, max=${request.max}`,
+		);
+
+		// Get headers from blockchain
 		const headers: BlockHeader[] = [];
+		try {
+			let currentNum: bigint;
+
+			// If block is a hash, find its number
+			if (typeof request.block !== 'bigint') {
+				try {
+					const blockByHash = await this.chain.getBlock(request.block);
+					currentNum = blockByHash.header.number;
+				} catch {
+					// Hash not found, return empty
+					this.config.logger?.debug(
+						`Block hash not found, returning empty`,
+					);
+					await this.sendBlockHeaders(stream, {
+						reqId: request.reqId,
+						headers: [],
+					});
+					return;
+				}
+			} else {
+				currentNum = request.block;
+			}
+
+			// Collect headers
+			for (let i = 0; i < request.max; i++) {
+				try {
+					const block = await this.chain.getBlock(currentNum);
+					headers.push(block.header);
+
+					// Calculate next block number
+					if (request.reverse) {
+						if (currentNum === 0n) break;
+						currentNum = currentNum - BigInt(request.skip + 1);
+					} else {
+						currentNum = currentNum + BigInt(request.skip + 1);
+					}
+				} catch {
+					// Block not found, stop
+					break;
+				}
+			}
+
+			this.config.logger?.info(
+				`📤 Sending ${headers.length} headers for reqId=${request.reqId}`,
+			);
+		} catch (err: any) {
+			this.config.logger?.error(
+				`Error getting headers: ${err.message}`,
+			);
+		}
 
 		await this.sendBlockHeaders(stream, {
 			reqId: request.reqId,
@@ -411,8 +488,32 @@ export class StreamEthProtocol extends Protocol {
 			hashes,
 		};
 
-		// TODO: Implement actual block body retrieval
+		this.config.logger?.info(
+			`📨 GetBlockBodies request: reqId=${request.reqId}, hashes=${request.hashes.length}`,
+		);
+
+		// Get bodies from blockchain
 		const bodies: BlockBodyBytes[] = [];
+		try {
+			for (const hash of request.hashes) {
+				try {
+					const block = await this.chain.getBlock(hash);
+					// BlockBodyBytes = [transactions, uncles]
+					bodies.push([block.transactions.map((tx) => tx.raw()), block.uncleHeaders.map((h) => h.raw())]);
+				} catch {
+					// Block not found, skip
+					continue;
+				}
+			}
+
+			this.config.logger?.info(
+				`📤 Sending ${bodies.length} bodies for reqId=${request.reqId}`,
+			);
+		} catch (err: any) {
+			this.config.logger?.error(
+				`Error getting bodies: ${err.message}`,
+			);
+		}
 
 		await this.sendBlockBodies(stream, {
 			reqId: request.reqId,
@@ -518,7 +619,7 @@ export class StreamEthProtocol extends Protocol {
 	}
 
 	/**
-	 * Send BlockHeaders response
+	 * Send BlockHeaders response (don't close stream - keep it alive!)
 	 */
 	async sendBlockHeaders(
 		stream: MplexStream,
@@ -533,10 +634,11 @@ export class StreamEthProtocol extends Protocol {
 			StreamEthProtocol.MSG_BLOCK_HEADERS,
 			payload,
 		);
+		// DON'T close stream - keep it open for ongoing communication
 	}
 
 	/**
-	 * Send BlockBodies response
+	 * Send BlockBodies response (don't close stream - keep it alive!)
 	 */
 	async sendBlockBodies(
 		stream: MplexStream,
@@ -548,10 +650,11 @@ export class StreamEthProtocol extends Protocol {
 			StreamEthProtocol.MSG_BLOCK_BODIES,
 			payload,
 		);
+		// DON'T close stream - keep it open for ongoing communication
 	}
 
 	/**
-	 * Send PooledTransactions response
+	 * Send PooledTransactions response (don't close stream - keep it alive!)
 	 */
 	async sendPooledTransactions(
 		stream: MplexStream,
@@ -570,10 +673,11 @@ export class StreamEthProtocol extends Protocol {
 			StreamEthProtocol.MSG_POOLED_TXS,
 			payload,
 		);
+		// DON'T close stream - keep it open for ongoing communication
 	}
 
 	/**
-	 * Send Receipts response
+	 * Send Receipts response (don't close stream - keep it alive!)
 	 */
 	async sendReceipts(
 		stream: MplexStream,
@@ -587,6 +691,7 @@ export class StreamEthProtocol extends Protocol {
 
 		const payload = [bigIntToUnpaddedBytes(opts.reqId), serializedReceipts];
 		await this.sendMessage(stream, StreamEthProtocol.MSG_RECEIPTS, payload);
+		// DON'T close stream - keep it open for ongoing communication
 	}
 
 	/**

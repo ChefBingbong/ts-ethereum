@@ -2,6 +2,7 @@ import { multiaddr } from "@multiformats/multiaddr";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { DPT as Devp2pDPT } from "../../../devp2p/dpt-1/index.ts";
 import { pk2id } from "../../../devp2p/util.ts";
+import { EcciesEncrypter } from "../../../p2p/connection-encrypters/eccies/eccies-encrypter.ts";
 import { Connection } from "../../../p2p/connection/connection.ts";
 import { Registrar } from "../../../p2p/connection/registrar.ts";
 import { Upgrader } from "../../../p2p/connection/upgrader.ts";
@@ -355,23 +356,30 @@ export class P2PServer extends Server {
 					`✅ Registrar created (protocols: ${this.registrar.getProtocols().length})`,
 				);
 
-				// Create stream muxer factory
+				// Create stream muxer factory  
 				const muxerFactory = mplex()();
 
-				// Create upgrader WITHOUT encryption for now
-				// TODO: Implement proper libp2p-compatible encryption (not ECIES which is RLPx-specific)
+				// Create upgrader WITHOUT ECIES
+				// ECIES frame encryption is incompatible with mplex because:
+				// - ECIES sets up frame cipher on socket (ingressAes/egressAes)
+				// - Mplex tries to read/write raw bytes
+				// - Data gets corrupted: "04b730d902776d0fcf..." (encrypted garbage)
+				// - Result: "missing stream" errors, timeouts
+				// TODO: Implement ECIES-aware socket wrapper or use TLS instead
 				this.upgrader = new Upgrader(
 					{ registrar: this.registrar },
 					{
 						privateKey: this.key,
 						id: peerId,
-						connectionEncrypter: null as any, // Skip encryption for now
+						connectionEncrypter: null,  // Disable ECIES
 						streamMuxerFactory: muxerFactory,
+						skipEncryptionNegotiation: false,
+						skipMuxerNegotiation: false,
 					},
 				);
 
 				this.config.logger?.info(
-					`⚠️  Upgrader created WITHOUT encryption (testing mode)`,
+					`⚠️  Upgrader created WITHOUT encryption (plaintext for testing)`,
 				);
 
 				// Create transport

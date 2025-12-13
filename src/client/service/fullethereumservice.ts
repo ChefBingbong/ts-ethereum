@@ -311,7 +311,9 @@ export class FullEthereumService extends Service {
 			}
 			case "NewBlock": {
 				if (this.synchronizer instanceof FullSynchronizer) {
-					console.log(message);
+					this.config.logger?.info(
+						`📦 Handling NewBlock message: height=${message.data[0].header.number}, peer=${peer?.id?.slice(0, 8) || 'null'}`,
+					);
 					await this.synchronizer.handleNewBlock(message.data[0], peer);
 				}
 				break;

@@ -95,12 +95,22 @@ export class Service {
 			async (message, protocol, peer) => {
 				if (this.running) {
 					try {
+						const msgName = (message as any)?.name || 'unknown';
+						this.config.logger?.info(
+							`📨 PROTOCOL_MESSAGE: ${msgName} from peer ${peer?.id?.slice(0, 8) || 'null'}`,
+						);
 						await this.handle(message, protocol, peer);
 					} catch (error: any) {
-						this.config.logger?.debug(
-							`Error handling message (${protocol}:${message.name}): ${error.message}`,
+						const msgName = (message as any)?.name || 'unknown';
+						this.config.logger?.error(
+							`Error handling message (${protocol}:${msgName}): ${error.message}`,
 						);
 					}
+				} else {
+					const msgName = (message as any)?.name || 'unknown';
+					this.config.logger?.debug(
+						`Ignoring PROTOCOL_MESSAGE (service not running): ${msgName}`,
+					);
 				}
 			},
 		);
