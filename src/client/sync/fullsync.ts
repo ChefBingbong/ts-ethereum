@@ -279,14 +279,18 @@ export class FullSynchronizer extends Synchronizer {
 	 * @param peer `Peer` that sent `NEW_BLOCK` announcement
 	 */
 	async handleNewBlock(block: Block, peer?: Peer) {
+		this.config.logger?.info(
+			`🔄 FullSynchronizer.handleNewBlock: height=${block.header.number}, chainHeight=${this.chain.headers.height}, peer=${peer?.id?.slice(0, 8) || 'null'}`,
+		);
+		
 		if (peer) {
 			// Don't send NEW_BLOCK announcement to peer that sent original new block message
 			this.addToKnownByPeer(block.hash(), peer);
 		}
 		if (block.header.number > this.chain.headers.height + BIGINT_1) {
 			// Block is too far ahead - we need to fetch missing blocks first
-			this.config.logger?.debug(
-				`Block ${block.header.number} is ahead of chain height ${this.chain.headers.height}, fetching missing blocks`,
+			this.config.logger?.info(
+				`📡 Block ${block.header.number} is ahead of chain height ${this.chain.headers.height}, fetching missing blocks`,
 			);
 			// Request the missing blocks via handleNewBlockHashes
 			this.handleNewBlockHashes([[block.hash(), block.header.number]]);

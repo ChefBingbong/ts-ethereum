@@ -7,6 +7,8 @@ import { Miner } from "../miner";
 import type { Peer } from "../net/peer/peer.ts";
 import type { Protocol } from "../net/protocol";
 import { EthProtocol } from "../net/protocol/ethprotocol.ts";
+import { StreamEthProtocol } from "../net/protocol/streamethprotocol.ts";
+import { P2PServer } from "../net/server/p2pserver.ts";
 import { FullSynchronizer } from "../sync";
 import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
@@ -217,13 +219,28 @@ export class FullEthereumService extends Service {
 	 * Returns all protocols required by this service
 	 */
 	override get protocols(): Protocol[] {
-		const protocols: Protocol[] = [
-			new EthProtocol({
-				config: this.config,
-				chain: this.chain,
-				timeout: this.timeout,
-			}),
-		];
+		const protocols: Protocol[] = [];
+		
+		// Use StreamEthProtocol for P2PServer, EthProtocol for RlpxServer
+		if (this.config.server instanceof P2PServer) {
+			protocols.push(
+				new StreamEthProtocol({
+					config: this.config,
+					chain: this.chain,
+					timeout: this.timeout,
+					// registrar will be set by P2PServer after initialization
+				}),
+			);
+		} else {
+			protocols.push(
+				new EthProtocol({
+					config: this.config,
+					chain: this.chain,
+					timeout: this.timeout,
+				}),
+			);
+		}
+		
 		return protocols;
 	}
 
@@ -294,7 +311,9 @@ export class FullEthereumService extends Service {
 			}
 			case "NewBlock": {
 				if (this.synchronizer instanceof FullSynchronizer) {
-					console.log(message);
+					this.config.logger?.info(
+						`📦 Handling NewBlock message: height=${message.data[0].header.number}, peer=${peer?.id?.slice(0, 8) || 'null'}`,
+					);
 					await this.synchronizer.handleNewBlock(message.data[0], peer);
 				}
 				break;

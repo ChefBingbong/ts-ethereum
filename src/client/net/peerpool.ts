@@ -1,6 +1,6 @@
 import { Event } from "../types.ts";
 
-import { type Peer, RlpxPeer } from "./peer";
+import { P2PPeer, type Peer, RlpxPeer } from "./peer";
 
 import type { Config } from "../config.ts";
 
@@ -267,7 +267,7 @@ export class PeerPool {
 	 */
 	async _peerBestHeaderUpdate() {
 		for (const p of this.peers) {
-			if (p.idle && p.eth !== undefined && p instanceof RlpxPeer) {
+			if (p.idle && p.eth !== undefined && (p instanceof RlpxPeer || p instanceof P2PPeer)) {
 				p.idle = false;
 				await p.latest();
 				p.idle = true;

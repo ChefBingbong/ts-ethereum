@@ -14,10 +14,12 @@ export interface MultiAddressConnectionOptions {
   direction: MessageStreamDirection
   inactivityTimeout?: number
   localAddr?: Multiaddr
+  remotePeerId?: Uint8Array
 }
 
 class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
-  private socket: Socket
+  public socket: Socket
+  public remotePeerId?: Uint8Array
 
   constructor (init: MultiAddressConnectionOptions) {
     let remoteAddr = init.remoteAddr
@@ -40,6 +42,7 @@ class TCPSocketMultiaddrConnection extends AbstractMultiaddrConnection {
     })
 
     this.socket = init.socket
+    this.remotePeerId = init.remotePeerId
 
     this.socket.on('data', buf => {
       this.onData(buf)

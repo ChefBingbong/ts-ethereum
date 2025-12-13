@@ -1,7 +1,7 @@
 import * as varint from 'uint8-varint'
 import { Uint8ArrayList } from 'uint8arraylist'
-import { AbstractMessageStream } from '../stream/default-message-stream'
 import { AbortOptions } from '../connection/types'
+import { AbstractMessageStream } from '../stream/default-message-stream'
 
 export interface LengthPrefixedStreamOptions {
   maxDataLength?: number

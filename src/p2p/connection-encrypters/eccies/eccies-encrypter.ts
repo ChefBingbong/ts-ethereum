@@ -9,8 +9,8 @@ import type { SecureConnection } from "../../connection/types";
 import { sendAuthGetAck, waitAuthSendAck } from "./handlers";
 import type { ConnectionEncrypter } from "./types";
 import {
-    setupFrame,
-    type HandlerContext
+	setupFrame,
+	type HandlerContext
 } from "./utils";
 
 const log = debug("p2p:encrypter");
@@ -102,9 +102,16 @@ private _buffer: Uint8Array = new Uint8Array(0);
 	}
 
 	private createResult(): SecureConnection {
+		// Convert remotePublicKey to peer ID (64 bytes without 0x04 prefix)
+		const remotePeer = this.remotePublicKey 
+			? (this.remotePublicKey.length === 65 
+				? this.remotePublicKey.slice(1)  // Remove 0x04 prefix
+				: this.remotePublicKey)
+			: new Uint8Array(64);
+
 		return {
-			socket: this.socket as unknown as import("tls").TLSSocket,
-			remoteInfo: { remotePublicKey: this.remotePublicKey, remoteNonce: this.remoteNonce },
+			socket: this.socket,
+			remotePeer: remotePeer,
 		};
 	}
 

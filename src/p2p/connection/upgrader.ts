@@ -6,6 +6,7 @@ import * as mss from '../multi-stream-select'
 import { MplexStreamMuxer, StreamMuxerFactory } from '../muxer'
 import { AbstractMessageStream } from '../stream/default-message-stream'
 import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
+import { BasicConnection, createBasicConnection } from './basic-connection'
 import { Connection, createConnection } from './connection'
 import { Registrar } from './registrar'
 import { AbortOptions, PeerId } from './types'
@@ -30,12 +31,14 @@ export interface SecuredConnection {
 export interface UpgraderInit {
   privateKey: Uint8Array
   id: Uint8Array
-  connectionEncrypter: ConnectionEncrypter
+  connectionEncrypter: ConnectionEncrypter | null
   streamMuxerFactory: StreamMuxerFactory
   inboundUpgradeTimeout?: number
   inboundStreamProtocolNegotiationTimeout?: number
   outboundStreamProtocolNegotiationTimeout?: number
   connectionCloseTimeout?: number
+  skipEncryptionNegotiation?: boolean  // Skip multi-stream-select for encryption (use direct)
+  skipMuxerNegotiation?: boolean       // Skip multi-stream-select for muxer (use direct)
 }
 
 export interface UpgraderComponents {
@@ -47,7 +50,7 @@ export const PROTOCOL_NEGOTIATION_TIMEOUT = 10_000
 export const CONNECTION_CLOSE_TIMEOUT = 1_000
 
 export class Upgrader {
-  private readonly connectionEncrypter: ConnectionEncrypter
+  private readonly connectionEncrypter: ConnectionEncrypter | null
   private readonly streamMuxerFactory: StreamMuxerFactory
   private readonly inboundUpgradeTimeout: number
   private readonly inboundStreamProtocolNegotiationTimeout: number
@@ -56,6 +59,8 @@ export class Upgrader {
   private readonly components: UpgraderComponents
   private readonly privateKey: Uint8Array
   private readonly id: Uint8Array
+  private readonly skipEncryptionNegotiation: boolean
+  private readonly skipMuxerNegotiation: boolean
 
   constructor (components: UpgraderComponents, init: UpgraderInit) {
     this.components = components
@@ -63,6 +68,8 @@ export class Upgrader {
     this.id = init.id
     this.connectionEncrypter = init.connectionEncrypter
     this.streamMuxerFactory = init.streamMuxerFactory
+    this.skipEncryptionNegotiation = init.skipEncryptionNegotiation ?? false
+    this.skipMuxerNegotiation = init.skipMuxerNegotiation ?? false
 
     this.inboundUpgradeTimeout = init.inboundUpgradeTimeout ?? INBOUND_UPGRADE_TIMEOUT
     this.inboundStreamProtocolNegotiationTimeout = init.inboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
@@ -94,6 +101,26 @@ export class Upgrader {
     return await this._performUpgrade(maConn, 'outbound', opts)
   }
 
+  /**
+   * Upgrade inbound connection to BasicConnection (no muxing, RLPx compatible)
+   */
+  async upgradeInboundBasic (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<BasicConnection> {
+    const signal = this.createInboundAbortSignal(opts.signal)
+    
+    try {
+      return await this._performBasicUpgrade(maConn, 'inbound', { signal })
+    } finally {
+      signal.clear()
+    }
+  }
+
+  /**
+   * Upgrade outbound connection to BasicConnection (no muxing, RLPx compatible)
+   */
+  async upgradeOutboundBasic (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<BasicConnection> {
+    return await this._performBasicUpgrade(maConn, 'outbound', opts)
+  }
+
   private async _performUpgrade (
     maConn: AbstractMultiaddrConnection, 
     direction: 'inbound' | 'outbound',
@@ -110,22 +137,42 @@ export class Upgrader {
       // Try to extract remote peer ID from multiaddr
       const peerIdString = maConn.remoteAddr.getComponents().findLast(c => c.code === CODE_P2P)?.value
 
-      // Encrypt the connection
-      const encrypted = direction === 'inbound'
-        ? await this._encryptInbound(stream, opts)
-        : await this._encryptOutbound(stream, opts)
+      // Skip encryption if no encrypter configured (testing mode)
+      if (this.connectionEncrypter) {
+        // Encrypt the connection DIRECTLY (no multi-stream-select for ECIES)
+        // ECIES from RLPx uses a custom handshake, not compatible with multistream-select
+        const encrypted = direction === 'inbound'
+          ? await this._encryptInboundDirect(stream, opts)
+          : await this._encryptOutboundDirect(stream, opts)
 
-      stream = encrypted.connection
-      remotePeer = encrypted.remotePeer
-      cryptoProtocol = encrypted.protocol
+        stream = encrypted.connection
+        remotePeer = encrypted.remotePeer
+        cryptoProtocol = encrypted.protocol
+      } else {
+        // No encryption - use peer ID from connection options
+        const maConnAny = maConn as any
+        remotePeer = maConnAny.remotePeerId || this.id
+        cryptoProtocol = 'none'
+        maConn.log('skipping encryption (testing mode), remote peer: %s', Buffer.from(remotePeer).toString('hex').slice(0, 16))
+      }
 
       // If we had a peer ID in the multiaddr, we could verify it matches here
       // For now we trust the encrypted connection's peer ID
 
       // Multiplex the connection
-      const muxerFactory = await (direction === 'inbound'
-        ? this._multiplexInbound(stream, opts)
-        : this._multiplexOutbound(stream, opts))
+      let muxerFactory: StreamMuxerFactory
+      
+      if (this.skipMuxerNegotiation) {
+        // Skip multi-stream-select, use muxer directly
+        // This is necessary when ECIES encryption is used because the socket is in frame mode
+        maConn.log('skipping muxer negotiation, using %s directly', this.streamMuxerFactory.protocol)
+        muxerFactory = this.streamMuxerFactory
+      } else {
+        // Standard libp2p flow with multi-stream-select
+        muxerFactory = await (direction === 'inbound'
+          ? this._multiplexInbound(stream, opts)
+          : this._multiplexOutbound(stream, opts))
+      }
 
       maConn.log('create muxer %s', muxerFactory.protocol)
       muxer = muxerFactory.createStreamMuxer(stream)
@@ -161,22 +208,36 @@ export class Upgrader {
   }
 
   /**
-   * Encrypts the incoming connection
+   * Encrypts the incoming connection (DIRECT - no multistream-select)
+   * ECIES uses its own handshake protocol, incompatible with multistream-select
    */
-  async _encryptInbound (connection: AbstractMessageStream, options: AbortOptions): Promise<SecuredConnection> {
-    const protocols = [this.connectionEncrypter.protocol]
-
+  async _encryptInboundDirect (connection: AbstractMessageStream, options: AbortOptions): Promise<SecuredConnection> {
     try {
-      const protocol = await mss.handle(connection, protocols, options)
+      connection.log('performing ECIES handshake (inbound) - direct, no multistream-select')
 
-      connection.log('encrypting inbound connection using %s', protocol)
+      // Perform actual ECIES encryption handshake
+      const maConn = connection as any
+      const socket = maConn.socket
+      if (!socket) {
+        throw new Error('No socket available for ECIES encryption')
+      }
 
-      // For ECIES, we don't have the socket directly here, so we work with the stream
-      // The actual encryption happens at the transport level
+      const secureConn = await this.connectionEncrypter.secureInBound(socket)
+      
+      connection.log('ECIES handshake complete (inbound), remote peer: %s', Buffer.from(secureConn.remotePeer).toString('hex').slice(0, 16))
+
+      // Clear any leftover data in the read buffer after ECIES handshake
+      // This ensures a clean stream for multi-stream-select negotiation
+      const connectionAny = connection as any
+      if (connectionAny.readBuffer?.byteLength > 0) {
+        connection.log('clearing %d bytes of leftover data from read buffer after ECIES handshake', connectionAny.readBuffer.byteLength)
+        connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength)
+      }
+
       return {
         connection,
-        remotePeer: new Uint8Array(64), // Will be set by actual encryption
-        protocol
+        remotePeer: secureConn.remotePeer,
+        protocol: 'eccies'
       }
     } catch (err: any) {
       throw new Error(`Failed to encrypt inbound connection: ${err.message}`)
@@ -184,22 +245,43 @@ export class Upgrader {
   }
 
   /**
-   * Encrypts the outgoing connection
+   * Encrypts the outgoing connection (DIRECT - no multistream-select)
+   * ECIES uses its own handshake protocol, incompatible with multistream-select
    */
-  async _encryptOutbound (connection: AbstractMessageStream, options: AbortOptions): Promise<SecuredConnection> {
-    const protocols = [this.connectionEncrypter.protocol]
-
+  async _encryptOutboundDirect (connection: AbstractMessageStream, options: AbortOptions): Promise<SecuredConnection> {
     try {
-      connection.log.trace('selecting encrypter from %s', protocols)
+      connection.log('performing ECIES handshake (outbound) - direct, no multistream-select')
 
-      const protocol = await mss.select(connection, protocols, options)
+      // Perform actual ECIES encryption handshake
+      const maConn = connection as any
+      const socket = maConn.socket
+      if (!socket) {
+        throw new Error('No socket available for ECIES encryption')
+      }
 
-      connection.log('encrypting outbound connection using %s', protocol)
+      // For outbound, we need the remote peer ID that was passed to the transport
+      const remotePeerId = maConn.remotePeerId
+      if (!remotePeerId) {
+        throw new Error('No remote peer ID available for ECIES encryption')
+      }
+
+      connection.log('performing ECIES handshake (outbound) with peer %s...', Buffer.from(remotePeerId).toString('hex').slice(0, 16))
+      const secureConn = await this.connectionEncrypter.secureOutBound(socket, remotePeerId)
+      
+      connection.log('ECIES handshake complete (outbound), remote peer: %s', Buffer.from(secureConn.remotePeer).toString('hex').slice(0, 16))
+
+      // Clear any leftover data in the read buffer after ECIES handshake
+      // This ensures a clean stream for multi-stream-select negotiation
+      const connectionAny = connection as any
+      if (connectionAny.readBuffer?.byteLength > 0) {
+        connection.log('clearing %d bytes of leftover data from read buffer after ECIES handshake', connectionAny.readBuffer.byteLength)
+        connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength)
+      }
 
       return {
         connection,
-        remotePeer: new Uint8Array(64), // Will be set by actual encryption
-        protocol
+        remotePeer: secureConn.remotePeer,
+        protocol: 'eccies'
       }
     } catch (err: any) {
       throw new Error(`Failed to encrypt outbound connection: ${err.message}`)
@@ -244,12 +326,64 @@ export class Upgrader {
     }
   }
 
-  getConnectionEncrypter (): ConnectionEncrypter {
+  getConnectionEncrypter (): ConnectionEncrypter | null {
     return this.connectionEncrypter
   }
 
   getStreamMuxerFactory (): StreamMuxerFactory {
     return this.streamMuxerFactory
+  }
+
+  getComponents (): UpgraderComponents {
+    return this.components
+  }
+
+  /**
+   * Perform basic upgrade (encryption only, no muxing)
+   * Creates a BasicConnection compatible with RLPx
+   */
+  private async _performBasicUpgrade(
+    maConn: AbstractMultiaddrConnection,
+    direction: 'inbound' | 'outbound',
+    opts: AbortOptions = {}
+  ): Promise<BasicConnection> {
+    let stream: AbstractMessageStream = maConn
+    let remotePeer: PeerId
+    let cryptoProtocol: string
+
+    const id = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`
+
+    try {
+      // Encrypt if encrypter configured
+      if (this.connectionEncrypter) {
+        const encrypted = direction === 'inbound'
+          ? await this._encryptInboundDirect(stream, opts)
+          : await this._encryptOutboundDirect(stream, opts)
+
+        stream = encrypted.connection
+        remotePeer = encrypted.remotePeer
+        cryptoProtocol = encrypted.protocol
+      } else {
+        // No encryption - use peer ID from connection options
+        const maConnAny = maConn as any
+        remotePeer = maConnAny.remotePeerId || this.id
+        cryptoProtocol = 'none'
+        maConn.log('skipping encryption (testing mode), remote peer: %s', Buffer.from(remotePeer).toString('hex').slice(0, 16))
+      }
+
+      return createBasicConnection({
+        id,
+        cryptoProtocol,
+        direction,
+        maConn,
+        stream,
+        remotePeer,
+        closeTimeout: this.connectionCloseTimeout
+      })
+    } catch (err: any) {
+      maConn.log.error('failed to upgrade %s basic connection: %s', direction, err.message)
+      throw err
+    }
   }
 }
 
