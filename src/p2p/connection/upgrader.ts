@@ -226,6 +226,14 @@ export class Upgrader {
       
       connection.log('ECIES handshake complete (inbound), remote peer: %s', Buffer.from(secureConn.remotePeer).toString('hex').slice(0, 16))
 
+      // Clear any leftover data in the read buffer after ECIES handshake
+      // This ensures a clean stream for multi-stream-select negotiation
+      const connectionAny = connection as any
+      if (connectionAny.readBuffer?.byteLength > 0) {
+        connection.log('clearing %d bytes of leftover data from read buffer after ECIES handshake', connectionAny.readBuffer.byteLength)
+        connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength)
+      }
+
       return {
         connection,
         remotePeer: secureConn.remotePeer,
@@ -261,6 +269,14 @@ export class Upgrader {
       const secureConn = await this.connectionEncrypter.secureOutBound(socket, remotePeerId)
       
       connection.log('ECIES handshake complete (outbound), remote peer: %s', Buffer.from(secureConn.remotePeer).toString('hex').slice(0, 16))
+
+      // Clear any leftover data in the read buffer after ECIES handshake
+      // This ensures a clean stream for multi-stream-select negotiation
+      const connectionAny = connection as any
+      if (connectionAny.readBuffer?.byteLength > 0) {
+        connection.log('clearing %d bytes of leftover data from read buffer after ECIES handshake', connectionAny.readBuffer.byteLength)
+        connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength)
+      }
 
       return {
         connection,
@@ -310,12 +326,16 @@ export class Upgrader {
     }
   }
 
-  getConnectionEncrypter (): ConnectionEncrypter {
+  getConnectionEncrypter (): ConnectionEncrypter | null {
     return this.connectionEncrypter
   }
 
   getStreamMuxerFactory (): StreamMuxerFactory {
     return this.streamMuxerFactory
+  }
+
+  getComponents (): UpgraderComponents {
+    return this.components
   }
 
   /**
