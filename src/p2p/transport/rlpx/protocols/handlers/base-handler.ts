@@ -10,7 +10,7 @@ export enum MessageType {
 
 export interface HandlerContext {
 	connection: RlpxConnection;
-	socket: Socket;
+	socket?: Socket;
 	timeout?: number;
 }
 

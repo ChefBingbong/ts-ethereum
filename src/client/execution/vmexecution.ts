@@ -1,3 +1,4 @@
+import debug from "debug";
 import * as mcl from "mcl-wasm";
 import { initRustBN } from "rustbn-wasm";
 import type { Block } from "../../block";
@@ -38,6 +39,8 @@ import { LevelDB } from "./level.ts";
 import { PreimagesManager } from "./preimage.ts";
 import { ReceiptsManager } from "./receipt.ts";
 import { IndexOperation, IndexType, TxIndex } from "./txIndex.ts";
+
+const log = debug("p2p:execution");
 
 export type ExecStatus = (typeof ExecStatus)[keyof typeof ExecStatus];
 
@@ -221,6 +224,7 @@ export class VMExecution extends Execution {
 				return;
 			}
 
+			log("Opening VMExecution");
 			const blockchain = this.chain.blockchain;
 			if (typeof blockchain.getIteratorHead !== "function") {
 				throw EthereumJSErrorWithoutCode(
@@ -229,6 +233,7 @@ export class VMExecution extends Execution {
 			}
 			const headBlock = await blockchain.getIteratorHead();
 			const { number, timestamp, stateRoot } = headBlock.header;
+			log("Head block: number=%d hash=%s", number, bytesToHex(headBlock.hash()).slice(0, 16));
 			this.chainStatus = {
 				height: number,
 				status: ExecStatus.VALID,
@@ -243,11 +248,13 @@ export class VMExecution extends Execution {
 			}
 			this.hardfork = this.config.execCommon.hardfork();
 
+			log("Initializing VM merkle statemanager hardfork=%s", this.hardfork);
 			this.config.logger?.info(
 				`Initializing VM merkle statemanager genesis hardfork=${this.hardfork}`,
 			);
 			await this.setupMerkleVM();
 			this.vm = this.merkleVM!;
+			log("VMExecution opened successfully");
 
 			if (number === BIGINT_0) {
 				const genesisState =
@@ -527,6 +534,7 @@ export class VMExecution extends Execution {
 				await this.checkAndReset(startHeadBlock);
 				let canonicalHead = await this.chain.blockchain.getCanonicalHeadBlock();
 
+				log("Running execution startHeadBlock=%d canonicalHead=%d loop=%s", startHeadBlock?.header.number, canonicalHead?.header.number, loop);
 				this.config.logger?.debug(
 					`Running execution startHeadBlock=${startHeadBlock?.header.number} canonicalHead=${canonicalHead?.header.number} loop=${loop}`,
 				);
@@ -788,18 +796,21 @@ export class VMExecution extends Execution {
 	 * Start execution
 	 */
 	async start(): Promise<boolean> {
+		log("Starting VMExecution");
 		this._statsInterval = setInterval(
 			await this.stats.bind(this),
 			this.STATS_INTERVAL,
 		);
 
 		if (this.running || !this.started) {
+			log("VMExecution already running or not started");
 			return false;
 		}
 
 		const vmHeadBlock = await this.chain.blockchain.getIteratorHead();
 		const canonicalHead = await this.chain.blockchain.getCanonicalHeadBlock();
 
+		log("VMExecution start: vmHead=%d canonicalHead=%d hardfork=%s execution=%s", vmHeadBlock.header.number, canonicalHead.header.number, this.config.execCommon.hardfork(), this.config.execution);
 		const infoStr = `vmHead=${vmHeadBlock.header.number} canonicalHead=${
 			canonicalHead.header.number
 		} hardfork=${this.config.execCommon.hardfork()} execution=${this.config.execution}`;
@@ -807,11 +818,14 @@ export class VMExecution extends Execution {
 			this.config.execution &&
 			vmHeadBlock.header.number < canonicalHead.header.number
 		) {
+			log("Starting execution run");
 			this.config.logger?.info(`Starting execution run ${infoStr}`);
 			void this.run(true, true);
 		} else {
+			log("Skipped execution run");
 			this.config.logger?.info(`Skipped execution run ${infoStr}`);
 		}
+		log("VMExecution started successfully");
 		return true;
 	}
 

@@ -282,14 +282,26 @@ export class FullSynchronizer extends Synchronizer {
 	 */
 	async sendNewBlock(block: Block, peers: Peer[]) {
 		for (const peer of peers) {
+			// Skip if peer doesn't have a valid RlpxConnection
+			if (!peer.rlpxConnection) {
+				continue;
+			}
+			
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
 				const ethHandler = this.getEthHandler(peer);
 				if (ethHandler) {
-					await ethHandler.announceNewBlock({
-						block: block as any,
-						td: this.chain.blocks.td,
-					});
+					try {
+						await ethHandler.announceNewBlock({
+							block: block as any,
+							td: this.chain.blocks.td,
+						});
+					} catch (error: any) {
+						// Log error but don't crash - peer connection might be closing
+						this.config.logger?.warn(
+							`Failed to announce new block to peer ${peer.id.slice(0, 8)}: ${error.message}`
+						);
+					}
 				}
 			}
 		}

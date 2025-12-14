@@ -1,11 +1,12 @@
 import * as RLP from "../../../../../rlp";
 import {
-    BaseEthHandler,
-    MessageType,
-    type HandlerContext,
+	BaseEthHandler,
+	MessageType,
+	type HandlerContext,
 } from "./base-handler";
 
 export interface GetPooledTransactionsRequest {
+	reqId?: bigint;
 	hashes: Uint8Array[];
 }
 
@@ -17,11 +18,13 @@ export class PooledTransactionsHandler extends BaseEthHandler {
 
 	/**
 	 * Send GET_POOLED_TRANSACTIONS and wait for POOLED_TRANSACTIONS response
+	 * Returns [reqId, transactions] tuple for eth/66 compatibility
 	 */
 	async sendGetPooledTransactions(
 		request: GetPooledTransactionsRequest,
 		ctx: HandlerContext,
-	): Promise<Uint8Array[]> {
+	): Promise<[bigint, Uint8Array[]]> {
+		const reqId = request.reqId ?? BigInt(Date.now());
 		return new Promise((resolve, reject) => {
 			const timeoutId = setTimeout(() => {
 				cleanup();
@@ -37,8 +40,14 @@ export class PooledTransactionsHandler extends BaseEthHandler {
 				const { code, data } = evt.detail;
 				if (code === this.responseCode) {
 					cleanup();
-					const txs = RLP.decode(data) as Uint8Array[];
-					resolve(txs);
+					// eth/66 format: [reqId, transactions]
+					const decoded = RLP.decode(data) as any[];
+					const responseReqId = typeof decoded[0] === 'bigint' ? decoded[0] : BigInt(decoded[0]);
+					const txs = decoded[1] || [];
+					// Match reqId to ensure we got the right response
+					if (responseReqId === reqId) {
+						resolve([reqId, txs]);
+					}
 				}
 			}) as EventListener;
 
@@ -49,8 +58,8 @@ export class PooledTransactionsHandler extends BaseEthHandler {
 
 			ctx.connection.addEventListener("message", onMessage);
 
-			// Send request
-			this.send(request, ctx);
+			// Send request with reqId
+			this.send({ ...request, reqId }, ctx);
 		});
 	}
 
@@ -58,7 +67,10 @@ export class PooledTransactionsHandler extends BaseEthHandler {
 		request: GetPooledTransactionsRequest,
 		ctx: HandlerContext,
 	): Promise<void> {
-		const encoded = RLP.encode(request.hashes as any);
+		// eth/66 format: [reqId, hashes]
+		const reqId = request.reqId ?? BigInt(Date.now());
+		const payload = [reqId, request.hashes];
+		const encoded = RLP.encode(payload as any);
 		await ctx.connection.sendMessage(this.code, encoded);
 	}
 
@@ -66,16 +78,29 @@ export class PooledTransactionsHandler extends BaseEthHandler {
 		data: Uint8Array,
 		ctx: HandlerContext,
 	): Promise<GetPooledTransactionsRequest> {
-		const hashes = RLP.decode(data) as Uint8Array[];
-		return { hashes };
+		// eth/66 format: [reqId, hashes]
+		const decoded = RLP.decode(data) as any[];
+		const reqId = decoded[0];
+		const hashes = decoded[1] as Uint8Array[];
+		return {
+			reqId: typeof reqId === 'bigint' ? reqId : BigInt(reqId),
+			hashes,
+		};
 	}
 
 	// Send POOLED_TRANSACTIONS response
+	// request should contain reqId from the original request
 	async sendTransactions(
 		transactions: Uint8Array[],
 		ctx: HandlerContext,
+		reqId?: bigint,
 	): Promise<void> {
-		const encoded = RLP.encode(transactions as any);
+		if (reqId === undefined) {
+			throw new Error("reqId required for POOLED_TRANSACTIONS response");
+		}
+		// eth/66 format: [reqId, transactions]
+		const payload = [reqId, transactions];
+		const encoded = RLP.encode(payload as any);
 		await ctx.connection.sendMessage(this.responseCode, encoded);
 	}
 }

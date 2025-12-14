@@ -1,9 +1,9 @@
+import type { EthProtocolHandler } from "../../../p2p/transport/rlpx/protocols/eth-protocol-handler";
 import { bytesToUnprefixedHex, hexToBytes } from "../../../utils";
 import type { Config } from "../../config.ts";
 import type { Peer } from "../../net/peer/peer.ts";
 import type { PeerPool } from "../../net/peerpool.ts";
 import type { TxPool } from "../../service/txpool.ts";
-import type { EthProtocolHandler } from "../../../p2p/transport/rlpx/protocols/eth-protocol-handler";
 
 interface TxFetcherOptions {
 	config: Config;
@@ -87,8 +87,8 @@ export class TxFetcher {
 		for (const hash of hashes) {
 			const hashStr = bytesToUnprefixedHex(hash);
 
-			// Skip if already handled by txpool
-			if (this.txPool.handled.has(hashStr)) continue;
+			// Skip if already handled by txpool (check via getByHash which returns undefined if not found)
+			if (this.txPool.getByHash([hash]).length > 0) continue;
 
 			// Skip if already pending
 			if (this.pending.has(hashStr)) continue;
@@ -146,14 +146,17 @@ export class TxFetcher {
 			}
 
 			try {
-				const txs = await ethHandler.getPooledTransactions({ hashes });
-				if (txs) {
-					for (const txData of txs) {
-						// txData is Uint8Array (serialized tx)
-						// For now, skip the deserialization
-						// The handleIncomingTransactions should handle TypedTransaction objects
-						const txHashStr = bytesToUnprefixedHex(txData);
-						this.pending.delete(txHashStr);
+				const result = await ethHandler.getPooledTransactions({ hashes });
+				if (result && Array.isArray(result) && result.length === 2) {
+					const [, txs] = result; // [reqId, txs]
+					if (txs && Array.isArray(txs)) {
+						for (const txData of txs) {
+							// txData is Uint8Array (serialized tx)
+							// For now, skip the deserialization
+							// The handleIncomingTransactions should handle TypedTransaction objects
+							const txHashStr = bytesToUnprefixedHex(txData);
+							this.pending.delete(txHashStr);
+						}
 					}
 				}
 			} catch (e: any) {

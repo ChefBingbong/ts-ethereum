@@ -24,6 +24,12 @@ export class RlpxConnection extends BasicConnection {
 
 	// Base protocol codes
 	private readonly BASE_PROTOCOL_LENGTH = 16; // 0x00-0x0F
+	
+	// Keepalive ping interval (15 seconds as per RLPx spec)
+	private readonly PING_INTERVAL = 15000;
+	private pingIntervalId?: NodeJS.Timeout;
+	private pingTimeoutId?: NodeJS.Timeout;
+	private readonly PING_TIMEOUT = 20000; // 20 seconds - if no PONG received, disconnect
 
 	constructor(init: RlpxConnectionInit) {
 		super(init);
@@ -33,6 +39,50 @@ export class RlpxConnection extends BasicConnection {
 
 		// Listen for messages on the underlying stream
 		this.stream.addEventListener('message', this.onIncomingMessage as EventListener);
+		
+		// Start keepalive ping mechanism
+		this.startKeepalive();
+	}
+	
+	/**
+	 * Start sending PING messages periodically to keep connection alive
+	 */
+	private startKeepalive(): void {
+		// Send initial PING after a short delay
+		setTimeout(() => {
+			this.sendPing();
+		}, 15000);
+		
+		// Set up periodic PING interval
+		this.pingIntervalId = setInterval(() => {
+			this.sendPing();
+		}, this.PING_INTERVAL);
+	}
+	
+	/**
+	 * Send a PING message (code 0x02)
+	 */
+	private async sendPing(): Promise<void> {
+		if (this.status !== 'open') {
+			return;
+		}
+		
+		try {
+			// Send PING (code 0x02) with empty data
+			await this.sendMessage(0x02, new Uint8Array(0));
+			
+			// Set timeout - if no PONG received, connection is dead
+			if (this.pingTimeoutId) {
+				clearTimeout(this.pingTimeoutId);
+			}
+			this.pingTimeoutId = setTimeout(() => {
+				this.log('PING timeout - no PONG received, closing connection');
+				this.abort(new Error('PING timeout - peer not responding'));
+			}, this.PING_TIMEOUT);
+		} catch (error: any) {
+			this.log('Failed to send PING: %s', error.message);
+			// Don't abort on ping send failure - connection might be closing
+		}
 	}
 
 	/**
@@ -40,7 +90,7 @@ export class RlpxConnection extends BasicConnection {
 	 * @param handler - The protocol handler implementation
 	 * @returns The assigned offset for this protocol
 	 */
-	registerProtocol(handler: ProtocolHandler): number {
+	async registerProtocol(handler: ProtocolHandler): Promise<number> {
 		if (this.protocols.has(handler.name)) {
 			throw new Error(`Protocol ${handler.name} already registered`);
 		}
@@ -58,6 +108,11 @@ export class RlpxConnection extends BasicConnection {
 		};
 
 		this.protocols.set(handler.name, descriptor);
+
+		// Activate the handler with this connection
+		if (handler.onActivate) {
+			await handler.onActivate(this);
+		}
 
 		// Map each code in the range to this handler
 		for (let i = 0; i < handler.length; i++) {
@@ -149,6 +204,11 @@ export class RlpxConnection extends BasicConnection {
 				break;
 			case 0x03: // PONG
 				this.log('received PONG');
+				// Clear ping timeout - connection is alive
+				if (this.pingTimeoutId) {
+					clearTimeout(this.pingTimeoutId);
+					this.pingTimeoutId = undefined;
+				}
 				break;
 			default:
 				this.log('unhandled base protocol code: 0x%s', code.toString(16));
@@ -171,14 +231,15 @@ export class RlpxConnection extends BasicConnection {
 
 	/**
 	 * Send a raw RLPx message
-	 * Delegates to the underlying stream which should be RlpxSocketMultiaddrConnection
+	 * Delegates to the underlying maConn (RlpxSocketMultiaddrConnection) which has _sendMessage
 	 */
 	async sendMessage(code: number, data: Uint8Array): Promise<void> {
-		const rlpxStream = this.stream as any;
-		if (typeof rlpxStream._sendMessage === 'function') {
-			rlpxStream._sendMessage(code, data);
+		// Access the maConn (RlpxSocketMultiaddrConnection) which has _sendMessage
+		const rlpxMaConn = this.maConn as any;
+		if (typeof rlpxMaConn._sendMessage === 'function') {
+			rlpxMaConn._sendMessage(code, data);
 		} else {
-			throw new Error('Underlying stream does not support _sendMessage');
+			throw new Error('Underlying connection does not support _sendMessage - RLPx handshake may not be complete');
 		}
 	}
 
@@ -190,9 +251,26 @@ export class RlpxConnection extends BasicConnection {
 	}
 
 	/**
+	 * Clean up keepalive timers
+	 */
+	private stopKeepalive(): void {
+		if (this.pingIntervalId) {
+			clearInterval(this.pingIntervalId);
+			this.pingIntervalId = undefined;
+		}
+		if (this.pingTimeoutId) {
+			clearTimeout(this.pingTimeoutId);
+			this.pingTimeoutId = undefined;
+		}
+	}
+
+	/**
 	 * Override close to clean up listeners and call protocol onClose handlers
 	 */
 	override async close(options: any = {}): Promise<void> {
+		// Stop keepalive ping
+		this.stopKeepalive();
+		
 		this.stream.removeEventListener('message', this.onIncomingMessage as EventListener);
 
 		// Call onClose for all registered protocols
@@ -209,6 +287,9 @@ export class RlpxConnection extends BasicConnection {
 	 * Override abort to clean up listeners and call protocol onClose handlers
 	 */
 	override abort(err: Error): void {
+		// Stop keepalive ping
+		this.stopKeepalive();
+		
 		this.stream.removeEventListener('message', this.onIncomingMessage as EventListener);
 
 		// Call onClose for all registered protocols

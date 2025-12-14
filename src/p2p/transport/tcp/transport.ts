@@ -4,11 +4,11 @@ import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
 import { bytesToHex } from "../../../utils";
 import {
-    type SafeError,
-    type SafePromise,
-    type SafeResult,
-    safeError,
-    safeResult,
+	type SafeError,
+	type SafePromise,
+	type SafeResult,
+	safeError,
+	safeResult,
 } from "../../../utils/safe";
 import { multiaddrToNetConfig } from "../../../utils/utils";
 import { BasicConnection } from "../../connection/basic-connection";
@@ -164,7 +164,7 @@ export class Transport {
 			log(`🔐 Starting encryption (basic) for ${peerAddr.toString()}...`);
 
 			// Always create BasicConnection first (encryption only, no muxing)
-			const basicConn = await this.upgrader.upgradeOutboundBasic(maConn);
+			const basicConn = await this.upgrader.upgradeOutbound(maConn, { signal: AbortSignal.timeout(5_000) });
 
 			log(`✅ BasicConnection created: ${basicConn.id}, remote peer: ${bytesToHex(basicConn.remotePeer).slice(0, 18)}...`);
 
@@ -174,7 +174,7 @@ export class Transport {
 			this.connectionCache.set(cacheKey, basicConn);
 
 			// Remove from cache when closed
-			basicConn.addEventListener('close', () => {
+			basicConn..addEventListener('close', () => {
 				this.connectionCache.delete(cacheKey);
 				log(`Connection ${basicConn.id} removed from cache`);
 			});

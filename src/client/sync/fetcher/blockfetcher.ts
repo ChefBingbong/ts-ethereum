@@ -50,12 +50,27 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
 			: `${first}-${first - BigInt(count - 1)}`;
 		const peerInfo = `id=${peer?.id.slice(0, 8)} address=${peer?.address}`;
 
-		const headersResult = await peer!.eth!.getBlockHeaders({
-			block: first,
-			max: count,
+		// Get ETH handler from peer's RlpxConnection
+		if (!peer?.rlpxConnection) {
+			this.DEBUG && this.debug(`Peer ${peerInfo} has no RlpxConnection`);
+			return [];
+		}
+		const protocols = peer.rlpxConnection.protocols;
+		const ethDescriptor = protocols.get('eth');
+		const ethHandler = ethDescriptor?.handler as any; // EthProtocolHandler
+		if (!ethHandler || typeof ethHandler.getBlockHeaders !== 'function') {
+			this.DEBUG && this.debug(`Peer ${peerInfo} has no ETH handler or invalid handler`);
+			return [];
+		}
+
+		// Request headers using new API
+		const headersResult = await ethHandler.getBlockHeaders({
+			startBlock: first,
+			maxHeaders: count,
+			skip: 0,
 			reverse: this.reverse,
 		});
-		if (!Array.isArray(headersResult) || headersResult[1].length === 0) {
+		if (!Array.isArray(headersResult) || headersResult.length !== 2 || headersResult[1].length === 0) {
 			// Catch occasional null or empty responses
 			this.DEBUG &&
 				this.debug(
@@ -63,12 +78,20 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
 				);
 			return [];
 		}
-		const headers = headersResult[1];
-		const bodiesResult = await peer?.eth?.getBlockBodies({
+		// Headers are returned as raw bytes (array of Uint8Array), decode them to BlockHeader objects
+		const { createBlockHeaderFromBytesArray } = await import("../../../block");
+		const headerBytesArray = headersResult[1] as Uint8Array[][];
+		const headers = headerBytesArray.map((hBytes: Uint8Array[]) => 
+			createBlockHeaderFromBytesArray(hBytes, { common: this.config.chainCommon })
+		);
+		
+		// Request bodies using new API
+		const bodiesResult = await ethHandler.getBlockBodies({
 			hashes: headers.map((h) => h.hash()),
 		});
 		if (
 			!Array.isArray(bodiesResult) ||
+			bodiesResult.length !== 2 ||
 			!Array.isArray(bodiesResult[1]) ||
 			bodiesResult[1].length === 0
 		) {
@@ -169,6 +192,6 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
 	 * Returns an idle peer that can process a next job.
 	 */
 	peer(): Peer | undefined {
-		return this.pool.idle((peer) => "eth" in peer);
+		return this.pool.idle((peer) => peer.rlpxConnection !== undefined && peer.rlpxConnection.protocols.has('eth'));
 	}
 }

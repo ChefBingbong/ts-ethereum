@@ -1,3 +1,4 @@
+import debug from "debug";
 import type { Block } from "../../block";
 import { SyncMode } from "../config.ts";
 import { VMExecution } from "../execution";
@@ -13,6 +14,8 @@ import { Event } from "../types.ts";
 import type { ServiceOptions } from "./service.ts";
 import { Service } from "./service.ts";
 import { TxPool } from "./txpool.ts";
+
+const log = debug("p2p:service:full");
 
 /**
  * Full Ethereum service
@@ -79,11 +82,14 @@ export class FullEthereumService extends Service {
 	}
 
 	override async open() {
+		log("Opening FullEthereumService");
 		if (this.synchronizer !== undefined) {
+			log("Using FullSynchronizer");
 			this.config.logger?.info(
 				"Preparing for sync using FullEthereumService with FullSynchronizer.",
 			);
 		} else {
+			log("No synchronizer configured");
 			this.config.logger?.info("Starting FullEthereumService with no syncing.");
 		}
 
@@ -140,14 +146,19 @@ export class FullEthereumService extends Service {
 		});
 
 		await super.open();
+		log("Service base opened");
 
 		await this.execution.open();
+		log("Execution opened");
 
 		this.txPool.open();
+		log("TxPool opened");
 		if (this.config.mine) {
 			// Start the TxPool immediately if mining
 			this.txPool.start();
+			log("TxPool started (mining enabled)");
 		}
+		log("FullEthereumService opened successfully");
 		return true;
 	}
 
@@ -158,11 +169,16 @@ export class FullEthereumService extends Service {
 		if (this.running) {
 			return false;
 		}
+		log("Starting FullEthereumService");
 		await super.start();
 		this.miner?.start();
+		log("Miner started");
 		await this.execution.start();
+		log("Execution started");
 		void this.buildHeadState();
 		this.txFetcher.start();
+		log("TxFetcher started");
+		log("FullEthereumService started successfully");
 		return true;
 	}
 
@@ -268,6 +284,7 @@ export class FullEthereumService extends Service {
 	 * Called when peer announces new block hashes via RlpxConnection
 	 */
 	async handleNewBlockHashes(hashes: any[], peer: Peer): Promise<void> {
+		log("Received %d new block hashes from peer %s", hashes.length, peer.id.slice(0, 8));
 		this.config.logger?.debug('[ETH] Received %d new block hashes', hashes.length);
 		// Trigger synchronizer to fetch these blocks
 		// Note: This would need to be integrated with the synchronizer's fetching mechanism
@@ -278,11 +295,14 @@ export class FullEthereumService extends Service {
 	 * Called when peer announces new full block via RlpxConnection
 	 */
 	async handleNewBlock(block: any, peer: Peer): Promise<void> {
+		log("Received new block number=%d hash=%s from peer %s", block.header.number, block.hash().toString('hex').slice(0, 16), peer.id.slice(0, 8));
 		this.config.logger?.debug('[ETH] Received new block');
 		// Validate and add to chain
 		try {
 			await this.chain.putBlocks([block]);
+			log("Successfully added block number=%d", block.header.number);
 		} catch (error: any) {
+			log("Failed to put block: %s", error.message);
 			this.config.logger?.error(`[ETH] Failed to put block: ${error.message}`);
 		}
 	}
@@ -291,19 +311,40 @@ export class FullEthereumService extends Service {
 	 * Called when peer requests headers via RlpxConnection
 	 */
 	async handleGetBlockHeaders(request: any, peer: Peer): Promise<void> {
+		log("Handling GetBlockHeaders request from peer %s", peer.id.slice(0, 8));
 		this.config.logger?.debug('[ETH] Peer requested block headers');
 
 		try {
-			// Fetch headers from chain
-			// Note: This is a simplified implementation, you may need to adjust based on your chain API
-			const headers = []; // await this.chain.getHeaders(request);
-
-			// Send response via peer's ETH protocol
 			const ethHandler = this.getEthHandler(peer);
-			if (ethHandler) {
-				await ethHandler.sendBlockHeaders(headers);
+			if (!ethHandler) {
+				this.config.logger?.warn('[ETH] No ETH handler for peer');
+				return;
 			}
+
+			// Request format: { reqId, startBlock, maxHeaders, skip, reverse }
+			const { reqId, startBlock, maxHeaders, skip, reverse } = request;
+			
+			// Validate request
+			if (typeof startBlock === 'bigint') {
+				if (
+					(reverse === true && startBlock > this.chain.headers.height) ||
+					(reverse !== true && startBlock + BigInt(maxHeaders * skip) > this.chain.headers.height)
+				) {
+					// Respond with empty list if request is beyond our chain height
+					log("Requested block range beyond chain height, sending empty response");
+					await ethHandler.sendBlockHeaders([], reqId);
+					return;
+				}
+			}
+
+			// Fetch headers from chain
+			const headers = await this.chain.getHeaders(startBlock, maxHeaders, skip, reverse);
+			log("Fetched %d headers, sending response with reqId=%d", headers.length, reqId);
+
+			// Send response with reqId
+			await ethHandler.sendBlockHeaders(headers.map(h => h.raw()), reqId);
 		} catch (error: any) {
+			log("Failed to handle getBlockHeaders: %s", error.message);
 			this.config.logger?.error(`[ETH] Failed to handle getBlockHeaders: ${error.message}`);
 		}
 	}
@@ -312,19 +353,32 @@ export class FullEthereumService extends Service {
 	 * Called when peer requests bodies via RlpxConnection
 	 */
 	async handleGetBlockBodies(request: any, peer: Peer): Promise<void> {
+		log("Handling GetBlockBodies request from peer %s", peer.id.slice(0, 8));
 		this.config.logger?.debug('[ETH] Peer requested block bodies');
 
 		try {
-			// Fetch bodies from chain
-			// Note: This is a simplified implementation, you may need to adjust based on your chain API
-			const bodies = []; // await this.chain.getBodies(request);
-
-			// Send response via peer's ETH protocol
 			const ethHandler = this.getEthHandler(peer);
-			if (ethHandler) {
-				await ethHandler.sendBlockBodies(bodies);
+			if (!ethHandler) {
+				this.config.logger?.warn('[ETH] No ETH handler for peer');
+				return;
 			}
+
+			// Request format: { reqId, hashes }
+			const { reqId, hashes } = request;
+
+			// Fetch blocks from chain
+			const blocks = await Promise.all(
+				hashes.map((hash: Uint8Array) => this.chain.getBlock(hash))
+			);
+			
+			// Extract bodies (raw block without header)
+			const bodies = blocks.map((block) => block.raw().slice(1));
+			log("Fetched %d block bodies, sending response with reqId=%d", bodies.length, reqId);
+
+			// Send response with reqId
+			await ethHandler.sendBlockBodies(bodies, reqId);
 		} catch (error: any) {
+			log("Failed to handle getBlockBodies: %s", error.message);
 			this.config.logger?.error(`[ETH] Failed to handle getBlockBodies: ${error.message}`);
 		}
 	}
@@ -384,13 +438,18 @@ export class FullEthereumService extends Service {
 		});
 
 		this.config.events.on(Event.ETH_GET_POOLED_TRANSACTIONS, async (request, peer) => {
+			log("Handling GetPooledTransactions request from peer %s", peer.id.slice(0, 8));
 			// Handle request for pooled transactions
-			const hashes = request.hashes || [];
-			const txs = this.txPool.getByHash(hashes);
+			const { reqId, hashes } = request;
+			const txs = this.txPool.getByHash(hashes || []);
 
 			const ethHandler = this.getEthHandler(peer);
-			if (ethHandler && txs.length > 0) {
-				await ethHandler.sendPooledTransactions(txs.map((tx) => tx.serialize()));
+			if (ethHandler) {
+				log("Sending %d pooled transactions with reqId=%d", txs.length, reqId);
+				await ethHandler.sendPooledTransactions(
+					txs.map((tx) => tx.serialize()),
+					reqId
+				);
 			}
 		});
 	}

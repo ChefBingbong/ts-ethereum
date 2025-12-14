@@ -1,3 +1,4 @@
+import debug from "debug";
 import type { Block } from "../../block";
 import type { EthProtocolHandler } from "../../p2p/transport/rlpx/protocols/eth-protocol-handler";
 import * as RLP from "../../rlp";
@@ -20,6 +21,8 @@ import { Heap } from "../ext/qheap.ts";
 import type { Peer } from "../net/peer/peer.ts";
 import type { PeerPool } from "../net/peerpool.ts";
 import type { FullEthereumService } from "./fullethereumservice.ts";
+
+const log = debug("p2p:txpool");
 
 // Configuration constants
 const MIN_GAS_PRICE_BUMP_PERCENT = 10;
@@ -283,6 +286,7 @@ export class TxPool {
 			return false;
 		}
 		this.opened = true;
+		log("TxPool opened");
 		return true;
 	}
 
@@ -308,6 +312,7 @@ export class TxPool {
 		);
 
 		this.running = true;
+		log("TxPool started (pending=%d queued=%d)", this.pendingCount, this.queuedCount);
 		this.config.logger?.info("TxPool started.");
 		return true;
 	}
@@ -507,11 +512,14 @@ export class TxPool {
 			.toString()
 			.slice(2);
 
+		log("Adding tx hash=%s address=%s nonce=%d local=%s", hash.slice(0, 16), address.slice(0, 8), tx.nonce, isLocalTransaction);
+
 		try {
 			await this.validate(tx, isLocalTransaction);
 
 			const pool = await this.classifyTransaction(tx, address);
 			const targetPool = pool === "pending" ? this.pending : this.queued;
+			log("Tx classified as %s (hash=%s)", pool, hash.slice(0, 16));
 
 			// Get existing txs for this address
 			let existingTxs = targetPool.get(address) ?? [];
@@ -555,6 +563,8 @@ export class TxPool {
 
 			this.handled.set(hash, { address, added });
 
+			log("Tx added to %s pool (pending=%d queued=%d)", pool, this.pendingCount, this.queuedCount);
+
 			// Try to promote queued txs if we added to pending
 			if (pool === "pending") {
 				await this.promoteExecutables(address);
@@ -563,6 +573,7 @@ export class TxPool {
 			// Enforce global limits
 			this.enforcePoolLimits();
 		} catch (e) {
+			log("Failed to add tx hash=%s error=%s", hash.slice(0, 16), (e as Error).message);
 			this.handled.set(hash, { address, added, error: e as Error });
 			throw e;
 		}
@@ -910,6 +921,7 @@ export class TxPool {
 		const targetPeers = peers ?? this.service.pool.peers;
 		const numPeers = targetPeers.length;
 		if (numPeers === 0) return;
+		log("Broadcasting %d transactions to %d peers", txs.length, numPeers);
 
 		// Calculate sqrt(n) peers for full tx broadcast
 		const numFullBroadcast = Math.max(
@@ -987,6 +999,7 @@ export class TxPool {
 	 */
 	async sendNewTxHashes(txs: [number[], number[], Uint8Array[]], peers: Peer[]) {
 		const txHashes = txs[2];
+		log("Sending %d tx hashes to %d peers", txHashes.length, peers.length);
 		for (const peer of peers) {
 			// Make sure data structure is initialized
 			if (!this.knownByPeer.has(peer.id)) {
@@ -1035,6 +1048,7 @@ export class TxPool {
 	async handleIncomingTransactions(txs: Uint8Array[] | TypedTransaction[], peer: Peer): Promise<void> {
 		if (!this.running || txs.length === 0) return;
 
+		log("Handling %d incoming transactions from peer %s", txs.length, peer.id.slice(0, 8));
 		this.config.logger?.debug(
 			`[TxPool] Received ${txs.length} transactions from peer ${peer.id.slice(0, 8)}`,
 		);
@@ -1263,6 +1277,7 @@ export class TxPool {
 	 * Remove txs included in the latest blocks from the tx pool
 	 */
 	removeNewBlockTxs(newBlocks: Block[]) {
+		log("Removing mined txs from %d blocks", newBlocks.length);
 		if (!this.running) return;
 		for (const block of newBlocks) {
 			for (const tx of block.transactions) {

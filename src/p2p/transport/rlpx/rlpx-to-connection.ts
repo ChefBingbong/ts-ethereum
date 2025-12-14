@@ -9,6 +9,9 @@ import {
 	createBody
 } from "../../connection-encrypters/eccies/utils/body";
 import {
+	sendFrameMessage
+} from "../../connection-encrypters/eccies/utils/frame";
+import {
 	createHeader
 } from "../../connection-encrypters/eccies/utils/header";
 import { AbstractMultiaddrConnection } from "../../connection/abstract-multiaddr-connection";
@@ -211,6 +214,30 @@ class RlpxSocketMultiaddrConnection extends AbstractMultiaddrConnection {
 
 	sendResume(): void {
 		this.socket.resume();
+	}
+
+	/**
+	 * Send an RLPx protocol message with code and data
+	 * This is used by RlpxConnection.sendMessage()
+	 */
+	_sendMessage(code: number, data: Uint8Array): void {
+		if (!this.encrypter) {
+			throw new Error("Encrypter not set - cannot send RLPx frame");
+		}
+
+		const egressAes = (this.encrypter as any).egressAes;
+		const egressMac = (this.encrypter as any).egressMac;
+
+		if (!egressAes || !egressMac) {
+			throw new Error("ECIES handshake not complete - AES/MAC not available");
+		}
+
+		if (this.socket.destroyed) {
+			throw new Error("Socket is destroyed");
+		}
+
+		// Use sendFrameMessage to create and send the RLPx frame
+		sendFrameMessage(this.socket, egressAes, egressMac, code, data);
 	}
 }
 

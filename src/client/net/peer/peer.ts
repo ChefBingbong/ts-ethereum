@@ -137,7 +137,7 @@ export class Peer extends EventEmitter {
 					`[Peer.connect] 📍 Dialing peer at ${peerAddr.toString()}, peerId=${this.id.slice(0, 16)}...`,
 				);
 
-				const result = await this.transportInstance.dialBasic(
+				const result = await this.transportInstance.dial(
 					peerAddr,
 					peerIdBytes,
 				);
@@ -238,21 +238,28 @@ export class Peer extends EventEmitter {
 		}
 
 		// Get ETH handler
-		const protocols = (this.rlpxConnection as any).protocols as Map<string, any>;
+		const protocols = this.rlpxConnection.protocols;
 		const ethDescriptor = protocols.get('eth');
-		const ethHandler = ethDescriptor?.handler;
+		const ethHandler = ethDescriptor?.handler as any; // EthProtocolHandler
 
-		if (!ethHandler) {
+		if (!ethHandler || typeof ethHandler.getBlockHeaders !== 'function') {
 			return;
 		}
 
 		// Try to get block headers for latest
 		try {
-			const headers = await ethHandler.getBlockHeaders({
-				block: 'latest' as any,
-				max: 1,
+			// Use a large block number to get latest (or we could use status.bestHash)
+			// For now, request from a very high number which should return the latest
+			const result = await ethHandler.getBlockHeaders({
+				startBlock: BigInt(Number.MAX_SAFE_INTEGER),
+				maxHeaders: 1,
+				skip: 0,
+				reverse: true,
 			});
-			return headers[0];
+			if (Array.isArray(result) && result.length === 2 && result[1].length > 0) {
+				return result[1][0];
+			}
+			return undefined;
 		} catch (error: any) {
 			this.config.logger?.debug(
 				`[Peer ${this.id.slice(0, 8)}] Failed to get latest header: ${error.message}`
@@ -309,7 +316,7 @@ export class Peer extends EventEmitter {
 
 		// Register ETH protocol
 		const ethHandler = this.createEthProtocolHandler();
-		const ethOffset = this.rlpxConnection.registerProtocol(ethHandler);
+		const ethOffset = await this.rlpxConnection.registerProtocol(ethHandler);
 		this.registeredProtocols.add('eth');
 
 		this.config.logger?.info(

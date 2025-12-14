@@ -1,11 +1,12 @@
 import * as RLP from "../../../../../rlp";
 import {
-    BaseEthHandler,
-    MessageType,
-    type HandlerContext,
+	BaseEthHandler,
+	MessageType,
+	type HandlerContext,
 } from "./base-handler";
 
 export interface GetBlockHeadersRequest {
+	reqId?: bigint;
 	startBlock: number | bigint | Uint8Array;
 	maxHeaders: number;
 	skip: number;
@@ -20,11 +21,13 @@ export class BlockHeadersHandler extends BaseEthHandler {
 
 	/**
 	 * Send GET_BLOCK_HEADERS and wait for BLOCK_HEADERS response
+	 * Returns [reqId, headers] tuple for eth/66 compatibility
 	 */
 	async sendGetHeaders(
 		request: GetBlockHeadersRequest,
 		ctx: HandlerContext,
-	): Promise<any[]> {
+	): Promise<[bigint, any[]]> {
+		const reqId = request.reqId ?? BigInt(Date.now());
 		return new Promise((resolve, reject) => {
 			const timeoutId = setTimeout(() => {
 				cleanup();
@@ -38,8 +41,14 @@ export class BlockHeadersHandler extends BaseEthHandler {
 				const { code, data } = evt.detail;
 				if (code === this.responseCode) {
 					cleanup();
-					const headers = RLP.decode(data) as any[];
-					resolve(headers);
+					// eth/66 format: [reqId, headers]
+					const decoded = RLP.decode(data) as any[];
+					const responseReqId = typeof decoded[0] === 'bigint' ? decoded[0] : BigInt(decoded[0]);
+					const headers = decoded[1] || [];
+					// Match reqId to ensure we got the right response
+					if (responseReqId === reqId) {
+						resolve([reqId, headers]);
+					}
 				}
 			}) as EventListener;
 
@@ -50,8 +59,8 @@ export class BlockHeadersHandler extends BaseEthHandler {
 
 			ctx.connection.addEventListener("message", onMessage);
 
-			// Send request
-			this.send(request, ctx);
+			// Send request with reqId
+			this.send({ ...request, reqId }, ctx);
 		});
 	}
 
@@ -59,11 +68,16 @@ export class BlockHeadersHandler extends BaseEthHandler {
 		request: GetBlockHeadersRequest,
 		ctx: HandlerContext,
 	): Promise<void> {
+		// eth/66 format: [reqId, [block, max, skip, reverse]]
+		const reqId = request.reqId ?? BigInt(Date.now());
 		const payload = [
-			request.startBlock,
-			request.maxHeaders,
-			request.skip,
-			request.reverse ? 1 : 0,
+			reqId,
+			[
+				request.startBlock,
+				request.maxHeaders,
+				request.skip,
+				request.reverse ? 1 : 0,
+			],
 		];
 		const encoded = RLP.encode(payload as any);
 		await ctx.connection.sendMessage(this.code, encoded);
@@ -73,18 +87,28 @@ export class BlockHeadersHandler extends BaseEthHandler {
 		data: Uint8Array,
 		ctx: HandlerContext,
 	): Promise<GetBlockHeadersRequest> {
+		// eth/66 format: [reqId, [block, max, skip, reverse]]
 		const decoded = RLP.decode(data) as any[];
+		const reqId = decoded[0];
+		const [block, max, skip, reverse] = decoded[1];
 		return {
-			startBlock: decoded[0],
-			maxHeaders: decoded[1],
-			skip: decoded[2],
-			reverse: decoded[3] === 1,
+			reqId: typeof reqId === 'bigint' ? reqId : BigInt(reqId),
+			startBlock: block,
+			maxHeaders: max,
+			skip: skip,
+			reverse: reverse === 1,
 		};
 	}
 
 	// Send BLOCK_HEADERS response
-	async sendHeaders(headers: any[], ctx: HandlerContext): Promise<void> {
-		const encoded = RLP.encode(headers as any);
+	// request should contain reqId from the original request
+	async sendHeaders(headers: any[], ctx: HandlerContext, reqId?: bigint): Promise<void> {
+		if (reqId === undefined) {
+			throw new Error("reqId required for BLOCK_HEADERS response");
+		}
+		// eth/66 format: [reqId, headers]
+		const payload = [reqId, headers];
+		const encoded = RLP.encode(payload as any);
 		await ctx.connection.sendMessage(this.responseCode, encoded);
 	}
 }

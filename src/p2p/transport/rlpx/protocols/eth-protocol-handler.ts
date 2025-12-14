@@ -1,20 +1,20 @@
 import * as RLP from '../../../../rlp/index';
 import { BaseProtocolHandler } from '../base-protocol-handler';
 import {
-    BlockBodiesHandler,
-    BlockHeadersHandler,
-    NewBlockHandler,
-    NewBlockHashesHandler,
-    PooledTransactionsHandler,
-    StatusHandler,
-    TransactionsHandler,
-    type BlockHash,
-    type GetBlockBodiesRequest,
-    type GetBlockHeadersRequest,
-    type GetPooledTransactionsRequest,
-    type HandlerContext,
-    type NewBlockPayload,
-    type StatusPayload,
+	BlockBodiesHandler,
+	BlockHeadersHandler,
+	NewBlockHandler,
+	NewBlockHashesHandler,
+	PooledTransactionsHandler,
+	StatusHandler,
+	TransactionsHandler,
+	type BlockHash,
+	type GetBlockBodiesRequest,
+	type GetBlockHeadersRequest,
+	type GetPooledTransactionsRequest,
+	type HandlerContext,
+	type NewBlockPayload,
+	type StatusPayload,
 } from './handlers';
 
 // ETH protocol message codes (relative to protocol offset)
@@ -91,8 +91,11 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 
 		// BLOCK_HEADERS (response)
 		this.on(this.blockHeadersHandler.responseCode, async (data, conn) => {
-			const headers = RLP.decode(data);
-			conn.dispatchEvent(new CustomEvent('eth:blockHeaders', { detail: headers }));
+			// eth/66 format: [reqId, headers]
+			const decoded = RLP.decode(data) as any[];
+			const reqId = typeof decoded[0] === 'bigint' ? decoded[0] : BigInt(decoded[0]);
+			const headers = decoded[1] || [];
+			conn.dispatchEvent(new CustomEvent('eth:blockHeaders', { detail: [reqId, headers] }));
 		});
 
 		// GET_BLOCK_BODIES
@@ -103,8 +106,11 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 
 		// BLOCK_BODIES (response)
 		this.on(this.blockBodiesHandler.responseCode, async (data, conn) => {
-			const bodies = RLP.decode(data);
-			conn.dispatchEvent(new CustomEvent('eth:blockBodies', { detail: bodies }));
+			// eth/66 format: [reqId, bodies]
+			const decoded = RLP.decode(data) as any[];
+			const reqId = typeof decoded[0] === 'bigint' ? decoded[0] : BigInt(decoded[0]);
+			const bodies = decoded[1] || [];
+			conn.dispatchEvent(new CustomEvent('eth:blockBodies', { detail: [reqId, bodies] }));
 		});
 
 		// NEW_BLOCK
@@ -121,15 +127,21 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 
 		// POOLED_TRANSACTIONS (response)
 		this.on(this.pooledTransactionsHandler.responseCode, async (data, conn) => {
-			const txs = RLP.decode(data);
-			conn.dispatchEvent(new CustomEvent('eth:pooledTransactions', { detail: txs }));
+			// eth/66 format: [reqId, transactions]
+			const decoded = RLP.decode(data) as any[];
+			const reqId = typeof decoded[0] === 'bigint' ? decoded[0] : BigInt(decoded[0]);
+			const txs = decoded[1] || [];
+			conn.dispatchEvent(new CustomEvent('eth:pooledTransactions', { detail: [reqId, txs] }));
 		});
 	}
 
 	private createContext(): HandlerContext {
+		if (!this.connection) {
+			throw new Error(`Cannot create handler context: ${this.name} protocol handler has no connection`);
+		}
 		return {
-			connection: this.connection!,
-			socket: (this.connection as any).socket,
+			connection: this.connection,
+			socket: this.connection.socket,
 			timeout: 8000,
 		};
 	}
@@ -148,30 +160,32 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 
 	/**
 	 * Request block headers and wait for response
+	 * Returns [reqId, headers] tuple for eth/66 compatibility
 	 */
-	async getBlockHeaders(request: GetBlockHeadersRequest): Promise<any[]> {
+	async getBlockHeaders(request: GetBlockHeadersRequest): Promise<[bigint, any[]]> {
 		return this.blockHeadersHandler.sendGetHeaders(request, this.createContext());
 	}
 
 	/**
 	 * Send block headers response
 	 */
-	async sendBlockHeaders(headers: any[]): Promise<void> {
-		await this.blockHeadersHandler.sendHeaders(headers, this.createContext());
+	async sendBlockHeaders(headers: any[], reqId?: bigint): Promise<void> {
+		await this.blockHeadersHandler.sendHeaders(headers, this.createContext(), reqId);
 	}
 
 	/**
 	 * Request block bodies and wait for response
+	 * Returns [reqId, bodies] tuple for eth/66 compatibility
 	 */
-	async getBlockBodies(request: GetBlockBodiesRequest): Promise<any[]> {
+	async getBlockBodies(request: GetBlockBodiesRequest): Promise<[bigint, any[]]> {
 		return this.blockBodiesHandler.sendGetBodies(request, this.createContext());
 	}
 
 	/**
 	 * Send block bodies response
 	 */
-	async sendBlockBodies(bodies: any[]): Promise<void> {
-		await this.blockBodiesHandler.sendBodies(bodies, this.createContext());
+	async sendBlockBodies(bodies: any[], reqId?: bigint): Promise<void> {
+		await this.blockBodiesHandler.sendBodies(bodies, this.createContext(), reqId);
 	}
 
 	/**
@@ -192,21 +206,25 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 	 * Announce new block
 	 */
 	async announceNewBlock(payload: NewBlockPayload): Promise<void> {
+		if (!this.connection) {
+			throw new Error(`Cannot announce new block: ${this.name} protocol handler has no connection`);
+		}
 		await this.newBlockHandler.send(payload, this.createContext());
 	}
 
 	/**
 	 * Request pooled transactions and wait for response
+	 * Returns [reqId, transactions] tuple for eth/66 compatibility
 	 */
-	async getPooledTransactions(request: GetPooledTransactionsRequest): Promise<Uint8Array[]> {
+	async getPooledTransactions(request: GetPooledTransactionsRequest): Promise<[bigint, Uint8Array[]]> {
 		return this.pooledTransactionsHandler.sendGetPooledTransactions(request, this.createContext());
 	}
 
 	/**
 	 * Send pooled transactions response
 	 */
-	async sendPooledTransactions(transactions: Uint8Array[]): Promise<void> {
-		await this.pooledTransactionsHandler.sendTransactions(transactions, this.createContext());
+	async sendPooledTransactions(transactions: Uint8Array[], reqId?: bigint): Promise<void> {
+		await this.pooledTransactionsHandler.sendTransactions(transactions, this.createContext(), reqId);
 	}
 }
 
