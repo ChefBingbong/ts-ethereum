@@ -6,7 +6,7 @@
  * This script tests RLPx transport connections in isolation:
  * - Creates two nodes (listener and dialer)
  * - Sets up RLPx transport on both
- * - Attempts BasicConnection and logs all steps
+ * - Attempts Connection and logs all steps
  */
 
 import { multiaddr } from "@multiformats/multiaddr";
@@ -14,10 +14,9 @@ import debug from "debug";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { genPrivateKey, KademliaNode, PeerInfo, pk2id } from "../../devp2p/index.ts";
 import { EcciesEncrypter } from "../../p2p/connection-encrypters/eccies/eccies-encrypter.ts";
-import type { BasicConnection } from "../../p2p/connection/basic-connection.ts";
+import type { Connection } from "../../p2p/connection/connection.ts";
 import { Registrar } from "../../p2p/connection/registrar.ts";
 import { Upgrader } from "../../p2p/connection/upgrader.ts";
-import { Connection } from "../../p2p/index.ts";
 import { mplex, MplexStream } from "../../p2p/muxer/index.ts";
 import { TransportListener } from "../../p2p/transport/rlpx/transport-listener.ts";
 import { Transport } from "../../p2p/transport/rlpx/transport.ts";
@@ -46,7 +45,7 @@ interface TestNode {
 	upgrader: Upgrader;
 	transport: Transport;
 	listener?: TransportListener;
-	connections: Map<string, BasicConnection>;
+	connections: Map<string, Connection>;
 }
 
 // ============ Helper Functions ============
@@ -119,7 +118,7 @@ function createTestNode(nodeIndex: number, udpPort: number, tcpPort: number): Te
     });
   
     // Storage
-    const connections = new Map<string, BasicConnection | Connection>();
+    const connections = new Map<string, Connection | Connection>();
     const protocolHandlers = new Map<string, (stream: MplexStream) => void>();
   
     // Listener for inbound connections
@@ -156,7 +155,7 @@ function createTestNode(nodeIndex: number, udpPort: number, tcpPort: number): Te
       
       // When we discover a new peer via DHT, try to establish TCP connection
       if (peer.tcpPort && peer.address && peer.id) {
-        await testBasicConnection(node, peer);
+        await testConnection(node, peer);
       }
     });
   
@@ -182,19 +181,19 @@ async function setupServer(node: TestNode): Promise<void> {
 	const listener = node.transport.createListener({});
 
 	// Handle incoming connections
-	listener.on("connection", (basicConn: BasicConnection) => {
+	listener.on("connection", (basicConn: Connection) => {
 		const remotePeerId = bytesToUnprefixedHex(basicConn.remotePeer);
 		const remoteAddr = basicConn.remoteAddr;
 		const { host, port } = getHostPortFromMultiaddr(remoteAddr);
 
-		log(node.name, `📥 INBOUND BasicConnection from peer ${remotePeerId.slice(0, 8)} at ${host}:${port}`);
+		log(node.name, `📥 INBOUND Connection from peer ${remotePeerId.slice(0, 8)} at ${host}:${port}`);
 		
 		const connKey = `${host}:${port}`;
 		node.connections.set(connKey, basicConn);
 
 		// Handle connection close
 		basicConn.addEventListener("close", () => {
-			log(node.name, `🔌 BasicConnection ${connKey} closed`);
+			log(node.name, `🔌 Connection ${connKey} closed`);
 			node.connections.delete(connKey);
 		});
 
@@ -220,9 +219,9 @@ async function setupServer(node: TestNode): Promise<void> {
 	node.listener = listener;
 }
 
-// ============ Test BasicConnection ============
+// ============ Test Connection ============
 
-async function testBasicConnection(node: TestNode, peer: PeerInfo): Promise<void> {
+async function testConnection(node: TestNode, peer: PeerInfo): Promise<void> {
     const connKey = `${peer.address}:${peer.tcpPort}`;
   
     // Skip if already connected

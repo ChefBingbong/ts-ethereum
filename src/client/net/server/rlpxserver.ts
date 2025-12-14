@@ -2,7 +2,7 @@ import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { DPT as Devp2pDPT } from "../../../devp2p/dpt-1/index.ts";
 import { pk2id } from "../../../devp2p/index";
 import { EcciesEncrypter } from "../../../p2p/connection-encrypters/eccies/eccies-encrypter";
-import type { BasicConnection } from "../../../p2p/connection/basic-connection";
+import type { Connection } from "../../../p2p/connection/connection";
 import { Registrar } from "../../../p2p/connection/registrar";
 import { Upgrader } from "../../../p2p/connection/upgrader.ts";
 import { mplex } from "../../../p2p/muxer";
@@ -297,8 +297,8 @@ export class RlpxServer extends Server {
 		}
 		// Close connection if peer is connected
 		const peer = this.peers.get(peerId);
-		if (peer && peer.basicConnection) {
-			peer.basicConnection.close().catch(() => {});
+		if (peer && peer.Connection) {
+			peer.Connection.close().catch(() => {});
 		}
 		return true;
 	}
@@ -447,7 +447,7 @@ export class RlpxServer extends Server {
 		this.listener = this.transport.createListener({});
 
 		// Handle incoming connections
-		this.listener.on("connection", async (basicConn: BasicConnection) => {
+		this.listener.on("connection", async (basicConn: Connection) => {
 			// Extract peer info from connection
 			const remotePeerId = bytesToUnprefixedHex(basicConn.remotePeer);
 			const remoteAddr = basicConn.remoteAddr;

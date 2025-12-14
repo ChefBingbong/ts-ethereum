@@ -58,7 +58,7 @@ async function main() {
 		// Handle incoming connections on Node 1
 		node1Listener.on("connection", async (basicConn: any) => {
 			try {
-				console.log("\n[Node 1] 📥 Received BasicConnection!");
+				console.log("\n[Node 1] 📥 Received Connection!");
 				console.log(
 					"[Node 1] Remote peer:",
 					Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16) + "...",
@@ -126,7 +126,7 @@ async function main() {
 		}
 
 		const basicConn = dialResult[1];
-		console.log("[Node 0] ✅ Dial successful! BasicConnection established");
+		console.log("[Node 0] ✅ Dial successful! Connection established");
 		console.log(
 			"[Node 0] Remote peer:",
 			Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16) + "...",
@@ -141,7 +141,7 @@ async function main() {
 	try {
 		await testPromise;
 		console.log("\n✅ Test completed successfully!");
-		console.log("✅ Both nodes established BasicConnections\n");
+		console.log("✅ Both nodes established Connections\n");
 
 		// Cleanup
 		await node1Listener.close();

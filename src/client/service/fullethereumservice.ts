@@ -1,5 +1,6 @@
 import debug from "debug";
 import type { Block } from "../../block";
+import { bytesToHex } from "../../utils";
 import { SyncMode } from "../config.ts";
 import { VMExecution } from "../execution";
 import { Miner } from "../miner";
@@ -96,8 +97,19 @@ export class FullEthereumService extends Service {
 		// Setup event listeners for RlpxConnection-based protocol handlers
 		this.setupRlpxEventListeners();
 
-		// Broadcast pending txs to newly connected peer
-		this.config.events.on(Event.POOL_PEER_ADDED, (peer) => {
+		// Initiate STATUS handshake and broadcast pending txs to newly connected peer
+		this.config.events.on(Event.POOL_PEER_ADDED, async (peer) => {
+			// Initiate STATUS handshake if peer has RLPx connection
+			if (peer.rlpxConnection) {
+				try {
+					log("Initiating STATUS handshake with peer %s", peer.id.slice(0, 8));
+					await this.initiateStatusHandshake(peer);
+				} catch (error: any) {
+					log("Failed to initiate STATUS handshake: %s", error.message);
+					this.config.logger?.error(`[ETH] Failed STATUS handshake with peer ${peer.id.slice(0, 8)}: ${error.message}`);
+				}
+			}
+			
 			// TODO: Should we do this if the txPool isn't started?
 			const txs: [number[], number[], Uint8Array[]] = [[], [], []];
 			// Iterate over pending pool (executable txs)
@@ -380,6 +392,52 @@ export class FullEthereumService extends Service {
 		} catch (error: any) {
 			log("Failed to handle getBlockBodies: %s", error.message);
 			this.config.logger?.error(`[ETH] Failed to handle getBlockBodies: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Initiate STATUS handshake with peer
+	 */
+	private async initiateStatusHandshake(peer: Peer): Promise<void> {
+		if (!peer.rlpxConnection) {
+			throw new Error('Peer has no RlpxConnection');
+		}
+
+		const ethHandler = this.getEthHandler(peer);
+		if (!ethHandler) {
+			throw new Error('Peer does not support ETH protocol');
+		}
+
+		// Build STATUS payload from chain state
+		const latestBlock = this.chain.blocks.latest;
+		if (!latestBlock) {
+			throw new Error('Chain has no latest block');
+		}
+
+		const statusPayload = {
+			protocolVersion: 68, // eth/68
+			networkId: this.chain.chainId,
+			td: this.chain.blocks.td,
+			bestHash: latestBlock.hash(),
+			genesisHash: this.chain.genesis.hash(),
+			forkID: undefined, // TODO: Add forkID support if needed
+		};
+
+		log("Sending STATUS to peer %s: protocolVersion=%d networkId=%d td=%d bestHash=%s", 
+			peer.id.slice(0, 8), statusPayload.protocolVersion, statusPayload.networkId, 
+			statusPayload.td, bytesToHex(statusPayload.bestHash).slice(0, 16));
+
+		try {
+			const peerStatus = await ethHandler.sendStatus(statusPayload);
+			log("Received STATUS from peer %s: protocolVersion=%d networkId=%d td=%d bestHash=%s", 
+				peer.id.slice(0, 8), peerStatus.protocolVersion, peerStatus.networkId, 
+				peerStatus.td, bytesToHex(peerStatus.bestHash).slice(0, 16));
+			this.config.logger?.info(
+				`[ETH] ✅ STATUS handshake completed with peer ${peer.id.slice(0, 8)}`
+			);
+		} catch (error: any) {
+			log("STATUS handshake failed with peer %s: %s", peer.id.slice(0, 8), error.message);
+			throw error;
 		}
 	}
 

@@ -1,5 +1,8 @@
-import type { ProtocolHandler, MessageHandler } from './protocol-handler';
+import debug from 'debug';
+import type { MessageHandler, ProtocolHandler } from './protocol-handler';
 import type { RlpxConnection } from './RlpxConnection';
+
+const log = debug('p2p:rlpx:protocol:base');
 
 /**
  * Base class for protocol handlers with message code mapping
@@ -40,10 +43,19 @@ export abstract class BaseProtocolHandler implements ProtocolHandler {
 		data: Uint8Array,
 		connection: RlpxConnection,
 	): Promise<void> {
+		log('🔄 [handleMessage] Protocol=%s code=0x%s size=%d', this.name, code.toString(16), data.length);
 		const handler = this.handlers.get(code);
 		if (handler) {
-			await handler(data, connection);
+			log('✅ [handleMessage] Found handler for code=0x%s', code.toString(16));
+			try {
+				await handler(data, connection);
+				log('✅ [handleMessage] Handler executed successfully code=0x%s', code.toString(16));
+			} catch (error: any) {
+				log('❌ [handleMessage] Handler error code=0x%s: %s', code.toString(16), error.message);
+				throw error;
+			}
 		} else {
+			log('⚠️ [handleMessage] No handler for code=0x%s', code.toString(16));
 			console.warn(
 				`[${this.name}] No handler for code 0x${code.toString(16)}`,
 			);
@@ -52,14 +64,20 @@ export abstract class BaseProtocolHandler implements ProtocolHandler {
 
 	/**
 	 * Send a message for this protocol
+	 * @param code - Relative code (will be converted to absolute by adding protocol offset)
+	 * @param data - Message data
 	 */
 	protected async send(code: number, data: Uint8Array): Promise<void> {
 		if (!this.connection) {
 			throw new Error('Protocol not activated');
 		}
 
-		// Connection will add the protocol offset automatically via routing
-		await this.connection.sendMessage(code, data);
+		// Get absolute code by adding protocol offset
+		const absoluteCode = this.connection.getAbsoluteCode(this.name, code);
+		log('📤 [send] Protocol=%s relative=0x%s absolute=0x%s size=%d', 
+			this.name, code.toString(16), absoluteCode.toString(16), data.length);
+
+		await this.connection.sendMessage(absoluteCode, data, this.name);
 	}
 
 	async onClose(): Promise<void> {

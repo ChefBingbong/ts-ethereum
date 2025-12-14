@@ -1,9 +1,12 @@
+import debug from 'debug';
 import * as RLP from "../../../../../rlp";
 import {
-    BaseEthHandler,
-    MessageType,
-    type HandlerContext,
+	BaseEthHandler,
+	MessageType,
+	type HandlerContext,
 } from "./base-handler";
+
+const log = debug('p2p:rlpx:handler:status');
 
 export interface StatusPayload {
 	protocolVersion: number;
@@ -26,41 +29,53 @@ export class StatusHandler extends BaseEthHandler {
 		payload: StatusPayload,
 		ctx: HandlerContext,
 	): Promise<StatusPayload> {
+		log('📤 [sendGetStatus] Sending STATUS and waiting for response timeout=%dms', this.timeout);
 		return new Promise((resolve, reject) => {
 			const timeoutId = setTimeout(() => {
 				cleanup();
+				log('❌ [sendGetStatus] STATUS handshake timeout after %dms', this.timeout);
 				reject(new Error(`STATUS handshake timeout after ${this.timeout}ms`));
 			}, this.timeout);
 
-			// Listen for STATUS response
-			const onMessage = ((evt: CustomEvent) => {
-				const { code, data } = evt.detail;
-				if (code === this.code) {
-					cleanup();
-					const status = this.decode(data);
-					resolve(status);
-				}
+			// Listen for eth:status events which are dispatched by EthProtocolHandler
+			// after it receives and decodes the STATUS message
+			const onStatus = ((evt: CustomEvent) => {
+				log('📥 [sendGetStatus] Received eth:status event');
+				const status = evt.detail as StatusPayload;
+				cleanup();
+				log('✅ [sendGetStatus] STATUS response received: protocolVersion=%d networkId=%d td=%d', 
+					status.protocolVersion, status.networkId, status.td);
+				resolve(status);
 			}) as EventListener;
 
 			const cleanup = () => {
 				clearTimeout(timeoutId);
-				ctx.connection.removeEventListener("message", onMessage);
+				ctx.connection.removeEventListener("eth:status", onStatus);
 			};
 
-			ctx.connection.addEventListener("message", onMessage);
+			// Set up listener BEFORE sending to avoid race condition
+			ctx.connection.addEventListener("eth:status", onStatus);
 
 			// Send our STATUS
+			log('📤 [sendGetStatus] Sending STATUS message');
 			this.send(payload, ctx);
 		});
 	}
 
 	async send(payload: StatusPayload, ctx: HandlerContext): Promise<void> {
+		log('📤 [send] Encoding and sending STATUS payload');
 		const encoded = this.encode(payload);
+		log('📤 [send] STATUS encoded size=%d, sending with code=0x%s', encoded.length, this.code.toString(16));
 		await ctx.connection.sendMessage(this.code, encoded);
+		log('✅ [send] STATUS message sent');
 	}
 
 	async handle(data: Uint8Array, ctx: HandlerContext): Promise<StatusPayload> {
-		return this.decode(data);
+		log('📥 [handle] Decoding STATUS message size=%d', data.length);
+		const status = this.decode(data);
+		log('✅ [handle] STATUS decoded: protocolVersion=%d networkId=%d td=%d', 
+			status.protocolVersion, status.networkId, status.td);
+		return status;
 	}
 
 	private encode(payload: StatusPayload): Uint8Array {

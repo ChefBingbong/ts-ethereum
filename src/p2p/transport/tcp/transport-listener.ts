@@ -4,15 +4,14 @@ import { EventEmitter } from "eventemitter3";
 import net, { type Server, type Socket } from "node:net";
 import type { NetConfig } from "../../../utils/getNetConfig";
 import { multiaddrToNetConfig } from "../../../utils/utils";
-import { BasicConnection } from "../../connection/basic-connection";
-import { Connection } from "../../connection/connection";
+import { Connection } from "../../connection";
 import { toMultiaddrConnection } from "./multiaddr-connection";
 import type { ListenerContext, Status } from "./types";
 
 const log = debug("p2p:transport:listener");
 
 interface TransportListenerEvents {
-	connection: (connection: BasicConnection | Connection) => void;
+	connection: (connection: Connection) => void;
 	listening: () => void;
 	error: (error: Error) => void;
 	close: () => void;
@@ -23,7 +22,7 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 	private addr: string = "unknown";
 	public context: ListenerContext;
 	private status: Status = { code: "INACTIVE" };
-	private connections: Map<string, BasicConnection | Connection> = new Map();
+	private connections: Map<string, Connection> = new Map();
 
 	constructor(context: ListenerContext) {
 		super();
@@ -69,11 +68,11 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 			});
 
 			log('upgrading inbound connection (basic, no muxing)...');
-			const basicConn = await this.context.upgrader.upgradeInboundBasic(maConn);
+			const basicConn = await this.context.upgrader.upgradeInbound(maConn);
 			
 			// Attempt upgrade with timeout
 			// The server will wait for the client to initiate muxer negotiation
-			// If client doesn't send muxer protocol within timeout, we keep BasicConnection
+			// If client doesn't send muxer protocol within timeout, we keep Connection
 			// If successful, handle full connection setup in .then()
 			// If failed/timeout, handle basic connection setup in .catch()
 			basicConn.upgrade(
@@ -94,7 +93,7 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 				this.emit('connection', fullConn);
 			}).catch((upgradeErr: any) => {
 				// Upgrade failed/timeout - client only wants basic connection
-				log('client did not request full connection (timeout or error), keeping BasicConnection: %s', upgradeErr.message);
+				log('client did not request full connection (timeout or error), keeping Connection: %s', upgradeErr.message);
 				
 				const connKey = basicConn.id;
 				this.connections.set(connKey, basicConn);
@@ -165,7 +164,7 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 		this.status = { code: "INACTIVE" };
 	}
 
-	getConnections(): (BasicConnection | Connection)[] {
+	getConnections(): (Connection)[] {
 		return Array.from(this.connections.values());
 	}
 

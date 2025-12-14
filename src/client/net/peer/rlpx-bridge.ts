@@ -1,25 +1,25 @@
 /**
- * Bridge to create devp2p ETH protocol instances from BasicConnection
+ * Bridge to create devp2p ETH protocol instances from Connection
  * This is a temporary solution until we fully migrate away from devp2p
  * 
  * TODO: This needs proper implementation. For now, it returns null and we fall back to legacy devp2p RLPx
  */
 
-import type { BasicConnection } from "../../../p2p/connection/basic-connection";
+import { Common } from "../../../chain-config";
+import type { Connection } from "../../../p2p/connection/connection";
 import type { AbstractProtocol } from "../protocol/abstract-protocol";
-import type { Common } from "../../../common";
 
 type Devp2pETH = any; // Temporary type stub
 
 /**
- * Create devp2p ETH protocol instance from BasicConnection
+ * Create devp2p ETH protocol instance from Connection
  * This is the main bridge function used by Peer.bindProtocols()
  * 
- * TODO: Implement proper bridge to extract/create devp2p ETH from BasicConnection
+ * TODO: Implement proper bridge to extract/create devp2p ETH from Connection
  * For now, this returns null and we fall back to legacy devp2p RLPx
  */
-export async function createEthProtocolFromBasicConnection(
-	basicConn: BasicConnection,
+export async function createEthProtocolFromConnection(
+	basicConn: Connection,
 	peerId: string,
 	protocolTemplate: AbstractProtocol<any>,
 	capabilities: any[],
@@ -28,11 +28,11 @@ export async function createEthProtocolFromBasicConnection(
 	// TODO: Implement proper bridge
 	// For now, return null to indicate we need to use legacy devp2p RLPx
 	// The actual implementation would:
-	// 1. Extract socket from BasicConnection
+	// 1. Extract socket from Connection
 	// 2. Create devp2p RLPx peer from socket
 	// 3. Extract ETH protocol from peer
 	// OR
-	// 1. Refactor EthProtocol.setupTransport() to work with BasicConnection directly
+	// 1. Refactor EthProtocol.setupTransport() to work with Connection directly
 	// 2. Handle RLPx message framing in EthProtocol itself
 	return null;
 }

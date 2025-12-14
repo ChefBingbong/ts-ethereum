@@ -73,14 +73,14 @@ async function main() {
 		// Handle incoming connections on Node 1
 		node1Listener.on("connection", async (basicConn: any) => {
 			try {
-				console.log("\n[Node 1] 📥 Received incoming BasicConnection");
+				console.log("\n[Node 1] 📥 Received incoming Connection");
 				console.log(
 					"[Node 1] Remote peer:",
 					Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16) + "...",
 				);
 
-				// Upgrade BasicConnection to RlpxConnection
-				// Note: BasicConnection has protected maConn and stream, so we cast to any
+				// Upgrade Connection to RlpxConnection
+				// Note: Connection has protected maConn and stream, so we cast to any
 				node1Connection = createRlpxConnection({
 					id: basicConn.id,
 					maConn: (basicConn as any).maConn,
@@ -184,14 +184,14 @@ async function main() {
 		}
 
 		const basicConn = dialResult[1];
-		console.log("[Node 0] ✅ Dial successful! BasicConnection established");
+		console.log("[Node 0] ✅ Dial successful! Connection established");
 		console.log(
 			"[Node 0] Remote peer:",
 			Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16) + "...",
 		);
 
-		// Upgrade BasicConnection to RlpxConnection
-		// Note: BasicConnection has protected maConn and stream, so we cast to any
+		// Upgrade Connection to RlpxConnection
+		// Note: Connection has protected maConn and stream, so we cast to any
 		node0Connection = createRlpxConnection({
 			id: basicConn.id,
 			maConn: (basicConn as any).maConn,

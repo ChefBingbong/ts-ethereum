@@ -1,26 +1,35 @@
-import { BasicConnection, type BasicConnectionInit } from '../../connection/basic-connection';
+import debug from 'debug';
+import { Connection, ConnectionComponents, ConnectionInit, Registrar } from '../../connection';
 import type {
     MessageHandler,
     ProtocolDescriptor,
     ProtocolHandler,
     ProtocolRegistration,
 } from './protocol-handler';
+import { RlpxProtocolRegistrarAdapter } from './rlpx-protocol-registrar-adapter';
 
-export interface RlpxConnectionInit extends BasicConnectionInit {
+const log = debug('p2p:rlpx:connection');
+
+export interface RlpxConnectionInit extends ConnectionInit {
 	// RLPx-specific options can go here
+	// Note: stream is required (not omitted) since Connection needs it
 }
 
 /**
- * RlpxConnection - Extends BasicConnection for RLPx protocol
+ * RlpxConnection - Extends Connection for RLPx protocol
  * No muxing, direct message stream access for RLPx frame handling
+ * Uses Connection base class but disables muxing/MSS-select
  */
-export class RlpxConnection extends BasicConnection {
+export class RlpxConnection extends Connection {
 	public direct: boolean = true;
 
 	// Protocol management
 	public protocols: Map<string, ProtocolDescriptor> = new Map();
-	    public messageRouter: Map<number, ProtocolHandler> = new Map();
+	public messageRouter: Map<number, ProtocolHandler> = new Map();
 	public registrations: Map<string, ProtocolRegistration> = new Map();
+	
+	// RLPx protocol registrar adapter (bridges Registrar with ProtocolHandler system)
+	private readonly rlpxRegistrar: RlpxProtocolRegistrarAdapter;
 
 	// Base protocol codes
 	private readonly BASE_PROTOCOL_LENGTH = 16; // 0x00-0x0F
@@ -31,14 +40,22 @@ export class RlpxConnection extends BasicConnection {
 	private pingTimeoutId?: NodeJS.Timeout;
 	private readonly PING_TIMEOUT = 20000; // 20 seconds - if no PONG received, disconnect
 
-	constructor(init: RlpxConnectionInit) {
-		super(init);
+	constructor(components: ConnectionComponents, init: RlpxConnectionInit) {
+		// Call Connection super with components and init, but set muxer to undefined
+		// RLPx doesn't use muxing - messages are sent directly via frames
+		super(components, {
+			...init,
+			muxer: undefined, // RLPx doesn't use muxing
+		});
+
+		// Create RLPx protocol registrar adapter
+		this.rlpxRegistrar = new RlpxProtocolRegistrarAdapter(components.registrar);
 
 		// Bind handlers
 		this.onIncomingMessage = this.onIncomingMessage.bind(this);
 
 		// Listen for messages on the underlying stream
-		this.stream.addEventListener('message', this.onIncomingMessage as EventListener);
+		// ((this as any).stream as any).addEventListener('message', this.onIncomingMessage as EventListener);
 		
 		// Start keepalive ping mechanism
 		this.startKeepalive();
@@ -63,7 +80,7 @@ export class RlpxConnection extends BasicConnection {
 	 * Send a PING message (code 0x02)
 	 */
 	private async sendPing(): Promise<void> {
-		if (this.status !== 'open') {
+		if ((this as any).status !== 'open') {
 			return;
 		}
 		
@@ -76,17 +93,22 @@ export class RlpxConnection extends BasicConnection {
 				clearTimeout(this.pingTimeoutId);
 			}
 			this.pingTimeoutId = setTimeout(() => {
-				this.log('PING timeout - no PONG received, closing connection');
+				log('PING timeout - no PONG received, closing connection');
 				this.abort(new Error('PING timeout - peer not responding'));
 			}, this.PING_TIMEOUT);
 		} catch (error: any) {
-			this.log('Failed to send PING: %s', error.message);
+			log('Failed to send PING: %s', error.message);
 			// Don't abort on ping send failure - connection might be closing
 		}
 	}
 
 	/**
 	 * Register a protocol handler
+	 * Synchronizes registration across three systems:
+	 * 1. protocols Map (metadata: offset, length)
+	 * 2. messageRouter Map (actual message routing: code -> handler)
+	 * 3. rlpxRegistrar adapter (bridges to Registrar for compatibility)
+	 * 
 	 * @param handler - The protocol handler implementation
 	 * @returns The assigned offset for this protocol
 	 */
@@ -107,19 +129,30 @@ export class RlpxConnection extends BasicConnection {
 			length: handler.length,
 		};
 
+		// 1. Register in protocols Map (metadata)
 		this.protocols.set(handler.name, descriptor);
 
-		// Activate the handler with this connection
+		// 2. Activate the handler with this connection
 		if (handler.onActivate) {
 			await handler.onActivate(this);
 		}
 
-		// Map each code in the range to this handler
+		// 3. Map each code in the range to this handler (message routing)
 		for (let i = 0; i < handler.length; i++) {
 			this.messageRouter.set(offset + i, handler);
 		}
 
-		this.log(
+		// 4. Register in rlpxRegistrar adapter (bridges to Registrar)
+		this.rlpxRegistrar.registerRlpxProtocol(handler);
+
+		log(
+			'📋 [registerProtocol] Registered protocol %s at offset 0x%s (length: %d, version: %d)',
+			handler.name,
+			offset.toString(16),
+			handler.length,
+			handler.version,
+		);
+		log(
 			'registered protocol %s at offset 0x%s (length: %d)',
 			handler.name,
 			offset.toString(16),
@@ -145,7 +178,7 @@ export class RlpxConnection extends BasicConnection {
 		}
 
 		registration.handlers.set(code, handler);
-		this.log('registered handler for %s code 0x%s', protocol, code.toString(16));
+		log('registered handler for %s code 0x%s', protocol, code.toString(16));
 	}
 
 	/**
@@ -159,11 +192,33 @@ export class RlpxConnection extends BasicConnection {
 	}
 
 	/**
+	 * Get protocol offset for a given protocol name
+	 */
+	getProtocolOffset(protocolName: string): number | undefined {
+		const descriptor = this.protocols.get(protocolName);
+		return descriptor?.offset;
+	}
+
+	/**
+	 * Get absolute code from protocol name and relative code
+	 */
+	getAbsoluteCode(protocolName: string, relativeCode: number): number {
+		const offset = this.getProtocolOffset(protocolName);
+		if (offset === undefined) {
+			throw new Error(`Protocol ${protocolName} not registered`);
+		}
+		return offset + relativeCode;
+	}
+
+	/**
 	 * Route incoming message to appropriate protocol handler
 	 */
 	private async routeMessage(code: number, data: Uint8Array): Promise<void> {
+		log('📥 [routeMessage] Received message code=0x%s size=%d', code.toString(16), data.length);
+
 		// Base protocol (0x00-0x0F) - already handled by encrypter/peer
 		if (code < this.BASE_PROTOCOL_LENGTH) {
+			log('📥 [routeMessage] Routing to base protocol handler');
 			this.handleBaseProtocol(code, data);
 			return;
 		}
@@ -175,16 +230,24 @@ export class RlpxConnection extends BasicConnection {
 			const descriptor = this.protocols.get(handler.name)!;
 			const relativeCode = code - descriptor.offset;
 
-			this.log(
-				'routing code 0x%s to %s (relative: 0x%s)',
+			log(
+				'📥 [routeMessage] Routing code 0x%s to protocol %s (offset=0x%s, relative=0x%s)',
 				code.toString(16),
 				handler.name,
+				descriptor.offset.toString(16),
 				relativeCode.toString(16),
 			);
 
-			await handler.handleMessage(relativeCode, data, this);
+			try {
+				await handler.handleMessage(relativeCode, data, this);
+				log('✅ [routeMessage] Successfully handled message code=0x%s', code.toString(16));
+			} catch (error: any) {
+				log('❌ [routeMessage] Error handling message code=0x%s: %s', code.toString(16), error.message);
+				throw error;
+			}
 		} else {
-			this.log.error('no handler for message code 0x%s', code.toString(16));
+			log('⚠️ [routeMessage] No handler found for message code 0x%s', code.toString(16));
+			log.error('no handler for message code 0x%s', code.toString(16));
 		}
 	}
 
@@ -193,17 +256,21 @@ export class RlpxConnection extends BasicConnection {
 	 * HELLO is handled by the encrypter
 	 */
 	private handleBaseProtocol(code: number, data: Uint8Array): void {
+		log('🔧 [handleBaseProtocol] Handling base protocol code=0x%s', code.toString(16));
 		switch (code) {
 			case 0x01: // DISCONNECT
-				this.log('received DISCONNECT');
+				log('🔌 [handleBaseProtocol] Received DISCONNECT');
+				log('received DISCONNECT');
 				this.abort(new Error('Peer disconnected'));
 				break;
 			case 0x02: // PING
-				this.log('received PING, sending PONG');
+				log('🏓 [handleBaseProtocol] Received PING, sending PONG');
+				log('received PING, sending PONG');
 				this.sendMessage(0x03, new Uint8Array(0)); // PONG
 				break;
 			case 0x03: // PONG
-				this.log('received PONG');
+				log('🏓 [handleBaseProtocol] Received PONG');
+				log('received PONG');
 				// Clear ping timeout - connection is alive
 				if (this.pingTimeoutId) {
 					clearTimeout(this.pingTimeoutId);
@@ -211,7 +278,8 @@ export class RlpxConnection extends BasicConnection {
 				}
 				break;
 			default:
-				this.log('unhandled base protocol code: 0x%s', code.toString(16));
+				log('⚠️ [handleBaseProtocol] Unhandled base protocol code=0x%s', code.toString(16));
+				log('unhandled base protocol code: 0x%s', code.toString(16));
 		}
 	}
 
@@ -220,8 +288,8 @@ export class RlpxConnection extends BasicConnection {
 	 */
 	private async onIncomingMessage(evt: CustomEvent<any>): Promise<void> {
 		const message = evt.detail;
-		this.log(
-			'received RLPx message, code: 0x%s, size: %d',
+		log(
+			'📨 [onIncomingMessage] Received RLPx message code=0x%s size=%d',
 			message.code.toString(16),
 			message.data?.length || 0,
 		);
@@ -231,15 +299,27 @@ export class RlpxConnection extends BasicConnection {
 
 	/**
 	 * Send a raw RLPx message
-	 * Delegates to the underlying maConn (RlpxSocketMultiaddrConnection) which has _sendMessage
+	 * @param code - Absolute message code (includes protocol offset)
+	 * @param data - Message data
+	 * @param protocolName - Optional protocol name for logging
 	 */
-	async sendMessage(code: number, data: Uint8Array): Promise<void> {
+	async sendMessage(code: number, data: Uint8Array, protocolName?: string): Promise<void> {
+		log(
+			'📤 [sendMessage] Sending message code=0x%s size=%d%s',
+			code.toString(16),
+			data.length,
+			protocolName ? ` protocol=${protocolName}` : '',
+		);
+
 		// Access the maConn (RlpxSocketMultiaddrConnection) which has _sendMessage
-		const rlpxMaConn = this.maConn as any;
+		const rlpxMaConn = (this as any).maConn as any;
 		if (typeof rlpxMaConn._sendMessage === 'function') {
 			rlpxMaConn._sendMessage(code, data);
+			log('✅ [sendMessage] Message sent successfully code=0x%s', code.toString(16));
 		} else {
-			throw new Error('Underlying connection does not support _sendMessage - RLPx handshake may not be complete');
+			const error = new Error('Underlying connection does not support _sendMessage - RLPx handshake may not be complete');
+			log('❌ [sendMessage] Failed to send: %s', error.message);
+			throw error;
 		}
 	}
 
@@ -271,7 +351,7 @@ export class RlpxConnection extends BasicConnection {
 		// Stop keepalive ping
 		this.stopKeepalive();
 		
-		this.stream.removeEventListener('message', this.onIncomingMessage as EventListener);
+		((this as any).stream as any).removeEventListener('message', this.onIncomingMessage as EventListener);
 
 		// Call onClose for all registered protocols
 		for (const descriptor of this.protocols.values()) {
@@ -290,7 +370,7 @@ export class RlpxConnection extends BasicConnection {
 		// Stop keepalive ping
 		this.stopKeepalive();
 		
-		this.stream.removeEventListener('message', this.onIncomingMessage as EventListener);
+		((this as any).stream as any).removeEventListener('message', this.onIncomingMessage as EventListener);
 
 		// Call onClose for all registered protocols
 		for (const descriptor of this.protocols.values()) {
@@ -303,6 +383,23 @@ export class RlpxConnection extends BasicConnection {
 	}
 }
 
-export function createRlpxConnection(init: RlpxConnectionInit): RlpxConnection {
-	return new RlpxConnection(init);
+/**
+ * Factory function to create RlpxConnection
+ * Creates a Registrar and passes it along with init to RlpxConnection constructor
+ */
+export function createRlpxConnection(
+	init: RlpxConnectionInit,
+	registrar?: Registrar
+): RlpxConnection {
+	// Create registrar if not provided
+	const rlpxRegistrar = registrar ?? new Registrar({
+		peerId: init.remotePeer,
+	});
+
+	// Create ConnectionComponents
+	const components: ConnectionComponents = {
+		registrar: rlpxRegistrar,
+	};
+
+	return new RlpxConnection(components, init);
 }

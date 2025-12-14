@@ -1,5 +1,5 @@
 import { EventEmitter } from "eventemitter3";
-import type { BasicConnection } from "../../../p2p/connection/basic-connection";
+import type { Connection } from "../../../p2p/connection";
 import {
 	createRlpxConnection,
 	type RlpxConnection,
@@ -60,7 +60,7 @@ export class Peer extends EventEmitter {
 	// RLPx-specific properties
 	private host: string;
 	private port: number;
-	public basicConnection: BasicConnection | null = null; // Store BasicConnection
+	public connection: Connection | null = null; // Store Connection
 	public transportInstance: Transport | null = null; // Store transport for dialing
 	public connected: boolean;
 
@@ -152,12 +152,12 @@ export class Peer extends EventEmitter {
 
 				const basicConn = result[1]; // Success case
 				this.config.logger?.info(
-					`[Peer.connect] ✅ Dial successful! BasicConnection established to peer ${this.id.slice(0, 8)}`,
+					`[Peer.connect] ✅ Dial successful! Connection established to peer ${this.id.slice(0, 8)}`,
 				);
 
-				this.basicConnection = basicConn;
+				this.connection = basicConn;
 				this.config.logger?.debug(
-					`[Peer.connect] 🔗 BasicConnection details: remotePeer=${bytesToUnprefixedHex(basicConn.remotePeer).slice(0, 8)}, remoteAddr=${basicConn.remoteAddr.toString()}`,
+					`[Peer.connect] 🔗 Connection details: remotePeer=${bytesToUnprefixedHex((basicConn as any).remotePeer).slice(0, 8)}, remoteAddr=${(basicConn as any).remoteAddr?.toString() ?? 'unknown'}`,
 				);
 				
 				// Upgrade to RlpxConnection and register protocols
@@ -173,12 +173,12 @@ export class Peer extends EventEmitter {
 				this.config.events.emit(Event.PEER_CONNECTED, this);
 
 				// Listen for connection close
-				basicConn.addEventListener("close", () => {
+				(basicConn as any).addEventListener("close", () => {
 					this.config.logger?.warn(
 						`[Peer.connect] 🔌 Connection closed for peer ${this.id.slice(0, 8)}`,
 					);
 					this.connected = false;
-					this.basicConnection = null;
+					this.connection = null;
 					this.config.events.emit(Event.PEER_DISCONNECTED, this);
 				});
 			} catch (error: any) {
@@ -200,9 +200,9 @@ export class Peer extends EventEmitter {
 
 	/**
 	 * Accept new peer connection from an rlpx server
-	 * @param basicConn BasicConnection from TransportListener
+	 * @param basicConn Connection from TransportListener
 	 */
-	async accept(basicConn: BasicConnection, server: RlpxServer): Promise<void> {
+	async accept(basicConn: Connection, server: RlpxServer): Promise<void> {
 		if (this.connected) {
 			this.config.logger?.debug(
 				`[Peer.accept] Peer ${this.id.slice(0, 8)} already connected, skipping`,
@@ -213,7 +213,7 @@ export class Peer extends EventEmitter {
 		this.config.logger?.info(
 			`[Peer.accept] 📥 Accepting INBOUND connection from peer ${this.id.slice(0, 8)}`,
 		);
-		this.basicConnection = basicConn;
+		this.connection = basicConn;
 
 		// Upgrade to RlpxConnection and register protocols
 		this.config.logger?.debug(
@@ -286,15 +286,17 @@ export class Peer extends EventEmitter {
 	}
 
 	/**
-	 * Convert BasicConnection to RlpxConnection and register protocols
+	 * Convert Connection to RlpxConnection and register protocols
 	 */
-	private async upgradeToRlpxConnection(basicConn: BasicConnection): Promise<void> {
-		// Convert BasicConnection to RlpxConnection
+	private async upgradeToRlpxConnection(basicConn: Connection): Promise<void> {
+		// Convert Connection to RlpxConnection
+		// The factory will create a registrar if not provided
+		// For now, we let it create one per connection (fine since RLPx doesn't use registrar for routing)
 		this.rlpxConnection = createRlpxConnection({
-			id: basicConn.id,
+			id: (basicConn as any).id,
 			maConn: (basicConn as any).maConn,
 			stream: (basicConn as any).stream,
-			remotePeer: basicConn.remotePeer,
+			remotePeer: (basicConn as any).remotePeer,
 			direction: this.inbound ? 'inbound' : 'outbound',
 			cryptoProtocol: 'eccies',
 		});
@@ -304,6 +306,9 @@ export class Peer extends EventEmitter {
 
 		// Set up event listeners
 		this.setupConnectionListeners();
+		
+		// Note: STATUS handshake will be initiated by the service after peer is added to pool
+		// This allows the service to provide chain data for STATUS payload
 	}
 
 	/**
@@ -348,7 +353,7 @@ export class Peer extends EventEmitter {
 		}
 
 		// Listen for connection close
-		this.rlpxConnection.addEventListener('close', () => {
+		(this.rlpxConnection as any).addEventListener('close', () => {
 			this.config.logger?.info(`[Peer ${this.id.slice(0, 8)}] RlpxConnection closed`);
 			this.connected = false;
 			this.rlpxConnection = undefined;

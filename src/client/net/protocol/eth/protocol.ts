@@ -1,6 +1,6 @@
 import type { BlockBodyBytes, BlockHeader } from "../../../../block";
 import { assertEq, formatLogId } from "../../../../devp2p/util";
-import type { BasicConnection } from "../../../../p2p/connection/basic-connection";
+import type { Connection } from "../../../../p2p/connection/connection";
 import * as RLP from "../../../../rlp";
 import type { TypedTransaction } from "../../../../tx";
 import {
@@ -488,20 +488,20 @@ export class EthProtocol extends AbstractProtocol<ProtocolOptions> {
 	}
 
 	setupTransport(transportContext: any): void {
-		// Accept either BasicConnection, RlpxProtocolAdapter, or legacy devp2p ETH protocol
+		// Accept either Connection, RlpxProtocolAdapter, or legacy devp2p ETH protocol
 		if (!transportContext) {
 			throw new Error(
-				"Invalid transport context. Expected BasicConnection, RlpxProtocolAdapter, or devp2p ETH protocol instance.",
+				"Invalid transport context. Expected Connection, RlpxProtocolAdapter, or devp2p ETH protocol instance.",
 			);
 		}
 
-		// Check if it's a BasicConnection
+		// Check if it's a Connection
 		if (
 			"underlyingStream" in transportContext &&
 			"status" in transportContext
 		) {
-			const basicConn = transportContext as BasicConnection;
-			// Create adapter from BasicConnection
+			const basicConn = transportContext as Connection;
+			// Create adapter from Connection
 			this.protocolAdapter = new RlpxProtocolAdapter(basicConn, 0);
 			this.protocolAdapter.startListening();
 
@@ -626,7 +626,7 @@ export class EthProtocol extends AbstractProtocol<ProtocolOptions> {
 		}
 
 		throw new Error(
-			"Invalid transport context. Expected BasicConnection, RlpxProtocolAdapter, or devp2p ETH protocol instance.",
+			"Invalid transport context. Expected Connection, RlpxProtocolAdapter, or devp2p ETH protocol instance.",
 		);
 	}
 

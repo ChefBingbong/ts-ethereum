@@ -1,12 +1,9 @@
-// src/client/bin/test-basic-connection.ts
-// Test script for BasicConnection, dialing, and upgrading to full Connection
 
 import { multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { genPrivateKey, pk2id } from "../../devp2p/index.ts";
 import { EcciesEncrypter } from "../../p2p/connection-encrypters/eccies/eccies-encrypter.ts";
-import { BasicConnection } from "../../p2p/connection/basic-connection.ts";
 import { Connection } from "../../p2p/connection/connection.ts";
 import { Registrar } from "../../p2p/connection/registrar.ts";
 import { Upgrader } from "../../p2p/connection/upgrader.ts";
@@ -38,7 +35,7 @@ interface TestNode {
   listener?: TransportListener;
   
   // Connections
-  connections: Map<string, BasicConnection | Connection>;
+  connections: Map<string, Connection | Connection>;
 }
 
 // ============ Logging ============
@@ -135,7 +132,7 @@ async function setupServer(node: TestNode): Promise<void> {
   const listener = node.transport.createListener({});
 
   // Handle incoming connections
-  listener.on("connection", (conn: BasicConnection | Connection) => {
+  listener.on("connection", (conn: Connection | Connection) => {
     const connType = conn instanceof Connection ? "Full" : "Basic";
     log(node.name, `New ${connType} connection: ${conn.id} from peer ${shortId(conn.remotePeer)}`);
     
@@ -158,8 +155,8 @@ async function setupServer(node: TestNode): Promise<void> {
 
 // ============ Test Scenarios ============
 
-async function testBasicConnection(client: TestNode, serverAddr: ReturnType<typeof multiaddr>, serverPeerId?: Uint8Array): Promise<void> {
-  log(client.name, "=== Test 1: Dial with BasicConnection ===");
+async function testConnection(client: TestNode, serverAddr: ReturnType<typeof multiaddr>, serverPeerId?: Uint8Array): Promise<void> {
+  log(client.name, "=== Test 1: Dial with Connection ===");
   
   const result = await client.transport.dialBasic(serverAddr, serverPeerId);
   
@@ -169,7 +166,7 @@ async function testBasicConnection(client: TestNode, serverAddr: ReturnType<type
   }
 
   const basicConn = result[1];
-  log(client.name, `Successfully created BasicConnection: ${basicConn.id}`);
+  log(client.name, `Successfully created Connection: ${basicConn.id}`);
   log(client.name, `Connection status: ${basicConn.status}`);
   log(client.name, `Encryption: ${basicConn.encryption || "none"}`);
   log(client.name, `Multiplexer: ${basicConn.multiplexer || "none"}`);
@@ -179,9 +176,9 @@ async function testBasicConnection(client: TestNode, serverAddr: ReturnType<type
   // Try to create a stream (should fail)
   try {
     await basicConn.newStream("/test/1.0.0");
-    log(client.name, "ERROR: newStream() should have failed on BasicConnection!");
+    log(client.name, "ERROR: newStream() should have failed on Connection!");
   } catch (err: any) {
-    log(client.name, `✓ Correctly rejected newStream() on BasicConnection: ${err.message}`);
+    log(client.name, `✓ Correctly rejected newStream() on Connection: ${err.message}`);
   }
 
   // Wait a bit
@@ -189,7 +186,7 @@ async function testBasicConnection(client: TestNode, serverAddr: ReturnType<type
 
   // Close basic connection
   await basicConn.close();
-  log(client.name, "Closed BasicConnection");
+  log(client.name, "Closed Connection");
 }
 
 async function testUpgradeToFull(client: TestNode, serverAddr: ReturnType<typeof multiaddr>, serverPeerId?: Uint8Array): Promise<void> {
@@ -203,7 +200,7 @@ async function testUpgradeToFull(client: TestNode, serverAddr: ReturnType<typeof
   }
 
   const basicConn = dialResult[1];
-  log(client.name, `Created BasicConnection: ${basicConn.id}`);
+  log(client.name, `Created Connection: ${basicConn.id}`);
 
   // Upgrade to full connection
   log(client.name, "Upgrading to full Connection...");
@@ -292,7 +289,7 @@ async function testDialFull(client: TestNode, serverAddr: ReturnType<typeof mult
 // ============ Main ============
 
 async function main() {
-  log("MAIN", "Starting BasicConnection test...");
+  log("MAIN", "Starting Connection test...");
 
   // Create server and client nodes
   const server = createTestNode("SERVER", SERVER_TCP_PORT);
@@ -312,7 +309,7 @@ async function main() {
     log("MAIN", `Encryption: ${server.encrypter ? 'ECIES enabled' : 'DISABLED (testing without encryption)'}`);
 
     // // Run tests
-    await testBasicConnection(client, serverAddr, serverPeerId);
+    await testConnection(client, serverAddr, serverPeerId);
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     await testUpgradeToFull(client, serverAddr, serverPeerId);

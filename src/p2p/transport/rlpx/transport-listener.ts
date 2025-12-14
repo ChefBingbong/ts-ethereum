@@ -5,16 +5,14 @@ import net, { type Server, type Socket } from "node:net";
 import type { NetConfig } from "../../../utils/getNetConfig";
 import { ipPortToMultiaddr } from "../../../utils/multi-addr";
 import { multiaddrToNetConfig } from "../../../utils/utils";
-import type { EcciesEncrypter as EcciesEncrypterType } from "../../connection-encrypters";
-import { EcciesEncrypter } from "../../connection-encrypters";
-import { BasicConnection, createBasicConnection } from "../../connection/basic-connection";
-import { toRlpxConnection } from "./rlpx-to-connection";
+import { Connection, toMultiaddrConnection } from "../../connection";
+import { EcciesEncrypter, type EcciesEncrypter as EcciesEncrypterType } from "../../connection-encrypters";
 import type { ListenerContext, Status } from "./types";
 
 const log = debug("p2p:transport:listener:rlpx");
 
 interface TransportListenerEvents {
-	connection: (connection: BasicConnection) => void;
+	connection: (connection: Connection) => void;
 	listening: () => void;
 	error: (error: Error) => void;
 	close: () => void;
@@ -25,7 +23,7 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 	private addr: string = "unknown";
 	public context: ListenerContext;
 	private status: Status = { code: "INACTIVE" };
-	private connections: Map<string, BasicConnection> = new Map();
+	private connections: Map<string, Connection> = new Map();
 	private encrypterMap: Map<string, EcciesEncrypterType> = new Map();
 
 	constructor(context: ListenerContext) {
@@ -55,8 +53,6 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 		}
 
 		try {
-			// For inbound connections, derive a temporary peer ID from the socket address
-			// The real peer ID will be extracted during ECIES handshake (if encryption is enabled)
 			const remoteAddr = sock.remoteAddress;
 			const remotePort = sock.remotePort;
 			const tempPeerId = null;
@@ -82,53 +78,28 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 
 			// Do ECIES + HELLO handshake directly on raw socket
 			const secureResult = await encrypter.secureInBound(sock);
-
-			log(`✅ Handshake complete! Remote peer: ${Buffer.from(secureResult.remotePeer!).toString("hex").slice(0, 16)}`);
-
-			// Create RLPx multiaddr connection from raw socket with encrypter
-			const maConn = toRlpxConnection({
+			// Create multiaddr connection from raw socket
+			const maConn = toMultiaddrConnection({
 				socket: sock,
-				remoteAddr: actualRemoteAddr, // Use actual remote address, not our listening address!
-				direction: "inbound",
-				remotePeerId: secureResult.remotePeer,
-				encrypter,
+				remoteAddr: this.status.listeningAddr,
+				direction: 'inbound'
 			});
 
-			// Now wrap in connection abstractions
-			const connId = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`;
-			const basicConn = createBasicConnection({
-				id: connId,
-				maConn,
-				stream: maConn,
-				remotePeer: secureResult.remotePeer!,
-				direction: "inbound",
-				cryptoProtocol: "eccies",
-			});
+			// Upgrade the connection (encrypt + mux)
+			const connection = await this.context.upgrader.upgradeInbound(maConn);
 
-			// Store encrypter mapped to connection ID for lifetime isolation
-			this.encrypterMap.set(connId, encrypter);
+			const connKey = connection.id;
+			this.connections.set(connKey, connection);
 
-			// Store and emit the BasicConnection
-			const connKey = basicConn.id;
-			this.connections.set(connKey, basicConn);
-
-			basicConn.addEventListener("close", () => {
+			connection.addEventListener('close', () => {
 				this.connections.delete(connKey);
-				this.encrypterMap.delete(connId);
+					this.encrypterMap.delete(connKey);
 				log("connection closed: %s (encrypter cleaned up)", connKey);
 			});
 
-			log(
-				"new inbound RLPx connection (basic): %s from peer %s",
-				connKey,
-				basicConn.remotePeer 
-					? Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16)
-					: "unknown (handshake pending)",
-			);
-			this.emit("connection", basicConn);
+			log('new inbound connection: %s', connKey);
 		} catch (err: any) {
-			console.error("error handling RLPx socket", err);	
-			log(`Error handling RLPx socket: ${err.message}`);
+			log(`Error handling socket: ${err.message}`);
 			sock.destroy();
 		}
 	};
@@ -186,7 +157,7 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 		this.status = { code: "INACTIVE" };
 	}
 
-	getConnections(): BasicConnection[] {
+	getConnections(): Connection[] {
 		return Array.from(this.connections.values());
 	}
 

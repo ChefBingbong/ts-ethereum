@@ -11,7 +11,6 @@ import {
 	safeResult,
 } from "../../../utils/safe";
 import { multiaddrToNetConfig } from "../../../utils/utils";
-import { BasicConnection } from "../../connection/basic-connection";
 import { Connection } from "../../connection/connection";
 import { Upgrader } from "../../connection/upgrader";
 import { toMultiaddrConnection } from "./multiaddr-connection";
@@ -27,8 +26,8 @@ export interface TransportInit {
 
 export class Transport {
 	private readonly upgrader: Upgrader;
-	private readonly connectionCache: Map<string, BasicConnection | Connection> = new Map();
-	private readonly inFlightDials = new Map<string, SafePromise<BasicConnection | Connection>>();
+	private readonly connectionCache: Map<string, Connection | Connection> = new Map();
+	private readonly inFlightDials = new Map<string, SafePromise<Connection | Connection>>();
 	private readonly dialOpts: TransportDialOpts;
 	private dialQueue: Array<() => void> = [];
 	private activeDials = 0;
@@ -38,7 +37,7 @@ export class Transport {
 		this.dialOpts = init.dialOpts ?? { maxActiveDials: 10 };
 	}
 
-	async dialBasic(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<BasicConnection> {
+	async dialBasic(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<Connection> {
 		const peerAddrStr = peerAddr.toString();
 		const netOptions = multiaddrToNetConfig(peerAddr) as TcpSocketConnectOpts;
 
@@ -49,7 +48,7 @@ export class Transport {
 		const existingDial = this.inFlightDials.get(peerAddrStr);
 		if (existingDial) return existingDial;
 		
-		const dialPromise = this.scheduleDial(async (): SafePromise<BasicConnection | Connection> => {
+		const dialPromise = this.scheduleDial(async (): SafePromise<Connection | Connection> => {
 			const sock = net.createConnection(netOptions);
 
 			sock.on("error", (err) => {
@@ -59,7 +58,7 @@ export class Transport {
 				} catch {}
 			});
 
-			return await new Promise<SafeError<Error> | SafeResult<BasicConnection>>((resolve) => {
+			return await new Promise<SafeError<Error> | SafeResult<Connection>>((resolve) => {
 				const cleanup = () => {
 					clearTimeout(timer);
 					sock.off("connect", onConnect);
@@ -111,7 +110,7 @@ export class Transport {
 			return safeResult(basicConn);
 		}
 
-		log(`🔄 Upgrading BasicConnection to full Connection with muxing...`);
+		log(`🔄 Upgrading Connection to full Connection with muxing...`);
 		try {
 			const fullConn = await basicConn.upgrade(
 				this.upgrader.getComponents(),
@@ -131,7 +130,7 @@ export class Transport {
 		return this.dialFull(peerAddr, remotePeerId, timeoutMs);
 	}
 
-	private async scheduleDial(dialCallback: () => SafePromise<BasicConnection | Connection>): SafePromise<BasicConnection | Connection> {
+	private async scheduleDial(dialCallback: () => SafePromise<Connection | Connection>): SafePromise<Connection | Connection> {
 		if (this.activeDials >= this.dialOpts.maxActiveDials) {
 			await new Promise<void>((resolve) => this.dialQueue.push(resolve));
 		}
@@ -147,11 +146,11 @@ export class Transport {
 	}
 
 	/**
-	 * Handle socket connection - always creates BasicConnection (no branching)
+	 * Handle socket connection - always creates Connection (no branching)
 	 */
-	private async onConnect(socket: net.Socket, peerAddr: Multiaddr, remotePeerId?: Uint8Array): Promise<SafeError<Error> | SafeResult<BasicConnection>> {
+	private async onConnect(socket: net.Socket, peerAddr: Multiaddr, remotePeerId?: Uint8Array): Promise<SafeError<Error> | SafeResult<Connection>> {
 		try {
-			log(`📡 TCP connected to ${peerAddr.toString()}, creating BasicConnection...`);
+			log(`📡 TCP connected to ${peerAddr.toString()}, creating Connection...`);
 
 			// Create multiaddr connection from raw socket
 			const maConn = toMultiaddrConnection({
@@ -163,14 +162,14 @@ export class Transport {
 
 			log(`🔐 Starting encryption (basic) for ${peerAddr.toString()}...`);
 
-			// Always create BasicConnection first (encryption only, no muxing)
+			// Always create Connection first (encryption only, no muxing)
 			const basicConn = await this.upgrader.upgradeOutbound(maConn, { signal: AbortSignal.timeout(5_000) });
 
-			log(`✅ BasicConnection created: ${basicConn.id}, remote peer: ${bytesToHex(basicConn.remotePeer).slice(0, 18)}...`);
+			log(`✅ Connection created: ${basicConn.id}, remote peer: ${bytesToHex(basicConn.remotePeer).slice(0, 18)}...`);
 
 			const cacheKey = peerAddr.toString();
 			
-			// Cache the BasicConnection
+			// Cache the Connection
 			this.connectionCache.set(cacheKey, basicConn);
 
 			// Remove from cache when closed
@@ -181,12 +180,12 @@ export class Transport {
 
 			return safeResult(basicConn);
 		} catch (err: any) {
-			log(`❌ BasicConnection creation failed for ${peerAddr.toString()}: ${err.message}`);
+			log(`❌ Connection creation failed for ${peerAddr.toString()}: ${err.message}`);
 			return safeError(err);
 		}
 	}
 
-	private checkExistingConnection(peerAddr: Multiaddr): SafeResult<BasicConnection | Connection> | null {
+	private checkExistingConnection(peerAddr: Multiaddr): SafeResult<Connection | Connection> | null {
 		const cacheKey = peerAddr.toString();
 		const cachedConnection = this.connectionCache.get(cacheKey);
 
@@ -209,7 +208,7 @@ export class Transport {
 		});
 	}
 
-	getConnections(): (BasicConnection | Connection)[] {
+	getConnections(): (Connection | Connection)[] {
 		return Array.from(this.connectionCache.values());
 	}
 

@@ -2,6 +2,7 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
+import { EthMessageCode } from "../../../client/net/protocol/eth/definitions";
 import {
 	type SafePromise,
 	type SafeResult,
@@ -11,9 +12,9 @@ import {
 import { multiaddrToNetConfig } from "../../../utils/utils";
 import type { EcciesEncrypter as EcciesEncrypterType } from "../../connection-encrypters";
 import { EcciesEncrypter } from "../../connection-encrypters";
-import { BasicConnection, createBasicConnection } from "../../connection/basic-connection";
 import { Upgrader } from "../../connection/upgrader";
 import { toRlpxConnection } from "./rlpx-to-connection";
+import { RlpxConnection, createRlpxConnection } from "./RlpxConnection";
 import { TransportListener, createListener } from "./transport-listener";
 import type { ListenerContext, TransportDialOpts } from "./types";
 
@@ -30,9 +31,9 @@ export class Transport {
 	private readonly upgrader: Upgrader;
 	private readonly privateKey: Uint8Array;
 	private readonly id: Uint8Array;
-	private readonly connectionCache: Map<string, BasicConnection> = new Map();
+	private readonly connectionCache: Map<string, RlpxConnection> = new Map();
 	private readonly encrypterMap: Map<string, EcciesEncrypterType> = new Map();
-	private readonly inFlightDials = new Map<string, SafePromise<BasicConnection>>();
+	private readonly inFlightDials = new Map<string, SafePromise<RlpxConnection>>();
 	private readonly dialOpts: TransportDialOpts;
 	private dialQueue: Array<() => void> = [];
 	private activeDials = 0;
@@ -44,7 +45,7 @@ export class Transport {
 		this.dialOpts = init.dialOpts ?? { maxActiveDials: 1000 };
 	}
 
-	async dial(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<BasicConnection> {
+	async dial(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<RlpxConnection> {
 		const peerAddrStr = peerAddr.toString();
 		const netOptions = multiaddrToNetConfig(peerAddr) as TcpSocketConnectOpts;
 
@@ -55,7 +56,7 @@ export class Transport {
 		const existingDial = this.inFlightDials.get(peerAddrStr);
 		if (existingDial) return existingDial;
 
-		const dialPromise = this.scheduleDial(async (): SafePromise<BasicConnection> => {
+		const dialPromise = this.scheduleDial(async (): SafePromise<RlpxConnection> => {
 			return new Promise((resolve) => {
 				const socket = net.connect(netOptions);
 
@@ -85,7 +86,7 @@ export class Transport {
 						});
 
 						const connId = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`;
-						const basicConn = createBasicConnection({
+						const rlpxConnection = createRlpxConnection({
 							id: connId,
 							maConn,
 							stream: maConn,
@@ -99,14 +100,14 @@ export class Transport {
 						this.encrypterMap.set(connId, encrypter);
 
 						// Cache the connection
-						this.connectionCache.set(peerAddrStr, basicConn);
-						basicConn.addEventListener("close", () => {
+						this.connectionCache.set(peerAddrStr, rlpxConnection);
+						maConn.socket.on("close", () => {
 							this.connectionCache.delete(peerAddrStr);
 							this.encrypterMap.delete(connId);
 							log(`Cleaned up encrypter for connection ${connId}`);
 						});
 
-						resolve(safeResult(basicConn));
+						resolve(safeResult(rlpxConnection));
 					} catch (err: any) {
 						log(`❌ Handshake failed: ${err.message}`);
 						socket.destroy();
@@ -137,7 +138,7 @@ export class Transport {
 		return result;
 	}
 
-	private async scheduleDial(dialCallback: () => SafePromise<BasicConnection>): SafePromise<BasicConnection> {
+	private async scheduleDial(dialCallback: () => SafePromise<RlpxConnection>): SafePromise<RlpxConnection> {
 		if (this.activeDials >= this.dialOpts.maxActiveDials) {
 			await new Promise<void>((resolve) => this.dialQueue.push(resolve));
 		}
@@ -152,11 +153,11 @@ export class Transport {
 		return result;
 	}
 
-	private checkExistingConnection(peerAddr: Multiaddr): SafeResult<BasicConnection> | null {
+	private checkExistingConnection(peerAddr: Multiaddr): SafeResult<RlpxConnection> | null {
 		const cacheKey = peerAddr.toString();
 		const cachedConnection = this.connectionCache.get(cacheKey);
 
-		if (cachedConnection && cachedConnection.status === "open") {
+		if (cachedConnection && cachedConnection.messageRouter.has(EthMessageCode.STATUS) && cachedConnection.messageRouter.get(EthMessageCode.STATUS)?.name === "STATUS") {
 			return safeResult(cachedConnection);
 		}
 
@@ -177,7 +178,7 @@ export class Transport {
 		});
 	}
 
-	getConnections(): BasicConnection[] {
+	getConnections(): RlpxConnection[] {
 		return Array.from(this.connectionCache.values());
 	}
 

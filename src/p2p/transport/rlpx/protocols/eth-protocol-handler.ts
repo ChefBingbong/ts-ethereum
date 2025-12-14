@@ -1,3 +1,4 @@
+import debug from 'debug';
 import * as RLP from '../../../../rlp/index';
 import { BaseProtocolHandler } from '../base-protocol-handler';
 import {
@@ -16,6 +17,8 @@ import {
 	type NewBlockPayload,
 	type StatusPayload,
 } from './handlers';
+
+const log = debug('p2p:rlpx:protocol:eth');
 
 // ETH protocol message codes (relative to protocol offset)
 export const ETH_CODES = {
@@ -64,37 +67,58 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 	private setupHandlers(): void {
 		// STATUS
 		this.on(this.statusHandler.code, async (data, conn) => {
-			const status = await this.statusHandler.handle(data, this.createContext());
-			// Store status for sync management
-			this.status = status;
-			// Emit event for service to handle
-			conn.dispatchEvent(new CustomEvent('eth:status', { detail: status }));
+			log('📥 [setupHandlers] Handling STATUS message size=%d', data.length);
+			try {
+				const status = await this.statusHandler.handle(data, this.createContext());
+				log('✅ [setupHandlers] STATUS decoded: protocolVersion=%d networkId=%d td=%d', 
+					status.protocolVersion, status.networkId, status.td);
+				// Store status for sync management
+				this.status = status;
+				// Emit event for service to handle
+				log('📢 [setupHandlers] Dispatching eth:status event');
+				conn.dispatchEvent(new CustomEvent('eth:status', { detail: status }));
+			} catch (error: any) {
+				log('❌ [setupHandlers] Error handling STATUS: %s', error.message);
+				throw error;
+			}
 		});
 
 		// NEW_BLOCK_HASHES
 		this.on(this.newBlockHashesHandler.code, async (data, conn) => {
+			log('📥 [setupHandlers] Handling NEW_BLOCK_HASHES size=%d', data.length);
 			const hashes = await this.newBlockHashesHandler.handle(data, this.createContext());
+			log('✅ [setupHandlers] NEW_BLOCK_HASHES decoded: count=%d', hashes.length);
+			log('📢 [setupHandlers] Dispatching eth:newBlockHashes event');
 			conn.dispatchEvent(new CustomEvent('eth:newBlockHashes', { detail: hashes }));
 		});
 
 		// TRANSACTIONS
 		this.on(this.transactionsHandler.code, async (data, conn) => {
+			log('📥 [setupHandlers] Handling TRANSACTIONS size=%d', data.length);
 			const txs = await this.transactionsHandler.handle(data, this.createContext());
+			log('✅ [setupHandlers] TRANSACTIONS decoded: count=%d', txs.length);
+			log('📢 [setupHandlers] Dispatching eth:transactions event');
 			conn.dispatchEvent(new CustomEvent('eth:transactions', { detail: txs }));
 		});
 
 		// GET_BLOCK_HEADERS
 		this.on(this.blockHeadersHandler.code, async (data, conn) => {
+			log('📥 [setupHandlers] Handling GET_BLOCK_HEADERS size=%d', data.length);
 			const request = await this.blockHeadersHandler.handle(data, this.createContext());
+			log('✅ [setupHandlers] GET_BLOCK_HEADERS decoded: reqId=%d', request.reqId);
+			log('📢 [setupHandlers] Dispatching eth:getBlockHeaders event');
 			conn.dispatchEvent(new CustomEvent('eth:getBlockHeaders', { detail: request }));
 		});
 
 		// BLOCK_HEADERS (response)
 		this.on(this.blockHeadersHandler.responseCode, async (data, conn) => {
+			log('📥 [setupHandlers] Handling BLOCK_HEADERS response size=%d', data.length);
 			// eth/66 format: [reqId, headers]
 			const decoded = RLP.decode(data) as any[];
 			const reqId = typeof decoded[0] === 'bigint' ? decoded[0] : BigInt(decoded[0]);
 			const headers = decoded[1] || [];
+			log('✅ [setupHandlers] BLOCK_HEADERS decoded: reqId=%d count=%d', reqId, headers.length);
+			log('📢 [setupHandlers] Dispatching eth:blockHeaders event');
 			conn.dispatchEvent(new CustomEvent('eth:blockHeaders', { detail: [reqId, headers] }));
 		});
 
@@ -152,10 +176,19 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 	 * Send STATUS and wait for peer's STATUS response
 	 */
 	async sendStatus(payload: StatusPayload): Promise<StatusPayload> {
-		const peerStatus = await this.statusHandler.sendGetStatus(payload, this.createContext());
-		// Store the peer's status
-		this.status = peerStatus;
-		return peerStatus;
+		log('📤 [sendStatus] Initiating STATUS handshake protocolVersion=%d networkId=%d td=%d', 
+			payload.protocolVersion, payload.networkId, payload.td);
+		try {
+			const peerStatus = await this.statusHandler.sendGetStatus(payload, this.createContext());
+			log('✅ [sendStatus] Received peer STATUS: protocolVersion=%d networkId=%d td=%d', 
+				peerStatus.protocolVersion, peerStatus.networkId, peerStatus.td);
+			// Store the peer's status
+			this.status = peerStatus;
+			return peerStatus;
+		} catch (error: any) {
+			log('❌ [sendStatus] STATUS handshake failed: %s', error.message);
+			throw error;
+		}
 	}
 
 	/**
@@ -199,7 +232,9 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 	 * Broadcast transactions
 	 */
 	async broadcastTransactions(txs: Uint8Array[]): Promise<void> {
+		log('📤 [broadcastTransactions] Broadcasting %d transactions', txs.length);
 		await this.transactionsHandler.send(txs, this.createContext());
+		log('✅ [broadcastTransactions] Transactions broadcast');
 	}
 
 	/**
@@ -209,7 +244,9 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 		if (!this.connection) {
 			throw new Error(`Cannot announce new block: ${this.name} protocol handler has no connection`);
 		}
+		log('📤 [announceNewBlock] Announcing new block');
 		await this.newBlockHandler.send(payload, this.createContext());
+		log('✅ [announceNewBlock] New block announced');
 	}
 
 	/**

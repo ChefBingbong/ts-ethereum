@@ -1,5 +1,4 @@
 export * from '../transport/tcp/multiaddr-connection'
-export * from './basic-connection'
 export * from './connection'
 export * from './registrar'
 export * from './types'
