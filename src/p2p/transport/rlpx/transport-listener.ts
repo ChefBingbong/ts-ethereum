@@ -3,6 +3,7 @@ import debug from "debug";
 import { EventEmitter } from "eventemitter3";
 import net, { type Server, type Socket } from "node:net";
 import type { NetConfig } from "../../../utils/getNetConfig";
+import { ipPortToMultiaddr } from "../../../utils/multi-addr";
 import { multiaddrToNetConfig } from "../../../utils/utils";
 import { BasicConnection } from "../../connection/basic-connection";
 import { toRlpxConnection } from "./rlpx-to-connection";
@@ -59,20 +60,78 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 
 			log("incoming RLPx socket from %s:%s", remoteAddr, remotePort);
 
-			// Get encrypter before creating connection
-			const encrypter = this.context.upgrader.getConnectionEncrypter?.();
+		// Get encrypter before creating connection
+		const encrypter = this.context.upgrader.getConnectionEncrypter?.();
 
-			// Create RLPx multiaddr connection from raw socket with encrypter
-			const maConn = toRlpxConnection({
-				socket: sock,
-				remoteAddr: this.status.listeningAddr,
-				direction: "inbound",
-				remotePeerId: tempPeerId, // Temporary ID
-				encrypter: encrypter as any,
+		// Get the actual remote address from the socket
+		const actualRemoteAddr = remoteAddr && remotePort
+			? ipPortToMultiaddr(remoteAddr, remotePort)
+			: this.status.listeningAddr;
+
+		// Create RLPx multiaddr connection from raw socket with encrypter
+		const maConn = toRlpxConnection({
+			socket: sock,
+			remoteAddr: actualRemoteAddr, // Use actual remote address, not our listening address!
+			direction: "inbound",
+			remotePeerId: tempPeerId, // Temporary ID
+			encrypter: encrypter as any,
+		});
+
+		log("upgrading inbound RLPx connection (basic, no muxing)...");
+		
+		// Wait for ECIES handshake to complete and extract remote peer ID
+		const maConnAny = maConn as any;
+		const rlpxEncrypter = maConnAny.encrypter as any;
+		
+		let actualRemotePeer: Uint8Array;
+		
+		if (rlpxEncrypter) {
+			// Wait for handshake to complete before creating BasicConnection
+			await new Promise<void>((resolve, reject) => {
+				const timeoutId = setTimeout(() => {
+					reject(new Error("Inbound ECIES handshake timeout after 10s"));
+				}, 10000);
+				
+			const onAckComplete = async () => {
+				clearTimeout(timeoutId);
+				(maConn as any).removeEventListener('ack-complete', onAckComplete);
+				
+				if (rlpxEncrypter.remotePublicKey) {
+					const { pk2id } = await import("../../../devp2p");
+					actualRemotePeer = pk2id(rlpxEncrypter.remotePublicKey);
+					log(`✅ ECIES handshake complete, remote peer: ${Buffer.from(actualRemotePeer).toString('hex').slice(0, 16)}`);
+					resolve();
+				} else {
+					reject(new Error("ECIES handshake completed but remotePublicKey not set"));
+				}
+			};
+			
+			(maConn as any).addEventListener('ack-complete', onAckComplete);
+				
+				// Check if already complete (race condition)
+				if (rlpxEncrypter.isHandshakeComplete && rlpxEncrypter.remotePublicKey) {
+					clearTimeout(timeoutId);
+					const { pk2id } = require("../../../devp2p");
+					actualRemotePeer = pk2id(rlpxEncrypter.remotePublicKey);
+					log(`✅ ECIES handshake already complete, remote peer: ${Buffer.from(actualRemotePeer).toString('hex').slice(0, 16)}`);
+					resolve();
+				}
 			});
-
-			log("upgrading inbound RLPx connection (basic, no muxing)...");
-			const basicConn = await this.context.upgrader.upgradeInboundBasic(maConn);
+		} else {
+			throw new Error("No encrypter available for inbound RLPx connection");
+		}
+		
+		// Now create BasicConnection with the correct remote peer
+		const stream = maConn as any;
+		const connId = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`;
+		const basicConn = new BasicConnection({
+			id: connId,
+			maConn: maConn,
+			stream: stream,
+			direction: 'inbound',
+			remotePeer: actualRemotePeer, // ✅ Now has the real peer ID!
+			cryptoProtocol: 'eccies',
+		});
 
 			// Set up RLPx frame parser for inbound connections
 			// This must be done before the connection is emitted so it can receive STATUS messages
@@ -96,13 +155,16 @@ export class TransportListener extends EventEmitter<TransportListenerEvents> {
 				log("connection closed: %s", connKey);
 			});
 
-			log(
-				"new inbound RLPx connection (basic): %s from peer %s",
-				connKey,
-				Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16),
-			);
-			this.emit("connection", basicConn);
+		log(
+			"new inbound RLPx connection (basic): %s from peer %s",
+			connKey,
+			basicConn.remotePeer 
+				? Buffer.from(basicConn.remotePeer).toString("hex").slice(0, 16)
+				: "unknown (handshake pending)",
+		);
+		this.emit("connection", basicConn);
 		} catch (err: any) {
+			console.error("error handling RLPx socket", err);	
 			log(`Error handling RLPx socket: ${err.message}`);
 			sock.destroy();
 		}

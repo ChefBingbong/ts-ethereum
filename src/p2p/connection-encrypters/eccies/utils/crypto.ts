@@ -7,7 +7,7 @@ import { hexToBytes } from "ethereum-cryptography/utils";
 import crypto from "node:crypto";
 import { assertEq, genPrivateKey, xor } from "../../../../devp2p";
 import { concatBytes } from "../../../../utils";
-import { MAC } from "../../../transport/rlpx/mac";
+import { MAC } from "../../../transport/rlpx";
 
 const SHA256_BLOCK_SIZE = 64;
 
@@ -81,6 +81,17 @@ export function decryptMessage(
 
 	if (!sharedMacData) sharedMacData = Uint8Array.from([]);
 	const _tag = crypto.createHmac("sha256", mKey).update(concatBytes(dataIV, sharedMacData)).digest();
+	
+	// Detailed logging for tag validation
+	const tagHex = Array.from(tag).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
+	const expectedTagHex = Array.from(_tag).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
+	console.log(`[decryptMessage] Tag validation:`);
+	console.log(`  Received tag: ${tagHex}`);
+	console.log(`  Expected tag: ${expectedTagHex}`);
+	console.log(`  dataIV length: ${dataIV.length}, sharedMacData length: ${sharedMacData.length}`);
+	console.log(`  dataIV first 16 bytes: ${Array.from(dataIV.subarray(0, Math.min(16, dataIV.length))).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}`);
+	console.log(`  sharedMacData: ${Array.from(sharedMacData).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}`);
+	
 	assertEq(_tag, tag, "should have valid tag", debug);
 
 	const IV = dataIV.subarray(0, 16);

@@ -1,7 +1,9 @@
 import type { EthProtocol, Sender } from "../protocol.ts";
 
 export abstract class Handler {
-	constructor(protected protocol: EthProtocol) {}
+	constructor(public protocol: EthProtocol) {
+		this.protocol = protocol;
+	}
 
 	// For REQUEST messages
 	async initiator?(payload: any, sender: Sender, timeoutMs?: number): Promise<any>;

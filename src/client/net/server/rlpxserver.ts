@@ -193,6 +193,15 @@ export class RlpxServer extends Server {
 		host: string,
 		port: number,
 	): Promise<void> {
+		// Skip if trying to connect to ourselves
+		const ourPeerId = bytesToUnprefixedHex(this.peerId);
+		if (peerId === ourPeerId) {
+			this.config.logger?.debug(
+				`[RlpxServer.connectToPeer] ⏭️ Skipping self-connection attempt (our ID: ${peerId.slice(0, 8)})`,
+			);
+			return;
+		}
+		
 		// Skip if already connected
 		if (this.peers.has(peerId)) {
 			this.config.logger?.debug(
@@ -229,6 +238,8 @@ export class RlpxServer extends Server {
 			inbound: false,
 			transportInstance: this.transport,
 		});
+		// Set server reference for outbound peers so they can send HELLO
+		peer.server = this;
 
 		try {
 			await peer.connect();
@@ -440,6 +451,19 @@ export class RlpxServer extends Server {
 			const remotePeerId = bytesToUnprefixedHex(basicConn.remotePeer);
 			const remoteAddr = basicConn.remoteAddr;
 			const { host, port } = getHostPortFromMultiaddr(remoteAddr);
+
+			// Check if peer already exists
+			if (this.peers.has(remotePeerId)) {
+				this.config.logger?.warn(
+					`[RlpxServer] ⚠️ Duplicate connection from peer ${remotePeerId.slice(0, 8)} at ${host}:${port}, closing duplicate`,
+				);
+				try {
+					await basicConn.close();
+				} catch {
+					// Ignore close errors
+				}
+				return;
+			}
 
 			this.config.logger?.info(
 				`[RlpxServer] 📥 New INBOUND connection from peer ${remotePeerId.slice(0, 8)} at ${host}:${port}`,

@@ -1,12 +1,6 @@
 import type { Socket } from "node:net";
 
-import type { HandshakeState } from "../eccies-encrypter";
-
 export type HandlerContext = {
-	handshakeState?: {
-		current: HandshakeState;
-		setState: (state: HandshakeState) => void;
-	};
 	socket: Socket;
 	privateKey: Uint8Array;
 	publicKey: Uint8Array;
@@ -15,6 +9,10 @@ export type HandlerContext = {
 	ephemeralPrivateKey: Uint8Array;
 	ephemeralPublicKey: Uint8Array;
 	requireEip8: boolean;
+	handshakeState?: {
+		current: "idle" | "auth" | "ack" | "complete";
+		setState: (state: "idle" | "auth" | "ack" | "complete") => void;
+	};
 };
 
 export type AuthResult = {
@@ -39,3 +37,4 @@ export type HeaderResult = {
 export type BodyResult = {
 	payload: Uint8Array;
 };
+

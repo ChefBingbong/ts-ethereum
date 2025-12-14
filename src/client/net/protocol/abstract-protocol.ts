@@ -1,5 +1,6 @@
 import { EventEmitter } from "eventemitter3";
 import type { Config } from "../../config.ts";
+import { Peer } from "../peer/peer.ts";
 import { EthMessageCode, MessageDefinition, ProtocolSpec } from "./eth/definitions.ts";
 
 export interface ProtocolOptions {
@@ -16,7 +17,7 @@ export abstract class AbstractProtocol<TProtocolOptions extends ProtocolOptions>
 	public config: Config;
         public timeout: number;
         public opened: boolean;
-	public _peer: any; // Peer instance (e.g., Devp2pRLPxPeer or our Peer class) - made public for access
+	public _peer: Peer; // Peer instance (e.g., Devp2pRLPxPeer or our Peer class) - made public for access
 	protected _service: any; // Service instance (e.g., FullEthereumService)
 
 	constructor(public readonly spec: ProtocolSpec<TProtocolOptions>) {

@@ -1,17 +1,13 @@
 import type crypto from "node:crypto";
 import { zfill } from "../../../../devp2p";
 import { concatBytes } from "../../../../utils";
-import type { MAC } from "../../../transport/rlpx/mac";
+import { MAC } from "../../../transport/rlpx";
 
 type Decipher = crypto.DecipherGCM;
 
 export const BODY_MAC_SIZE = 16;
 
-export function createBody(
-	data: Uint8Array,
-	egressAes: Decipher,
-	egressMac: MAC,
-): Uint8Array {
+export function createBody(data: Uint8Array, egressAes: Decipher, egressMac: MAC): Uint8Array {
 	const paddedSize = Math.ceil(data.length / 16) * 16;
 	const paddedData = zfill(data, paddedSize, false) as Uint8Array;
 	const encryptedData = Uint8Array.from(egressAes.update(paddedData));
@@ -23,13 +19,12 @@ export function createBody(
 export function parseBody(
 	data: Uint8Array,
 	bodySize: number,
-	ingressAes: Decipher | null | undefined,
-	ingressMac: MAC | null | undefined,
-): { bodyPayload: Uint8Array; size: number } | null {
+	ingressAes: Decipher,
+	ingressMac: MAC,
+): Uint8Array | undefined {
 	if (!ingressAes || !ingressMac) {
 		throw new Error("ECIES handshake not complete - AES/MAC not available");
 	}
-
 	const body = data.subarray(0, -BODY_MAC_SIZE);
 	const mac = data.subarray(-BODY_MAC_SIZE);
 
@@ -52,3 +47,4 @@ function compareMac(a: Uint8Array, b: Uint8Array): boolean {
 	for (let i = 0; i < a.length; i++) result |= a[i] ^ b[i];
 	return result === 0;
 }
+
