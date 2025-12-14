@@ -16,12 +16,17 @@ export function createBody(data: Uint8Array, egressAes: Decipher, egressMac: MAC
 	return concatBytes(encryptedData, tag);
 }
 
+export type ParseBodyResult = {
+	bodyPayload: Uint8Array;
+	size: number;
+};
+
 export function parseBody(
 	data: Uint8Array,
 	bodySize: number,
 	ingressAes: Decipher,
 	ingressMac: MAC,
-): Uint8Array | undefined {
+): ParseBodyResult {
 	if (!ingressAes || !ingressMac) {
 		throw new Error("ECIES handshake not complete - AES/MAC not available");
 	}

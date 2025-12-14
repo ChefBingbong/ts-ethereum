@@ -18,9 +18,9 @@ export class RlpxConnection extends BasicConnection {
 	public direct: boolean = true;
 
 	// Protocol management
-	private protocols: Map<string, ProtocolDescriptor> = new Map();
-	private messageRouter: Map<number, ProtocolHandler> = new Map();
-	private registrations: Map<string, ProtocolRegistration> = new Map();
+	public protocols: Map<string, ProtocolDescriptor> = new Map();
+	    public messageRouter: Map<number, ProtocolHandler> = new Map();
+	public registrations: Map<string, ProtocolRegistration> = new Map();
 
 	// Base protocol codes
 	private readonly BASE_PROTOCOL_LENGTH = 16; // 0x00-0x0F

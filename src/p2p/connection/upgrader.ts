@@ -8,7 +8,7 @@ import { AbstractMultiaddrConnection } from "./abstract-multiaddr-connection";
 import { BasicConnection, createBasicConnection } from "./basic-connection";
 import { Connection, createConnection } from "./connection";
 import { Registrar } from "./registrar";
-import { AbortOptions, PeerId, SecureConnection } from "./types";
+import { AbortOptions, PeerId } from "./types";
 
 interface CreateConnectionOptions {
 	id: string;
@@ -118,7 +118,7 @@ export class Upgrader {
 	 * Upgrade inbound connection to BasicConnection (no muxing, RLPx compatible)
 	 */
 	async upgradeInboundBasic(
-		maConn: AbstractMultiaddrConnection | SecureConnection,
+		maConn: AbstractMultiaddrConnection,
 		opts: { signal?: AbortSignal } = {},
 	): Promise<BasicConnection> {
 		const signal = this.createInboundAbortSignal(opts.signal);
@@ -137,8 +137,8 @@ export class Upgrader {
 		maConn: AbstractMultiaddrConnection,
 		opts: { signal?: AbortSignal } = {},
 	): Promise<BasicConnection> {
-		const secureConn = maConn as SecureConnection;
-		return await this._performBasicUpgrade(secureConn.connection, "outbound", opts);
+		const secureConn = maConn;
+		return await this._performBasicUpgrade(maConn, "outbound", opts);
 	}
 
 	private async _performUpgrade(
@@ -380,11 +380,11 @@ export class Upgrader {
 	 * Creates a BasicConnection compatible with RLPx
 	 */
 	private async _performBasicUpgrade(
-		maConn: AbstractMultiaddrConnection |  SecureConnection,
+		maConn: AbstractMultiaddrConnection,
 		direction: "inbound" | "outbound",
 		opts: AbortOptions = {},
 	): Promise<BasicConnection> {
-		let stream: AbstractMessageStream = maConn.maConn;
+		let stream: AbstractMessageStream = maConn;
 		let remotePeer: PeerId;
 		let cryptoProtocol: string;
 

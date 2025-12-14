@@ -1,4 +1,4 @@
-import { secp256k1 } from "ethereum-cryptography/secp256k1";
+import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import net from "node:net";
 import { genPrivateKey, pk2id } from "../../devp2p";
 import { EcciesEncrypter } from "../../p2p/connection-encrypters/eccies/eccies-encrypter";

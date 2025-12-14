@@ -42,6 +42,9 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 	public newBlockHandler: NewBlockHandler;
 	public pooledTransactionsHandler: PooledTransactionsHandler;
 
+	// Store peer status for sync management
+	public status?: StatusPayload;
+
 	constructor(version: number = 68) {
 		super('eth', version, 16); // Reserve 16 codes
 
@@ -62,6 +65,8 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 		// STATUS
 		this.on(this.statusHandler.code, async (data, conn) => {
 			const status = await this.statusHandler.handle(data, this.createContext());
+			// Store status for sync management
+			this.status = status;
 			// Emit event for service to handle
 			conn.dispatchEvent(new CustomEvent('eth:status', { detail: status }));
 		});
@@ -135,7 +140,10 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 	 * Send STATUS and wait for peer's STATUS response
 	 */
 	async sendStatus(payload: StatusPayload): Promise<StatusPayload> {
-		return this.statusHandler.sendGetStatus(payload, this.createContext());
+		const peerStatus = await this.statusHandler.sendGetStatus(payload, this.createContext());
+		// Store the peer's status
+		this.status = peerStatus;
+		return peerStatus;
 	}
 
 	/**

@@ -70,9 +70,12 @@ export function sendFrameMessage(
 	const msg = concatBytes(RLP.encode(code), data);
 
 	const header = createBlockHeader(egressAes, egressMac, msg.length);
-	socket.write(header);
-
 	const body = createBody(egressAes, egressMac, msg);
+	
+	console.log("[sendFrameMessage] code:", code, "payload:", data.length, "total frame:", header.length + body.length);
+	console.log("[sendFrameMessage] header first 16 bytes:", Array.from(header.subarray(0, 16)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+	
+	socket.write(header);
 	socket.write(body);
 
 	return true;

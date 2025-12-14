@@ -75,12 +75,19 @@ export function sendHelloGetHello(
 		let bodySize = 0;
 
 		const onData = (data: Uint8Array) => {
+			log("📨 [initiator] Received %d bytes, total buffered: %d, state: %s, nextPacketSize: %d", 
+				data.length, socketData.length + data.length, state, nextPacketSize);
+			log("📨 [initiator] First 32 bytes of new data: %s", 
+				Array.from(data.subarray(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+			
 			socketData = new Uint8Array([...socketData, ...data]);
 
 			try {
 				while (socketData.length >= nextPacketSize) {
 					if (state === "header") {
 						const headerData = socketData.subarray(0, 32);
+						log("📨 [initiator] Parsing header: %s", 
+							Array.from(headerData).map(b => b.toString(16).padStart(2, '0')).join(' '));
 						bodySize = parseHeader(
 							ctx.ingressAes!,
 							ctx.ingressMac!,
@@ -138,7 +145,21 @@ export function sendHelloGetHello(
 			clearTimeout(timer);
 			ctx.socket.off("data", onData);
 			ctx.socket.off("error", onError);
+			
+			// Validate cleanup
+			const remainingDataListeners = ctx.socket.listenerCount("data");
+			if (remainingDataListeners > 0) {
+				log(`⚠️ [Hello-Initiator] Cleanup: ${remainingDataListeners} data listener(s) still attached after cleanup`);
+			} else {
+				log(`✅ [Hello-Initiator] Cleanup: All data listeners removed`);
+			}
 		};
+
+		// Check for leftover listeners before attaching new ones
+		const existingDataListeners = ctx.socket.listenerCount("data");
+		if (existingDataListeners > 0) {
+			log(`⚠️ [Hello-Initiator] Found ${existingDataListeners} existing data listener(s) before attaching HELLO handler`);
+		}
 
 		const timer = setTimeout(onTimeout, timeoutMs);
 		ctx.socket.on("data", onData);

@@ -95,6 +95,7 @@ export function waitHelloSendHello(
 							);
 
 							// Send our HELLO response
+							log("📤 [responder] Sending HELLO response...");
 							const helloPayload = createHelloPayload(ctx);
 							const sent = sendFrameMessage(
 								ctx.socket,
@@ -145,7 +146,21 @@ export function waitHelloSendHello(
 			clearTimeout(timer);
 			ctx.socket.off("data", onData);
 			ctx.socket.off("error", onError);
+			
+			// Validate cleanup
+			const remainingDataListeners = ctx.socket.listenerCount("data");
+			if (remainingDataListeners > 0) {
+				log(`⚠️ [Hello-Responder] Cleanup: ${remainingDataListeners} data listener(s) still attached after cleanup`);
+			} else {
+				log(`✅ [Hello-Responder] Cleanup: All data listeners removed`);
+			}
 		};
+
+		// Check for leftover listeners before attaching new ones
+		const existingDataListeners = ctx.socket.listenerCount("data");
+		if (existingDataListeners > 0) {
+			log(`⚠️ [Hello-Responder] Found ${existingDataListeners} existing data listener(s) before attaching HELLO handler`);
+		}
 
 		const timer = setTimeout(onTimeout, timeoutMs);
 		ctx.socket.on("data", onData);

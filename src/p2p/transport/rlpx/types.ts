@@ -24,6 +24,8 @@ export type Status =
 	  };
 
 export interface ListenerContext extends RLPxCreateListenerOptions {
+	privateKey?: Uint8Array;
+	id?: Uint8Array;
 	socketInactivityTimeout?: number;
 	socketCloseTimeout?: number;
 	maxConnections?: number;

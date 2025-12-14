@@ -102,12 +102,16 @@ function createTestNode(nodeIndex: number, udpPort: number, tcpPort: number): Te
         id: peerId,
         connectionEncrypter: encrypter,
         streamMuxerFactory: muxerFactory,
+        skipEncryptionNegotiation: true,
+        skipMuxerNegotiation: true,
       }
     );
   
     // Transport for outbound connections
     const transport = new Transport({
       upgrader,
+      privateKey,
+      id: peerId,
       dialOpts: {
         timeoutMs: 30000,
         maxActiveDials: 10,
@@ -119,10 +123,11 @@ function createTestNode(nodeIndex: number, udpPort: number, tcpPort: number): Te
     const protocolHandlers = new Map<string, (stream: MplexStream) => void>();
   
     // Listener for inbound connections
-    const listener = transport.createListener({});
+    const listener = transport.createListener({  });
   
     return {
-      index: nodeIndex,
+      index: String(nodeIndex),
+      name: `Node-${nodeIndex}`,
       privateKey,
       peerId,
       udpPort,
@@ -132,6 +137,8 @@ function createTestNode(nodeIndex: number, udpPort: number, tcpPort: number): Te
       listener,
       connections,
       registrar,
+      upgrader,
+      encrypter,
     };
   }
   
@@ -171,7 +178,7 @@ function createTestNode(nodeIndex: number, udpPort: number, tcpPort: number): Te
 async function setupServer(node: TestNode): Promise<void> {
 	log(node.name, "Setting up RLPx listener...");
 
-	// Create listener
+	// Create listener (transport provides upgrader, privateKey, and id automatically)
 	const listener = node.transport.createListener({});
 
 	// Handle incoming connections
@@ -268,7 +275,7 @@ async function main() {
   
     // Step 1: Create all nodes
     console.log("📦 Creating nodes...\n");
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const udpPort = 9000 + i;
       const tcpPort = 9100 + i;
       const node = createTestNode(i, udpPort, tcpPort);
@@ -307,12 +314,12 @@ async function main() {
         id: nodes[i - 1].peerId
       };
       
-      log(i, `Bootstrapping to Node-${i - 1}...`);
+      log(`Node-${i}`, `Bootstrapping to Node-${i - 1}...`);
       try {
         await nodes[i].kademlia.bootstrap(bootstrapPeer);
-        log(i, `Bootstrap successful!`);
+        log(`Node-${i}`, `Bootstrap successful!`);
       } catch (err: any) {
-        log(i, `Bootstrap failed: ${err.message}`);
+        log(`Node-${i}`, `Bootstrap failed: ${err.message}`);
       }
       
       await sleep(500);

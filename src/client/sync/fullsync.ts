@@ -1,8 +1,8 @@
 import type { Block } from "../../block";
+import type { EthProtocolHandler } from "../../p2p/transport/rlpx/protocols/eth-protocol-handler";
 import { BIGINT_0, BIGINT_1, equalsBytes } from "../../utils";
 import type { VMExecution } from "../execution";
 import type { Peer } from "../net/peer/peer.ts";
-import { EthMessageCode } from "../net/protocol/eth/definitions.ts";
 import type { TxPool } from "../service/txpool.ts";
 import { Event } from "../types.ts";
 import { short } from "../util";
@@ -62,6 +62,18 @@ export class FullSynchronizer extends Synchronizer {
 		this._fetcher = fetcher;
 	}
 
+	/**
+	 * Get ETH protocol handler from peer's RlpxConnection
+	 */
+	private getEthHandler(peer: Peer): EthProtocolHandler | null {
+		if (!peer.rlpxConnection) {
+			return null;
+		}
+		const protocols = peer.rlpxConnection.protocols;
+		const ethDescriptor = protocols.get('eth');
+		return (ethDescriptor?.handler as EthProtocolHandler) || null;
+	}
+
 	async sync() {
 		const syncWithFetcher = super.sync();
 		const syncEvent: Promise<boolean> = new Promise((resolve) => {
@@ -111,7 +123,7 @@ export class FullSynchronizer extends Synchronizer {
 	 * Returns true if peer can be used for syncing
 	 */
 	syncable(peer: Peer): boolean {
-		return peer.eth !== undefined;
+		return peer.rlpxConnection !== undefined;
 	}
 
 	/**
@@ -125,11 +137,14 @@ export class FullSynchronizer extends Synchronizer {
 		// For PoW (Ethash) chains we want to select the peer with the highest TD
 		let best: Peer | undefined;
 		for (const peer of peers) {
-			if (peer.eth?.status !== undefined) {
-				const td = peer.eth.status.td;
+			// Get ETH handler to check status
+			const ethHandler = this.getEthHandler(peer);
+			if (ethHandler?.status !== undefined) {
+				const td = ethHandler.status.td;
+				const bestEthHandler = best ? this.getEthHandler(best) : null;
 				if (
 					(!best && td >= this.chain.blocks.td) ||
-					(best?.eth?.status.td !== undefined && best.eth.status.td < td)
+					(bestEthHandler?.status?.td !== undefined && bestEthHandler.status.td < td)
 				) {
 					best = peer;
 				}
@@ -269,7 +284,13 @@ export class FullSynchronizer extends Synchronizer {
 		for (const peer of peers) {
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
-				peer.eth?.send(0x07, [block, this.chain.blocks.td]); // NEW_BLOCK code
+				const ethHandler = this.getEthHandler(peer);
+				if (ethHandler) {
+					await ethHandler.announceNewBlock({
+						block: block as any,
+						td: this.chain.blocks.td,
+					});
+				}
 			}
 		}
 	}
@@ -341,7 +362,13 @@ export class FullSynchronizer extends Synchronizer {
 			// Send `NEW_BLOCK_HASHES` message for received block to all other peers
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
-				peer.eth?.send(EthMessageCode.NEW_BLOCK_HASHES, [[block.hash(), block.header.number]]);
+				const ethHandler = this.getEthHandler(peer);
+				if (ethHandler) {
+					await ethHandler.announceBlockHashes([{
+						hash: block.hash(),
+						number: block.header.number,
+					}]);
+				}
 			}
 		}
 	}

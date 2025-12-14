@@ -17,7 +17,6 @@ import {
 import type { TxReceipt } from "../../../../vm";
 import type { Chain } from "../../../blockchain";
 import { AbstractProtocol } from "../abstract-protocol.ts";
-import { RlpxProtocolAdapter } from "../rlpx-protocol-adapter";
 
 // import type { ETH as Devp2pETH } from "../../../../devp2p"; // TODO: Migrate away from devp2p
 type Devp2pETH = any; // Temporary type stub until migration complete
@@ -66,7 +65,6 @@ export class EthProtocol extends AbstractProtocol<ProtocolOptions> {
 	private _nextForkBlock = BIGINT_0;
 	private handlers: Map<number, Handler> = new Map();
 	private devp2pEth?: Devp2pETH; // Legacy devp2p support (to be removed)
-	private protocolAdapter?: RlpxProtocolAdapter; // New adapter for BasicConnection
 	public updatedBestHeader?: BlockHeader;
 	private ethSpec: EthProtocolSpec; // Store the original ETH spec for access to options
 

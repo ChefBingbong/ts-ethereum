@@ -234,7 +234,6 @@ export class RlpxServer extends Server {
 			id: peerId,
 			host: host,
 			port: port,
-			protocols: Array.from(this.protocols),
 			inbound: false,
 			transportInstance: this.transport,
 		});
@@ -438,6 +437,8 @@ export class RlpxServer extends Server {
 		// Create transport
 		this.transport = new Transport({
 			upgrader: this.upgrader,
+			privateKey: this.key,
+			id: this.peerId,
 			dialOpts: { maxActiveDials: this.config.maxPeers ?? 10 },
 		});
 
@@ -469,15 +470,14 @@ export class RlpxServer extends Server {
 				`[RlpxServer] 📥 New INBOUND connection from peer ${remotePeerId.slice(0, 8)} at ${host}:${port}`,
 			);
 
-			let peer: Peer | null = new Peer({
-				config: this.config,
-				id: remotePeerId,
-				host: host,
-				port: Number(port),
-				protocols: Array.from(this.protocols),
-				inbound: true,
-				transportInstance: this.transport, // Provide transport for future outbound connections
-			});
+		let peer: Peer | null = new Peer({
+			config: this.config,
+			id: remotePeerId,
+			host: host,
+			port: Number(port),
+			inbound: true,
+			transportInstance: this.transport, // Provide transport for future outbound connections
+		});
 
 			try {
 				await peer.accept(basicConn, this);

@@ -4,7 +4,6 @@ import { secp256k1 } from "ethereum-cryptography/secp256k1";
 import crypto from "node:crypto";
 import type { Socket } from "node:net";
 import { genPrivateKey, id2pk, pk2id } from "../../../devp2p";
-import { concatBytes } from "../../../utils";
 import type { SecureConnection } from "../../connection/types";
 import { MAC } from "../../transport/rlpx/mac";
 import {
@@ -67,9 +66,12 @@ export class EcciesEncrypter implements ConnectionEncrypter {
 		);
 	}
 
+	static createNewSession(privateKey: Uint8Array, options: EcciesEncrypterOptions): EcciesEncrypter {
+		return new EcciesEncrypter(privateKey, options);
+	}
+
 	async secureInBound(socket: Socket): Promise<SecureConnection> {
 		this.socket = socket;
-		this.handshakeState = "idle";
 		const { authResult, ackMsg } = await waitAuthSendAck(this.getContext());
 
 		this.initMsg = ackMsg;
@@ -81,6 +83,24 @@ export class EcciesEncrypter implements ConnectionEncrypter {
 
 		// Setup frame encryption BEFORE HELLO exchange
 		this.setupFrameEncryption(authResult.remoteInitMsg, true);
+
+		// Validate handshake transition: AUTH/ACK → HELLO
+		const { validateHandshakeTransition, logMacState } = await import("./utils/validation");
+		if (this.ingressMac && this.egressMac) {
+			const validation = validateHandshakeTransition(
+				socket,
+				this.ingressMac,
+				this.egressMac,
+				"AUTH/ACK",
+				"HELLO",
+			);
+			if (!validation.valid) {
+				log(`❌ Handshake validation failed: ${validation.errors.join("; ")}`);
+			}
+			logMacState(this.ingressMac, this.egressMac, "inbound:before-HELLO", {
+				remotePeer: this.remotePublicKey ? Buffer.from(this.remotePublicKey).toString("hex").slice(0, 16) : "unknown",
+			});
+		}
 
 		// Now do HELLO exchange (responder waits for peer's HELLO first)
 		this.helloResult = await this.helloInbound(
@@ -112,11 +132,29 @@ export class EcciesEncrypter implements ConnectionEncrypter {
 		this.remoteEphemeralPublicKey = ackResult.remoteEphemeralPublicKey;
 		this.ephemeralSharedSecret = ackResult.ephemeralSharedSecret;
 
-		let sharedMacData = ackMsg;
-		if (gotEIP8Ack) sharedMacData = concatBytes(ackMsg.subarray(0, 2), ackMsg);
-
+		// For MAC initialization, use the actual ACK message received (remoteInitMsg)
+		// This must match what the responder used for its egressMac initialization
+		// Note: remoteInitMsg is the raw ACK packet, which matches what responder sent
 		// Setup frame encryption BEFORE HELLO exchange
-		this.setupFrameEncryption(sharedMacData, false);
+		this.setupFrameEncryption(this.remoteInitMsg, false);
+
+		// Validate handshake transition: AUTH/ACK → HELLO
+		const { validateHandshakeTransition, logMacState } = await import("./utils/validation");
+		if (this.ingressMac && this.egressMac) {
+			const validation = validateHandshakeTransition(
+				socket,
+				this.ingressMac,
+				this.egressMac,
+				"AUTH/ACK",
+				"HELLO",
+			);
+			if (!validation.valid) {
+				log(`❌ Handshake validation failed: ${validation.errors.join("; ")}`);
+			}
+			logMacState(this.ingressMac, this.egressMac, "outbound:before-HELLO", {
+				remotePeer: remotePeerId ? Buffer.from(remotePeerId).toString("hex").slice(0, 16) : "unknown",
+			});
+		}
 
 		// Now do HELLO exchange (initiator sends HELLO first)
 		this.helloResult = await this.helloOutbound(

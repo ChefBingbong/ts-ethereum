@@ -100,6 +100,14 @@ export function waitAuthSendAck(
 			clearTimeout(timer);
 			ctx.socket.off("data", onData);
 			ctx.socket.off("error", onError);
+			
+			// Validate cleanup
+			const remainingDataListeners = ctx.socket.listenerCount("data");
+			if (remainingDataListeners > 0) {
+				log(`⚠️ [Responder] Cleanup: ${remainingDataListeners} data listener(s) still attached after cleanup`);
+			} else {
+				log(`✅ [Responder] Cleanup: All data listeners removed`);
+			}
 		};
 		const onTimeout = () => {
 			cleanup();
@@ -113,9 +121,6 @@ export function waitAuthSendAck(
 		log("🔐 [Responder] Attaching socket data handler for handshake");
 		ctx.socket.on("data", onData);
 		ctx.socket.once("error", onError);
-
-		// Update handshake state to "auth" when waiting for AUTH
-		ctx.handshakeState?.setState("auth");
 
 		log("🔐 [Responder] Waiting for AUTH message from peer...");
 	});

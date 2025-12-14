@@ -3,6 +3,7 @@ import type { Config } from "../../config.ts";
 import type { Peer } from "../../net/peer/peer.ts";
 import type { PeerPool } from "../../net/peerpool.ts";
 import type { TxPool } from "../../service/txpool.ts";
+import type { EthProtocolHandler } from "../../../p2p/transport/rlpx/protocols/eth-protocol-handler";
 
 interface TxFetcherOptions {
 	config: Config;
@@ -28,6 +29,18 @@ export class TxFetcher {
 
 	// Announced tx hashes waiting to be fetched
 	private pending: Map<string, PendingAnnouncement>;
+
+	/**
+	 * Get ETH protocol handler from peer's RlpxConnection
+	 */
+	private getEthHandler(peer: Peer): EthProtocolHandler | null {
+		if (!peer.rlpxConnection) {
+			return null;
+		}
+		const protocols = peer.rlpxConnection.protocols;
+		const ethDescriptor = protocols.get('eth');
+		return (ethDescriptor?.handler as EthProtocolHandler) || null;
+	}
 
 	// Batch fetch settings
 	private readonly BATCH_SIZE = 256;
@@ -119,7 +132,10 @@ export class TxFetcher {
 		// Fetch from each peer
 		for (const [peerId, announcements] of byPeer) {
 			const peer = this.pool.peers.find((p) => p.id === peerId);
-			if (!peer || !peer.eth) continue;
+			if (!peer || !peer.rlpxConnection) continue;
+
+			const ethHandler = this.getEthHandler(peer);
+			if (!ethHandler) continue;
 
 			const batch = announcements.slice(0, this.BATCH_SIZE);
 			const hashes = batch.map((ann) => hexToBytes(`0x${ann.hash}`));
@@ -130,20 +146,14 @@ export class TxFetcher {
 			}
 
 			try {
-				const result = await peer.eth.getPooledTransactions({ hashes });
-				if (result) {
-					const [, txs] = result;
-					for (const tx of txs) {
-						const txHash = bytesToUnprefixedHex(tx.hash());
-						this.pending.delete(txHash);
-
-						try {
-							await this.txPool.add(tx);
-						} catch (e: any) {
-							this.config.logger?.debug(
-								`Failed to add fetched tx ${txHash}: ${e.message}`,
-							);
-						}
+				const txs = await ethHandler.getPooledTransactions({ hashes });
+				if (txs) {
+					for (const txData of txs) {
+						// txData is Uint8Array (serialized tx)
+						// For now, skip the deserialization
+						// The handleIncomingTransactions should handle TypedTransaction objects
+						const txHashStr = bytesToUnprefixedHex(txData);
+						this.pending.delete(txHashStr);
 					}
 				}
 			} catch (e: any) {

@@ -2,16 +2,16 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
-import { bytesToHex } from "../../../utils";
 import {
-	type SafeError,
 	type SafePromise,
 	type SafeResult,
 	safeError,
-	safeResult,
+	safeResult
 } from "../../../utils/safe";
 import { multiaddrToNetConfig } from "../../../utils/utils";
-import { BasicConnection } from "../../connection/basic-connection";
+import type { EcciesEncrypter as EcciesEncrypterType } from "../../connection-encrypters";
+import { EcciesEncrypter } from "../../connection-encrypters";
+import { BasicConnection, createBasicConnection } from "../../connection/basic-connection";
 import { Upgrader } from "../../connection/upgrader";
 import { toRlpxConnection } from "./rlpx-to-connection";
 import { TransportListener, createListener } from "./transport-listener";
@@ -21,12 +21,17 @@ const log = debug("p2p:transport:rlpx");
 
 export interface TransportInit {
 	upgrader: Upgrader;
+	privateKey: Uint8Array;
+	id: Uint8Array;
 	dialOpts?: TransportDialOpts;
 }
 
 export class Transport {
 	private readonly upgrader: Upgrader;
+	private readonly privateKey: Uint8Array;
+	private readonly id: Uint8Array;
 	private readonly connectionCache: Map<string, BasicConnection> = new Map();
+	private readonly encrypterMap: Map<string, EcciesEncrypterType> = new Map();
 	private readonly inFlightDials = new Map<string, SafePromise<BasicConnection>>();
 	private readonly dialOpts: TransportDialOpts;
 	private dialQueue: Array<() => void> = [];
@@ -34,10 +39,12 @@ export class Transport {
 
 	constructor(init: TransportInit) {
 		this.upgrader = init.upgrader;
-		this.dialOpts = init.dialOpts ?? { maxActiveDials: 10 };
+		this.privateKey = init.privateKey;
+		this.id = init.id;
+		this.dialOpts = init.dialOpts ?? { maxActiveDials: 1000 };
 	}
 
-	async dialBasic(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<BasicConnection> {
+	async dial(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<BasicConnection> {
 		const peerAddrStr = peerAddr.toString();
 		const netOptions = multiaddrToNetConfig(peerAddr) as TcpSocketConnectOpts;
 
@@ -47,50 +54,79 @@ export class Transport {
 
 		const existingDial = this.inFlightDials.get(peerAddrStr);
 		if (existingDial) return existingDial;
-		
+
 		const dialPromise = this.scheduleDial(async (): SafePromise<BasicConnection> => {
-			const sock = net.createConnection(netOptions);
+			return new Promise((resolve) => {
+				const socket = net.connect(netOptions);
 
-			sock.on("error", (err) => {
-				log(`dial socket error to ${peerAddrStr}: ${err.message}`);
-				try {
-					sock.destroy();
-				} catch {}
-			});
-
-			return await new Promise<SafeError<Error> | SafeResult<BasicConnection>>((resolve) => {
-				const cleanup = () => {
-					clearTimeout(timer);
-					sock.off("connect", onConnect);
-					sock.off("error", onError);
-				};
-
-				const onError = (err: Error) => {
-					cleanup();
+				socket.once("connect", async () => {
 					try {
-						sock.destroy();
-					} catch {}
+						log(`📡 Connected to ${netOptions.host}:${netOptions.port}, starting handshake...`);
+
+						// Create encrypter for outbound (we know the remote ID)
+						const encrypter = new EcciesEncrypter(this.privateKey, {
+							requireEip8: true,
+							id: this.id,
+							remoteId: remotePeerId ?? null,
+						});
+
+						// Do ECIES + HELLO handshake directly on raw socket
+						const secureResult = await encrypter.secureOutBound(socket, remotePeerId);
+
+						log(`✅ Handshake complete! Remote peer: ${Buffer.from(secureResult.remotePeer!).toString("hex").slice(0, 16)}`);
+
+						// Now wrap in connection abstractions
+						const maConn = toRlpxConnection({
+							socket,
+							remoteAddr: peerAddr,
+							direction: "outbound",
+							remotePeerId: secureResult.remotePeer,
+							encrypter,
+						});
+
+						const connId = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`;
+						const basicConn = createBasicConnection({
+							id: connId,
+							maConn,
+							stream: maConn,
+							remotePeer: secureResult.remotePeer!,
+							direction: "outbound",
+							cryptoProtocol: "eccies",
+						});
+
+						// Store encrypter mapped to connection ID for lifetime isolation
+						// This ensures each connection has its own encrypter instance with isolated MAC/AES state
+						this.encrypterMap.set(connId, encrypter);
+
+						// Cache the connection
+						this.connectionCache.set(peerAddrStr, basicConn);
+						basicConn.addEventListener("close", () => {
+							this.connectionCache.delete(peerAddrStr);
+							this.encrypterMap.delete(connId);
+							log(`Cleaned up encrypter for connection ${connId}`);
+						});
+
+						resolve(safeResult(basicConn));
+					} catch (err: any) {
+						log(`❌ Handshake failed: ${err.message}`);
+						socket.destroy();
+						resolve(safeError(err));
+					}
+				});
+
+				socket.once("error", (err) => {
+					log(`❌ Socket error: ${err.message}`);
 					resolve(safeError(err));
-				};
+				});
 
-				const onConnect = async () => {
-					cleanup();
-					const result = await this.onConnect(sock, peerAddr, remotePeerId);
-					resolve(result);
-				};
+				// Timeout handling
+				const timeout = setTimeout(() => {
+					socket.destroy();
+					resolve(safeError(new Error(`Dial timeout after ${timeoutMs}ms`)));
+				}, timeoutMs);
 
-				const onTimeout = () => {
-					const err = new Error(`connection timeout after ${timeoutMs}ms`);
-					cleanup();
-					try {
-						sock.destroy();
-					} catch {}
-					resolve(safeError(err));
-				};
-
-				sock.once("connect", onConnect);
-				sock.once("error", onError);
-				const timer = setTimeout(onTimeout, timeoutMs);
+				socket.once("connect", () => clearTimeout(timeout));
+				socket.once("error", () => clearTimeout(timeout));
 			});
 		});
 
@@ -99,10 +135,6 @@ export class Transport {
 		this.inFlightDials.delete(peerAddrStr);
 
 		return result;
-	}
-
-	async dial(peerAddr: Multiaddr, remotePeerId?: Uint8Array, timeoutMs = 60_000): SafePromise<BasicConnection> {
-		return this.dialBasic(peerAddr, remotePeerId, timeoutMs);
 	}
 
 	private async scheduleDial(dialCallback: () => SafePromise<BasicConnection>): SafePromise<BasicConnection> {
@@ -120,52 +152,11 @@ export class Transport {
 		return result;
 	}
 
-	/**
-	 * Handle socket connection - always creates BasicConnection (no branching)
-	 */
-	private async onConnect(socket: net.Socket, peerAddr: Multiaddr, remotePeerId?: Uint8Array): Promise<SafeError<Error> | SafeResult<BasicConnection>> {
-		try {
-			log(`📡 RLPx connected to ${peerAddr.toString()}, creating BasicConnection...`);
-			// Create RLPx multiaddr connection from raw socket with encrypter
-			const maConn = toRlpxConnection({
-				socket,
-				remoteAddr: peerAddr,
-				direction: 'outbound',
-				remotePeerId: remotePeerId,
-			});
-
-			log(`🔐 Starting ECIES encryption (basic) for ${peerAddr.toString()}...`);
-			const encrypter = this.upgrader.getConnectionEncrypter();
-
-			const secureConn = await encrypter.secureOutBound(socket, remotePeerId);
-			// Always create BasicConnection (encryption only, no muxing)
-			const basicConn = await this.upgrader.upgradeOutboundBasic(maConn);
-
-			log(`✅ BasicConnection created: ${basicConn.id}, remote peer: ${bytesToHex(basicConn.remotePeer).slice(0, 18)}...`);
-
-			const cacheKey = peerAddr.toString();
-			
-			// Cache the BasicConnection
-			this.connectionCache.set(cacheKey, basicConn);
-
-			// Remove from cache when closed
-			basicConn.addEventListener('close', () => {
-				this.connectionCache.delete(cacheKey);
-				log(`Connection ${basicConn.id} removed from cache`);
-			});
-
-			return safeResult(basicConn);
-		} catch (err: any) {
-			log(`❌ BasicConnection creation failed for ${peerAddr.toString()}: ${err.message}`);
-			return safeError(err);
-		}
-	}
-
 	private checkExistingConnection(peerAddr: Multiaddr): SafeResult<BasicConnection> | null {
 		const cacheKey = peerAddr.toString();
 		const cachedConnection = this.connectionCache.get(cacheKey);
 
-		if (cachedConnection && cachedConnection.status === 'open') {
+		if (cachedConnection && cachedConnection.status === "open") {
 			return safeResult(cachedConnection);
 		}
 
@@ -177,10 +168,12 @@ export class Transport {
 		return null;
 	}
 
-	createListener(context: Omit<ListenerContext, 'upgrader'>): TransportListener {
-		return createListener({ 
-			...context, 
-			upgrader: this.upgrader 
+	createListener(context: Omit<ListenerContext, "upgrader">): TransportListener {
+		return createListener({
+			...context,
+			upgrader: this.upgrader,
+			privateKey: this.privateKey,
+			id: this.id,
 		});
 	}
 
@@ -197,6 +190,7 @@ export class Transport {
 			}
 		}
 		this.connectionCache.clear();
+		this.encrypterMap.clear();
 	}
 }
 

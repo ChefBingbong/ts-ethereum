@@ -12,22 +12,26 @@ export const peers = (client: EthereumClient) =>
 
 			return safeResult(
 				peers?.map((peer) => {
-					const rlpxPeer = peer.rlpxPeer;
-					const name = rlpxPeer?.["_hello"]?.clientId ?? null;
+					// Get RlpxConnection data
+					const rlpxConn = peer.rlpxConnection;
+					const name = (rlpxConn as any)?._hello?.clientId ?? null;
+					
+					// Get ETH protocol handler
+					const protocols = (rlpxConn as any)?.protocols as Map<string, any>;
+					const ethDescriptor = protocols?.get('eth');
+					const ethHandler = ethDescriptor?.handler;
+					
 					return {
 						id: peer.id,
 						name,
 						protocols: {
 							eth: {
-								head:
-									peer.eth?.updatedBestHeader !== undefined
-										? bytesToHex(peer.eth.updatedBestHeader.hash())
-										: bytesToHex(peer.eth?.status.bestHash ?? new Uint8Array()),
-								difficulty: peer.eth?.status.td.toString(10),
-								version: peer.eth?.["versions"].slice(-1)[0] ?? null,
+								head: ethHandler ? bytesToHex(new Uint8Array()) : bytesToHex(new Uint8Array()),
+								difficulty: ethHandler ? ((ethHandler as any).status?.td?.toString(10) ?? "0") : "0",
+								version: 68, // ETH/68
 							},
 						},
-						caps: peer.eth?.["versions"].map((ver) => "eth/" + ver),
+						caps: peer.registeredProtocols ? Array.from(peer.registeredProtocols).map(p => `${p}/68`) : [],
 						network: {
 							remoteAddress: peer.address,
 						},

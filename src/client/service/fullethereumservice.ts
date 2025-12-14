@@ -3,11 +3,6 @@ import { SyncMode } from "../config.ts";
 import { VMExecution } from "../execution";
 import { Miner } from "../miner";
 import type { Peer } from "../net/peer/peer.ts";
-import type { ProtocolOptions } from "../net/protocol/abstract-protocol.ts";
-import { AbstractProtocol } from "../net/protocol/abstract-protocol.ts";
-import { ETH_PROTOCOL_SPEC } from "../net/protocol/eth/definitions.ts";
-import { EthProtocol } from "../net/protocol/eth/protocol.ts";
-type Protocol = AbstractProtocol<ProtocolOptions>;
 // import type { Protocol } from "../net/protocol";
 // import { EthProtocol } from "../net/protocol/ethprotocol.ts";
 // import { StreamEthProtocol } from "../net/protocol/streamethprotocol.ts";
@@ -222,23 +217,6 @@ export class FullEthereumService extends Service {
 		await super.close();
 	}
 
-	/**
-	 * Returns all protocols required by this service
-	 */
-	override get protocols(): Protocol[] {
-		const protocols: Protocol[] = [];
-		
-		// Use StreamEthProtocol for P2PServer, EthProtocol for RlpxServer
-		protocols.push(
-			new EthProtocol({
-				spec: ETH_PROTOCOL_SPEC,
-				config: this.config,
-				chain: this.chain,
-				service: this, // Pass service reference for handler context
-			}),
-		);
-		return protocols;
-	}
 
 	/**
 	 * Handles incoming message from connected peer

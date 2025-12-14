@@ -108,6 +108,13 @@ export function setupFrame(
 	ephemeralSharedSecret: Uint8Array,
 	incoming: boolean,
 ) {
+	console.log("[setupFrame] incoming:", incoming);
+	console.log("[setupFrame] nonce:", Buffer.from(nonce).toString('hex').slice(0, 16));
+	console.log("[setupFrame] remoteNonce:", Buffer.from(remoteNonce).toString('hex').slice(0, 16));
+	console.log("[setupFrame] ephemeralSharedSecret:", Buffer.from(ephemeralSharedSecret).toString('hex').slice(0, 16));
+	console.log("[setupFrame] remoteData length:", remoteData.length);
+	console.log("[setupFrame] initMsg length:", initMsg.length);
+	
 	const nonceMaterial = incoming
 		? concatBytes(nonce, remoteNonce)
 		: concatBytes(remoteNonce, nonce);
@@ -122,12 +129,20 @@ export function setupFrame(
 	const egressAes = crypto.createDecipheriv("aes-256-ctr", aesSecret, IV);
 
 	const macSecret = keccak256(concatBytes(ephemeralSharedSecret, aesSecret));
+	console.log("[setupFrame] macSecret:", Buffer.from(macSecret).toString('hex').slice(0, 16));
+	
 	const ingressMac = new MAC(macSecret);
-	ingressMac.update(concatBytes(xor(macSecret, nonce), remoteData));
+	const ingressInitData = concatBytes(xor(macSecret, nonce), remoteData);
+	ingressMac.update(ingressInitData);
+	console.log("[setupFrame] ingressMac after init:", Buffer.from(ingressMac.digest()).toString('hex').slice(0, 16));
+	console.log("[setupFrame] ingressMac init data length:", ingressInitData.length, "nonce:", Buffer.from(nonce).toString('hex').slice(0, 16), "remoteData length:", remoteData.length);
+	
 	const egressMac = new MAC(macSecret);
-
 	if (initMsg === null || initMsg === undefined) return;
-	egressMac.update(concatBytes(xor(macSecret, remoteNonce), initMsg));
+	const egressInitData = concatBytes(xor(macSecret, remoteNonce), initMsg);
+	egressMac.update(egressInitData);
+	console.log("[setupFrame] egressMac after init:", Buffer.from(egressMac.digest()).toString('hex').slice(0, 16));
+	console.log("[setupFrame] egressMac init data length:", egressInitData.length, "remoteNonce:", Buffer.from(remoteNonce).toString('hex').slice(0, 16), "initMsg length:", initMsg.length);
 
 	return { ingressAes, egressAes, ingressMac, egressMac };
 }

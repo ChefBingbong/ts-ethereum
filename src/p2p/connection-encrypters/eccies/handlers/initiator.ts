@@ -94,6 +94,14 @@ export function sendAuthGetAck(
 			clearTimeout(timer);
 			ctx.socket.off("data", onData);
 			ctx.socket.off("error", onError);
+			
+			// Validate cleanup
+			const remainingDataListeners = ctx.socket.listenerCount("data");
+			if (remainingDataListeners > 0) {
+				log(`⚠️ [Initiator] Cleanup: ${remainingDataListeners} data listener(s) still attached after cleanup`);
+			} else {
+				log(`✅ [Initiator] Cleanup: All data listeners removed`);
+			}
 		};
 		const onTimeout = () => {
 			cleanup();
