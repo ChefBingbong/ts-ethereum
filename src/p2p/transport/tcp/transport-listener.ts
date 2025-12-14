@@ -2,11 +2,11 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import { EventEmitter } from "eventemitter3";
 import net, { type Server, type Socket } from "node:net";
-import type { NetConfig } from "../../utils/getNetConfig";
-import { multiaddrToNetConfig } from "../../utils/utils";
-import { BasicConnection } from "../connection/basic-connection";
-import { Connection } from "../connection/connection";
-import { toMultiaddrConnection } from "../connection/multiaddr-connection";
+import type { NetConfig } from "../../../utils/getNetConfig";
+import { multiaddrToNetConfig } from "../../../utils/utils";
+import { BasicConnection } from "../../connection/basic-connection";
+import { Connection } from "../../connection/connection";
+import { toMultiaddrConnection } from "./multiaddr-connection";
 import type { ListenerContext, Status } from "./types";
 
 const log = debug("p2p:transport:listener");

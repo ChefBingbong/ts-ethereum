@@ -17,6 +17,7 @@ import type { QHeap } from "../ext/qheap.ts";
 import { Heap } from "../ext/qheap.ts";
 import type { Peer } from "../net/peer/peer.ts";
 import type { PeerPool } from "../net/peerpool.ts";
+import { EthMessageCode } from "../net/protocol/eth/definitions.ts";
 import type { FullEthereumService } from "./fullethereumservice.ts";
 
 // Configuration constants
@@ -950,9 +951,12 @@ export class TxPool {
 				newHashesHex.includes(bytesToUnprefixedHex(tx.hash())),
 			);
 			if (newTxs.length > 0) {
-				peer.eth?.request("Transactions", newTxs).catch((e) => {
+				// Use send() for announcements (Transactions is an announcement, not a request)
+				try {
+					peer.eth?.send(EthMessageCode.TRANSACTIONS, newTxs);
+				} catch (e) {
 					this.markFailedSends(peer, newHashes, e as Error);
-				});
+				}
 			}
 		}
 	}
@@ -1005,7 +1009,7 @@ export class TxPool {
 
 					try {
 						peer.eth?.send(
-							"NewPooledTransactionHashes",
+							0x08, // NEW_POOLED_TRANSACTION_HASHES code
 							txsToSend.slice(0, 4096),
 						);
 					} catch (e) {
@@ -1018,7 +1022,7 @@ export class TxPool {
 						// We `send` this directly instead of using devp2p's async `request` since NewPooledTransactionHashes has no response and is just sent to peers
 						// and this requires no tracking of a peer's response
 						peer.eth?.send(
-							"NewPooledTransactionHashes",
+							EthMessageCode.NEW_POOLED_TRANSACTION_HASHES,
 							hashesToSend.slice(0, 4096),
 						);
 					} catch (e) {
@@ -1136,7 +1140,7 @@ export class TxPool {
 		this.config.logger?.debug(
 			`TxPool: requesting txs number=${reqHashes.length} fetching=${this.fetchingHashes.length}`,
 		);
-		const getPooledTxs = await peer.eth?.getPooledTransactions({
+		const getPooledTxs = await (peer.eth as any)?.getPooledTransactions?.({
 			hashes: reqHashes.slice(0, this.TX_RETRIEVAL_LIMIT),
 		});
 

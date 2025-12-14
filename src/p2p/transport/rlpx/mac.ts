@@ -1,7 +1,7 @@
 import { createCipheriv } from "crypto";
 import { keccak256 } from "ethereum-cryptography/keccak.js";
 
-import { xor } from "../util.ts";
+import { xor } from "../../../devp2p/util.ts";
 
 type Hash = ReturnType<typeof keccak256.create>;
 
@@ -35,3 +35,4 @@ export class MAC {
 		return Uint8Array.from(this._hash.clone().digest().subarray(0, 16));
 	}
 }
+

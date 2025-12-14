@@ -3,10 +3,10 @@ import { Unix } from '@multiformats/multiaddr-matcher'
 import type { Socket } from 'net'
 import { pEvent, TimeoutError } from 'p-event'
 import type { Uint8ArrayList } from 'uint8arraylist'
-import { ipPortToMultiaddr } from '../../utils/multi-addr'
-import { MessageStreamDirection, SendResult } from '../stream/types'
-import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
-import { AbortOptions } from './types'
+import { ipPortToMultiaddr } from '../../../utils/multi-addr'
+import { AbstractMultiaddrConnection } from '../../connection/abstract-multiaddr-connection'
+import { AbortOptions } from '../../connection/types'
+import { MessageStreamDirection, SendResult } from '../../stream/types'
 
 export interface MultiAddressConnectionOptions {
   socket: Socket

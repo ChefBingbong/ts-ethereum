@@ -11,8 +11,8 @@ import { Connection } from "../../p2p/connection/connection.ts";
 import { Registrar } from "../../p2p/connection/registrar.ts";
 import { Upgrader } from "../../p2p/connection/upgrader.ts";
 import { mplex, MplexStream } from "../../p2p/muxer/index.ts";
-import { TransportListener } from "../../p2p/transport/transport-listener.ts";
-import { Transport } from "../../p2p/transport/transport.ts";
+import { TransportListener } from "../../p2p/transport/tcp/transport-listener.ts";
+import { Transport } from "../../p2p/transport/tcp/transport.ts";
 import { bytesToUnprefixedHex } from "../../utils/index.ts";
 
 debug.enable("p2p:*,p2p:transport:*,p2p:connection:*");
@@ -312,13 +312,13 @@ async function main() {
     log("MAIN", `Encryption: ${server.encrypter ? 'ECIES enabled' : 'DISABLED (testing without encryption)'}`);
 
     // // Run tests
-    // await testBasicConnection(client, serverAddr, serverPeerId);
-    // await new Promise(resolve => setTimeout(resolve, 1000));
+    await testBasicConnection(client, serverAddr, serverPeerId);
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     await testUpgradeToFull(client, serverAddr, serverPeerId);
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // await testDialFull(client, serverAddr, serverPeerId);
+    await testDialFull(client, serverAddr, serverPeerId);
 
     log("MAIN", "All tests completed!");
 

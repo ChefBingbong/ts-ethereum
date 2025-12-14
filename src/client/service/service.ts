@@ -6,7 +6,8 @@ import { type V8Engine, getV8Engine } from "../util";
 import type { AbstractLevel } from "abstract-level";
 import type { Config } from "../config.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import type { Protocol } from "../net/protocol";
+import type { ProtocolOptions } from "../net/protocol/abstract-protocol.ts";
+import { AbstractProtocol } from "../net/protocol/abstract-protocol.ts";
 import type { Synchronizer } from "../sync";
 
 export interface ServiceOptions {
@@ -133,7 +134,7 @@ export class Service {
 	/**
 	 * Returns all protocols required by this service
 	 */
-	get protocols(): Protocol[] {
+	get protocols(): AbstractProtocol<ProtocolOptions>[] {
 		return [];
 	}
 

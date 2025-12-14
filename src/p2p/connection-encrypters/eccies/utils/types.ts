@@ -1,6 +1,12 @@
 import type { Socket } from "node:net";
 
+import type { HandshakeState } from "../eccies-encrypter";
+
 export type HandlerContext = {
+	handshakeState?: {
+		current: HandshakeState;
+		setState: (state: HandshakeState) => void;
+	};
 	socket: Socket;
 	privateKey: Uint8Array;
 	publicKey: Uint8Array;
@@ -33,4 +39,3 @@ export type HeaderResult = {
 export type BodyResult = {
 	payload: Uint8Array;
 };
-

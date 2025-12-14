@@ -1,6 +1,6 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
-import type { NetConfig } from "../../utils/getNetConfig";
-import { Upgrader } from "../connection/upgrader";
+import type { NetConfig } from "../../../utils/getNetConfig";
+import { Upgrader } from "../../connection/upgrader";
 
 export interface TCPSocketOptions {
 	noDelay?: boolean;

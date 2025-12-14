@@ -2,7 +2,8 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import type { Config } from "../../config.ts";
 import type { KeyLike, MultiaddrLike } from "../../types.ts";
 import { parseKey, parseMultiaddrs } from "../../util/parse.ts";
-import type { Protocol } from "../protocol/protocol.ts";
+import type { AbstractProtocol } from "../protocol/abstract-protocol.ts";
+type Protocol = AbstractProtocol<any>; // Temporary type alias
 
 export interface ServerOptions {
 	/* Config */

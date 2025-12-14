@@ -1,15 +1,19 @@
 import type crypto from "node:crypto";
-import type { MAC } from "../../../../devp2p";
 import { zfill } from "../../../../devp2p";
 import * as RLP from "../../../../rlp";
 import { bytesToInt, concatBytes, intToBytes } from "../../../../utils";
+import type { MAC } from "../../../transport/rlpx/mac";
 import type { HeaderResult } from "./types";
 
 type Decipher = crypto.DecipherGCM;
 
 export const HEADER_SIZE = 32;
 
-export function createHeader(size: number, egressAes: Decipher, egressMac: MAC): Uint8Array {
+export function createHeader(
+	size: number,
+	egressAes: Decipher,
+	egressMac: MAC,
+): Uint8Array {
 	const bufSize = zfill(intToBytes(size), 3);
 	const headerData = RLP.encode([0, 0]);
 	const headerConcat = concatBytes(bufSize, headerData);
@@ -20,8 +24,13 @@ export function createHeader(size: number, egressAes: Decipher, egressMac: MAC):
 	return concatBytes(header, tag);
 }
 
-export function parseHeader(data: Uint8Array, ingressAes: Decipher, ingressMac: MAC): HeaderResult {
-	if (data.length < HEADER_SIZE) throw new Error(`Header too short: ${data.length}`);
+export function parseHeader(
+	data: Uint8Array,
+	ingressAes: Decipher,
+	ingressMac: MAC,
+): HeaderResult {
+	if (data.length < HEADER_SIZE)
+		throw new Error(`Header too short: ${data.length}`);
 
 	let header = data.subarray(0, 16);
 	const mac = data.subarray(16, 32);
@@ -43,4 +52,3 @@ function compareMac(a: Uint8Array, b: Uint8Array): boolean {
 	for (let i = 0; i < a.length; i++) result |= a[i] ^ b[i];
 	return result === 0;
 }
-

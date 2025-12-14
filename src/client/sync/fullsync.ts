@@ -2,6 +2,7 @@ import type { Block } from "../../block";
 import { BIGINT_0, BIGINT_1, equalsBytes } from "../../utils";
 import type { VMExecution } from "../execution";
 import type { Peer } from "../net/peer/peer.ts";
+import { EthMessageCode } from "../net/protocol/eth/definitions.ts";
 import type { TxPool } from "../service/txpool.ts";
 import { Event } from "../types.ts";
 import { short } from "../util";
@@ -268,7 +269,7 @@ export class FullSynchronizer extends Synchronizer {
 		for (const peer of peers) {
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
-				peer.eth?.send("NewBlock", [block, this.chain.blocks.td]);
+				peer.eth?.send(0x07, [block, this.chain.blocks.td]); // NEW_BLOCK code
 			}
 		}
 	}
@@ -340,7 +341,7 @@ export class FullSynchronizer extends Synchronizer {
 			// Send `NEW_BLOCK_HASHES` message for received block to all other peers
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
-				peer.eth?.send("NewBlockHashes", [[block.hash(), block.header.number]]);
+				peer.eth?.send(EthMessageCode.NEW_BLOCK_HASHES, [[block.hash(), block.header.number]]);
 			}
 		}
 	}

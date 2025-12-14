@@ -1,14 +1,17 @@
 import type { Block } from "../../block";
-import { concatBytes } from "../../utils";
-import { encodeReceipt } from "../../vm";
 import { SyncMode } from "../config.ts";
 import { VMExecution } from "../execution";
 import { Miner } from "../miner";
 import type { Peer } from "../net/peer/peer.ts";
-import type { Protocol } from "../net/protocol";
-import { EthProtocol } from "../net/protocol/ethprotocol.ts";
-import { StreamEthProtocol } from "../net/protocol/streamethprotocol.ts";
-import { P2PServer } from "../net/server/p2pserver.ts";
+import type { ProtocolOptions } from "../net/protocol/abstract-protocol.ts";
+import { AbstractProtocol } from "../net/protocol/abstract-protocol.ts";
+import { ETH_PROTOCOL_SPEC } from "../net/protocol/eth/definitions.ts";
+import { EthProtocol } from "../net/protocol/eth/protocol.ts";
+type Protocol = AbstractProtocol<ProtocolOptions>;
+// import type { Protocol } from "../net/protocol";
+// import { EthProtocol } from "../net/protocol/ethprotocol.ts";
+// import { StreamEthProtocol } from "../net/protocol/streamethprotocol.ts";
+// import { P2PServer } from "../net/server/p2pserver.ts"; // Removed - using RLPx only
 import { FullSynchronizer } from "../sync";
 import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
@@ -222,25 +225,14 @@ export class FullEthereumService extends Service {
 		const protocols: Protocol[] = [];
 		
 		// Use StreamEthProtocol for P2PServer, EthProtocol for RlpxServer
-		if (this.config.server instanceof P2PServer) {
-			protocols.push(
-				new StreamEthProtocol({
-					config: this.config,
-					chain: this.chain,
-					timeout: this.timeout,
-					// registrar will be set by P2PServer after initialization
-				}),
-			);
-		} else {
-			protocols.push(
-				new EthProtocol({
-					config: this.config,
-					chain: this.chain,
-					timeout: this.timeout,
-				}),
-			);
-		}
-		
+		protocols.push(
+			new EthProtocol({
+				spec: ETH_PROTOCOL_SPEC,
+				config: this.config,
+				chain: this.chain,
+				service: this, // Pass service reference for handler context
+			}),
+		);
 		return protocols;
 	}
 
@@ -262,111 +254,20 @@ export class FullEthereumService extends Service {
 
 	/**
 	 * Handles incoming ETH message from connected peer
+	 * 
+	 * NOTE: Most request/response handling is now done directly by protocol handlers.
+	 * REQUEST messages (GetBlockHeaders, GetBlockBodies, GetReceipts, GetPooledTransactions)
+	 * are handled by handler.responder() methods which automatically send responses via peer.eth.send().
+	 * 
+	 * ANNOUNCEMENT messages (Transactions, NewBlock, NewBlockHashes, NewPooledTransactionHashes)
+	 * are handled by handler.handle() methods which process the announcements.
+	 * 
+	 * This method is kept for backwards compatibility but should rarely be called now.
 	 * @param message message object
 	 * @param peer peer
 	 */
 	async handleEth(message: any, peer: Peer): Promise<void> {
-		switch (message.name) {
-			case "GetBlockHeaders": {
-				const { reqId, block, max, skip, reverse } = message.data;
-				if (typeof block === "bigint") {
-					if (
-						(reverse === true && block > this.chain.headers.height) ||
-						(reverse !== true &&
-							block + BigInt(max * skip) > this.chain.headers.height)
-					) {
-						// Respond with an empty list in case the header is higher than the current height
-						// This is to ensure Geth does not disconnect with "useless peer"
-						// TODO: in batch queries filter out the headers we do not have and do not send
-						// the empty list in case one or more headers are not available
-						peer.eth!.send("BlockHeaders", { reqId, headers: [] });
-						return;
-					}
-				}
-				const headers = await this.chain.getHeaders(block, max, skip, reverse);
-				peer.eth!.send("BlockHeaders", { reqId, headers });
-				break;
-			}
-
-			case "GetBlockBodies": {
-				const { reqId, hashes } = message.data;
-				const blocks: Block[] = await Promise.all(
-					hashes.map((hash: Uint8Array) => this.chain.getBlock(hash)),
-				);
-				const bodies = blocks.map((block) => block.raw().slice(1));
-				peer.eth!.send("BlockBodies", { reqId, bodies });
-				break;
-			}
-			case "NewBlockHashes": {
-				console.log(message);
-
-				if (this.synchronizer instanceof FullSynchronizer) {
-					this.synchronizer.handleNewBlockHashes(message.data);
-				}
-				break;
-			}
-			case "Transactions": {
-				await this.txPool.handleAnnouncedTxs(message.data, peer, this.pool);
-				break;
-			}
-			case "NewBlock": {
-				if (this.synchronizer instanceof FullSynchronizer) {
-					this.config.logger?.info(
-						`📦 Handling NewBlock message: height=${message.data[0].header.number}, peer=${peer?.id?.slice(0, 8) || 'null'}`,
-					);
-					await this.synchronizer.handleNewBlock(message.data[0], peer);
-				}
-				break;
-			}
-			case "NewPooledTransactionHashes": {
-				let hashes = [];
-				if (peer.eth!["versions"].includes(68)) {
-					// eth/68 message data format - [tx_types: number[], tx_sizes: number[], tx_hashes: uint8array[]]
-					// With eth/68, we can check transaction types and transaction sizes to
-					// decide whether or not to download the transactions announced by this message.  This
-					// can be used to prevent mempool spamming or decide whether or not to filter out certain
-					// transactions - though this is not prescribed in eth/68 (EIP 5793)
-					// https://eips.ethereum.org/EIPS/eip-5793
-					hashes = message.data[2] as Uint8Array[];
-				} else {
-					hashes = message.data;
-				}
-				await this.txPool.handleAnnouncedTxHashes(hashes, peer, this.pool);
-				break;
-			}
-			case "GetPooledTransactions": {
-				const { reqId, hashes } = message.data;
-				const txs = this.txPool.getByHash(hashes);
-				// Always respond, also on an empty list
-				peer.eth?.send("PooledTransactions", { reqId, txs });
-				break;
-			}
-			case "GetReceipts": {
-				const [reqId, hashes] = message.data;
-				const { receiptsManager } = this.execution;
-				if (!receiptsManager) return;
-				const receipts = [];
-				let receiptsSize = 0;
-				for (const hash of hashes) {
-					const blockReceipts = await receiptsManager.getReceipts(
-						hash,
-						true,
-						true,
-					);
-					if (blockReceipts === undefined) continue;
-					receipts.push(...blockReceipts);
-					const receiptsBytes = concatBytes(
-						...receipts.map((r) => encodeReceipt(r, r.txType)),
-					);
-					receiptsSize += receiptsBytes.byteLength;
-					// From spec: The recommended soft limit for Receipts responses is 2 MiB.
-					if (receiptsSize >= 2097152) {
-						break;
-					}
-				}
-				peer.eth?.send("Receipts", { reqId, receipts });
-				break;
-			}
-		}
+		// All message handling is now done by protocol handlers
+		// This method is essentially a no-op but kept for compatibility
 	}
 }

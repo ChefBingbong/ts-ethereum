@@ -2,19 +2,19 @@ import type { Multiaddr } from "@multiformats/multiaddr";
 import debug from "debug";
 import type { TcpSocketConnectOpts } from "net";
 import net from "node:net";
-import { bytesToHex } from "../../utils";
+import { bytesToHex } from "../../../utils";
 import {
     type SafeError,
     type SafePromise,
     type SafeResult,
     safeError,
     safeResult,
-} from "../../utils/safe";
-import { multiaddrToNetConfig } from "../../utils/utils";
-import { BasicConnection } from "../connection/basic-connection";
-import { Connection } from "../connection/connection";
-import { toMultiaddrConnection } from "../connection/multiaddr-connection";
-import { Upgrader } from "../connection/upgrader";
+} from "../../../utils/safe";
+import { multiaddrToNetConfig } from "../../../utils/utils";
+import { BasicConnection } from "../../connection/basic-connection";
+import { Connection } from "../../connection/connection";
+import { Upgrader } from "../../connection/upgrader";
+import { toMultiaddrConnection } from "./multiaddr-connection";
 import { TransportListener, createListener } from "./transport-listener";
 import type { ListenerContext, TransportDialOpts } from "./types";
 

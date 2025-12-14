@@ -1,14 +1,17 @@
 import type crypto from "node:crypto";
-import type { MAC } from "../../../../devp2p";
 import { zfill } from "../../../../devp2p";
 import { concatBytes } from "../../../../utils";
-import type { BodyResult } from "./types";
+import type { MAC } from "../../../transport/rlpx/mac";
 
 type Decipher = crypto.DecipherGCM;
 
 export const BODY_MAC_SIZE = 16;
 
-export function createBody(data: Uint8Array, egressAes: Decipher, egressMac: MAC): Uint8Array {
+export function createBody(
+	data: Uint8Array,
+	egressAes: Decipher,
+	egressMac: MAC,
+): Uint8Array {
 	const paddedSize = Math.ceil(data.length / 16) * 16;
 	const paddedData = zfill(data, paddedSize, false) as Uint8Array;
 	const encryptedData = Uint8Array.from(egressAes.update(paddedData));
@@ -20,9 +23,13 @@ export function createBody(data: Uint8Array, egressAes: Decipher, egressMac: MAC
 export function parseBody(
 	data: Uint8Array,
 	bodySize: number,
-	ingressAes: Decipher,
-	ingressMac: MAC,
-): BodyResult {
+	ingressAes: Decipher | null | undefined,
+	ingressMac: MAC | null | undefined,
+): { bodyPayload: Uint8Array; size: number } | null {
+	if (!ingressAes || !ingressMac) {
+		throw new Error("ECIES handshake not complete - AES/MAC not available");
+	}
+
 	const body = data.subarray(0, -BODY_MAC_SIZE);
 	const mac = data.subarray(-BODY_MAC_SIZE);
 
@@ -30,10 +37,13 @@ export function parseBody(
 	const expectedMac = Uint8Array.from(ingressMac.digest());
 	if (!compareMac(expectedMac, mac)) throw new Error("Invalid MAC in body");
 
-	const decrypted = Uint8Array.from(ingressAes.update(body));
-	const payload = decrypted.subarray(0, bodySize);
+	const size = bodySize;
+	const bodyPayload = Uint8Array.from(ingressAes.update(body)).subarray(0, size);
 
-	return { payload };
+	return {
+		bodyPayload,
+		size,
+	};
 }
 
 function compareMac(a: Uint8Array, b: Uint8Array): boolean {
@@ -42,4 +52,3 @@ function compareMac(a: Uint8Array, b: Uint8Array): boolean {
 	for (let i = 0; i < a.length; i++) result |= a[i] ^ b[i];
 	return result === 0;
 }
-

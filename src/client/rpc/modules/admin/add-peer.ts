@@ -4,7 +4,7 @@ import { bytesToHex } from "../../../../utils/index.ts";
 import { safeError, safeResult, safeTry } from "../../../../utils/safe.ts";
 import type { EthereumClient } from "../../../client.ts";
 import { Config } from "../../../index.ts";
-import { RlpxPeer } from "../../../net/peer/rlpxpeer.ts";
+import { Peer } from "../../../net/peer/peer.ts";
 import type { FullEthereumService } from "../../../service/index.ts";
 import { createRpcMethod } from "../../validation.ts";
 import { peerInfoSchema } from "./schema.ts";
@@ -19,7 +19,7 @@ export const addPeer = (
 		if (error) return safeError(error);
 
 		service.pool.add(
-			new RlpxPeer({
+			new Peer({
 				config: new Config({ common: client.config.chainCommon }),
 				id: bytesToHex(peerInfo.id),
 				host: peerInfo.address,
