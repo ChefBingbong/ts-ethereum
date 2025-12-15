@@ -27,14 +27,14 @@ export interface ConnectionInit {
   closeTimeout?: number
 }
 
-const isDirect = (remoteAddr: Multiaddr): boolean => {
-  return remoteAddr.getComponents().find(component => component.code === CODE_P2P) != null
-}
 /**
  * An implementation of the js-libp2p connection.
  * Any libp2p transport should use an upgrader to return this connection.
  */
 export class Connection extends TypedEventEmitter<MessageStreamEvents> implements Connection {
+  private static isDirect(remoteAddr: Multiaddr): boolean {
+    return remoteAddr.getComponents().find(component => component.code === CODE_P2P) != null
+  }
   public readonly id: string
   public readonly remoteAddr: Multiaddr
   public readonly remotePeer: PeerId
@@ -68,7 +68,7 @@ export class Connection extends TypedEventEmitter<MessageStreamEvents> implement
     this.outboundStreamProtocolNegotiationTimeout = init.outboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
     this.inboundStreamProtocolNegotiationTimeout = init.inboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
     this.closeTimeout = init.closeTimeout ?? CONNECTION_CLOSE_TIMEOUT
-    this.direct = isDirect(init.maConn.remoteAddr)
+    this.direct = Connection.isDirect(init.maConn.remoteAddr)
 
     this.onIncomingStream = this.onIncomingStream.bind(this)
 

@@ -337,6 +337,37 @@ export class Peer extends EventEmitter {
 	private createEthProtocolHandler(): EthProtocolHandler {
 		const handler = new EthProtocolHandler(68);
 
+		// Set up STATUS provider so handler can send our STATUS when receiving peer STATUS
+		// This allows the handler to respond to STATUS messages automatically
+		handler.setStatusProvider(() => {
+			// Get chain from server/service
+			const server = this.server;
+			if (!server) {
+				throw new Error('Cannot provide STATUS: no server available');
+			}
+			
+			// Get chain from server's service
+			const service = (server as any).service;
+			if (!service || !service.chain) {
+				throw new Error('Cannot provide STATUS: no chain available');
+			}
+			
+			const chain = service.chain;
+			const latestBlock = chain.blocks.latest;
+			if (!latestBlock) {
+				throw new Error('Cannot provide STATUS: chain has no latest block');
+			}
+			
+			return {
+				protocolVersion: 67, // eth/68
+				networkId: chain.chainId,
+				td: chain.blocks.td,
+				bestHash: latestBlock.hash(),
+				genesisHash: chain.genesis.hash(),
+				forkID: undefined, // TODO: Add forkID support if needed
+			};
+		});
+
 		// Bind handlers to service methods
 		// The service will listen to events emitted by the protocol handler
 		// via the connection's event system

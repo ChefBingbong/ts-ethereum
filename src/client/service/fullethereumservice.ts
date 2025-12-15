@@ -298,9 +298,23 @@ export class FullEthereumService extends Service {
 	async handleNewBlockHashes(hashes: any[], peer: Peer): Promise<void> {
 		log("Received %d new block hashes from peer %s", hashes.length, peer.id.slice(0, 8));
 		this.config.logger?.debug('[ETH] Received %d new block hashes', hashes.length);
+		
+		// Convert hashes format from handler to synchronizer expected format [Uint8Array, bigint][]
+		// Handler returns BlockHash[] with { hash: Uint8Array, number: number | bigint }
+		const syncHashes: [Uint8Array, bigint][] = hashes.map((h: any) => {
+			const hash = h.hash || h[0];
+			const number = typeof h.number === 'bigint' ? h.number : BigInt(h.number || h[1]);
+			return [hash, number];
+		});
+		
 		// Trigger synchronizer to fetch these blocks
-		// Note: This would need to be integrated with the synchronizer's fetching mechanism
-		// For now, we just log the announcement
+		if (this.synchronizer) {
+			log("Calling synchronizer.handleNewBlockHashes with %d hashes", syncHashes.length);
+			this.synchronizer.handleNewBlockHashes(syncHashes);
+		} else {
+			log("No synchronizer available to handle new block hashes");
+			this.config.logger?.warn('[ETH] No synchronizer available to handle new block hashes');
+		}
 	}
 
 	/**

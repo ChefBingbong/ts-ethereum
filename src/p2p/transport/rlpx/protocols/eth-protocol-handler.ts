@@ -47,6 +47,12 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 
 	// Store peer status for sync management
 	public status?: StatusPayload;
+	
+	// Flag to track if we've sent our STATUS
+	private _statusSent: boolean = false;
+	
+	// Callback to get our STATUS payload (set by Peer when chain is available)
+	private _statusProvider?: () => Promise<StatusPayload> | StatusPayload;
 
 	constructor(version: number = 68) {
 		super('eth', version, 16); // Reserve 16 codes
@@ -63,6 +69,13 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 		// Register handlers
 		this.setupHandlers();
 	}
+	
+	/**
+	 * Set callback to provide STATUS payload when needed
+	 */
+	setStatusProvider(provider: () => Promise<StatusPayload> | StatusPayload): void {
+		this._statusProvider = provider;
+	}
 
 	private setupHandlers(): void {
 		// STATUS
@@ -74,6 +87,21 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 					status.protocolVersion, status.networkId, status.td);
 				// Store status for sync management
 				this.status = status;
+				
+				// If we haven't sent our STATUS yet, send it back now (we're the responder)
+				if (!this._statusSent && this._statusProvider) {
+					log('📤 [setupHandlers] Sending our STATUS in response to peer STATUS');
+					try {
+						const ourStatus = await Promise.resolve(this._statusProvider());
+						await this.statusHandler.send(ourStatus, this.createContext());
+						this._statusSent = true;
+						log('✅ [setupHandlers] Our STATUS sent successfully');
+					} catch (error: any) {
+						log('❌ [setupHandlers] Failed to send our STATUS: %s', error.message);
+						// Don't throw - we still want to process the peer's STATUS
+					}
+				}
+				
 				// Emit event for service to handle
 				log('📢 [setupHandlers] Dispatching eth:status event');
 				conn.dispatchEvent(new CustomEvent('eth:status', { detail: status }));
@@ -179,6 +207,8 @@ export class EthProtocolHandler extends BaseProtocolHandler {
 		log('📤 [sendStatus] Initiating STATUS handshake protocolVersion=%d networkId=%d td=%d', 
 			payload.protocolVersion, payload.networkId, payload.td);
 		try {
+			// Mark that we've sent STATUS (we're the initiator)
+			this._statusSent = true;
 			const peerStatus = await this.statusHandler.sendGetStatus(payload, this.createContext());
 			log('✅ [sendStatus] Received peer STATUS: protocolVersion=%d networkId=%d td=%d', 
 				peerStatus.protocolVersion, peerStatus.networkId, peerStatus.td);
