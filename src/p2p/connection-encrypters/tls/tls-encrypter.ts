@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import debug from "debug";
 import type { Socket } from "node:net";
 import {

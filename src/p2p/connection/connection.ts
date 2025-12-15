@@ -1,17 +1,14 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_P2P } from '@multiformats/multiaddr'
-import { setMaxListeners } from 'main-event'
+import { setMaxListeners, TypedEventEmitter } from 'main-event'
 import * as mss from '../multi-stream-select'
-import { MplexStreamMuxer } from '../muxer'
-import { AbstractMessageStream } from '../stream/default-message-stream'
-import { MessageStreamDirection } from '../stream/types'
+import { AbstractMessageStream, Logger } from '../stream/default-message-stream'
+import { MessageStreamDirection, MessageStreamEvents, StreamCloseEvent } from '../stream/types'
 import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
-import { BasicConnection } from './basic-connection'
 import { DEFAULT_MAX_INBOUND_STREAMS, DEFAULT_MAX_OUTBOUND_STREAMS, Registrar } from './registrar'
 import { AbortOptions, NewStreamOptions, PeerId } from './types'
+import { CONNECTION_CLOSE_TIMEOUT, PROTOCOL_NEGOTIATION_TIMEOUT } from './upgrader'
 
-const PROTOCOL_NEGOTIATION_TIMEOUT = 10_000
-const CONNECTION_CLOSE_TIMEOUT = 1_000
 
 export interface ConnectionComponents {
   registrar: Registrar
@@ -23,55 +20,77 @@ export interface ConnectionInit {
   stream: AbstractMessageStream
   remotePeer: PeerId
   direction?: MessageStreamDirection
-  muxer?: MplexStreamMuxer
+  muxer?: any
   cryptoProtocol?: string
   outboundStreamProtocolNegotiationTimeout?: number
   inboundStreamProtocolNegotiationTimeout?: number
   closeTimeout?: number
 }
 
-const isDirect = (multiaddr: Multiaddr): boolean => {
-  return multiaddr.getComponents().find(component => component.code === CODE_P2P) != null
-}
-
-export class Connection extends BasicConnection {
+/**
+ * An implementation of the js-libp2p connection.
+ * Any libp2p transport should use an upgrader to return this connection.
+ */
+export class Connection extends TypedEventEmitter<MessageStreamEvents> implements Connection {
+  private static isDirect(remoteAddr: Multiaddr): boolean {
+    return remoteAddr.getComponents().find(component => component.code === CODE_P2P) != null
+  }
+  public readonly id: string
+  public readonly remoteAddr: Multiaddr
+  public readonly remotePeer: PeerId
+  public direction: MessageStreamDirection
+  public timeline: any
   public direct: boolean
+  public multiplexer?: string
+  public encryption?: string
+  public readonly log: Logger
 
-  private readonly muxer?: MplexStreamMuxer
+  private readonly maConn: AbstractMultiaddrConnection
+  private readonly muxer?: any
   private readonly components: ConnectionComponents
   private readonly outboundStreamProtocolNegotiationTimeout: number
   private readonly inboundStreamProtocolNegotiationTimeout: number
+  private readonly closeTimeout: number
 
+  
   constructor (components: ConnectionComponents, init: ConnectionInit) {
-    super({
-      id: init.id,
-      maConn: init.maConn,
-      stream: init.stream,
-      remotePeer: init.remotePeer,
-      direction: init.direction,
-      cryptoProtocol: init.cryptoProtocol,
-      closeTimeout: init.closeTimeout
-    })
+    super()
 
     this.components = components
-    this.muxer = init.muxer
+
+    this.id = init.id
+    this.remoteAddr = init.maConn.remoteAddr
+    this.remotePeer = init.remotePeer
+    this.direction = init.direction ?? 'outbound'
+    this.encryption = init.cryptoProtocol
+    this.maConn = init.maConn
+    this.log = init.maConn.log
     this.outboundStreamProtocolNegotiationTimeout = init.outboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
     this.inboundStreamProtocolNegotiationTimeout = init.inboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
-    this.direct = isDirect(init.maConn.remoteAddr)
+    this.closeTimeout = init.closeTimeout ?? CONNECTION_CLOSE_TIMEOUT
+    this.direct = Connection.isDirect(init.maConn.remoteAddr)
 
     this.onIncomingStream = this.onIncomingStream.bind(this)
 
+    if (this.remoteAddr.getComponents().find(component => component.code === CODE_P2P) == null) {
+      this.remoteAddr = this.remoteAddr.encapsulate(`/p2p/${this.remotePeer}`)
+    }
+
     if (init.muxer != null) {
       this.multiplexer = init.muxer.protocol
+      this.muxer = init.muxer
       this.muxer.addEventListener('stream', this.onIncomingStream)
     }
-  }
 
-  override get streams () {
+    this.maConn.addEventListener('close', (evt) => {
+      this.dispatchEvent(new StreamCloseEvent(evt.local, evt.error))
+    })
+  }
+  get streams () {
     return this.muxer?.streams ?? []
   }
 
-  override async newStream (protocols: string | string[], options: NewStreamOptions = {}): Promise<any> {
+  async newStream (protocols: string | string[], options: AbortOptions = {}): Promise<AbstractMessageStream> {
     if (this.muxer == null) {
       throw new Error('Connection is not multiplexed')
     }
@@ -81,7 +100,7 @@ export class Connection extends BasicConnection {
     }
 
     if (this.maConn.status !== 'open') {
-      throw new Error(`The connection is "${this.status}" and not "open"`)
+      throw new Error(`The connection is "${this.maConn.status}" and not "open"`)
     }
 
     if (!Array.isArray(protocols)) {
@@ -222,7 +241,7 @@ export class Connection extends BasicConnection {
   /**
    * Close the connection
    */
-  override async close (options: AbortOptions = {}): Promise<void> {
+  async close (options: AbortOptions = {}): Promise<void> {
     this.log('closing connection to %s', this.remoteAddr.toString())
 
     if (options.signal == null) {
@@ -236,12 +255,12 @@ export class Connection extends BasicConnection {
     }
 
     await this.muxer?.close(options)
-    await super.close(options)
+    await this.maConn.close(options)
   }
 
-  override abort (err: Error): void {
+  abort (err: Error): void {
     this.muxer?.abort(err)
-    super.abort(err)
+    this.maConn.abort(err)
   }
 }
 

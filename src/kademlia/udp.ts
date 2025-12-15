@@ -169,9 +169,10 @@ export class UdpTransport implements KademliaTransport {
 						);
 					}
 					this._requests.delete(rKey);
-					deferred.reject(
-						new Error(`Timeout error: ping ${peer.address}:${peer.udpPort}`),
-					);
+					const error = new Error(`Timeout error: ping ${peer.address}:${peer.udpPort}`);
+					// Don't let timeout errors crash the process - they're expected for unreachable peers
+					deferred.reject(error);
+					// Emit error event so it can be handled upstream
 				}
 			}, this._timeout),
 		});

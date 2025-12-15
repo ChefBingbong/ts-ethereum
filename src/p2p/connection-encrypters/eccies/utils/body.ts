@@ -1,8 +1,7 @@
 import type crypto from "node:crypto";
-import type { MAC } from "../../../../devp2p";
 import { zfill } from "../../../../devp2p";
 import { concatBytes } from "../../../../utils";
-import type { BodyResult } from "./types";
+import { MAC } from "../../../transport/rlpx";
 
 type Decipher = crypto.DecipherGCM;
 
@@ -17,12 +16,20 @@ export function createBody(data: Uint8Array, egressAes: Decipher, egressMac: MAC
 	return concatBytes(encryptedData, tag);
 }
 
+export type ParseBodyResult = {
+	bodyPayload: Uint8Array;
+	size: number;
+};
+
 export function parseBody(
 	data: Uint8Array,
 	bodySize: number,
 	ingressAes: Decipher,
 	ingressMac: MAC,
-): BodyResult {
+): ParseBodyResult {
+	if (!ingressAes || !ingressMac) {
+		throw new Error("ECIES handshake not complete - AES/MAC not available");
+	}
 	const body = data.subarray(0, -BODY_MAC_SIZE);
 	const mac = data.subarray(-BODY_MAC_SIZE);
 
@@ -30,10 +37,13 @@ export function parseBody(
 	const expectedMac = Uint8Array.from(ingressMac.digest());
 	if (!compareMac(expectedMac, mac)) throw new Error("Invalid MAC in body");
 
-	const decrypted = Uint8Array.from(ingressAes.update(body));
-	const payload = decrypted.subarray(0, bodySize);
+	const size = bodySize;
+	const bodyPayload = Uint8Array.from(ingressAes.update(body)).subarray(0, size);
 
-	return { payload };
+	return {
+		bodyPayload,
+		size,
+	};
 }
 
 function compareMac(a: Uint8Array, b: Uint8Array): boolean {

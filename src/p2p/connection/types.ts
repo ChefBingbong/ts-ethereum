@@ -33,8 +33,19 @@ export interface NetworkEvents {
 }
 
 export interface SecureConnection {
-	socket: import("node:net").Socket;
+	socket: import("node:net").Socket | import("tls").TLSSocket;
 	remotePeer: PeerId;
+	privateKey: Uint8Array;
+	publicKey: Uint8Array;
+	remotePublicKey: Uint8Array | null;
+	nonce: Uint8Array;
+	ephemeralPrivateKey: Uint8Array;
+	ephemeralPublicKey: Uint8Array;
+	requireEip8: boolean;
+	remoteInfo: {
+		remotePublicKey: Uint8Array | null;
+		remoteNonce: Uint8Array | null;
+	};
 }
 
 export interface NewStreamOptions extends AbortOptions {

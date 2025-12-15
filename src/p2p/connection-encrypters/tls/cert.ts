@@ -1,8 +1,7 @@
 // cert.mjs
 
-import { secp256k1 as secp } from "@noble/curves/secp256k1";
-import { sha256 } from "@noble/hashes/sha256";
 import * as x509 from "@peculiar/x509";
+import { keccak256 } from "ethereum-cryptography/keccak";
 import crypto from "node:crypto";
 import { toString as uint8ArrayToString } from "uint8arrays/to-string";
 
@@ -41,7 +40,7 @@ export async function generateBoundCertificate(keyPair: Uint8Array) {
 		"spki",
 		tlsKeys.publicKey,
 	);
-	const digest = sha256(new Uint8Array(spkiAB));
+	const digest = keccak256(new Uint8Array(spkiAB));
 	const sigDer = secp.sign(digest, nodePriv);
 	const sigRS = secp.Signature.fromHex(sigDer.toHex()).toBytes(); // 64-byte r||s
 
@@ -154,7 +153,7 @@ export async function verifyPeerCertificate(
 	// Export SPKI of the TLS public key and verify binding
 	const cryptoPubKey = await x.publicKey.export();
 	const spkiAB = await crypto.webcrypto.subtle.exportKey("spki", cryptoPubKey);
-	const digest = sha256(new Uint8Array(spkiAB));
+	const digest = keccak256(new Uint8Array(spkiAB));
 
 	const ok = secp.verify(sig, digest, pub);
 	if (!ok) throw new Error("node binding signature invalid");
