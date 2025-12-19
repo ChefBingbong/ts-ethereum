@@ -1,6 +1,6 @@
 import { Event } from "../types.ts";
 
-import { type Peer } from "./peer";
+import { P2PPeer, type Peer, RlpxPeer } from "./peer";
 
 import type { Config } from "../config.ts";
 
@@ -169,13 +169,9 @@ export class PeerPool {
 	 * @param peer peer
 	 */
 	private connected(peer: Peer) {
-		if (this.size >= this.config.maxPeers) {
-			this.config.logger?.warn(`[PeerPool.connected] ⚠️ Peer pool full (${this.size}/${this.config.maxPeers}), rejecting peer ${peer.id.slice(0, 8)}`);
-			return;
-		}
-		this.config.logger?.info(`[PeerPool.connected] ➕ Adding peer ${peer.id.slice(0, 8)} to pool (${this.size + 1}/${this.config.maxPeers})`);
+		if (this.size >= this.config.maxPeers) return;
 		this.add(peer);
-		// Messages are handled directly by protocols via their event listeners
+		peer.handleMessageQueue();
 	}
 
 	/**
@@ -271,7 +267,7 @@ export class PeerPool {
 	 */
 	async _peerBestHeaderUpdate() {
 		for (const p of this.peers) {
-			if (p.idle && p.eth !== undefined) {
+			if (p.idle && p.eth !== undefined && (p instanceof RlpxPeer || p instanceof P2PPeer)) {
 				p.idle = false;
 				await p.latest();
 				p.idle = true;

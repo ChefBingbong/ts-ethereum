@@ -5,9 +5,8 @@ import { secp256k1 } from "ethereum-cryptography/secp256k1";
 import { ecdh } from "ethereum-cryptography/secp256k1-compat.js";
 import { hexToBytes } from "ethereum-cryptography/utils";
 import crypto from "node:crypto";
-import { assertEq, genPrivateKey, xor } from "../../../../devp2p";
+import { assertEq, genPrivateKey, MAC, xor } from "../../../../devp2p";
 import { concatBytes } from "../../../../utils";
-import { MAC } from "../../../transport/rlpx";
 
 const SHA256_BLOCK_SIZE = 64;
 
@@ -81,17 +80,6 @@ export function decryptMessage(
 
 	if (!sharedMacData) sharedMacData = Uint8Array.from([]);
 	const _tag = crypto.createHmac("sha256", mKey).update(concatBytes(dataIV, sharedMacData)).digest();
-	
-	// Detailed logging for tag validation
-	const tagHex = Array.from(tag).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
-	const expectedTagHex = Array.from(_tag).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ');
-	console.log(`[decryptMessage] Tag validation:`);
-	console.log(`  Received tag: ${tagHex}`);
-	console.log(`  Expected tag: ${expectedTagHex}`);
-	console.log(`  dataIV length: ${dataIV.length}, sharedMacData length: ${sharedMacData.length}`);
-	console.log(`  dataIV first 16 bytes: ${Array.from(dataIV.subarray(0, Math.min(16, dataIV.length))).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}`);
-	console.log(`  sharedMacData: ${Array.from(sharedMacData).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}`);
-	
 	assertEq(_tag, tag, "should have valid tag", debug);
 
 	const IV = dataIV.subarray(0, 16);
@@ -108,13 +96,6 @@ export function setupFrame(
 	ephemeralSharedSecret: Uint8Array,
 	incoming: boolean,
 ) {
-	console.log("[setupFrame] incoming:", incoming);
-	console.log("[setupFrame] nonce:", Buffer.from(nonce).toString('hex').slice(0, 16));
-	console.log("[setupFrame] remoteNonce:", Buffer.from(remoteNonce).toString('hex').slice(0, 16));
-	console.log("[setupFrame] ephemeralSharedSecret:", Buffer.from(ephemeralSharedSecret).toString('hex').slice(0, 16));
-	console.log("[setupFrame] remoteData length:", remoteData.length);
-	console.log("[setupFrame] initMsg length:", initMsg.length);
-	
 	const nonceMaterial = incoming
 		? concatBytes(nonce, remoteNonce)
 		: concatBytes(remoteNonce, nonce);
@@ -129,20 +110,12 @@ export function setupFrame(
 	const egressAes = crypto.createDecipheriv("aes-256-ctr", aesSecret, IV);
 
 	const macSecret = keccak256(concatBytes(ephemeralSharedSecret, aesSecret));
-	console.log("[setupFrame] macSecret:", Buffer.from(macSecret).toString('hex').slice(0, 16));
-	
 	const ingressMac = new MAC(macSecret);
-	const ingressInitData = concatBytes(xor(macSecret, nonce), remoteData);
-	ingressMac.update(ingressInitData);
-	console.log("[setupFrame] ingressMac after init:", Buffer.from(ingressMac.digest()).toString('hex').slice(0, 16));
-	console.log("[setupFrame] ingressMac init data length:", ingressInitData.length, "nonce:", Buffer.from(nonce).toString('hex').slice(0, 16), "remoteData length:", remoteData.length);
-	
+	ingressMac.update(concatBytes(xor(macSecret, nonce), remoteData));
 	const egressMac = new MAC(macSecret);
+
 	if (initMsg === null || initMsg === undefined) return;
-	const egressInitData = concatBytes(xor(macSecret, remoteNonce), initMsg);
-	egressMac.update(egressInitData);
-	console.log("[setupFrame] egressMac after init:", Buffer.from(egressMac.digest()).toString('hex').slice(0, 16));
-	console.log("[setupFrame] egressMac init data length:", egressInitData.length, "remoteNonce:", Buffer.from(remoteNonce).toString('hex').slice(0, 16), "initMsg length:", initMsg.length);
+	egressMac.update(concatBytes(xor(macSecret, remoteNonce), initMsg));
 
 	return { ingressAes, egressAes, ingressMac, egressMac };
 }

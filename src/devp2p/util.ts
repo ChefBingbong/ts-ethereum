@@ -9,7 +9,7 @@ import {
 	equalsBytes,
 } from "../utils";
 
-import type { EthStatusMsg } from "../client/net/protocol/eth/protocol";
+import type { EthStatusMsg } from "./protocol/eth.ts";
 
 // Do not use :# here, no logging without sub namespace occurring and current code structure
 // otherwise creates loggers like `devp2p:#:eth`

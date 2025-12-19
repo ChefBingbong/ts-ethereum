@@ -1,4 +1,3 @@
-import debug from "debug";
 import { Chain } from "../blockchain";
 import { PeerPool } from "../net/peerpool.ts";
 import { Event } from "../types.ts";
@@ -7,11 +6,8 @@ import { type V8Engine, getV8Engine } from "../util";
 import type { AbstractLevel } from "abstract-level";
 import type { Config } from "../config.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import type { ProtocolOptions } from "../net/protocol/abstract-protocol.ts";
-import { AbstractProtocol } from "../net/protocol/abstract-protocol.ts";
+import type { Protocol } from "../net/protocol";
 import type { Synchronizer } from "../sync";
-
-const log = debug("p2p:service");
 
 export interface ServiceOptions {
 	/* Config */
@@ -100,21 +96,18 @@ export class Service {
 				if (this.running) {
 					try {
 						const msgName = (message as any)?.name || 'unknown';
-						log("PROTOCOL_MESSAGE: %s:%s from peer %s", protocol, msgName, peer?.id?.slice(0, 8) || 'null');
 						this.config.logger?.info(
 							`📨 PROTOCOL_MESSAGE: ${msgName} from peer ${peer?.id?.slice(0, 8) || 'null'}`,
 						);
 						await this.handle(message, protocol, peer);
 					} catch (error: any) {
 						const msgName = (message as any)?.name || 'unknown';
-						log("Error handling message %s:%s: %s", protocol, msgName, error.message);
 						this.config.logger?.error(
 							`Error handling message (${protocol}:${msgName}): ${error.message}`,
 						);
 					}
 				} else {
 					const msgName = (message as any)?.name || 'unknown';
-					log("Ignoring PROTOCOL_MESSAGE (service not running): %s:%s", protocol, msgName);
 					this.config.logger?.debug(
 						`Ignoring PROTOCOL_MESSAGE (service not running): ${msgName}`,
 					);
@@ -140,7 +133,7 @@ export class Service {
 	/**
 	 * Returns all protocols required by this service
 	 */
-	get protocols(): AbstractProtocol<ProtocolOptions>[] {
+	get protocols(): Protocol[] {
 		return [];
 	}
 
@@ -151,30 +144,23 @@ export class Service {
 		if (this.opened) {
 			return false;
 		}
-		log("Opening service");
 		const protocols = this.protocols;
 		this.config.server && this.config.server.addProtocols(protocols);
 
-		this.config.events.on(Event.POOL_PEER_BANNED, (peer) => {
-			log("Peer banned: %s", peer.id?.slice(0, 8) || 'unknown');
-			this.config.logger?.debug(`Peer banned: ${peer}`);
-		});
-		this.config.events.on(Event.POOL_PEER_ADDED, (peer) => {
-			log("Peer added: %s", peer.id?.slice(0, 8) || 'unknown');
-			this.config.logger?.debug(`Peer added: ${peer}`);
-		});
-		this.config.events.on(Event.POOL_PEER_REMOVED, (peer) => {
-			log("Peer removed: %s", peer.id?.slice(0, 8) || 'unknown');
-			this.config.logger?.debug(`Peer removed: ${peer}`);
-		});
+		this.config.events.on(Event.POOL_PEER_BANNED, (peer) =>
+			this.config.logger?.debug(`Peer banned: ${peer}`),
+		);
+		this.config.events.on(Event.POOL_PEER_ADDED, (peer) =>
+			this.config.logger?.debug(`Peer added: ${peer}`),
+		);
+		this.config.events.on(Event.POOL_PEER_REMOVED, (peer) =>
+			this.config.logger?.debug(`Peer removed: ${peer}`),
+		);
 
 		await this.pool.open();
-		log("PeerPool opened");
 		await this.chain.open();
-		log("Chain opened");
 		await this.synchronizer?.open();
 		this.opened = true;
-		log("Service opened successfully");
 		return true;
 	}
 
@@ -195,9 +181,7 @@ export class Service {
 		if (this.running) {
 			return false;
 		}
-		log("Starting service");
 		await this.pool.start();
-		log("PeerPool started");
 		void this.synchronizer?.start();
 		if (this.v8Engine === null) {
 			this.v8Engine = await getV8Engine();
@@ -208,7 +192,6 @@ export class Service {
 			this.STATS_INTERVAL,
 		);
 		this.running = true;
-		log("Service started successfully");
 		this.config.logger?.info(`Started ${this.name} service.`);
 		return true;
 	}

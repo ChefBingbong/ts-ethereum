@@ -3,5 +3,5 @@
  */
 
 export * from "./rlpxserver.ts";
-// Removed: export * from "./p2pserver.ts"; - P2P server removed, using RLPx only
+export * from "./p2pserver.ts";
 export * from "./server.ts";

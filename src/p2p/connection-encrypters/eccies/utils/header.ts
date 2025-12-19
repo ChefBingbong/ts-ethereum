@@ -1,8 +1,9 @@
 import type crypto from "node:crypto";
+import type { MAC } from "../../../../devp2p";
 import { zfill } from "../../../../devp2p";
 import * as RLP from "../../../../rlp";
 import { bytesToInt, concatBytes, intToBytes } from "../../../../utils";
-import { MAC } from "../../../transport/rlpx";
+import type { HeaderResult } from "./types";
 
 type Decipher = crypto.DecipherGCM;
 
@@ -19,7 +20,7 @@ export function createHeader(size: number, egressAes: Decipher, egressMac: MAC):
 	return concatBytes(header, tag);
 }
 
-export function parseHeader(data: Uint8Array, ingressAes: Decipher, ingressMac: MAC) {
+export function parseHeader(data: Uint8Array, ingressAes: Decipher, ingressMac: MAC): HeaderResult {
 	if (data.length < HEADER_SIZE) throw new Error(`Header too short: ${data.length}`);
 
 	let header = data.subarray(0, 16);
@@ -35,6 +36,7 @@ export function parseHeader(data: Uint8Array, ingressAes: Decipher, ingressMac: 
 
 	return { bodySize, paddedBodySize };
 }
+
 function compareMac(a: Uint8Array, b: Uint8Array): boolean {
 	if (a.length !== b.length) return false;
 	let result = 0;

@@ -1,11 +1,15 @@
+import type { Socket } from "net";
 import type { Common } from "../chain-config";
+import type { NestedUint8Array } from "../rlp";
+import type { DPT } from "./dpt-1/index.ts";
+import type { EthMessageCodes } from "./protocol/eth.ts";
+import type { Protocol } from "./protocol/protocol.ts";
+import type { Peer } from "./rlpx/peer.ts";
 
-// NOTE: RLPxEvent references Peer type which was from old devp2p implementation
-// This interface may not be used anymore but kept for compatibility
 export interface RLPxEvent {
-	"peer:added": [peer: any]; // Peer type was from old devp2p, using any for compatibility
-	"peer:error": [peer: any, error: any];
-	"peer:removed": [peer: any, reason: any, disconnectWe: boolean | null]; // disconnectWe indicates whether the disconnection was initiated by us or not
+	"peer:added": [peer: Peer];
+	"peer:error": [peer: Peer, error: any];
+	"peer:removed": [peer: Peer, reason: any, disconnectWe: boolean | null]; // disconnectWe indicates whether the disconnection was initiated by us or not
 	error: [error: Error];
 	close: undefined;
 	listening: undefined;
@@ -17,7 +21,16 @@ export interface PeerEvent {
 	close: [reason: any, disconnectWe: boolean | null]; // disconnectWe indicates whether the disconnection was initiated by us or not
 }
 
-// REMOVED: ProtocolEvent - protocol events are now handled in src/client/net/protocol/abstract-protocol.ts
+export interface ProtocolEvent {
+	message: [code: EthMessageCodes, payload: Uint8Array | NestedUint8Array];
+	status: {
+		chainId: Uint8Array | Uint8Array[];
+		td: Uint8Array;
+		bestHash: Uint8Array;
+		genesisHash: Uint8Array;
+		forkId?: Uint8Array | Uint8Array[];
+	};
+}
 
 export interface KBucketEvent {
 	ping: [contacts: Contact[], contact: PeerInfo];
@@ -41,9 +54,16 @@ export interface ServerEvent {
 	error: [error: Error];
 	peers: any[];
 }
+interface ProtocolConstructor {
+	new (...args: any[]): Protocol;
+}
 
-// REMOVED: ProtocolConstructor and Capabilities - these were for the old devp2p protocol system
-// Protocol capabilities are now handled in src/client/net/protocol/eth/definitions.ts
+export interface Capabilities {
+	name: string;
+	version: number;
+	length: number;
+	constructor: ProtocolConstructor;
+}
 
 export type DISCONNECT_REASON =
 	(typeof DISCONNECT_REASON)[keyof typeof DISCONNECT_REASON];
@@ -212,8 +232,31 @@ export interface Contact extends PeerInfo {
 	vectorClock: number;
 }
 
-// REMOVED: PeerOptions and RLPxOptions - these were for the old devp2p RLPx implementation
-// These types are no longer used as we've migrated to the new RLPx transport system
-// Peer options are now in src/client/net/peer/peer.ts
+export interface PeerOptions {
+	clientId: Uint8Array;
+	capabilities?: Capabilities[];
+	common: Common;
+	port: number;
+	id: Uint8Array;
+	remoteClientIdFilter?: string[];
+	remoteId: Uint8Array;
+	EIP8?: Uint8Array | boolean;
+	privateKey: Uint8Array;
+	socket: Socket;
+	timeout: number;
+}
+
+export interface RLPxOptions {
+	clientId?: Uint8Array;
+	/* Timeout (default: 10s) */
+	timeout?: number;
+	dpt?: DPT | null;
+	/* Max peers (default: 10) */
+	maxPeers?: number;
+	remoteClientIdFilter?: string[];
+	capabilities: Capabilities[];
+	common: Common;
+	listenPort?: number | null;
+}
 
 export type SendMethod = (code: number, data: Uint8Array) => any;

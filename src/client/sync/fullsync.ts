@@ -1,5 +1,4 @@
 import type { Block } from "../../block";
-import type { EthProtocolHandler } from "../../p2p/transport/rlpx/protocols/eth-protocol-handler";
 import { BIGINT_0, BIGINT_1, equalsBytes } from "../../utils";
 import type { VMExecution } from "../execution";
 import type { Peer } from "../net/peer/peer.ts";
@@ -62,18 +61,6 @@ export class FullSynchronizer extends Synchronizer {
 		this._fetcher = fetcher;
 	}
 
-	/**
-	 * Get ETH protocol handler from peer's RlpxConnection
-	 */
-	private getEthHandler(peer: Peer): EthProtocolHandler | null {
-		if (!peer.rlpxConnection) {
-			return null;
-		}
-		const protocols = peer.rlpxConnection.protocols;
-		const ethDescriptor = protocols.get('eth');
-		return (ethDescriptor?.handler as EthProtocolHandler) || null;
-	}
-
 	async sync() {
 		const syncWithFetcher = super.sync();
 		const syncEvent: Promise<boolean> = new Promise((resolve) => {
@@ -123,7 +110,7 @@ export class FullSynchronizer extends Synchronizer {
 	 * Returns true if peer can be used for syncing
 	 */
 	syncable(peer: Peer): boolean {
-		return peer.rlpxConnection !== undefined;
+		return peer.eth !== undefined;
 	}
 
 	/**
@@ -137,14 +124,11 @@ export class FullSynchronizer extends Synchronizer {
 		// For PoW (Ethash) chains we want to select the peer with the highest TD
 		let best: Peer | undefined;
 		for (const peer of peers) {
-			// Get ETH handler to check status
-			const ethHandler = this.getEthHandler(peer);
-			if (ethHandler?.status !== undefined) {
-				const td = ethHandler.status.td;
-				const bestEthHandler = best ? this.getEthHandler(best) : null;
+			if (peer.eth?.status !== undefined) {
+				const td = peer.eth.status.td;
 				if (
 					(!best && td >= this.chain.blocks.td) ||
-					(bestEthHandler?.status?.td !== undefined && bestEthHandler.status.td < td)
+					(best?.eth?.status.td !== undefined && best.eth.status.td < td)
 				) {
 					best = peer;
 				}
@@ -282,27 +266,9 @@ export class FullSynchronizer extends Synchronizer {
 	 */
 	async sendNewBlock(block: Block, peers: Peer[]) {
 		for (const peer of peers) {
-			// Skip if peer doesn't have a valid RlpxConnection
-			if (!peer.rlpxConnection) {
-				continue;
-			}
-			
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
-				const ethHandler = this.getEthHandler(peer);
-				if (ethHandler) {
-					try {
-						await ethHandler.announceNewBlock({
-							block: block as any,
-							td: this.chain.blocks.td,
-						});
-					} catch (error: any) {
-						// Log error but don't crash - peer connection might be closing
-						this.config.logger?.warn(
-							`Failed to announce new block to peer ${peer.id.slice(0, 8)}: ${error.message}`
-						);
-					}
-				}
+				peer.eth?.send("NewBlock", [block, this.chain.blocks.td]);
 			}
 		}
 	}
@@ -374,13 +340,7 @@ export class FullSynchronizer extends Synchronizer {
 			// Send `NEW_BLOCK_HASHES` message for received block to all other peers
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {
-				const ethHandler = this.getEthHandler(peer);
-				if (ethHandler) {
-					await ethHandler.announceBlockHashes([{
-						hash: block.hash(),
-						number: block.header.number,
-					}]);
-				}
+				peer.eth?.send("NewBlockHashes", [[block.hash(), block.header.number]]);
 			}
 		}
 	}

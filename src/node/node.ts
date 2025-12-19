@@ -7,8 +7,8 @@ import { genPrivateKey, pk2id } from "../devp2p";
 import { EcciesEncrypter } from "../p2p/connection-encrypters/eccies/eccies-encrypter";
 import type { MuxedConnection } from "../p2p/connection/connection";
 import type { ProtocolStream } from "../p2p/connection/protocol-stream";
-import { Transport } from "../p2p/transport/tcp/transport";
-import { TransportListener } from "../p2p/transport/tcp/transport-listener";
+import { Transport } from "../p2p/transport/transport";
+import { TransportListener } from "../p2p/transport/transport-listener";
 
 const log = debug("p2p:node");
 

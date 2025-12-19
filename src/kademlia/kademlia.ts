@@ -201,13 +201,12 @@ export class KademliaNode {
 	 * Add peers with staggered timing to avoid flooding.
 	 */
 	private _addPeerBatch(peers: PeerInfo[]): void {
-		const DIFF_TIME_MS = 1000;
+		const DIFF_TIME_MS = 200;
 		let ms = 0;
 
 		for (const peer of peers) {
 			setTimeout(() => {
-				this.addPeer(peer).catch((error: any) => {
-					// Emit all errors - timeout errors are expected but still useful for debugging
+				this.addPeer(peer).catch((error) => {
 					this.events.emit("error", error);
 				});
 			}, ms);

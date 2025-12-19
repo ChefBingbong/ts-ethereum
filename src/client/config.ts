@@ -13,7 +13,7 @@ import {
 } from "../utils";
 import type { VM, VMProfilerOpts } from "../vm";
 import type { Logger } from "./logging.ts";
-import { RlpxServer } from "./net/server";
+import { P2PServer, RlpxServer } from "./net/server";
 import type { EventParams, MultiaddrLike, PrometheusMetrics } from "./types.ts";
 import { Event } from "./types.ts";
 import { isBrowser, short } from "./util";
@@ -110,7 +110,7 @@ export interface ConfigOptions {
 	 * Transport servers (RLPx or P2P)
 	 * Only used for testing purposes
 	 */
-	server?: RlpxServer;
+	server?: RlpxServer | P2PServer;
 
 	/**
 	 * Save tx receipts and logs in the meta db (default: false)
@@ -410,7 +410,7 @@ export class Config {
 	public readonly chainCommon: Common;
 	public readonly execCommon: Common;
 
-	public readonly server: RlpxServer | undefined = undefined;
+	public readonly server: RlpxServer | P2PServer | undefined = undefined;
 
 	public readonly metrics: PrometheusMetrics | undefined;
 
@@ -513,8 +513,12 @@ export class Config {
 				const bootnodes: MultiaddrLike =
 					this.bootnodes ?? (this.chainCommon.bootstrapNodes() as any);
 				
-				// Always use RlpxServer (P2PServer removed)
-				this.server = new RlpxServer({ config: this, bootnodes });
+				// Use new P2P server if flag is enabled, otherwise use legacy RLPx server
+				if (options.useP2PServer === true) {
+					this.server = new P2PServer({ config: this, bootnodes });
+				} else {
+					this.server = new RlpxServer({ config: this, bootnodes });
+				}
 			}
 		}
 

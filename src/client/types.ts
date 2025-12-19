@@ -31,17 +31,6 @@ export const Event = {
 	PROTOCOL_ERROR: "protocol:error",
 	PROTOCOL_MESSAGE: "protocol:message",
 	CHAIN_REORG: "blockchain:chain:reorg",
-	// ETH protocol events (from new RlpxConnection system)
-	ETH_STATUS: "eth:status",
-	ETH_NEW_BLOCK_HASHES: "eth:newBlockHashes",
-	ETH_TRANSACTIONS: "eth:transactions",
-	ETH_NEW_BLOCK: "eth:newBlock",
-	ETH_GET_BLOCK_HEADERS: "eth:getBlockHeaders",
-	ETH_BLOCK_HEADERS: "eth:blockHeaders",
-	ETH_GET_BLOCK_BODIES: "eth:getBlockBodies",
-	ETH_BLOCK_BODIES: "eth:blockBodies",
-	ETH_GET_POOLED_TRANSACTIONS: "eth:getPooledTransactions",
-	ETH_POOLED_TRANSACTIONS: "eth:pooledTransactions",
 } as const;
 
 export interface EventParams {
@@ -72,17 +61,6 @@ export interface EventParams {
 		protocolName: string,
 		sendingPeer: Peer,
 	];
-	// ETH protocol events
-	[Event.ETH_STATUS]: [status: any, peer: Peer];
-	[Event.ETH_NEW_BLOCK_HASHES]: [hashes: any[], peer: Peer];
-	[Event.ETH_TRANSACTIONS]: [txs: Uint8Array[], peer: Peer];
-	[Event.ETH_NEW_BLOCK]: [block: any, peer: Peer];
-	[Event.ETH_GET_BLOCK_HEADERS]: [request: any, peer: Peer];
-	[Event.ETH_BLOCK_HEADERS]: [headers: any[], peer: Peer];
-	[Event.ETH_GET_BLOCK_BODIES]: [request: any, peer: Peer];
-	[Event.ETH_BLOCK_BODIES]: [bodies: any[], peer: Peer];
-	[Event.ETH_GET_POOLED_TRANSACTIONS]: [request: any, peer: Peer];
-	[Event.ETH_POOLED_TRANSACTIONS]: [txs: Uint8Array[], peer: Peer];
 }
 
 /**
