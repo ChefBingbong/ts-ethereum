@@ -27,6 +27,22 @@ export type EthStatusOpts = {
 	genesisHash: Uint8Array;
 };
 
+export type EthStatusEncoded = {
+	chainId: Uint8Array;
+	td: Uint8Array;
+	bestHash: Uint8Array;
+	genesisHash: Uint8Array;
+	forkId?: Uint8Array | Uint8Array[];
+};
+
+export type EthStatusDecoded = {
+	chainId: bigint;
+	td: bigint;
+	bestHash: string;
+	genesisHash: string;
+	forkId?: string;
+};
+
 export const EthMessageCodes = {
 	// eth62
 	STATUS: 0x00,
@@ -65,7 +81,7 @@ export const EthMessageCodeNames: { [key in EthMessageCodes]: string } =
 
 export class ETH extends Protocol {
 	protected _status: EthStatusMsg | null = null;
-	protected _peerStatus: EthStatusMsg | null = null;
+	public _peerStatus: EthStatusMsg | null = null;
 	private DEBUG: boolean = false;
 
 	// Eth64
@@ -220,14 +236,8 @@ export class ETH extends Protocol {
 			"STATUS",
 		);
 
-		const status: {
-			chainId: Uint8Array | Uint8Array[];
-			td: Uint8Array;
-			bestHash: Uint8Array;
-			genesisHash: Uint8Array;
-			forkId?: Uint8Array | Uint8Array[];
-		} = {
-			chainId: this._peerStatus[1],
+		const status: EthStatusEncoded = {
+			chainId: this._peerStatus[1] as Uint8Array,
 			td: this._peerStatus[2] as Uint8Array,
 			bestHash: this._peerStatus[3] as Uint8Array,
 			genesisHash: this._peerStatus[4] as Uint8Array,
@@ -290,7 +300,7 @@ export class ETH extends Protocol {
 		if (this._status !== null) return;
 		this._status = [
 			intToBytes(this._version),
-			bigIntToBytes(this._peer.common.chainId()),
+			bigIntToBytes(BigInt(this._peer.common.chainId())),
 			status.td,
 			status.bestHash,
 			status.genesisHash,
@@ -414,5 +424,17 @@ export class ETH extends Protocol {
 
 	getMsgPrefix(msgCode: EthMessageCodes): string {
 		return EthMessageCodeNames[msgCode];
+	}
+
+	decodeStatus(status: EthStatusEncoded): EthStatusDecoded {
+		return {
+			chainId: bytesToBigInt(status.chainId),
+			td: bytesToBigInt(status.td as Uint8Array),
+			bestHash: bytesToHex(status.bestHash as Uint8Array),
+			genesisHash: bytesToHex(status.genesisHash as Uint8Array),
+			forkId: status.forkId
+				? bytesToHex(status.forkId[0] as Uint8Array)
+				: undefined,
+		};
 	}
 }

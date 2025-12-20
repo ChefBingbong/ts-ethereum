@@ -18,13 +18,18 @@ import { createHash } from "crypto";
 import debug from "debug";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { Common, Hardfork } from "../src/chain-config/index.ts";
-import { ETH } from "../src/devp2p/protocol/eth.ts";
+import {
+	ETH,
+	EthStatusEncoded,
+	type EthStatusOpts,
+} from "../src/devp2p/protocol/eth.ts";
 import {
 	type Connection,
 	createP2PNode,
 	type PeerId,
 	type Topology,
 } from "../src/p2p/libp2p/index.ts";
+import type { RLPxConnection } from "../src/p2p/transport/rlpx/connection.ts";
 import { rlpx } from "../src/p2p/transport/rlpx/index.ts";
 import { bytesToUnprefixedHex } from "../src/utils/index.ts";
 
@@ -333,6 +338,133 @@ async function main() {
 		await new Promise((resolve) => setTimeout(resolve, 500));
 
 		console.log(`   Topology onConnect calls: ${topologyConnectCount}`);
+
+		// =========================================================================
+		// ETH Protocol Status Exchange
+		// =========================================================================
+		console.log("\n📨 Testing ETH Protocol Status Exchange...");
+		console.log("─".repeat(50));
+
+		// Get RLPx connections from both sides
+		const nodeBRLPxConn = (connection as any).getRLPxConnection?.() as
+			| RLPxConnection
+			| undefined;
+		const nodeARLPxConn = (nodeAConnection as any)?.getRLPxConnection?.() as
+			| RLPxConnection
+			| undefined;
+
+		if (!nodeBRLPxConn) {
+			console.log("   ⚠️ Could not get RLPx connection from Node B wrapper");
+		} else if (!nodeARLPxConn) {
+			console.log("   ⚠️ Could not get RLPx connection from Node A wrapper");
+		} else {
+			// Get ETH protocols from both connections
+			const nodeBProtocols = nodeBRLPxConn.getProtocols();
+			const nodeAProtocols = nodeARLPxConn.getProtocols();
+
+			const nodeBEth = nodeBProtocols.find(
+				(p) => p.constructor.name === "ETH",
+			) as ETH | undefined;
+			const nodeAEth = nodeAProtocols.find(
+				(p) => p.constructor.name === "ETH",
+			) as ETH | undefined;
+
+			console.log(
+				`   Node A protocols: ${nodeAProtocols.map((p) => p.constructor.name).join(", ")}`,
+			);
+			console.log(
+				`   Node B protocols: ${nodeBProtocols.map((p) => p.constructor.name).join(", ")}`,
+			);
+
+			if (nodeBEth && nodeAEth) {
+				console.log(`   Node A ETH version: ${nodeAEth.getVersion()}`);
+				console.log(`   Node B ETH version: ${nodeBEth.getVersion()}`);
+
+				// Create test status options
+				const testGenesisHash = createHash("sha256")
+					.update("test-genesis")
+					.digest();
+				const testBestHash = createHash("sha256")
+					.update("test-best-block")
+					.digest();
+
+				const statusOpts: EthStatusOpts = {
+					td: new Uint8Array([0x01]), // Total difficulty = 1
+					bestHash: testBestHash,
+					genesisHash: testGenesisHash,
+				};
+
+				// Set up status event handlers
+				let nodeAStatusReceived = false;
+				let nodeBStatusReceived = false;
+				let nodeAStatus: any = null;
+				let nodeBStatus: any = null;
+
+				const statusPromise = new Promise<void>((resolve, reject) => {
+					const timeout = setTimeout(() => {
+						reject(new Error("Status exchange timed out"));
+					}, 5000);
+
+					nodeAEth.events.on("status", (_status) => {
+						const status = nodeAEth.decodeStatus(_status as EthStatusEncoded);
+						console.log("   ✅ Node A received STATUS from Node B");
+						console.log(`      Chain ID: ${status.chainId}`);
+						console.log(`      TD: ${status.td}`);
+						console.log(
+							`      Genesis Hash: ${(status.genesisHash).slice(0, 16)}...`,
+						);
+						nodeAStatusReceived = true;
+						nodeAStatus = status;
+						events.push("nodeA:eth:status:received");
+						if (nodeAStatusReceived && nodeBStatusReceived) {
+							clearTimeout(timeout);
+							resolve();
+						}
+					});
+
+					nodeBEth.events.on("status", (status) => {
+						console.log("   ✅ Node B received STATUS from Node A");
+						console.log(`      Chain ID: ${status.chainId}`);
+						console.log(`      TD: ${status.td.length > 0 ? status.td[0] : 0}`);
+						console.log(
+							`      Genesis Hash: ${bytesToUnprefixedHex(status.genesisHash).slice(0, 16)}...`,
+						);
+						nodeBStatusReceived = true;
+						nodeBStatus = status;
+						events.push("nodeB:eth:status:received");
+						if (nodeAStatusReceived && nodeBStatusReceived) {
+							clearTimeout(timeout);
+							resolve();
+						}
+					});
+				});
+
+				// Send STATUS from both sides
+				console.log("\n   📤 Node A sending STATUS...");
+				nodeAEth.sendStatus(statusOpts);
+
+				console.log("   📤 Node B sending STATUS...");
+				nodeBEth.sendStatus(statusOpts);
+
+				try {
+					await statusPromise;
+					console.log("\n   🎉 ETH Status exchange successful!");
+					console.log("   ─".repeat(25));
+					console.log(
+						`   Node A received status: ${nodeAStatusReceived ? "✅" : "❌"}`,
+					);
+					console.log(
+						`   Node B received status: ${nodeBStatusReceived ? "✅" : "❌"}`,
+					);
+				} catch (err: any) {
+					console.log(`\n   ❌ ETH Status exchange failed: ${err.message}`);
+				}
+			} else {
+				console.log("   ⚠️ ETH protocol not found on one or both connections");
+				console.log(`   Node A ETH: ${nodeAEth ? "found" : "not found"}`);
+				console.log(`   Node B ETH: ${nodeBEth ? "found" : "not found"}`);
+			}
+		}
 
 		// =========================================================================
 		// Keep connections alive briefly
