@@ -4,7 +4,6 @@ import type { SyncMode } from ".";
 import type { Block, BlockHeader } from "../block";
 import type { Address } from "../utils";
 import type { Peer } from "./net/peer";
-import type { Server } from "./net/server";
 
 export type Event = (typeof Event)[keyof typeof Event];
 /**
@@ -51,7 +50,7 @@ export interface EventParams {
 	[Event.PEER_DISCONNECTED]: [disconnectedPeer: Peer];
 	[Event.PEER_ERROR]: [error: Error, peerCausingError: Peer];
 	[Event.SERVER_LISTENING]: [{ transport: string; url: string }];
-	[Event.SERVER_ERROR]: [serverError: Error, serverCausingError: Server];
+	[Event.SERVER_ERROR]: [serverError: Error, serverCausingError: any];
 	[Event.POOL_PEER_ADDED]: [addedPeer: Peer];
 	[Event.POOL_PEER_REMOVED]: [removedPeer: Peer];
 	[Event.POOL_PEER_BANNED]: [bannedPeer: Peer];

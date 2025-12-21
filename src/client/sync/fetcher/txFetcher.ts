@@ -1,12 +1,12 @@
 import { bytesToUnprefixedHex, hexToBytes } from "../../../utils";
 import type { Config } from "../../config.ts";
 import type { Peer } from "../../net/peer/peer.ts";
-import type { PeerPool } from "../../net/peerpool.ts";
+import type { PeerPoolLike } from "../../net/peerpool-types.ts";
 import type { TxPool } from "../../service/txpool.ts";
 
 interface TxFetcherOptions {
 	config: Config;
-	pool: PeerPool;
+	pool: PeerPoolLike;
 	txPool: TxPool;
 }
 
@@ -23,7 +23,7 @@ interface PendingAnnouncement {
  */
 export class TxFetcher {
 	private config: Config;
-	private pool: PeerPool;
+	private pool: PeerPoolLike;
 	private txPool: TxPool;
 
 	// Announced tx hashes waiting to be fetched
@@ -75,7 +75,7 @@ export class TxFetcher {
 			const hashStr = bytesToUnprefixedHex(hash);
 
 			// Skip if already handled by txpool
-			if (this.txPool.handled.has(hashStr)) continue;
+			if (this.txPool.hasHandled(hashStr)) continue;
 
 			// Skip if already pending
 			if (this.pending.has(hashStr)) continue;

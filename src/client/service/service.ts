@@ -1,20 +1,22 @@
-import { Chain } from "../blockchain";
-import { PeerPool } from "../net/peerpool.ts";
-import { Event } from "../types.ts";
-import { type V8Engine, getV8Engine } from "../util";
-
 import type { AbstractLevel } from "abstract-level";
+import debug from "debug";
+import { Chain } from "../blockchain";
 import type { Config } from "../config.ts";
+import { VMExecution } from "../execution/vmexecution.ts";
+import { P2PPeerPool } from "../net/p2p-peerpool.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import type { Protocol } from "../net/protocol";
 import type { Synchronizer } from "../sync";
+import { Event } from "../types.ts";
+import { getV8Engine, type V8Engine } from "../util";
+
+const log = debug("service");
 
 export interface ServiceOptions {
-	/* Config */
+	/* Config (should have node property - Config now creates P2PNode automatically) */
 	config: Config;
 
-	/* Blockchain */
-	chain: Chain;
+	/* Blockchain (optional - will be created if not provided) */
+	chain?: Chain;
 
 	/* Blockchain database */
 	chainDB?: AbstractLevel<
@@ -46,13 +48,16 @@ export interface ServiceOptions {
 
 /**
  * Base class for all services
+ * Uses P2PPeerPool for libp2p-style networking
+ *
  * @memberof module:service
  */
 export class Service {
 	public config: Config;
+	public execution: VMExecution;
 	public opened: boolean;
 	public running: boolean;
-	public pool: PeerPool;
+	public pool: P2PPeerPool;
 	public chain: Chain;
 	public interval: number;
 	public timeout: number;
@@ -81,13 +86,36 @@ export class Service {
 	 * Create new service and associated peer pool
 	 */
 	constructor(options: ServiceOptions) {
+		log("Creating Service");
 		this.config = options.config;
 
 		this.opened = false;
 		this.running = false;
 
-		this.pool = new PeerPool({
+		// P2PPeerPool requires a P2PNode instance from P2PConfig
+		const p2pConfig = this.config as any;
+		if (!p2pConfig.node) {
+			log("ERROR: P2PConfig missing node property");
+			throw new Error(
+				"Service requires Config with node property. Config now creates P2PNode automatically.",
+			);
+		}
+
+		//@ts-expect-error TODO replace with async create constructor
+		this.chain = options.chain ?? new Chain(options);
+
+		this.execution = new VMExecution({
+			config: options.config,
+			stateDB: options.stateDB,
+			metaDB: options.metaDB,
+			chain: this.chain,
+		});
+		log("Creating P2PPeerPool");
+		this.pool = new P2PPeerPool({
 			config: this.config,
+			node: p2pConfig.node,
+			chain: this.chain, // Pass chain for STATUS exchange
+			execution: this.execution,
 		});
 
 		this.config.events.on(
@@ -95,19 +123,19 @@ export class Service {
 			async (message, protocol, peer) => {
 				if (this.running) {
 					try {
-						const msgName = (message as any)?.name || 'unknown';
+						const msgName = (message as any)?.name || "unknown";
 						this.config.logger?.info(
-							`📨 PROTOCOL_MESSAGE: ${msgName} from peer ${peer?.id?.slice(0, 8) || 'null'}`,
+							`📨 PROTOCOL_MESSAGE: ${msgName} from peer ${peer?.id?.slice(0, 8) || "null"}`,
 						);
 						await this.handle(message, protocol, peer);
 					} catch (error: any) {
-						const msgName = (message as any)?.name || 'unknown';
+						const msgName = (message as any)?.name || "unknown";
 						this.config.logger?.error(
 							`Error handling message (${protocol}:${msgName}): ${error.message}`,
 						);
 					}
 				} else {
-					const msgName = (message as any)?.name || 'unknown';
+					const msgName = (message as any)?.name || "unknown";
 					this.config.logger?.debug(
 						`Ignoring PROTOCOL_MESSAGE (service not running): ${msgName}`,
 					);
@@ -115,9 +143,8 @@ export class Service {
 			},
 		);
 
-		//@ts-expect-error TODO replace with async create constructor
-		this.chain = options.chain ?? new Chain(options);
-		this.interval = options.interval ?? 8000;
+		// this.chain = options.chain ?? new Chain(options);
+		this.interval = options.interval ?? 200;
 		this.timeout = options.timeout ?? 6000;
 		this.opened = false;
 		this.running = false;
@@ -132,8 +159,10 @@ export class Service {
 
 	/**
 	 * Returns all protocols required by this service
+	 * For P2P services, protocols are handled at the transport level (RLPx)
+	 * so we return an empty array (no server.addProtocols() call needed)
 	 */
-	get protocols(): Protocol[] {
+	get protocols(): any[] {
 		return [];
 	}
 
@@ -142,25 +171,32 @@ export class Service {
 	 */
 	async open() {
 		if (this.opened) {
+			log("Service already opened");
 			return false;
 		}
-		const protocols = this.protocols;
-		this.config.server && this.config.server.addProtocols(protocols);
 
-		this.config.events.on(Event.POOL_PEER_BANNED, (peer) =>
-			this.config.logger?.debug(`Peer banned: ${peer}`),
-		);
-		this.config.events.on(Event.POOL_PEER_ADDED, (peer) =>
-			this.config.logger?.debug(`Peer added: ${peer}`),
-		);
-		this.config.events.on(Event.POOL_PEER_REMOVED, (peer) =>
-			this.config.logger?.debug(`Peer removed: ${peer}`),
-		);
+		log("Opening Service");
+		// For P2P services, protocols are handled at transport level (RLPx)
+		// No need to add protocols to server like in the old Service class
+
+		this.config.events.on(Event.POOL_PEER_BANNED, (peer) => {
+			log("Peer banned: %s", peer.id.slice(0, 8));
+			this.config.logger?.debug(`Peer banned: ${peer}`);
+		});
+		this.config.events.on(Event.POOL_PEER_ADDED, (peer) => {
+			log("Peer added: %s", peer.id.slice(0, 8));
+			this.config.logger?.debug(`Peer added: ${peer}`);
+		});
+		this.config.events.on(Event.POOL_PEER_REMOVED, (peer) => {
+			log("Peer removed: %s", peer.id.slice(0, 8));
+			this.config.logger?.debug(`Peer removed: ${peer}`);
+		});
 
 		await this.pool.open();
 		await this.chain.open();
 		await this.synchronizer?.open();
 		this.opened = true;
+		log("Service opened");
 		return true;
 	}
 
@@ -168,10 +204,17 @@ export class Service {
 	 * Close service.
 	 */
 	async close() {
+		if (!this.opened) {
+			log("Service not opened");
+			return false;
+		}
+		log("Closing Service");
 		if (this.opened) {
 			await this.pool.close();
 		}
 		this.opened = false;
+		log("Service closed");
+		return true;
 	}
 
 	/**
@@ -179,8 +222,10 @@ export class Service {
 	 */
 	async start(): Promise<boolean> {
 		if (this.running) {
+			log("Service already running");
 			return false;
 		}
+		log("Starting Service");
 		await this.pool.start();
 		void this.synchronizer?.start();
 		if (this.v8Engine === null) {
@@ -193,6 +238,7 @@ export class Service {
 		);
 		this.running = true;
 		this.config.logger?.info(`Started ${this.name} service.`);
+		log("Service started");
 		return true;
 	}
 
@@ -200,6 +246,11 @@ export class Service {
 	 * Stop service
 	 */
 	async stop(): Promise<boolean> {
+		if (!this.running) {
+			log("Service not running");
+			return false;
+		}
+		log("Stopping Service");
 		if (this.opened) {
 			await this.close();
 			await this.synchronizer?.close();
@@ -209,6 +260,7 @@ export class Service {
 		await this.synchronizer?.stop();
 		this.running = false;
 		this.config.logger?.info(`Stopped ${this.name} service.`);
+		log("Service stopped");
 		return true;
 	}
 

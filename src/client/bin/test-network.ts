@@ -16,19 +16,25 @@ import {
 	ConsensusAlgorithm,
 	Hardfork,
 } from "../../chain-config/index.ts";
+import { ETH } from "../../devp2p/protocol/eth.ts";
 import { Ethash } from "../../eth-hash/index.ts";
+import { createP2PNode, dptDiscovery } from "../../p2p/libp2p/index.ts";
+import type { ComponentLogger } from "../../p2p/libp2p/types.ts";
+import { rlpx } from "../../p2p/transport/rlpx/index.ts";
 import {
 	Address,
 	bytesToHex,
 	bytesToUnprefixedHex,
 	createAddressFromPrivateKey,
+	hexToBytes,
 } from "../../utils/index.ts";
 import { EthereumClient } from "../client.ts";
-import { Config, DataDirectory, SyncMode } from "../config.ts";
 import { LevelDB } from "../execution/level.ts";
+import { DataDirectory, SyncMode } from "../index.ts";
 import { getLogger, type Logger } from "../logging.ts";
-import { createRpcManager, RPCArgs } from "../rpc/index.ts";
-import type { FullEthereumService } from "../service/fullethereumservice.ts";
+import { P2PConfig } from "../p2p-config.ts";
+import { createP2PRpcManager, RPCArgs } from "../rpc/index.ts";
+import type { P2PFullEthereumService } from "../service/p2p-fullethereumservice.ts";
 import { Event } from "../types.ts";
 import { setupMetrics } from "../util/metrics.ts";
 
@@ -159,13 +165,15 @@ function createGenesisState(accounts: Account[]): GenesisState {
 function writeBootnodeInfo(port: number, nodeKey: Uint8Array): void {
 	const nodeId = bytesToUnprefixedHex(getNodeId(nodeKey));
 	const enodeUrl = `enode://${nodeId}@127.0.0.1:${port}`;
+	const udpPort = port + 10000; // DPT uses separate UDP port
 
 	mkdirSync(SHARED_DIR, { recursive: true });
 	const infoPath = `${SHARED_DIR}/bootnode.txt`;
 	writeFileSync(infoPath, enodeUrl);
 
 	console.log(`\n🌐 Bootnode enode written to ${infoPath}`);
-	console.log(`   ${enodeUrl}\n`);
+	console.log(`   ${enodeUrl}`);
+	console.log(`   UDP port: ${udpPort} (for DPT discovery)\n`);
 }
 
 function readBootnodeInfo(): string | null {
@@ -193,6 +201,73 @@ function enodeToMultiaddr(
 
 	const [, _nodeId, ip, port] = match;
 	return multiaddr(`/ip4/${ip}/tcp/${port}`);
+}
+
+/**
+ * Convert enode URL to DPT PeerInfo format
+ */
+function enodeToDPTPeerInfo(enodeUrl: string): {
+	id: Uint8Array;
+	address: string;
+	tcpPort: number;
+	udpPort: number;
+} | null {
+	const match = enodeUrl.match(/^enode:\/\/([a-fA-F0-9]+)@([^:]+):(\d+)$/);
+	if (!match) {
+		console.error(`Invalid enode URL: ${enodeUrl}`);
+		return null;
+	}
+
+	const [, nodeIdHex, ip, port] = match;
+	const nodeId = hexToBytes("0x" + nodeIdHex);
+	const tcpPort = parseInt(port, 10);
+	// DPT uses UDP for discovery, use port + 10000 for UDP (same as we do for local nodes)
+	const udpPort = tcpPort;
+
+	return {
+		id: nodeId,
+		address: ip,
+		tcpPort,
+		udpPort,
+	};
+}
+
+/**
+ * Create component logger from config logger
+ */
+function createComponentLoggerFromLogger(
+	logger: Logger | undefined,
+	name: string,
+): ComponentLogger {
+	if (!logger) {
+		return {
+			forComponent: () =>
+				({
+					enabled: false,
+					trace: () => {},
+					debug: () => {},
+					info: () => {},
+					warn: () => {},
+					error: () => {},
+					newScope: () => ({
+						enabled: false,
+						trace: () => {},
+						debug: () => {},
+						info: () => {},
+						warn: () => {},
+						error: () => {},
+						newScope: () => ({}) as any,
+					}),
+				}) as any,
+		};
+	}
+
+	return {
+		forComponent: (component: string) => {
+			const scopeLogger = logger.newScope(`${name}:${component}`);
+			return scopeLogger as any;
+		},
+	};
 }
 
 function getDataDir(port: number): string {
@@ -281,9 +356,69 @@ async function startClient() {
 
 	const nodeLogger: Logger | undefined = getLogger();
 
-	const config = new Config({
+	// Convert bootnodes from enode format to DPT PeerInfo format
+	const dptBootnodes: Array<{
+		id: Uint8Array;
+		address: string;
+		tcpPort: number;
+		udpPort: number;
+	}> = [];
+	if (!isBootnode) {
+		// Read bootnode info and convert to DPT format
+		const enodeUrl = readBootnodeInfo();
+		if (enodeUrl) {
+			const peerInfo = enodeToDPTPeerInfo(enodeUrl);
+			if (peerInfo) {
+				dptBootnodes.push(peerInfo);
+			}
+		}
+	}
+
+	// Create P2PNode instance
+	// const componentLogger = createComponentLoggerFromLogger(
+	// 	nodeLogger,
+	// 	`node-${port}`,
+	// );
+
+	// DPT discovery uses UDP, so we use a separate UDP port
+	// Use port + 10000 to avoid conflicts with TCP ports
+	const udpPort = port;
+
+	const p2pNode = await createP2PNode({
+		privateKey: nodeKey,
+		addresses: {
+			listen: [`/ip4/127.0.0.1/tcp/${port}`],
+		},
+		transports: [
+			(components) =>
+				rlpx({
+					privateKey: nodeKey,
+					capabilities: [ETH.eth68],
+					common,
+					timeout: 10000,
+					maxConnections: 25,
+				})({
+					logger: components.logger,
+				}) as any,
+		],
+		peerDiscovery: [
+			(components) =>
+				dptDiscovery({
+					privateKey: nodeKey,
+					bindAddr: "127.0.0.1",
+					bindPort: udpPort, // DPT uses separate UDP port
+					bootstrapNodes: isBootnode ? undefined : dptBootnodes,
+					autoDial: true,
+					autoDialBootstrap: isBootnode ? false : true,
+				})(components),
+		],
+		// logger: componentLogger as any,
+		maxConnections: 25,
+	} as any);
+
+	const config = new P2PConfig({
 		accounts: [nodeAccount], // This node's account for signing
-		bootnodes,
+		bootnodes, // Keep for compatibility, but DPT uses dptBootnodes
 		common,
 		datadir: getDataDir(port),
 		prometheusMetrics: setupMetrics(),
@@ -304,6 +439,7 @@ async function startClient() {
 		port,
 		saveReceipts: true,
 		syncmode: SyncMode.Full,
+		node: p2pNode,
 	});
 
 	const chainDataDir = config.getDataDirectory(DataDirectory.Chain);
@@ -376,7 +512,7 @@ async function startClient() {
 	client.config.updateSynchronizedState(client.chain.headers.latest, true);
 
 	// Ensure txPool is running
-	const fullService = client.service as FullEthereumService;
+	const fullService = client.service as P2PFullEthereumService;
 	fullService.txPool?.checkRunState();
 
 	await client.start();
@@ -419,7 +555,7 @@ async function startClient() {
 		rpcPort,
 	};
 
-	createRpcManager(client, rpcArgs);
+	createP2PRpcManager(client, rpcArgs);
 
 	console.log("\n" + "=".repeat(60));
 	console.log("✅ Node started successfully!");

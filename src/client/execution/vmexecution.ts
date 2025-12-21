@@ -70,7 +70,7 @@ export class VMExecution extends Execution {
 	private vmPromise?: Promise<number | null>;
 
 	/** Maximally tolerated block time before giving a warning on console */
-	private MAX_TOLERATED_BLOCK_TIME = 12;
+	private MAX_TOLERATED_BLOCK_TIME = 5;
 
 	/**
 	 * Interval for client execution stats output (in ms)
@@ -515,6 +515,18 @@ export class VMExecution extends Execution {
 			this.config.shutdown
 		)
 			return 0;
+
+		// Fix race condition: wait for any in-flight VM execution to complete
+		if (this.vmPromise) {
+			try {
+				await this.vmPromise;
+			} catch (error) {
+				// Ignore errors from previous execution, we're starting fresh
+				this.config.logger?.debug(
+					"Previous VM execution completed with error, continuing",
+				);
+			}
+		}
 
 		return this.runWithLock<number>(async () => {
 			try {

@@ -11,6 +11,24 @@ import { Connection, createConnection } from './connection'
 import { Registrar } from './registrar'
 import { AbortOptions, PeerId } from './types'
 
+// Debug logging helper
+const DEBUG_LOG_ENDPOINT = "http://127.0.0.1:7242/ingest/0eeace01-3679-4faf-afd2-c243f94d4f5a";
+function debugLog(location: string, message: string, data: any, hypothesisId: string): void {
+	fetch(DEBUG_LOG_ENDPOINT, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			location,
+			message,
+			data,
+			timestamp: Date.now(),
+			sessionId: "debug-session",
+			runId: "run1",
+			hypothesisId,
+		}),
+	}).catch(() => {});
+}
+
 interface CreateConnectionOptions {
   id: string
   cryptoProtocol: string
@@ -78,7 +96,14 @@ export class Upgrader {
   }
 
   createInboundAbortSignal (signal?: AbortSignal): ClearableSignal {
-    const signals: AbortSignal[] = [AbortSignal.timeout(this.inboundUpgradeTimeout)]
+    // #region agent log
+    const timeoutSignal = AbortSignal.timeout(this.inboundUpgradeTimeout)
+    debugLog('upgrader.ts:81', 'Created AbortSignal.timeout for inbound upgrade', { timeout: this.inboundUpgradeTimeout }, 'C');
+    timeoutSignal.addEventListener('abort',()=>{
+      debugLog('upgrader.ts:81', 'AbortSignal fired for inbound upgrade', { reason: timeoutSignal.reason }, 'C');
+    });
+    // #endregion
+    const signals: AbortSignal[] = [timeoutSignal]
     if (signal) {
       signals.push(signal)
     }

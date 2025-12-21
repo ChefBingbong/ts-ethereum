@@ -1,16 +1,19 @@
 import type { AbstractLevel } from "abstract-level";
+import debug from "debug";
 import type { Blockchain } from "../blockchain";
 import type { GenesisState } from "../chain-config";
 import { Chain } from "./blockchain";
-import type { Config } from "./config.ts";
-import { FullEthereumService } from "./service";
+import { P2PConfig } from "./p2p-config.ts";
+import { P2PFullEthereumService } from "./service/p2p-fullethereumservice.ts";
 import type { MultiaddrLike } from "./types.ts";
 import { Event } from "./types.ts";
 import { getPackageJSON } from "./util";
 
-export interface EthereumClientOptions {
+const log = debug("p2p:client");
+
+export interface P2PEthereumClientOptions {
 	/** Client configuration */
-	config: Config;
+	config: P2PConfig;
 
 	/** Custom blockchain (optional) */
 	blockchain?: Blockchain;
@@ -65,14 +68,17 @@ export interface EthereumClientOptions {
 }
 
 /**
- * Represents the top-level ethereum node, and is responsible for managing the
- * lifecycle of included services.
- * @memberof module:node
+ * P2P Ethereum Client - Top-level client using P2P networking
+ *
+ * Similar to EthereumClient but uses P2PNode instead of RlpxServer
+ * and P2PFullEthereumService instead of FullEthereumService.
+ *
+ * @memberof module:client
  */
 export class EthereumClient {
-	public config: Config;
+	public config: P2PConfig;
 	public chain: Chain;
-	public service: FullEthereumService;
+	public service: P2PFullEthereumService;
 
 	public opened: boolean;
 	public started: boolean;
@@ -83,18 +89,22 @@ export class EthereumClient {
 	 * Safe creation of a Chain object awaiting the initialization
 	 * of the underlying Blockchain object.
 	 */
-	public static async create(options: EthereumClientOptions) {
+	public static async create(options: P2PEthereumClientOptions) {
+		log("Creating P2PEthereumClient");
 		const chain = await Chain.create(options);
+		log("Chain created, instantiating client");
 		return new this(chain, options);
 	}
 
 	/**
-	 * Create new node
+	 * Create new P2P node
 	 */
-	protected constructor(chain: Chain, options: EthereumClientOptions) {
+	protected constructor(chain: Chain, options: P2PEthereumClientOptions) {
+		log("P2PEthereumClient constructor");
 		this.config = options.config;
 		this.chain = chain;
-		this.service = new FullEthereumService({
+		log("Creating P2PFullEthereumService");
+		this.service = new P2PFullEthereumService({
 			config: this.config,
 			chainDB: options.chainDB,
 			stateDB: options.stateDB,
@@ -103,6 +113,7 @@ export class EthereumClient {
 		});
 		this.opened = false;
 		this.started = false;
+		log("P2PEthereumClient created");
 	}
 
 	/**
@@ -110,70 +121,136 @@ export class EthereumClient {
 	 */
 	async open() {
 		if (this.opened) {
+			log("Client already opened");
 			return false;
 		}
+		log("Opening P2PEthereumClient");
 		const name = this.config.chainCommon.chainName();
 		const chainId = this.config.chainCommon.chainId();
 		const packageJSON = getPackageJSON();
+		log(
+			"Initializing P2P Ethereumjs client version=v%s network=%s chainId=%d",
+			packageJSON.version,
+			name,
+			chainId,
+		);
 		this.config.logger?.info(
-			`Initializing Ethereumjs client version=v${packageJSON.version} network=${name} chainId=${chainId}`,
+			`Initializing P2P Ethereumjs client version=v${packageJSON.version} network=${name} chainId=${chainId}`,
 		);
 
-		this.config.events.on(Event.SERVER_ERROR, (error) => {
-			this.config.logger?.warn(
-				`Server error: ${error.name} - ${error.message}`,
-			);
-		});
-		this.config.events.on(Event.SERVER_LISTENING, (details) => {
-			this.config.logger?.info(
-				`Server listener up transport=${details.transport} url=${details.url}`,
-			);
-		});
+		// Listen for P2PNode events
+		if (this.config.node) {
+			log("Setting up P2PNode event listeners");
+			this.config.node.addEventListener("peer:connect", (evt) => {
+				log("P2PNode peer:connect event");
+				this.config.logger?.info(`Peer connected: ${evt.detail}`);
+			});
 
+			this.config.node.addEventListener("peer:disconnect", (evt) => {
+				log("P2PNode peer:disconnect event");
+				this.config.logger?.info(`Peer disconnected: ${evt.detail}`);
+			});
+		}
+
+		log("Opening service");
 		await this.service.open();
 
 		this.opened = true;
+		log("P2PEthereumClient opened");
 	}
 
 	/**
-	 * Starts node and all services and network servers.
+	 * Starts node and all services and P2PNode.
 	 */
 	async start() {
 		if (this.started) {
+			log("Client already started");
 			return false;
 		}
+		log("Starting P2PEthereumClient");
 		this.config.logger?.info("Setup networking and services.");
 
+		log("Starting service");
 		await this.service.start();
-		this.config.server && (await this.config.server.start());
-		// Only call bootstrap if servers are actually started
-		this.config.server &&
-			this.config.server.started &&
-			(await this.config.server.bootstrap());
+
+		// Start P2PNode if it exists
+		if (this.config.node) {
+			log("Starting P2PNode");
+			await this.config.node.start();
+			const addresses = this.config.node.getMultiaddrs();
+			log(
+				"P2PNode started, listening on: %s",
+				addresses.map((a) => a.toString()).join(", "),
+			);
+			this.config.logger?.info(
+				`P2PNode started, listening on: ${addresses.map((a) => a.toString()).join(", ")}`,
+			);
+		}
 
 		this.started = true;
+		log("P2PEthereumClient started");
 	}
 
 	/**
-	 * Stops node and all services and network servers.
+	 * Stops node and all services and P2PNode.
 	 */
 	async stop() {
 		if (!this.started) {
+			log("Client not started");
 			return false;
 		}
+		log("Stopping P2PEthereumClient");
 		this.config.events.emit(Event.CLIENT_SHUTDOWN);
+		log("Stopping service");
 		await this.service.stop();
-		this.config.server &&
-			this.config.server.started &&
-			(await this.config.server.stop());
+
+		// Stop P2PNode if it exists
+		if (this.config.node) {
+			log("Stopping P2PNode");
+			await this.config.node.stop();
+		}
+
 		this.started = false;
+		log("P2PEthereumClient stopped");
 	}
 
 	/**
-	 *
-	 * @returns the RLPx server (if it exists)
+	 * Close node and all services
 	 */
+	async close() {
+		if (!this.opened) {
+			log("Client not opened");
+			return false;
+		}
+		log("Closing P2PEthereumClient");
+		await this.service.close();
+		this.opened = false;
+		log("P2PEthereumClient closed");
+	}
+
+	/**
+	 * Get the P2PNode instance (if it exists)
+	 */
+	node() {
+		return this.config.node;
+	}
+
 	server() {
-		return this.config.server;
+		return this.config.node;
+	}
+
+	/**
+	 * Get connected peers
+	 * @returns Array of peer IDs
+	 */
+	peers(): string[] {
+		return Array.from(this.service.pool.peers.values()).map((peer) => peer.id);
+	}
+
+	/**
+	 * Get peer count
+	 */
+	peerCount(): number {
+		return this.service.pool.size;
 	}
 }

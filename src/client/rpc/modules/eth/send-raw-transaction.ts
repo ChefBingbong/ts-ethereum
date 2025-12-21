@@ -1,13 +1,13 @@
+import type { TypedTransaction } from "../../../../tx/index.ts";
+import { createTxFromRLP } from "../../../../tx/index.ts";
+import type { PrefixedHexString } from "../../../../utils/index.ts";
 import {
 	BIGINT_0,
 	BIGINT_1,
 	bytesToHex,
 	hexToBytes,
 } from "../../../../utils/index.ts";
-import { createTxFromRLP } from "../../../../tx/index.ts";
-import type { TypedTransaction } from "../../../../tx/index.ts";
 import { safeError, safeResult } from "../../../../utils/safe.ts";
-import type { PrefixedHexString } from "../../../../utils/index.ts";
 import type { EthereumClient } from "../../../client.ts";
 import type { FullEthereumService } from "../../../service";
 import { createRpcMethod } from "../../validation.ts";
@@ -58,6 +58,7 @@ export const sendRawTransaction = (client: EthereumClient) => {
 			}
 
 			const peerPool = service.pool;
+			console.log("peerPool", peerPool.peers);
 			if (
 				peerPool.peers.length === 0 &&
 				!client.config.mine &&

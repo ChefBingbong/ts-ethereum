@@ -6,7 +6,7 @@ import { wait } from "../util/wait.ts";
 import type { Chain } from "../blockchain";
 import type { Config } from "../config.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import type { PeerPool } from "../net/peerpool.ts";
+import type { PeerPoolLike } from "../net/peerpool-types.ts";
 import type { BlockFetcher } from "./fetcher";
 
 export interface SynchronizerOptions {
@@ -14,7 +14,7 @@ export interface SynchronizerOptions {
 	config: Config;
 
 	/* Peer pool */
-	pool: PeerPool;
+	pool: PeerPoolLike;
 
 	/* Blockchain */
 	chain: Chain;
@@ -30,7 +30,7 @@ export interface SynchronizerOptions {
 export abstract class Synchronizer {
 	public config: Config;
 
-	protected pool: PeerPool;
+	protected pool: PeerPoolLike;
 	protected chain: Chain;
 
 	protected interval: number;

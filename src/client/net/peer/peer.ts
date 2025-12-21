@@ -1,12 +1,8 @@
 import { EventEmitter } from "eventemitter3";
-import { BIGINT_0, EthereumJSErrorWithoutCode, short } from "../../../utils";
-
-import { BoundEthProtocol } from "../protocol";
-
 import type { BlockHeader } from "../../../block";
+import { BIGINT_0, BIGINT_1, short } from "../../../utils";
 import type { Config } from "../../config.ts";
-import type { BoundProtocol, Protocol, Sender } from "../protocol";
-import type { Server } from "../server";
+import type { EthProtocolMethods } from "../protocol/eth-methods.ts";
 
 export interface PeerOptions {
 	/* Config */
@@ -25,10 +21,8 @@ export interface PeerOptions {
 	inbound?: boolean;
 
 	/* Supported protocols */
-	protocols?: Protocol[];
 
 	/* Server */
-	server?: Server;
 }
 
 /**
@@ -40,13 +34,14 @@ export abstract class Peer extends EventEmitter {
 	public id: string;
 	public address: string;
 	public inbound: boolean;
-	public server: Server | undefined;
 	protected transport: string;
-	protected protocols: Protocol[];
-	protected boundProtocols: BoundProtocol[] = [];
+	protected boundProtocols: Array<{
+		name: string;
+		handleMessageQueue(): void;
+	}> = [];
 	private _idle: boolean;
 
-	public eth?: BoundEthProtocol;
+	public eth?: EthProtocolMethods;
 
 	/*
     If the peer is in the PeerPool.
@@ -68,7 +63,6 @@ export abstract class Peer extends EventEmitter {
 		this.address = options.address;
 		this.transport = options.transport;
 		this.inbound = options.inbound ?? false;
-		this.protocols = options.protocols ?? [];
 
 		this._idle = true;
 	}
@@ -101,16 +95,55 @@ export abstract class Peer extends EventEmitter {
 			// If there is no updated best header stored yet, start with the status hash
 			block = this.eth!.status.bestHash;
 		} else {
+			// Try forward-calculated number first, but fall back to last known header if it doesn't exist
 			block = this.getPotentialBestHeaderNum();
 		}
+
 		const result = await this.eth!.getBlockHeaders({
 			block,
 			max: 1,
 		});
+
+		// If forward-calculated block doesn't exist (0 headers), fall back to last known header
+		if (
+			result !== undefined &&
+			result[1].length === 0 &&
+			this.eth!.updatedBestHeader
+		) {
+			// Try requesting from last known header number + 1 to get the next block
+			const lastKnownNum = this.eth!.updatedBestHeader.number;
+			const nextBlockNum = lastKnownNum + BIGINT_1;
+			const fallbackResult = await this.eth!.getBlockHeaders({
+				block: nextBlockNum,
+				max: 1,
+			});
+			if (fallbackResult !== undefined && fallbackResult[1].length > 0) {
+				const latest = fallbackResult[1][0];
+				this.eth!.updatedBestHeader = latest;
+				if (latest !== undefined) {
+					const height = latest.number;
+					if (
+						height > BIGINT_0 &&
+						(this.config.syncTargetHeight === undefined ||
+							this.config.syncTargetHeight === BIGINT_0 ||
+							this.config.syncTargetHeight < latest.number)
+					) {
+						this.config.syncTargetHeight = height;
+						this.config.logger?.info(
+							`New sync target height=${height} hash=${short(latest.hash())}`,
+						);
+					}
+				}
+				return this.eth!.updatedBestHeader;
+			}
+			// If next block also doesn't exist, return current updatedBestHeader (peer hasn't progressed)
+			return this.eth!.updatedBestHeader;
+		}
+
 		if (result !== undefined) {
 			const latest = result[1][0];
-			this.eth!.updatedBestHeader = latest;
 			if (latest !== undefined) {
+				this.eth!.updatedBestHeader = latest;
 				const height = latest.number;
 				if (
 					height > BIGINT_0 &&
@@ -141,7 +174,7 @@ export abstract class Peer extends EventEmitter {
 			const bestHeaderNum = this.eth!.updatedBestHeader.number;
 			const nowSec = Math.floor(Date.now() / 1000);
 			const diffSec = nowSec - Number(this.eth!.updatedBestHeader.timestamp);
-			const SLOT_TIME = 12;
+			const SLOT_TIME = 5;
 			const diffBlocks = BigInt(Math.floor(diffSec / SLOT_TIME));
 			forwardCalculatedNum = bestHeaderNum + diffBlocks;
 		}
@@ -157,28 +190,6 @@ export abstract class Peer extends EventEmitter {
 	 */
 	handleMessageQueue() {
 		this.boundProtocols.map((e) => e.handleMessageQueue());
-	}
-
-	async addProtocol(sender: Sender, protocol: Protocol): Promise<void> {
-		let bound: BoundProtocol;
-		const boundOpts = {
-			config: protocol.config,
-			protocol,
-			peer: this,
-			sender,
-		};
-
-		if (protocol.name === "eth") {
-			bound = new BoundEthProtocol(boundOpts);
-			await bound!.handshake(sender);
-			this.eth = bound as BoundEthProtocol;
-		} else {
-			throw EthereumJSErrorWithoutCode(
-				`addProtocol: ${protocol.name} protocol not supported`,
-			);
-		}
-
-		this.boundProtocols.push(bound);
 	}
 
 	toString(withFullId = false): string {

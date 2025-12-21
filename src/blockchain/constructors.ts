@@ -89,8 +89,6 @@ export async function createBlockchain(opts: BlockchainOptions = {}) {
 		);
 	}
 
-	console.log("blockchain", genesisBlock);
-
 	DEBUG &&
 		debug(`genesis block initialized with hash ${bytesToHex(genesisHash!)}`);
 

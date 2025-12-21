@@ -1,14 +1,12 @@
+import type { Debugger } from "debug";
 import debug from "debug";
 import { Readable, Writable } from "stream";
-
-import { Heap } from "../../ext/qheap.ts";
-import { Event } from "../../types.ts";
-
-import type { Debugger } from "debug";
 import type { Config } from "../../config.ts";
 import type { QHeap } from "../../ext/qheap.ts";
+import { Heap } from "../../ext/qheap.ts";
 import type { Peer } from "../../net/peer";
-import type { PeerPool } from "../../net/peerpool.ts";
+import type { PeerPoolLike } from "../../net/peerpool-types.ts";
+import { Event } from "../../types.ts";
 import type { JobTask as BlockFetcherJobTask } from "./blockfetcherbase.ts";
 import type { Job } from "./types.ts";
 
@@ -17,7 +15,7 @@ export interface FetcherOptions {
 	config: Config;
 
 	/* Peer pool */
-	pool: PeerPool;
+	pool: PeerPoolLike;
 
 	/* Fetch task timeout in ms (default: 8000) */
 	timeout?: number;
@@ -54,7 +52,7 @@ export abstract class Fetcher<
 	protected debug: Debugger;
 	protected DEBUG: boolean;
 
-	protected pool: PeerPool;
+	protected pool: PeerPoolLike;
 	protected timeout: number;
 	protected interval: number;
 	protected banTime: number;
@@ -78,7 +76,7 @@ export abstract class Fetcher<
 		super({ ...options, objectMode: true });
 
 		this.DEBUG =
-			typeof window === "undefined"
+			typeof globalThis.window === "undefined"
 				? (process?.env?.DEBUG?.includes("ethjs") ?? false)
 				: false;
 
@@ -87,9 +85,9 @@ export abstract class Fetcher<
 
 		this.pool = options.pool;
 		this.timeout = options.timeout ?? 8000;
-		this.interval = options.interval ?? 1000;
+		this.interval = options.interval ?? 200;
 		this.banTime = options.banTime ?? 60000;
-		this.maxQueue = options.maxQueue ?? 4;
+		this.maxQueue = options.maxQueue ?? 50;
 
 		this.DEBUG &&
 			this.debug(

@@ -40,3 +40,24 @@ export const createRpcHandlers = (
 		methods: Object.keys(methods),
 	};
 };
+
+export const createP2PRpcHandlers = (
+	client: EthereumClient,
+	debug: boolean,
+): {
+	methods: string[];
+	rpcHandlers: RpcHandler<Record<string, RpcMethodFn>>;
+} => {
+	const methods: Record<AllRpcMethods, RpcMethodFn> = {
+		...createAdminRpcMethods(client),
+		...createEthRpcMethods(client),
+		...createNetRpcMethods(client),
+		...createTxPoolRpcMethods(client),
+		...createWeb3RpcMethods(client),
+		...createDebugRpcMethods(client),
+	};
+	return {
+		rpcHandlers: createRpcHandler(methods, { debug }),
+		methods: Object.keys(methods),
+	};
+};

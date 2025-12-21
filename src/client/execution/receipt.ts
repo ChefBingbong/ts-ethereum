@@ -108,6 +108,23 @@ export class ReceiptsManager extends MetaDBManager {
 		await this.put(DBKey.Receipts, block.hash(), encoded);
 	}
 
+	/**
+	 * Batch save receipts for multiple blocks (optimization for bulk operations)
+	 * @param blocks Array of blocks with their receipts
+	 */
+	async batchSaveReceipts(
+		blocks: Array<{ block: Block; receipts: TxReceipt[] }>,
+	): Promise<void> {
+		if (blocks.length === 0) return;
+		
+		// Use batch API if available, otherwise fall back to individual saves
+		// Note: dbKey is private in MetaDBManager, so we'll use individual saves
+		// The batch optimization can be added later if MetaDBManager exposes batch API
+		for (const { block, receipts } of blocks) {
+			await this.saveReceipts(block, receipts);
+		}
+	}
+
 	async deleteReceipts(block: Block) {
 		await this.delete(DBKey.Receipts, block.hash());
 	}

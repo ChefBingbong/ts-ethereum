@@ -8,7 +8,9 @@ export const createAdminRpcMethods = (
 	client: EthereumClient,
 ): RpcMethods<typeof AdminRpcMethods> => {
 	const service = client.service!;
-	const dpt = client.service.pool.config.server.dpt;
+	// P2PNode handles peer discovery internally - DPT is not directly accessible
+	// TODO: Update addPeer to work with P2PNode if needed
+	const dpt = null as any; // DPT not available in P2P architecture
 	return {
 		admin_addPeer: addPeer(client, service, dpt),
 		admin_nodeInfo: nodeInfo(client, service),

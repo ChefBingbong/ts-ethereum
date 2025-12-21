@@ -1,17 +1,14 @@
+import type { Block, BlockBytes } from "../../../block";
 import { createBlockFromBytesArray } from "../../../block";
 import {
+	equalsBytes,
 	KECCAK256_RLP,
 	KECCAK256_RLP_ARRAY,
-	equalsBytes,
 } from "../../../utils";
-
+import type { Peer } from "../../net/peer/peer.ts";
 import { Event } from "../../types.ts";
-
-import { BlockFetcherBase } from "./blockfetcherbase.ts";
-
-import type { Block, BlockBytes } from "../../../block";
-import type { Peer } from "../../net/peer";
 import type { BlockFetcherOptions, JobTask } from "./blockfetcherbase.ts";
+import { BlockFetcherBase } from "./blockfetcherbase.ts";
 import type { Job } from "./types.ts";
 
 /**
@@ -64,22 +61,45 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
 			return [];
 		}
 		const headers = headersResult[1];
-		const bodiesResult = await peer?.eth?.getBlockBodies({
-			hashes: headers.map((h) => h.hash()),
-		});
-		if (
-			!Array.isArray(bodiesResult) ||
-			!Array.isArray(bodiesResult[1]) ||
-			bodiesResult[1].length === 0
-		) {
-			// Catch occasional null or empty responses
+
+		// Optimize: Batch block body requests for better performance
+		// Split into batches to avoid overwhelming the peer with large requests
+		const BATCH_SIZE = 50; // Request up to 50 bodies at a time
+		const allBodies: any[] = [];
+
+		for (let i = 0; i < headers.length; i += BATCH_SIZE) {
+			const batchHashes = headers.slice(i, i + BATCH_SIZE).map((h) => h.hash());
+			const bodiesResult = await peer?.eth?.getBlockBodies({
+				hashes: batchHashes,
+			});
+
+			if (
+				!Array.isArray(bodiesResult) ||
+				!Array.isArray(bodiesResult[1]) ||
+				bodiesResult[1].length === 0
+			) {
+				// Catch occasional null or empty responses
+				this.DEBUG &&
+					this.debug(
+						`Peer ${peerInfo} returned no bodies for batch ${i}-${i + BATCH_SIZE} of blocks=${blocksRange}`,
+					);
+				// If first batch fails, return empty
+				if (i === 0) return [];
+				// Otherwise break and use what we have
+				break;
+			}
+			allBodies.push(...bodiesResult[1]);
+		}
+
+		if (allBodies.length === 0) {
 			this.DEBUG &&
 				this.debug(
 					`Peer ${peerInfo} returned no bodies for blocks=${blocksRange}`,
 				);
 			return [];
 		}
-		const bodies = bodiesResult[1];
+
+		const bodies = allBodies;
 		this.DEBUG &&
 			this.debug(
 				`Requested blocks=${blocksRange} from ${peerInfo} (received: ${headers.length} headers / ${bodies.length} bodies)`,

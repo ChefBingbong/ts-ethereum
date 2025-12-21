@@ -11,7 +11,7 @@ import type { Config } from "../config.ts";
 import type { VMExecution } from "../execution";
 import { LevelDB } from "../execution/level.ts";
 import { IndexOperation, IndexType } from "../execution/txIndex.ts";
-import type { FullEthereumService } from "../service";
+import type { FullEthereumServiceLike } from "../service/fullethereumservice-types.ts";
 import type { FullSynchronizer } from "../sync";
 import { Event } from "../types.ts";
 
@@ -19,8 +19,8 @@ export interface MinerOptions {
 	/* Config */
 	config: Config;
 
-	/* FullEthereumService */
-	service: FullEthereumService;
+	/* FullEthereumService or P2PFullEthereumService */
+	service: FullEthereumServiceLike;
 
 	/* Skip hardfork validation */
 	skipHardForkValidation?: boolean;
@@ -41,7 +41,7 @@ export class Miner {
 		| undefined; /* global NodeJS */
 	private _boundChainUpdatedHandler: (() => void) | undefined;
 	private config: Config;
-	private service: FullEthereumService;
+	private service: FullEthereumServiceLike;
 	private execution: VMExecution;
 	private assembling: boolean;
 	private period: number;
