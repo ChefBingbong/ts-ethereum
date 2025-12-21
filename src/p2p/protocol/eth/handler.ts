@@ -14,7 +14,7 @@ import type { TypedTransaction } from "../../../tx";
 import { BIGINT_0, bigIntToUnpaddedBytes, bytesToBigInt } from "../../../utils";
 import type { TxReceipt } from "../../../vm";
 import type { RLPxConnection } from "../../transport/rlpx/connection";
-import { registerDefaultHandlers } from "./messages";
+import { registerDefaultHandlers } from "./handlers";
 import { EthHandlerRegistry } from "./registry";
 import { validateStatus } from "./status";
 import type { EthStatus, RequestResolver } from "./types";
