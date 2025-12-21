@@ -5,7 +5,6 @@ import type { Config } from "../config.ts";
 import { VMExecution } from "../execution/vmexecution.ts";
 import { P2PPeerPool } from "../net/p2p-peerpool.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import type { Protocol } from "../net/protocol";
 import type { Synchronizer } from "../sync";
 import { Event } from "../types.ts";
 import { getV8Engine, type V8Engine } from "../util";
@@ -163,7 +162,7 @@ export class Service {
 	 * For P2P services, protocols are handled at the transport level (RLPx)
 	 * so we return an empty array (no server.addProtocols() call needed)
 	 */
-	get protocols(): Protocol[] {
+	get protocols(): any[] {
 		return [];
 	}
 

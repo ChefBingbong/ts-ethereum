@@ -2,8 +2,7 @@ import { EventEmitter } from "eventemitter3";
 import type { BlockHeader } from "../../../block";
 import { BIGINT_0, BIGINT_1, short } from "../../../utils";
 import type { Config } from "../../config.ts";
-import type { Protocol } from "../protocol";
-import type { EthProtocolMethods } from "../protocol/ethprotocol.ts";
+import type { EthProtocolMethods } from "../protocol/eth-methods.ts";
 
 export interface PeerOptions {
 	/* Config */
@@ -22,7 +21,6 @@ export interface PeerOptions {
 	inbound?: boolean;
 
 	/* Supported protocols */
-	protocols?: Protocol[];
 
 	/* Server */
 }
@@ -37,7 +35,6 @@ export abstract class Peer extends EventEmitter {
 	public address: string;
 	public inbound: boolean;
 	protected transport: string;
-	protected protocols: Protocol[];
 	protected boundProtocols: Array<{
 		name: string;
 		handleMessageQueue(): void;
@@ -66,7 +63,6 @@ export abstract class Peer extends EventEmitter {
 		this.address = options.address;
 		this.transport = options.transport;
 		this.inbound = options.inbound ?? false;
-		this.protocols = options.protocols ?? [];
 
 		this._idle = true;
 	}

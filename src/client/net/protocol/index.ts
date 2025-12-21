@@ -2,5 +2,4 @@
  * @module net/protocol
  */
 
-export * from "./ethprotocol.ts";
-export * from "./protocol.ts";
+export * from "./eth-methods.ts";

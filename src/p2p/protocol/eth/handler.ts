@@ -1,25 +1,24 @@
 import debug from "debug";
 import { EventEmitter } from "eventemitter3";
-import type { BlockHeader } from "../../../block";
+import type { BlockBodyBytes, BlockHeader } from "../../../block";
 import type { Chain } from "../../../client/blockchain";
 import type { Config } from "../../../client/config";
 import type { VMExecution } from "../../../client/execution";
+import type { EthProtocolMethods } from "../../../client/net/protocol/eth-methods";
 import {
 	ETH_MESSAGES,
 	EthMessageCode,
 } from "../../../client/net/protocol/eth/definitions";
 import { ETH } from "../../../devp2p/protocol/eth";
+import type { TypedTransaction } from "../../../tx";
 import { BIGINT_0, bigIntToUnpaddedBytes, bytesToBigInt } from "../../../utils";
+import type { TxReceipt } from "../../../vm";
 import type { RLPxConnection } from "../../transport/rlpx/connection";
-import {
-	handleGetBlockBodies,
-	handleGetBlockHeaders,
-	handleGetNodeData,
-	handleGetPooledTransactions,
-	handleGetReceipts,
-} from "./messages";
+import { registerDefaultHandlers } from "./messages";
+import { EthHandlerRegistry } from "./registry";
 import { validateStatus } from "./status";
 import type { EthStatus, RequestResolver } from "./types";
+import type { EthStatusOpts } from "./wire";
 
 const log = debug("p2p:eth:handler");
 
@@ -29,8 +28,11 @@ const log = debug("p2p:eth:handler");
  * Handles ETH protocol messages through RLPxConnection socket.
  * Messages are sent/received via ECIES-encrypted RLPx connection,
  * not through libp2p streams.
+ *
+ * Implements EthProtocolMethods interface for compatibility with existing code.
  */
-export class EthHandler extends EventEmitter {
+export class EthHandler extends EventEmitter implements EthProtocolMethods {
+	public readonly name = "eth";
 	public readonly config: Config;
 	public readonly chain: Chain;
 	public readonly execution: VMExecution;
@@ -43,16 +45,24 @@ export class EthHandler extends EventEmitter {
 	public updatedBestHeader?: BlockHeader;
 
 	// Request tracking for async request/response matching
-	private resolvers: Map<bigint, RequestResolver> = new Map();
+	public readonly resolvers: Map<bigint, RequestResolver> = new Map();
 	private readonly timeout: number = 8000; // 8 second timeout
 	private nextReqId = BIGINT_0;
 
 	// Request deduplication: track in-flight requests to avoid duplicates
 	private inFlightRequests: Map<string, Promise<any>> = new Map();
 
-	// ETH protocol instance from RLPxConnection (for compatibility)
+	// ETH protocol instance from RLPxConnection
+	// NOTE: devp2p ETH protocol is now only used for:
+	// - Event listening (message, status events from RLPxConnection)
+	// - Getting protocol version and offset
+	// All message encoding/sending is done via wire module and RLPxConnection directly
 	private ethProtocol: ETH | null = null;
 	private protocolOffset: number = 0;
+	private protocolVersion: number = 68; // Default to ETH/68
+
+	// Handler registry for request/response routing
+	private readonly registry: EthHandlerRegistry = new EthHandlerRegistry();
 
 	constructor(options: {
 		config: Config;
@@ -66,8 +76,11 @@ export class EthHandler extends EventEmitter {
 		this.execution = options.execution;
 		this.rlpxConnection = options.rlpxConnection;
 
-		// Find ETH protocol from RLPxConnection
+		// Find ETH protocol from RLPxConnection first
 		this.setupProtocol();
+
+		// Register all default handlers with protocol's registry
+		registerDefaultHandlers(this.registry);
 	}
 
 	/**
@@ -86,6 +99,11 @@ export class EthHandler extends EventEmitter {
 
 		this.ethProtocol = ethProtocol;
 
+		// Get protocol version
+		if ((ethProtocol as any)._version !== undefined) {
+			this.protocolVersion = (ethProtocol as any)._version;
+		}
+
 		// Find protocol offset
 		const protocolsDesc = (this.rlpxConnection as any)._protocols as Array<{
 			protocol: ETH;
@@ -99,7 +117,9 @@ export class EthHandler extends EventEmitter {
 			this.protocolOffset = ethDesc.offset;
 		}
 
-		// Listen to protocol events
+		// Listen to protocol events from devp2p ETH protocol
+		// The devp2p protocol handles RLP decoding and emits decoded payloads
+		// We only use it for event listening - all sending is done via wire module
 		ethProtocol.events.on("message", (code: number, payload: any) => {
 			this.handleMessage(code, payload);
 		});
@@ -135,16 +155,16 @@ export class EthHandler extends EventEmitter {
 
 	/**
 	 * Send STATUS message (called by P2PPeerPool or external code)
+	 * Delegates to protocol's sendStatus method
 	 */
 	sendStatus(): void {
-		if (!this.ethProtocol) {
-			log("Cannot send STATUS: ETH protocol not available");
-			return;
-		}
-
 		if (this._status !== null) {
 			log("STATUS already sent");
 			return;
+		}
+
+		if (!this.ethProtocol) {
+			throw new Error("ETH protocol not available");
 		}
 
 		try {
@@ -158,15 +178,15 @@ export class EthHandler extends EventEmitter {
 				throw new Error("No genesis block available for STATUS");
 			}
 
-			// Use devp2p ETH protocol's sendStatus method for now
-			// This ensures compatibility with RLPx message format
-			// TODO: Replace with our own STATUS encoding once we remove devp2p dependency
-			this.ethProtocol.sendStatus({
+			const statusOpts: EthStatusOpts = {
 				td: bigIntToUnpaddedBytes(this.chain.headers.td),
 				bestHash: header.hash(),
 				genesisHash: genesis.hash(),
 				latestBlock: bigIntToUnpaddedBytes(header.number),
-			});
+			};
+
+			// Use protocol's sendStatus which handles encoding and sending
+			this.ethProtocol.sendStatus(statusOpts);
 
 			this._status = {
 				chainId: this.config.chainCommon.chainId(),
@@ -223,89 +243,65 @@ export class EthHandler extends EventEmitter {
 	}
 
 	/**
-	 * Handle incoming protocol message
+	 * Handle incoming protocol message using registry
+	 * Delegates to protocol's message handling
 	 */
 	private handleMessage(code: number, payload: any): void {
-		if (!this._statusExchanged && code !== 0x00) {
+		if (!this._statusExchanged && code !== EthMessageCode.STATUS) {
 			log("Received message before STATUS exchange: code=%d", code);
 			return;
 		}
 
-		// Route to appropriate handler based on message code
-		switch (code) {
-			case 0x00: // STATUS - already handled
-				break;
-			case 0x01: // NEW_BLOCK_HASHES
-				this.handleNewBlockHashes(payload);
-				break;
-			case 0x02: // TRANSACTIONS
-				this.handleTransactions(payload);
-				break;
-			case 0x03: // GET_BLOCK_HEADERS
-				handleGetBlockHeaders(this, payload).catch((err) => {
-					log("Error handling GET_BLOCK_HEADERS: %s", err.message);
-					this.emit("error", err);
-				});
-				break;
-			case 0x04: // BLOCK_HEADERS
-				this.handleBlockHeaders(payload);
-				break;
-			case 0x05: // GET_BLOCK_BODIES
-				handleGetBlockBodies(this, payload).catch((err) => {
-					log("Error handling GET_BLOCK_BODIES: %s", err.message);
-					this.emit("error", err);
-				});
-				break;
-			case 0x06: // BLOCK_BODIES
-				this.handleBlockBodies(payload);
-				break;
-			case 0x07: // NEW_BLOCK
-				this.handleNewBlock(payload);
-				break;
-			case 0x08: // NEW_POOLED_TRANSACTION_HASHES
-				this.handleNewPooledTransactionHashes(payload);
-				break;
-			case 0x09: // GET_POOLED_TRANSACTIONS
-				handleGetPooledTransactions(this, payload);
-				break;
-			case 0x0a: // POOLED_TRANSACTIONS
-				this.handlePooledTransactions(payload);
-				break;
-			case 0x0d: // GET_NODE_DATA
-				handleGetNodeData(this, payload).catch((err) => {
-					log("Error handling GET_NODE_DATA: %s", err.message);
-					this.emit("error", err);
-				});
-				break;
-			case 0x0e: // NODE_DATA
-				this.handleNodeData(payload);
-				break;
-			case 0x0f: // GET_RECEIPTS
-				handleGetReceipts(this, payload).catch((err) => {
-					log("Error handling GET_RECEIPTS: %s", err.message);
-					this.emit("error", err);
-				});
-				break;
-			case 0x10: // RECEIPTS
-				this.handleReceipts(payload);
-				break;
-			default:
-				log("Unknown message code: %d", code);
+		// STATUS is handled separately by protocol
+		if (code === EthMessageCode.STATUS) {
+			return; // Already handled by handleStatus()
+		}
+
+		// Route to handler via registry
+		const handler = this.registry.getHandler(code as EthMessageCode);
+		if (handler) {
+			try {
+				const result = handler(this, payload);
+				if (result instanceof Promise) {
+					result.catch((err) => {
+						log("Error handling message code 0x%02x: %s", code, err.message);
+						this.emit("error", err);
+					});
+				}
+			} catch (error: any) {
+				log("Error handling message code 0x%02x: %s", code, error.message);
+				this.emit("error", error);
+			}
+		} else {
+			log("No handler registered for message code: 0x%02x", code);
 		}
 	}
 
 	/**
 	 * Send a protocol message
+	 * Delegates to protocol's sendMessage which handles encoding and sending
 	 */
-	sendMessage(code: number, data: Uint8Array): void {
+	sendMessage(code: number, payload: any): void {
 		if (!this.ethProtocol) {
 			throw new Error("ETH protocol not available");
 		}
 
-		this.rlpxConnection.sendSubprotocolMessage(
-			this.protocolOffset + code,
-			data,
-		);
+		// Use protocol's sendMessage which handles encoding, compression, and sending
+		this.ethProtocol.sendMessage(code as EthMessageCode, payload);
+	}
+
+	/**
+	 * Get protocol version
+	 */
+	getProtocolVersion(): number {
+		return this.protocolVersion;
+	}
+
+	/**
+	 * Get protocol offset
+	 */
+	getProtocolOffset(): number {
+		return this.protocolOffset;
 	}
 
 	/**
@@ -349,8 +345,8 @@ export class EthHandler extends EventEmitter {
 			{ value: this.nextReqId },
 		);
 
-		// Send request
-		this.ethProtocol.sendMessage(EthMessageCode.GET_BLOCK_HEADERS, requestData);
+		// Send request using wire module
+		this.sendMessage(EthMessageCode.GET_BLOCK_HEADERS, requestData);
 
 		log("Sent GET_BLOCK_HEADERS request: reqId=%d", reqId);
 
@@ -392,7 +388,7 @@ export class EthHandler extends EventEmitter {
 	async getBlockBodies(opts: {
 		reqId?: bigint;
 		hashes: Uint8Array[];
-	}): Promise<[bigint, any[]]> {
+	}): Promise<[bigint, BlockBodyBytes[]]> {
 		if (!this.ethProtocol) {
 			throw new Error("ETH protocol not available");
 		}
@@ -428,8 +424,8 @@ export class EthHandler extends EventEmitter {
 			{ value: this.nextReqId },
 		);
 
-		// Send request
-		this.ethProtocol.sendMessage(EthMessageCode.GET_BLOCK_BODIES, requestData);
+		// Send request using wire module
+		this.sendMessage(EthMessageCode.GET_BLOCK_BODIES, requestData);
 
 		log(
 			"Sent GET_BLOCK_BODIES request: reqId=%d, hashes=%d",
@@ -438,32 +434,34 @@ export class EthHandler extends EventEmitter {
 		);
 
 		// Wait for response
-		const promise = new Promise<[bigint, any[]]>((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				if (this.resolvers.has(reqId)) {
-					this.resolvers.delete(reqId);
-					this.inFlightRequests.delete(requestKey);
-					reject(
-						new Error(`GET_BLOCK_BODIES request timed out (reqId=${reqId})`),
-					);
-				}
-			}, this.timeout);
+		const promise = new Promise<[bigint, BlockBodyBytes[]]>(
+			(resolve, reject) => {
+				const timeout = setTimeout(() => {
+					if (this.resolvers.has(reqId)) {
+						this.resolvers.delete(reqId);
+						this.inFlightRequests.delete(requestKey);
+						reject(
+							new Error(`GET_BLOCK_BODIES request timed out (reqId=${reqId})`),
+						);
+					}
+				}, this.timeout);
 
-			this.resolvers.set(reqId, {
-				resolve: (value: unknown) => {
-					clearTimeout(timeout);
-					this.inFlightRequests.delete(requestKey);
-					const result = value as [bigint, any[]];
-					resolve(result);
-				},
-				reject: (err) => {
-					clearTimeout(timeout);
-					this.inFlightRequests.delete(requestKey);
-					reject(err);
-				},
-				timeout,
-			});
-		});
+				this.resolvers.set(reqId, {
+					resolve: (value: unknown) => {
+						clearTimeout(timeout);
+						this.inFlightRequests.delete(requestKey);
+						const result = value as [bigint, BlockBodyBytes[]];
+						resolve(result);
+					},
+					reject: (err) => {
+						clearTimeout(timeout);
+						this.inFlightRequests.delete(requestKey);
+						reject(err);
+					},
+					timeout,
+				});
+			},
+		);
 
 		this.inFlightRequests.set(requestKey, promise);
 		return promise;
@@ -475,7 +473,7 @@ export class EthHandler extends EventEmitter {
 	async getPooledTransactions(opts: {
 		reqId?: bigint;
 		hashes: Uint8Array[];
-	}): Promise<[bigint, any[]]> {
+	}): Promise<[bigint, TypedTransaction[]]> {
 		if (!this.ethProtocol) {
 			throw new Error("ETH protocol not available");
 		}
@@ -510,11 +508,8 @@ export class EthHandler extends EventEmitter {
 			EthMessageCode.GET_POOLED_TRANSACTIONS
 		].encode({ ...opts, reqId }, { value: this.nextReqId });
 
-		// Send request
-		this.ethProtocol.sendMessage(
-			EthMessageCode.GET_POOLED_TRANSACTIONS,
-			requestData,
-		);
+		// Send request using wire module
+		this.sendMessage(EthMessageCode.GET_POOLED_TRANSACTIONS, requestData);
 
 		log(
 			"Sent GET_POOLED_TRANSACTIONS request: reqId=%d, hashes=%d",
@@ -523,34 +518,36 @@ export class EthHandler extends EventEmitter {
 		);
 
 		// Wait for response
-		const promise = new Promise<[bigint, any[]]>((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				if (this.resolvers.has(reqId)) {
-					this.resolvers.delete(reqId);
-					this.inFlightRequests.delete(requestKey);
-					reject(
-						new Error(
-							`GET_POOLED_TRANSACTIONS request timed out (reqId=${reqId})`,
-						),
-					);
-				}
-			}, this.timeout);
+		const promise = new Promise<[bigint, TypedTransaction[]]>(
+			(resolve, reject) => {
+				const timeout = setTimeout(() => {
+					if (this.resolvers.has(reqId)) {
+						this.resolvers.delete(reqId);
+						this.inFlightRequests.delete(requestKey);
+						reject(
+							new Error(
+								`GET_POOLED_TRANSACTIONS request timed out (reqId=${reqId})`,
+							),
+						);
+					}
+				}, this.timeout);
 
-			this.resolvers.set(reqId, {
-				resolve: (value: unknown) => {
-					clearTimeout(timeout);
-					this.inFlightRequests.delete(requestKey);
-					const result = value as [bigint, any[]];
-					resolve(result);
-				},
-				reject: (err) => {
-					clearTimeout(timeout);
-					this.inFlightRequests.delete(requestKey);
-					reject(err);
-				},
-				timeout,
-			});
-		});
+				this.resolvers.set(reqId, {
+					resolve: (value: unknown) => {
+						clearTimeout(timeout);
+						this.inFlightRequests.delete(requestKey);
+						const result = value as [bigint, TypedTransaction[]];
+						resolve(result);
+					},
+					reject: (err) => {
+						clearTimeout(timeout);
+						this.inFlightRequests.delete(requestKey);
+						reject(err);
+					},
+					timeout,
+				});
+			},
+		);
 
 		this.inFlightRequests.set(requestKey, promise);
 		return promise;
@@ -562,7 +559,7 @@ export class EthHandler extends EventEmitter {
 	async getReceipts(opts: {
 		reqId?: bigint;
 		hashes: Uint8Array[];
-	}): Promise<[bigint, any[]]> {
+	}): Promise<[bigint, TxReceipt[]]> {
 		if (!this.ethProtocol) {
 			throw new Error("ETH protocol not available");
 		}
@@ -595,8 +592,8 @@ export class EthHandler extends EventEmitter {
 			{ value: this.nextReqId },
 		);
 
-		// Send request
-		this.ethProtocol.sendMessage(EthMessageCode.GET_RECEIPTS, requestData);
+		// Send request using wire module
+		this.sendMessage(EthMessageCode.GET_RECEIPTS, requestData);
 
 		log(
 			"Sent GET_RECEIPTS request: reqId=%d, hashes=%d",
@@ -605,7 +602,7 @@ export class EthHandler extends EventEmitter {
 		);
 
 		// Wait for response
-		const promise = new Promise<[bigint, any[]]>((resolve, reject) => {
+		const promise = new Promise<[bigint, TxReceipt[]]>((resolve, reject) => {
 			const timeout = setTimeout(() => {
 				if (this.resolvers.has(reqId)) {
 					this.resolvers.delete(reqId);
@@ -618,7 +615,7 @@ export class EthHandler extends EventEmitter {
 				resolve: (value: unknown) => {
 					clearTimeout(timeout);
 					this.inFlightRequests.delete(requestKey);
-					const result = value as [bigint, any[]];
+					const result = value as [bigint, TxReceipt[]];
 					resolve(result);
 				},
 				reject: (err) => {
@@ -634,226 +631,134 @@ export class EthHandler extends EventEmitter {
 		return promise;
 	}
 
-	// Message handlers (stubs for now - will be implemented in messages.ts)
-	private handleNewBlockHashes(payload: any): void {
-		// Decode NewBlockHashes message
-		try {
-			const decoded =
-				ETH_MESSAGES[EthMessageCode.NEW_BLOCK_HASHES].decode(payload);
-			this.emit("message", {
-				code: 0x01,
-				name: "NewBlockHashes",
-				data: decoded,
-			});
-		} catch (error: any) {
-			log("Error handling NEW_BLOCK_HASHES: %s", error.message);
-			this.emit("error", error);
+	/**
+	 * Send ETH protocol message (for announcements and responses)
+	 * Implements EthProtocolMethods.send()
+	 */
+	send(name: string, args?: unknown): void {
+		// Map message name to code
+		const nameToCode: Record<string, EthMessageCode> = {
+			Status: EthMessageCode.STATUS,
+			NewBlockHashes: EthMessageCode.NEW_BLOCK_HASHES,
+			Transactions: EthMessageCode.TRANSACTIONS,
+			GetBlockHeaders: EthMessageCode.GET_BLOCK_HEADERS,
+			BlockHeaders: EthMessageCode.BLOCK_HEADERS,
+			GetBlockBodies: EthMessageCode.GET_BLOCK_BODIES,
+			BlockBodies: EthMessageCode.BLOCK_BODIES,
+			NewBlock: EthMessageCode.NEW_BLOCK,
+			NewPooledTransactionHashes: EthMessageCode.NEW_POOLED_TRANSACTION_HASHES,
+			GetPooledTransactions: EthMessageCode.GET_POOLED_TRANSACTIONS,
+			PooledTransactions: EthMessageCode.POOLED_TRANSACTIONS,
+			GetNodeData: EthMessageCode.GET_NODE_DATA,
+			NodeData: EthMessageCode.NODE_DATA,
+			GetReceipts: EthMessageCode.GET_RECEIPTS,
+			Receipts: EthMessageCode.RECEIPTS,
+		};
+
+		const code = nameToCode[name];
+		if (code === undefined) {
+			throw new Error(`Unknown message name: ${name}`);
 		}
-	}
 
-	private handleTransactions(payload: any): void {
-		// Decode Transactions message
-		// Payload is already decoded by devp2p protocol: array of transaction bytes
-		try {
-			const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(
-				payload,
-				{
-					chainCommon: this.config.chainCommon,
-					synchronized: this._statusExchanged,
-				},
-			);
-			this.emit("message", {
-				code: 0x02,
-				name: "Transactions",
-				data: decoded,
-			});
-		} catch (error: any) {
-			log("Error handling TRANSACTIONS: %s", error.message);
-			this.emit("error", error);
+		// Get message definition
+		const messageDef = ETH_MESSAGES[code];
+		if (!messageDef) {
+			throw new Error(`No message definition for code: ${code}`);
 		}
-	}
 
-	private handleGetBlockHeaders(payload: any): void {
-		this.emit("message", { code: 0x03, payload });
-	}
-
-	private handleBlockHeaders(payload: any): void {
-		// Payload is already decoded: [reqId, headers]
-		// Decode using protocol definitions
-		try {
-			const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(
-				payload,
-				{ chainCommon: this.config.chainCommon },
-			) as [bigint, BlockHeader[]];
-			const reqId = decoded[0] as bigint;
-			const headers = decoded[1] as BlockHeader[];
-
-			log(
-				"BLOCK_HEADERS response: reqId=%d, headers=%d",
-				reqId,
-				headers.length,
-			);
-
-			// Resolve pending request if exists
-			const resolver = this.resolvers.get(reqId);
-			if (resolver) {
-				clearTimeout(resolver.timeout);
-				this.resolvers.delete(reqId);
-				resolver.resolve([reqId, headers]);
-				log("Resolved GET_BLOCK_HEADERS request for reqId=%d", reqId);
+		// Encode data using protocol definitions
+		let encodedData: any;
+		if (messageDef.encode) {
+			// Handle different argument formats based on message type
+			if (name === "NewBlock" && Array.isArray(args)) {
+				// NewBlock: [block, td] - encode takes tuple
+				const encodeFn = messageDef.encode as (args: [any, bigint]) => any;
+				encodedData = encodeFn(args as [any, bigint]);
+			} else if (name === "NewBlockHashes" && Array.isArray(args)) {
+				// NewBlockHashes: array of [hash, number] - encode takes array
+				const encodeFn = messageDef.encode as (args: any[]) => any;
+				encodedData = encodeFn(args as any[]);
+			} else if (name === "Transactions" && Array.isArray(args)) {
+				// Transactions: array of transactions - encode takes array
+				const encodeFn = messageDef.encode as (args: TypedTransaction[]) => any;
+				encodedData = encodeFn(args as TypedTransaction[]);
+			} else if (name === "NewPooledTransactionHashes" && Array.isArray(args)) {
+				// NewPooledTransactionHashes: can be array or tuple
+				const encodeFn = messageDef.encode as (
+					params:
+						| Uint8Array[]
+						| [types: number[], sizes: number[], hashes: Uint8Array[]],
+				) => any;
+				encodedData = encodeFn(args as any);
+			} else if (typeof args === "object" && args !== null) {
+				// Object format: { reqId, headers }, { reqId, bodies }, etc.
+				const encodeFn = messageDef.encode as (args: any) => any;
+				encodedData = encodeFn(args as any);
 			} else {
-				// No pending request, emit as event for service layer
-				this.emit("message", {
-					code: 0x04,
-					name: "BlockHeaders",
-					data: { reqId, headers },
-				});
+				const encodeFn = messageDef.encode as (args: any) => any;
+				encodedData = encodeFn(args as any);
 			}
-		} catch (error: any) {
-			log("Error handling BLOCK_HEADERS: %s", error.message);
-			this.emit("error", error);
+		} else {
+			encodedData = args;
 		}
-	}
 
-	private handleGetBlockBodies(payload: any): void {
-		this.emit("message", { code: 0x05, payload });
-	}
-
-	private handleBlockBodies(payload: any): void {
-		// Payload is already decoded: [reqId, bodies]
-		try {
-			const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_BODIES].decode(payload);
-			const reqId = decoded[0] as bigint;
-			const bodies = decoded[1] as any[];
-
-			log("BLOCK_BODIES response: reqId=%d, bodies=%d", reqId, bodies.length);
-
-			// Resolve pending request if exists
-			const resolver = this.resolvers.get(reqId);
-			if (resolver) {
-				clearTimeout(resolver.timeout);
-				this.resolvers.delete(reqId);
-				resolver.resolve([reqId, bodies]);
-				log("Resolved GET_BLOCK_BODIES request for reqId=%d", reqId);
-			} else {
-				// No pending request, emit as event for service layer
-				this.emit("message", {
-					code: 0x06,
-					name: "BlockBodies",
-					data: { reqId, bodies },
-				});
-			}
-		} catch (error: any) {
-			log("Error handling BLOCK_BODIES: %s", error.message);
-			this.emit("error", error);
-		}
-	}
-
-	private handleNewBlock(payload: any): void {
-		// Decode NewBlock message: [block, td]
-		// Payload is already decoded by devp2p protocol: [blockBytes, tdBytes]
-		try {
-			const decoded = ETH_MESSAGES[EthMessageCode.NEW_BLOCK].decode(payload, {
-				chainCommon: this.config.chainCommon,
-			});
-			const block = decoded[0];
-			const td = decoded[1];
-			this.emit("message", {
-				code: 0x07,
-				name: "NewBlock",
-				data: [block, td],
-			});
-		} catch (error: any) {
-			log("Error handling NEW_BLOCK: %s", error.message);
-			this.emit("error", error);
-		}
-	}
-
-	private handleNewPooledTransactionHashes(payload: any): void {
-		this.emit("message", { code: 0x08, payload });
-	}
-
-	private handleGetPooledTransactions(payload: any): void {
-		this.emit("message", { code: 0x09, payload });
-	}
-
-	private handlePooledTransactions(payload: any): void {
-		// Payload is already decoded: [reqId, txs]
-		try {
-			const decoded = ETH_MESSAGES[EthMessageCode.POOLED_TRANSACTIONS].decode(
-				payload,
-				{ chainCommon: this.config.chainCommon },
-			) as [bigint, any[]];
-			const reqId = decoded[0] as bigint;
-			const txs = decoded[1] as any[];
-
-			log("POOLED_TRANSACTIONS response: reqId=%d, txs=%d", reqId, txs.length);
-
-			// Resolve pending request if exists
-			const resolver = this.resolvers.get(reqId);
-			if (resolver) {
-				clearTimeout(resolver.timeout);
-				this.resolvers.delete(reqId);
-				resolver.resolve([reqId, txs]);
-				log("Resolved GET_POOLED_TRANSACTIONS request for reqId=%d", reqId);
-			} else {
-				// No pending request, emit as event for service layer
-				this.emit("message", {
-					code: 0x0a,
-					name: "PooledTransactions",
-					data: { reqId, txs },
-				});
-			}
-		} catch (error: any) {
-			log("Error handling POOLED_TRANSACTIONS: %s", error.message);
-			this.emit("error", error);
-		}
-	}
-
-	private handleGetNodeData(payload: any): void {
-		this.emit("message", { code: 0x0d, payload });
-	}
-
-	private handleNodeData(payload: any): void {
-		this.emit("message", { code: 0x0e, payload });
-	}
-
-	private handleGetReceipts(payload: any): void {
-		this.emit("message", { code: 0x0f, payload });
-	}
-
-	private handleReceipts(payload: any): void {
-		// Payload is already decoded: [reqId, receipts]
-		try {
-			const decoded = ETH_MESSAGES[EthMessageCode.RECEIPTS].decode(payload);
-			const reqId = decoded[0] as bigint;
-			const receipts = decoded[1] as any[];
-
-			log("RECEIPTS response: reqId=%d, receipts=%d", reqId, receipts.length);
-
-			// Resolve pending request if exists
-			const resolver = this.resolvers.get(reqId);
-			if (resolver) {
-				clearTimeout(resolver.timeout);
-				this.resolvers.delete(reqId);
-				resolver.resolve([reqId, receipts]);
-				log("Resolved GET_RECEIPTS request for reqId=%d", reqId);
-			} else {
-				// No pending request, emit as event for service layer
-				this.emit("message", {
-					code: 0x10,
-					name: "Receipts",
-					data: { reqId, receipts },
-				});
-			}
-		} catch (error: any) {
-			log("Error handling RECEIPTS: %s", error.message);
-			this.emit("error", error);
-		}
+		// Send via wire module (encodes and sends via RLPxConnection)
+		this.sendMessage(code, encodedData);
 	}
 
 	/**
-	 * Get peer status
+	 * Request with response (for compatibility with BoundProtocol interface)
+	 * Implements EthProtocolMethods.request()
+	 */
+	async request(name: string, args?: unknown): Promise<unknown> {
+		// Check if this is a request/response message or an announcement
+		const responseMessages = [
+			"BlockHeaders",
+			"BlockBodies",
+			"PooledTransactions",
+			"Receipts",
+			"NodeData",
+		];
+		const requestMessages = [
+			"GetBlockHeaders",
+			"GetBlockBodies",
+			"GetPooledTransactions",
+			"GetReceipts",
+			"GetNodeData",
+		];
+
+		// If it's an announcement (like "Transactions"), just send it
+		if (!requestMessages.includes(name) && !responseMessages.includes(name)) {
+			this.send(name, args);
+			return Promise.resolve(undefined);
+		}
+
+		// For actual requests, use the specific methods
+		if (name === "GetBlockHeaders") {
+			return this.getBlockHeaders(args as any);
+		} else if (name === "GetBlockBodies") {
+			return this.getBlockBodies(args as any);
+		} else if (name === "GetPooledTransactions") {
+			return this.getPooledTransactions(args as any);
+		} else if (name === "GetReceipts") {
+			return this.getReceipts(args as any);
+		}
+
+		// Fallback: just send
+		this.send(name, args);
+		return Promise.resolve(undefined);
+	}
+
+	/**
+	 * Handle message queue (no-op for compatibility)
+	 * Implements EthProtocolMethods.handleMessageQueue()
+	 */
+	handleMessageQueue(): void {
+		// No-op - messages handled directly via registry
+	}
+
+	/**
+	 * Get peer status (for EthProtocolMethods interface)
 	 */
 	get status(): EthStatus | null {
 		return this._peerStatus;

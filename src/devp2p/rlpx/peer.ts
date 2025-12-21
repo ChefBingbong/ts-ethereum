@@ -207,6 +207,15 @@ export class Peer {
 	}
 
 	/**
+	 * Send a subprotocol message (for ProtocolConnection compatibility)
+	 * @param code Absolute message code (includes protocol offset)
+	 * @param data Message data
+	 */
+	sendSubprotocolMessage(code: number, data: Uint8Array): boolean {
+		return this._sendMessage(code, data);
+	}
+
+	/**
 	 * Create message HEADER and BODY and send to socket
 	 * Also called from SubProtocol context
 	 * @param code
@@ -447,17 +456,12 @@ export class Peer {
 				const _offset = offset;
 				offset += obj.length;
 
-				// The send method handed over to the subprotocol object (e.g. an `ETH` instance).
-				// The subprotocol is then calling into the lower level method
-				// (e.g. `ETH` calling into `Peer._sendMessage()`).
-				const sendMethod = (code: number, data: Uint8Array) => {
-					if (code > obj.length) throw new Error("Code out of range");
-					this._sendMessage(_offset + code, data);
-				};
 				// Dynamically instantiate the subprotocol object
 				// from the constructor
+				// New interface: pass connection (this) and protocol offset
+				// For backward compatibility, Peer implements ProtocolConnection interface
 				const SubProtocol = obj.constructor;
-				const protocol = new SubProtocol(obj.version, this, sendMethod);
+				const protocol = new SubProtocol(obj.version, this, _offset);
 
 				return { protocol, offset: _offset, length: obj.length };
 			});

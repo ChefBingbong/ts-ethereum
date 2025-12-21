@@ -1,235 +1,15 @@
 import debug from "debug";
-import type { BlockBodyBytes, BlockHeader } from "../../../block";
-import type { EthStatusEncoded } from "../../../devp2p/protocol/eth.ts";
 import type { Connection } from "../../../p2p/libp2p/types.ts";
 import { peerIdToString } from "../../../p2p/libp2p/types.ts";
 import { EthHandler } from "../../../p2p/protocol/eth/handler.ts";
 import type { RLPxConnection } from "../../../p2p/transport/rlpx/index.ts";
-import type { TypedTransaction } from "../../../tx";
-import { bigIntToUnpaddedBytes } from "../../../utils";
-import type { TxReceipt } from "../../../vm";
 import type { Chain } from "../../blockchain";
 import type { VMExecution } from "../../execution";
 import { Event } from "../../types.ts";
-import { ETH_MESSAGES, EthMessageCode } from "../protocol/eth/definitions.ts";
-import type { EthProtocolMethods } from "../protocol/ethprotocol.ts";
 import type { PeerOptions } from "./peer.ts";
 import { Peer } from "./peer.ts";
 
 const log = debug("p2p:peer");
-
-/**
- * Adapter that wraps EthHandler to match BoundEthProtocol interface
- */
-class EthHandlerAdapter implements EthProtocolMethods {
-	public readonly name = "eth";
-	public readonly config: typeof this.handler.config;
-	public readonly peer: Peer;
-	public updatedBestHeader?: BlockHeader;
-
-	constructor(
-		private readonly handler: EthHandler,
-		peer: Peer,
-	) {
-		this.config = handler.config;
-		this.peer = peer;
-		this.updatedBestHeader = handler.updatedBestHeader;
-
-		// Forward updatedBestHeader updates
-		handler.on("status", () => {
-			this.updatedBestHeader = handler.updatedBestHeader;
-		});
-
-		// Forward messages from EthHandler to service via PROTOCOL_MESSAGE event
-		handler.on("message", (message: any) => {
-			// Emit PROTOCOL_MESSAGE event so service can handle it
-			this.config.events.emit(Event.PROTOCOL_MESSAGE, message, "eth", peer);
-		});
-	}
-
-	get status(): EthStatusEncoded {
-		// Return status in format expected by BoundEthProtocol
-		const handlerStatus = this.handler.status;
-		if (!handlerStatus) {
-			throw new Error("Status not yet received");
-		}
-		// Convert EthStatus to EthStatusEncoded format
-		return {
-			chainId: bigIntToUnpaddedBytes(handlerStatus.chainId),
-			td: bigIntToUnpaddedBytes(handlerStatus.td),
-			bestHash: handlerStatus.bestHash,
-			genesisHash: handlerStatus.genesisHash,
-			forkId: handlerStatus.forkId,
-		};
-	}
-
-	get versions(): number[] {
-		return [68]; // ETH/68
-	}
-
-	async getBlockHeaders(opts: {
-		reqId?: bigint;
-		block: bigint | Uint8Array;
-		max: number;
-		skip?: number;
-		reverse?: boolean;
-	}): Promise<[bigint, BlockHeader[]]> {
-		return this.handler.getBlockHeaders(opts);
-	}
-
-	async getBlockBodies(opts: {
-		reqId?: bigint;
-		hashes: Uint8Array[];
-	}): Promise<[bigint, BlockBodyBytes[]]> {
-		const result = await this.handler.getBlockBodies(opts);
-		return result as [bigint, BlockBodyBytes[]];
-	}
-
-	async getPooledTransactions(opts: {
-		reqId?: bigint;
-		hashes: Uint8Array[];
-	}): Promise<[bigint, TypedTransaction[]]> {
-		const result = await this.handler.getPooledTransactions(opts);
-		return result as [bigint, TypedTransaction[]];
-	}
-
-	async getReceipts(opts: {
-		reqId?: bigint;
-		hashes: Uint8Array[];
-	}): Promise<[bigint, TxReceipt[]]> {
-		const result = await this.handler.getReceipts(opts);
-		return result as [bigint, TxReceipt[]];
-	}
-
-	handleMessageQueue(): void {
-		// No-op - messages handled by EthHandler
-	}
-
-	/**
-	 * Send ETH protocol message
-	 * Maps message names to codes and encodes data using protocol definitions
-	 */
-	send(name: string, args?: unknown): void {
-		// Map message name to code
-		const nameToCode: Record<string, EthMessageCode> = {
-			Status: EthMessageCode.STATUS,
-			NewBlockHashes: EthMessageCode.NEW_BLOCK_HASHES,
-			Transactions: EthMessageCode.TRANSACTIONS,
-			GetBlockHeaders: EthMessageCode.GET_BLOCK_HEADERS,
-			BlockHeaders: EthMessageCode.BLOCK_HEADERS,
-			GetBlockBodies: EthMessageCode.GET_BLOCK_BODIES,
-			BlockBodies: EthMessageCode.BLOCK_BODIES,
-			NewBlock: EthMessageCode.NEW_BLOCK,
-			NewPooledTransactionHashes: EthMessageCode.NEW_POOLED_TRANSACTION_HASHES,
-			GetPooledTransactions: EthMessageCode.GET_POOLED_TRANSACTIONS,
-			PooledTransactions: EthMessageCode.POOLED_TRANSACTIONS,
-			GetNodeData: EthMessageCode.GET_NODE_DATA,
-			NodeData: EthMessageCode.NODE_DATA,
-			GetReceipts: EthMessageCode.GET_RECEIPTS,
-			Receipts: EthMessageCode.RECEIPTS,
-		};
-
-		const code = nameToCode[name];
-		if (code === undefined) {
-			throw new Error(`Unknown message name: ${name}`);
-		}
-
-		// Get message definition
-		const messageDef = ETH_MESSAGES[code];
-		if (!messageDef) {
-			throw new Error(`No message definition for code: ${code}`);
-		}
-
-		// Encode data using protocol definitions
-		let encodedData: any;
-		if (messageDef.encode) {
-			// Handle different argument formats based on message type
-			if (name === "NewBlock" && Array.isArray(args)) {
-				// NewBlock: [block, td] - encode takes tuple
-				const encodeFn = messageDef.encode as (args: [any, bigint]) => any;
-				encodedData = encodeFn(args as [any, bigint]);
-			} else if (name === "NewBlockHashes" && Array.isArray(args)) {
-				// NewBlockHashes: array of [hash, number] - encode takes array
-				const encodeFn = messageDef.encode as (args: any[]) => any;
-				encodedData = encodeFn(args as any[]);
-			} else if (name === "Transactions" && Array.isArray(args)) {
-				// Transactions: array of transactions - encode takes array
-				const encodeFn = messageDef.encode as (args: TypedTransaction[]) => any;
-				encodedData = encodeFn(args as TypedTransaction[]);
-			} else if (name === "NewPooledTransactionHashes" && Array.isArray(args)) {
-				// NewPooledTransactionHashes: can be array or tuple
-				const encodeFn = messageDef.encode as (
-					params:
-						| Uint8Array[]
-						| [types: number[], sizes: number[], hashes: Uint8Array[]],
-				) => any;
-				encodedData = encodeFn(args as any);
-			} else if (typeof args === "object" && args !== null) {
-				// Object format: { reqId, headers }, { reqId, bodies }, etc.
-				// Responses don't need nextReqId, only requests do
-				const encodeFn = messageDef.encode as (args: any) => any;
-				encodedData = encodeFn(args as any);
-			} else {
-				const encodeFn = messageDef.encode as (args: any) => any;
-				encodedData = encodeFn(args as any);
-			}
-		} else {
-			encodedData = args;
-		}
-
-		// Get ethProtocol from handler (it's private, so we need to access it)
-		const ethProtocol = (this.handler as any).ethProtocol;
-		if (!ethProtocol) {
-			throw new Error("ETH protocol not available");
-		}
-
-		// Send via ethProtocol (it will RLP-encode internally)
-		ethProtocol.sendMessage(code, encodedData);
-	}
-
-	/**
-	 * Request with response (for compatibility with BoundProtocol interface)
-	 * For announcements like "Transactions", this just calls send() without waiting
-	 */
-	async request(name: string, args?: unknown): Promise<unknown> {
-		// Check if this is a request/response message or an announcement
-		const responseMessages = [
-			"BlockHeaders",
-			"BlockBodies",
-			"PooledTransactions",
-			"Receipts",
-			"NodeData",
-		];
-		const requestMessages = [
-			"GetBlockHeaders",
-			"GetBlockBodies",
-			"GetPooledTransactions",
-			"GetReceipts",
-			"GetNodeData",
-		];
-
-		// If it's an announcement (like "Transactions"), just send it
-		if (!requestMessages.includes(name) && !responseMessages.includes(name)) {
-			this.send(name, args);
-			return Promise.resolve(undefined);
-		}
-
-		// For actual requests, use the specific methods
-		if (name === "GetBlockHeaders") {
-			return this.getBlockHeaders(args as any);
-		} else if (name === "GetBlockBodies") {
-			return this.getBlockBodies(args as any);
-		} else if (name === "GetPooledTransactions") {
-			return this.getPooledTransactions(args as any);
-		} else if (name === "GetReceipts") {
-			return this.getReceipts(args as any);
-		}
-
-		// Fallback: just send
-		this.send(name, args);
-		return Promise.resolve(undefined);
-	}
-}
 
 export interface P2PPeerOptions
 	extends Omit<PeerOptions, "address" | "transport"> {
@@ -280,8 +60,6 @@ export class P2PPeer extends Peer {
 			address,
 			transport: "p2p",
 			inbound: options.inbound ?? options.connection.direction === "inbound",
-			protocols: [], // Protocols are accessed via RLPxConnection
-			server: options.server,
 		});
 
 		this.connection = options.connection;
@@ -329,7 +107,7 @@ export class P2PPeer extends Peer {
 			log("Binding ETH protocol for peer %s", this.id.slice(0, 8));
 
 			if (this.chain && this.execution) {
-				// Use new EthHandler
+				// Use EthHandler directly (it implements EthProtocolMethods)
 				log("Creating EthHandler for peer %s", this.id.slice(0, 8));
 				const ethHandler = new EthHandler({
 					config: this.config,
@@ -338,10 +116,15 @@ export class P2PPeer extends Peer {
 					rlpxConnection: this.rlpxConnection,
 				});
 
-				// Create adapter to match EthProtocolMethods interface
-				const ethAdapter = new EthHandlerAdapter(ethHandler, this);
-				this.eth = ethAdapter;
-				this.boundProtocols.push(ethAdapter);
+				// Forward messages from EthHandler to service via PROTOCOL_MESSAGE event
+				ethHandler.on("message", (message: any) => {
+					// Emit PROTOCOL_MESSAGE event so service can handle it
+					this.config.events.emit(Event.PROTOCOL_MESSAGE, message, "eth", this);
+				});
+
+				// Use handler directly (it implements EthProtocolMethods)
+				this.eth = ethHandler;
+				this.boundProtocols.push(ethHandler);
 				log(
 					"ETH protocol bound using EthHandler for peer %s",
 					this.id.slice(0, 8),

@@ -12,10 +12,9 @@ import {
 	intToBytes,
 	isHexString,
 } from "../../utils";
-import type { Peer } from "../rlpx/peer.ts";
-import type { SendMethod } from "../types.ts";
 import { ProtocolType } from "../types.ts";
 import { assertEq, formatLogData, formatLogId } from "../util.ts";
+import type { ProtocolConnection } from "./protocol.ts";
 import { Protocol } from "./protocol.ts";
 
 export interface EthStatusMsg extends Array<Uint8Array | Uint8Array[]> {}
@@ -90,12 +89,22 @@ export class ETH extends Protocol {
 	protected _forkHash: string = "";
 	protected _nextForkBlock = BIGINT_0;
 
-	constructor(version: number, peer: Peer, send: SendMethod) {
-		super(peer, send, ProtocolType.ETH, version, EthMessageCodes);
+	constructor(
+		version: number,
+		connection: ProtocolConnection,
+		protocolOffset?: number,
+	) {
+		super(
+			connection,
+			ProtocolType.ETH,
+			version,
+			EthMessageCodes,
+			protocolOffset,
+		);
 
 		// Set forkHash and nextForkBlock
 		if (this._version >= 64) {
-			const c = this._peer.common;
+			const c = this._connection.common;
 			this._hardfork = c.hardfork() ?? this._hardfork;
 			// Set latestBlock minimally to start block of fork to have some more
 			// accurate basis if no latestBlock is provided along status send
@@ -116,45 +125,92 @@ export class ETH extends Protocol {
 	static eth67 = { name: "eth", version: 67, length: 17, constructor: ETH };
 	static eth68 = { name: "eth", version: 68, length: 17, constructor: ETH };
 
-	_handleMessage(code: EthMessageCodes, data: Uint8Array) {
+	/**
+	 * Register message handlers for ETH protocol
+	 * By default, messages are emitted as events for backward compatibility
+	 * Handlers can be registered externally via registerHandler()
+	 */
+	protected registerHandlers(): void {
+		// STATUS is handled specially in _handleMessage
+		// Other messages are emitted as events by default
+		// External code (like EthHandler) can register handlers via registerHandler()
+	}
+
+	/**
+	 * Handle incoming ETH protocol messages
+	 * Decodes RLP and routes to handlers or emits events
+	 */
+	_handleMessage(code: number, data: Uint8Array): void {
+		const ethCode = code as EthMessageCodes;
 		const payload = RLP.decode(data);
 
-		if (code !== EthMessageCodes.STATUS && this.DEBUG) {
+		if (ethCode !== EthMessageCodes.STATUS && this.DEBUG) {
 			const debugMsg = this.DEBUG
-				? `Received ${this.getMsgPrefix(code)} message from ${
-						this._peer["_socket"].remoteAddress
-					}:${this._peer["_socket"].remotePort}`
+				? `Received ${this.getMsgPrefix(ethCode)} message from ${
+						this._connection._socket.remoteAddress
+					}:${this._connection._socket.remotePort}`
 				: undefined;
 			const logData = formatLogData(bytesToHex(data), this._verbose);
-			this.debug(this.getMsgPrefix(code), `${debugMsg}: ${logData}`);
+			this.debug(this.getMsgPrefix(ethCode), `${debugMsg}: ${logData}`);
 		}
-		switch (code) {
-			case EthMessageCodes.STATUS: {
-				assertEq(
-					this._peerStatus,
-					null,
-					"Uncontrolled status message",
-					this.debug.bind(this),
-					"STATUS",
-				);
-				this._peerStatus = payload as EthStatusMsg;
-				const peerStatusMsg = `${
-					this._peerStatus !== undefined
-						? this._getStatusString(this._peerStatus)
-						: ""
-				}`;
-				if (this.DEBUG) {
-					const debugMsg = this.DEBUG
-						? `Received ${this.getMsgPrefix(code)} message from ${
-								this._peer["_socket"].remoteAddress
-							}:${this._peer["_socket"].remotePort}`
-						: undefined;
-					this.debug(this.getMsgPrefix(code), `${debugMsg}: ${peerStatusMsg}`);
-				}
-				this._handleStatus();
-				break;
-			}
 
+		// STATUS is handled specially
+		if (ethCode === EthMessageCodes.STATUS) {
+			this._handleStatusMessage(payload);
+			return;
+		}
+
+		// Validate message code against protocol version
+		if (!this._validateMessageCode(ethCode)) {
+			return;
+		}
+
+		// Check if handler is registered, otherwise emit event for backward compatibility
+		if (this._registry.has(ethCode)) {
+			// Route to registered handler
+			super._handleMessage(ethCode, payload as Uint8Array);
+		} else {
+			// Emit as event for backward compatibility
+			this.events.emit("message", ethCode, payload);
+		}
+	}
+
+	/**
+	 * Handle STATUS message specially
+	 */
+	private _handleStatusMessage(payload: unknown): void {
+		assertEq(
+			this._peerStatus,
+			null,
+			"Uncontrolled status message",
+			this.debug.bind(this),
+			"STATUS",
+		);
+		this._peerStatus = payload as EthStatusMsg;
+		const peerStatusMsg = `${
+			this._peerStatus !== undefined
+				? this._getStatusString(this._peerStatus)
+				: ""
+		}`;
+		if (this.DEBUG) {
+			const debugMsg = this.DEBUG
+				? `Received ${this.getMsgPrefix(EthMessageCodes.STATUS)} message from ${
+						this._connection._socket.remoteAddress
+					}:${this._connection._socket.remotePort}`
+				: undefined;
+			this.debug(
+				this.getMsgPrefix(EthMessageCodes.STATUS),
+				`${debugMsg}: ${peerStatusMsg}`,
+			);
+		}
+		this._handleStatus();
+	}
+
+	/**
+	 * Validate message code against protocol version
+	 */
+	private _validateMessageCode(code: EthMessageCodes): boolean {
+		switch (code) {
 			case EthMessageCodes.NEW_BLOCK_HASHES:
 			case EthMessageCodes.TX:
 			case EthMessageCodes.GET_BLOCK_HEADERS:
@@ -162,34 +218,27 @@ export class ETH extends Protocol {
 			case EthMessageCodes.GET_BLOCK_BODIES:
 			case EthMessageCodes.BLOCK_BODIES:
 			case EthMessageCodes.NEW_BLOCK:
-				if (this._version >= ETH.eth62.version) break;
-				return;
+				return this._version >= ETH.eth62.version;
 
 			case EthMessageCodes.GET_RECEIPTS:
 			case EthMessageCodes.RECEIPTS:
-				if (this._version >= ETH.eth63.version) break;
-				return;
+				return this._version >= ETH.eth63.version;
 
 			case EthMessageCodes.NEW_POOLED_TRANSACTION_HASHES:
 			case EthMessageCodes.GET_POOLED_TRANSACTIONS:
 			case EthMessageCodes.POOLED_TRANSACTIONS:
-				if (this._version >= ETH.eth65.version) break;
-				return;
+				return this._version >= ETH.eth65.version;
 
 			case EthMessageCodes.GET_NODE_DATA:
 			case EthMessageCodes.NODE_DATA:
-				if (
+				return (
 					this._version >= ETH.eth63.version &&
 					this._version <= ETH.eth66.version
-				)
-					break;
-				return;
+				);
 
 			default:
-				return;
+				return false;
 		}
-
-		this.events.emit("message", code, payload);
 	}
 
 	/**
@@ -300,7 +349,7 @@ export class ETH extends Protocol {
 		if (this._status !== null) return;
 		this._status = [
 			intToBytes(this._version),
-			bigIntToBytes(BigInt(this._peer.common.chainId())),
+			bigIntToBytes(BigInt(this._connection.common.chainId())),
 			status.td,
 			status.bestHash,
 			status.genesisHash,
@@ -331,8 +380,8 @@ export class ETH extends Protocol {
 			this.debug(
 				"STATUS",
 
-				`Send STATUS message to ${this._peer["_socket"].remoteAddress}:${
-					this._peer["_socket"].remotePort
+				`Send STATUS message to ${this._connection._socket.remoteAddress}:${
+					this._connection._socket.remotePort
 				} (eth${this._version}): ${this._getStatusString(this._status)}`,
 			);
 		}
@@ -341,85 +390,51 @@ export class ETH extends Protocol {
 
 		// Use snappy compression if peer supports DevP2P >=v5
 		if (
-			this._peer["_hello"] !== null &&
-			this._peer["_hello"].protocolVersion >= 5
+			this._connection._hello !== null &&
+			this._connection._hello.protocolVersion >= 5
 		) {
 			payload = snappy.compress(payload);
 		}
 
-		this._send(EthMessageCodes.STATUS, payload);
+		// Use base class sendMessage directly to bypass STATUS check
+		// (sendStatus is the proper way to send STATUS, but internally we use base class)
+		super.sendMessage(EthMessageCodes.STATUS, payload);
 		this._handleStatus();
 	}
 
-	sendMessage(code: EthMessageCodes, payload: Input) {
+	sendMessage(code: EthMessageCodes, payload: Input): void {
+		if (code === EthMessageCodes.STATUS) {
+			throw new Error("Please send status message through .sendStatus");
+		}
+
+		// Validate message code against protocol version
+		if (!this._validateMessageCode(code)) {
+			throw new Error(`Code ${code} not allowed with version ${this._version}`);
+		}
+
 		if (this.DEBUG) {
 			const logData = formatLogData(
 				bytesToHex(RLP.encode(payload)),
 				this._verbose,
 			);
 			const messageName = this.getMsgPrefix(code);
-			const debugMsg = `Send ${messageName} message to ${this._peer["_socket"].remoteAddress}:${this._peer["_socket"].remotePort}: ${logData}`;
+			const debugMsg = `Send ${messageName} message to ${this._connection._socket.remoteAddress}:${this._connection._socket.remotePort}: ${logData}`;
 
 			this.debug(messageName, debugMsg);
 		}
 
-		switch (code) {
-			case EthMessageCodes.STATUS:
-				throw new Error("Please send status message through .sendStatus");
-
-			case EthMessageCodes.NEW_BLOCK_HASHES:
-			case EthMessageCodes.TX:
-			case EthMessageCodes.GET_BLOCK_HEADERS:
-			case EthMessageCodes.BLOCK_HEADERS:
-			case EthMessageCodes.GET_BLOCK_BODIES:
-			case EthMessageCodes.BLOCK_BODIES:
-			case EthMessageCodes.NEW_BLOCK:
-				if (this._version >= ETH.eth62.version) break;
-				throw new Error(
-					`Code ${code} not allowed with version ${this._version}`,
-				);
-
-			case EthMessageCodes.GET_RECEIPTS:
-			case EthMessageCodes.RECEIPTS:
-				if (this._version >= ETH.eth63.version) break;
-				throw new Error(
-					`Code ${code} not allowed with version ${this._version}`,
-				);
-
-			case EthMessageCodes.NEW_POOLED_TRANSACTION_HASHES:
-			case EthMessageCodes.GET_POOLED_TRANSACTIONS:
-			case EthMessageCodes.POOLED_TRANSACTIONS:
-				if (this._version >= ETH.eth65.version) break;
-				throw new Error(
-					`Code ${code} not allowed with version ${this._version}`,
-				);
-
-			case EthMessageCodes.GET_NODE_DATA:
-			case EthMessageCodes.NODE_DATA:
-				if (
-					this._version >= ETH.eth63.version &&
-					this._version <= ETH.eth66.version
-				)
-					break;
-				throw new Error(
-					`Code ${code} not allowed with version ${this._version}`,
-				);
-
-			default:
-				throw new Error(`Unknown code ${code}`);
-		}
-
-		payload = RLP.encode(payload);
+		let encodedPayload = RLP.encode(payload);
 
 		// Use snappy compression if peer supports DevP2P >=v5
 		if (
-			this._peer["_hello"] !== null &&
-			this._peer["_hello"].protocolVersion >= 5
+			this._connection._hello !== null &&
+			this._connection._hello.protocolVersion >= 5
 		) {
-			payload = snappy.compress(payload);
+			encodedPayload = snappy.compress(encodedPayload);
 		}
 
-		this._send(code, payload);
+		// Use base class sendMessage which calls connection.sendSubprotocolMessage
+		super.sendMessage(code, encodedPayload);
 	}
 
 	getMsgPrefix(msgCode: EthMessageCodes): string {

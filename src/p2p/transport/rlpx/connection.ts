@@ -483,13 +483,9 @@ export class RLPxConnection extends EventEmitter<RLPxConnectionEvents> {
 				const _offset = offset;
 				offset += obj.length;
 
-				const sendMethod = (code: number, data: Uint8Array) => {
-					if (code > obj.length) throw new Error("Code out of range");
-					this._sendMessage(_offset + code, data);
-				};
-
 				const SubProtocol = obj.constructor;
-				const protocol = new SubProtocol(obj.version, this, sendMethod);
+				// Pass connection (this) and protocol offset instead of sendMethod callback
+				const protocol = new SubProtocol(obj.version, this, _offset);
 
 				return { protocol, offset: _offset, length: obj.length };
 			});

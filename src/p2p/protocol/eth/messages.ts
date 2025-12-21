@@ -48,21 +48,14 @@ export async function handleGetBlockHeaders(
 
 		log("Sending %d headers in response to reqId=%d", headers.length, reqId);
 
-		// Send response using devp2p protocol's sendMessage
-		// sendMessage expects RLP-encodable data (array)
-		const ethProtocol = (handler as any).ethProtocol;
-		if (!ethProtocol) {
-			throw new Error("ETH protocol not available");
-		}
-
 		// Encode response using protocol definitions
 		const responseData = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].encode({
 			reqId,
 			headers,
 		});
 
-		// sendMessage will RLP-encode the data internally
-		ethProtocol.sendMessage(EthMessageCode.BLOCK_HEADERS, responseData);
+		// Send using handler's sendMessage (uses wire module internally)
+		handler.sendMessage(EthMessageCode.BLOCK_HEADERS, responseData);
 	} catch (error: any) {
 		log("Error handling GET_BLOCK_HEADERS: %s", error.message);
 		throw error;
@@ -97,18 +90,13 @@ export async function handleGetBlockBodies(
 
 		log("Sending %d bodies in response to reqId=%d", bodies.length, reqId);
 
-		// Send response using devp2p protocol's sendMessage
-		const ethProtocol = (handler as any).ethProtocol;
-		if (!ethProtocol) {
-			throw new Error("ETH protocol not available");
-		}
-
 		const responseData = ETH_MESSAGES[EthMessageCode.BLOCK_BODIES].encode({
 			reqId,
 			bodies,
 		});
 
-		ethProtocol.sendMessage(EthMessageCode.BLOCK_BODIES, responseData);
+		// Send using handler's sendMessage (uses wire module internally)
+		handler.sendMessage(EthMessageCode.BLOCK_BODIES, responseData);
 	} catch (error: any) {
 		log("Error handling GET_BLOCK_BODIES: %s", error.message);
 		throw error;
@@ -152,18 +140,13 @@ export async function handleGetReceipts(
 			reqId,
 		);
 
-		// Send response using devp2p protocol's sendMessage
-		const ethProtocol = (handler as any).ethProtocol;
-		if (!ethProtocol) {
-			throw new Error("ETH protocol not available");
-		}
-
 		const responseData = ETH_MESSAGES[EthMessageCode.RECEIPTS].encode({
 			reqId,
 			receipts: receipts as any, // Type compatibility
 		});
 
-		ethProtocol.sendMessage(EthMessageCode.RECEIPTS, responseData);
+		// Send using handler's sendMessage (uses wire module internally)
+		handler.sendMessage(EthMessageCode.RECEIPTS, responseData);
 	} catch (error: any) {
 		log("Error handling GET_RECEIPTS: %s", error.message);
 		throw error;
@@ -192,18 +175,13 @@ export async function handleGetNodeData(
 
 		log("Sending %d nodes in response to reqId=%d", nodes.length, reqId);
 
-		// Send response using devp2p protocol's sendMessage
-		const ethProtocol = (handler as any).ethProtocol;
-		if (!ethProtocol) {
-			throw new Error("ETH protocol not available");
-		}
-
 		const responseData = ETH_MESSAGES[EthMessageCode.NODE_DATA].encode({
 			reqId,
 			data: nodes,
 		});
 
-		ethProtocol.sendMessage(EthMessageCode.NODE_DATA, responseData as any);
+		// Send using handler's sendMessage (uses wire module internally)
+		handler.sendMessage(EthMessageCode.NODE_DATA, responseData);
 	} catch (error: any) {
 		log("Error handling GET_NODE_DATA: %s", error.message);
 		throw error;
@@ -214,10 +192,10 @@ export async function handleGetNodeData(
  * Handle GET_POOLED_TRANSACTIONS request
  * Payload is already decoded: [reqId, hashes]
  */
-export function handleGetPooledTransactions(
+export async function handleGetPooledTransactions(
 	handler: EthHandler,
 	payload: any,
-): void {
+): Promise<void> {
 	try {
 		// Payload is already decoded: [reqId, hashes]
 		const decoded =
@@ -237,12 +215,6 @@ export function handleGetPooledTransactions(
 
 		log("Sending %d transactions in response to reqId=%d", txs.length, reqId);
 
-		// Send response using devp2p protocol's sendMessage
-		const ethProtocol = (handler as any).ethProtocol;
-		if (!ethProtocol) {
-			throw new Error("ETH protocol not available");
-		}
-
 		const responseData = ETH_MESSAGES[
 			EthMessageCode.POOLED_TRANSACTIONS
 		].encode({
@@ -250,12 +222,333 @@ export function handleGetPooledTransactions(
 			txs,
 		});
 
-		ethProtocol.sendMessage(
-			EthMessageCode.POOLED_TRANSACTIONS,
-			responseData as any,
-		);
+		// Send using handler's sendMessage (uses wire module internally)
+		handler.sendMessage(EthMessageCode.POOLED_TRANSACTIONS, responseData);
 	} catch (error: any) {
 		log("Error handling GET_POOLED_TRANSACTIONS: %s", error.message);
 		throw error;
 	}
+}
+
+/**
+ * Handle NEW_BLOCK_HASHES announcement
+ * Payload is already decoded: array of [hash, number]
+ */
+export function handleNewBlockHashes(handler: EthHandler, payload: any): void {
+	try {
+		const decoded =
+			ETH_MESSAGES[EthMessageCode.NEW_BLOCK_HASHES].decode(payload);
+		handler.emit("message", {
+			code: EthMessageCode.NEW_BLOCK_HASHES,
+			name: "NewBlockHashes",
+			data: decoded,
+		});
+	} catch (error: any) {
+		log("Error handling NEW_BLOCK_HASHES: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle TRANSACTIONS announcement
+ * Payload is already decoded: array of transaction bytes
+ */
+export function handleTransactions(handler: EthHandler, payload: any): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(payload, {
+			chainCommon: handler.config.chainCommon,
+			synchronized: handler.isReady,
+		});
+		handler.emit("message", {
+			code: EthMessageCode.TRANSACTIONS,
+			name: "Transactions",
+			data: decoded,
+		});
+	} catch (error: any) {
+		log("Error handling TRANSACTIONS: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle NEW_BLOCK announcement
+ * Payload is already decoded: [blockBytes, tdBytes]
+ */
+export function handleNewBlock(handler: EthHandler, payload: any): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.NEW_BLOCK].decode(payload, {
+			chainCommon: handler.config.chainCommon,
+		});
+		const block = decoded[0];
+		const td = decoded[1];
+		handler.emit("message", {
+			code: EthMessageCode.NEW_BLOCK,
+			name: "NewBlock",
+			data: [block, td],
+		});
+	} catch (error: any) {
+		log("Error handling NEW_BLOCK: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle NEW_POOLED_TRANSACTION_HASHES announcement
+ * Payload is already decoded: array or tuple format
+ */
+export function handleNewPooledTransactionHashes(
+	handler: EthHandler,
+	payload: any,
+): void {
+	try {
+		const decoded =
+			ETH_MESSAGES[EthMessageCode.NEW_POOLED_TRANSACTION_HASHES].decode(
+				payload,
+			);
+		handler.emit("message", {
+			code: EthMessageCode.NEW_POOLED_TRANSACTION_HASHES,
+			name: "NewPooledTransactionHashes",
+			data: decoded,
+		});
+	} catch (error: any) {
+		log("Error handling NEW_POOLED_TRANSACTION_HASHES: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle BLOCK_HEADERS response
+ * Payload is already decoded: [reqId, headers]
+ */
+export function handleBlockHeaders(handler: EthHandler, payload: any): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(payload, {
+			chainCommon: handler.config.chainCommon,
+		}) as [bigint, any[]];
+		const reqId = decoded[0] as bigint;
+		const headers = decoded[1] as any[];
+
+		log("BLOCK_HEADERS response: reqId=%d, headers=%d", reqId, headers.length);
+
+		// Resolve pending request if exists
+		const resolver = handler.resolvers.get(reqId);
+		if (resolver) {
+			clearTimeout(resolver.timeout);
+			handler.resolvers.delete(reqId);
+			resolver.resolve([reqId, headers]);
+			log("Resolved GET_BLOCK_HEADERS request for reqId=%d", reqId);
+		} else {
+			// No pending request, emit as event for service layer
+			handler.emit("message", {
+				code: EthMessageCode.BLOCK_HEADERS,
+				name: "BlockHeaders",
+				data: { reqId, headers },
+			});
+		}
+	} catch (error: any) {
+		log("Error handling BLOCK_HEADERS: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle BLOCK_BODIES response
+ * Payload is already decoded: [reqId, bodies]
+ */
+export function handleBlockBodies(handler: EthHandler, payload: any): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_BODIES].decode(payload);
+		const reqId = decoded[0] as bigint;
+		const bodies = decoded[1] as any[];
+
+		log("BLOCK_BODIES response: reqId=%d, bodies=%d", reqId, bodies.length);
+
+		// Resolve pending request if exists
+		const resolver = handler.resolvers.get(reqId);
+		if (resolver) {
+			clearTimeout(resolver.timeout);
+			handler.resolvers.delete(reqId);
+			resolver.resolve([reqId, bodies]);
+			log("Resolved GET_BLOCK_BODIES request for reqId=%d", reqId);
+		} else {
+			// No pending request, emit as event for service layer
+			handler.emit("message", {
+				code: EthMessageCode.BLOCK_BODIES,
+				name: "BlockBodies",
+				data: { reqId, bodies },
+			});
+		}
+	} catch (error: any) {
+		log("Error handling BLOCK_BODIES: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle POOLED_TRANSACTIONS response
+ * Payload is already decoded: [reqId, txs]
+ */
+export function handlePooledTransactions(
+	handler: EthHandler,
+	payload: any,
+): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.POOLED_TRANSACTIONS].decode(
+			payload,
+			{ chainCommon: handler.config.chainCommon },
+		) as [bigint, any[]];
+		const reqId = decoded[0] as bigint;
+		const txs = decoded[1] as any[];
+
+		log("POOLED_TRANSACTIONS response: reqId=%d, txs=%d", reqId, txs.length);
+
+		// Resolve pending request if exists
+		const resolver = handler.resolvers.get(reqId);
+		if (resolver) {
+			clearTimeout(resolver.timeout);
+			handler.resolvers.delete(reqId);
+			resolver.resolve([reqId, txs]);
+			log("Resolved GET_POOLED_TRANSACTIONS request for reqId=%d", reqId);
+		} else {
+			// No pending request, emit as event for service layer
+			handler.emit("message", {
+				code: EthMessageCode.POOLED_TRANSACTIONS,
+				name: "PooledTransactions",
+				data: { reqId, txs },
+			});
+		}
+	} catch (error: any) {
+		log("Error handling POOLED_TRANSACTIONS: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle NODE_DATA response
+ * Payload is already decoded: [reqId, data]
+ */
+export function handleNodeData(handler: EthHandler, payload: any): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.NODE_DATA].decode(payload);
+		const reqId = decoded[0] as bigint;
+		const data = decoded[1] as Uint8Array[];
+
+		log("NODE_DATA response: reqId=%d, nodes=%d", reqId, data.length);
+
+		// Resolve pending request if exists
+		const resolver = handler.resolvers.get(reqId);
+		if (resolver) {
+			clearTimeout(resolver.timeout);
+			handler.resolvers.delete(reqId);
+			resolver.resolve([reqId, data]);
+			log("Resolved GET_NODE_DATA request for reqId=%d", reqId);
+		} else {
+			// No pending request, emit as event for service layer
+			handler.emit("message", {
+				code: EthMessageCode.NODE_DATA,
+				name: "NodeData",
+				data: { reqId, data },
+			});
+		}
+	} catch (error: any) {
+		log("Error handling NODE_DATA: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Handle RECEIPTS response
+ * Payload is already decoded: [reqId, receipts]
+ */
+export function handleReceipts(handler: EthHandler, payload: any): void {
+	try {
+		const decoded = ETH_MESSAGES[EthMessageCode.RECEIPTS].decode(payload);
+		const reqId = decoded[0] as bigint;
+		const receipts = decoded[1] as any[];
+
+		log("RECEIPTS response: reqId=%d, receipts=%d", reqId, receipts.length);
+
+		// Resolve pending request if exists
+		const resolver = handler.resolvers.get(reqId);
+		if (resolver) {
+			clearTimeout(resolver.timeout);
+			handler.resolvers.delete(reqId);
+			resolver.resolve([reqId, receipts]);
+			log("Resolved GET_RECEIPTS request for reqId=%d", reqId);
+		} else {
+			// No pending request, emit as event for service layer
+			handler.emit("message", {
+				code: EthMessageCode.RECEIPTS,
+				name: "Receipts",
+				data: { reqId, receipts },
+			});
+		}
+	} catch (error: any) {
+		log("Error handling RECEIPTS: %s", error.message);
+		handler.emit("error", error);
+	}
+}
+
+/**
+ * Register all default handlers with the registry
+ * This function is called by EthHandler during initialization
+ */
+export function registerDefaultHandlers(
+	registry: import("./registry").EthHandlerRegistry,
+): void {
+	// Register request handlers
+	registry.registerRequestHandler(
+		EthMessageCode.GET_BLOCK_HEADERS,
+		handleGetBlockHeaders,
+	);
+	registry.registerRequestHandler(
+		EthMessageCode.GET_BLOCK_BODIES,
+		handleGetBlockBodies,
+	);
+	registry.registerRequestHandler(
+		EthMessageCode.GET_POOLED_TRANSACTIONS,
+		handleGetPooledTransactions,
+	);
+	registry.registerRequestHandler(
+		EthMessageCode.GET_RECEIPTS,
+		handleGetReceipts,
+	);
+	registry.registerRequestHandler(
+		EthMessageCode.GET_NODE_DATA,
+		handleGetNodeData,
+	);
+
+	// Register response handlers
+	registry.registerResponseHandler(
+		EthMessageCode.BLOCK_HEADERS,
+		handleBlockHeaders,
+	);
+	registry.registerResponseHandler(
+		EthMessageCode.BLOCK_BODIES,
+		handleBlockBodies,
+	);
+	registry.registerResponseHandler(
+		EthMessageCode.POOLED_TRANSACTIONS,
+		handlePooledTransactions,
+	);
+	registry.registerResponseHandler(EthMessageCode.RECEIPTS, handleReceipts);
+	registry.registerResponseHandler(EthMessageCode.NODE_DATA, handleNodeData);
+
+	// Register announcement handlers
+	registry.registerAnnouncementHandler(
+		EthMessageCode.NEW_BLOCK_HASHES,
+		handleNewBlockHashes,
+	);
+	registry.registerAnnouncementHandler(
+		EthMessageCode.TRANSACTIONS,
+		handleTransactions,
+	);
+	registry.registerAnnouncementHandler(
+		EthMessageCode.NEW_BLOCK,
+		handleNewBlock,
+	);
+	registry.registerAnnouncementHandler(
+		EthMessageCode.NEW_POOLED_TRANSACTION_HASHES,
+		handleNewPooledTransactionHashes,
+	);
 }

@@ -5,8 +5,7 @@ import { encodeReceipt } from "../../vm";
 import { SyncMode } from "../config.ts";
 import { Miner } from "../miner";
 import type { Peer } from "../net/peer/peer.ts";
-import { EthProtocol } from "../net/protocol/ethprotocol.ts";
-import { Protocol } from "../net/protocol/protocol.ts";
+// EthProtocol removed - P2P uses EthHandler directly
 import { FullSynchronizer } from "../sync";
 import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
@@ -413,19 +412,9 @@ export class P2PFullEthereumService extends Service {
 		}
 	}
 
-	override get protocols(): Protocol[] {
-		const protocols: Protocol[] = [];
-
-		// Use StreamEthProtocol for P2PServer, EthProtocol for RlpxServer
-
-		protocols.push(
-			new EthProtocol({
-				config: this.config,
-				chain: this.chain,
-				timeout: this.timeout,
-			}),
-		);
-
-		return protocols;
+	override get protocols(): any[] {
+		// For P2P, protocols are handled via EthHandler instances on peers
+		// Return empty array as Protocol instances are not used in P2P mode
+		return [];
 	}
 }
