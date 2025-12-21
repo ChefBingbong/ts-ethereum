@@ -3,6 +3,7 @@
 import { multiaddr } from "@multiformats/multiaddr";
 import type { AbstractLevel } from "abstract-level";
 import { createHash } from "crypto";
+import debug from "debug";
 import { secp256k1 } from "ethereum-cryptography/secp256k1.js";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { Level } from "level";
@@ -37,7 +38,7 @@ import type { P2PFullEthereumService } from "../service/p2p-fullethereumservice.
 import { Event } from "../types.ts";
 import { setupMetrics } from "../util/metrics.ts";
 
-// debug.enable("p2p:*");
+debug.enable("p2p:*");
 export type Account = [address: Address, privateKey: Uint8Array];
 
 let logger: Logger | undefined;
