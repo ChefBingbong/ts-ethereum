@@ -116,7 +116,9 @@ export class FullSynchronizer extends Synchronizer {
 	 * blockchain. Returns null if no valid peer is found.
 	 */
 	async best(): Promise<Peer | undefined> {
-		const peers = this.pool.getConnectedPeers().filter(this.syncable.bind(this));
+		const peers = this.pool
+			.getConnectedPeers()
+			.filter(this.syncable.bind(this));
 		if (peers.length < this.config.options.minPeers && !this.forceSync) return;
 
 		// For PoW (Ethash) chains we want to select the peer with the highest TD
@@ -229,9 +231,7 @@ export class FullSynchronizer extends Synchronizer {
 		this.config.options.logger?.info(
 			`Imported blocks count=${
 				blocks.length
-			} first=${first} last=${last} hash=${hash} hardfork=${this.config.chainCommon.hardfork()} peers=${
-				this.pool.getPeerCount()
-			}`,
+			} first=${first} last=${last} hash=${hash} hardfork=${this.config.chainCommon.hardfork()} peers=${this.pool.getPeerCount()}`,
 		);
 
 		this.txPool.removeNewBlockTxs(blocks);
@@ -336,7 +336,9 @@ export class FullSynchronizer extends Synchronizer {
 			// Call handleNewBlockHashes to retrieve all blocks between chain tip and new block
 			this.handleNewBlockHashes([[block.hash(), block.header.number]]);
 		}
-		for (const peer of this.pool.getConnectedPeers().slice(numPeersToShareWith)) {
+		for (const peer of this.pool
+			.getConnectedPeers()
+			.slice(numPeersToShareWith)) {
 			// Send `NEW_BLOCK_HASHES` message for received block to all other peers
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {

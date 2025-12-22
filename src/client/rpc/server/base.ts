@@ -22,109 +22,37 @@ export type RpcServerModules = {
 	logger: Logger;
 };
 
-/**
- * Base RPC Server powered by Hono.
- * Provides common functionality for error handling, logging, CORS, and lifecycle management.
- */
 export class RpcServerBase {
 	protected readonly app: Hono<RpcApiEnv>;
-	protected readonly server?: ServerType;
+	protected server?: ServerType;
 	protected readonly logger: Logger;
-	protected readonly opts: RpcServerOpts;
 	protected isListening = false;
 
-	constructor(opts: RpcServerOpts, modules: RpcServerModules) {
-		this.opts = opts;
+	constructor(
+		protected opts: RpcServerOpts,
+		modules: RpcServerModules,
+	) {
+		const app = new Hono<RpcApiEnv>();
 		this.logger = modules.logger;
 
-		const app = new Hono<RpcApiEnv>();
-
-		// Add CORS if configured
-		if (opts.cors) {
-			app.use("*", cors({ origin: opts.cors }));
-		}
-
-		// Error handler middleware
-		app.onError((err, c) => {
-			const requestId = c.get("requestId") 
-			// rpcMethod may not be set if error occurs before rpcValidator middleware
-			// Access via Variables to avoid type errors
-			const rpcMethod = c .get?.("rpcMethod") 
-
-			// Check if error should be ignored
-			if (this.shouldIgnoreError(err)) {
-				return;
-			}
-
-			// Log error
-			if (err.message.includes("validation") || err.message.includes("Invalid")) {
-				this.logger.warn(`Req ${requestId} ${rpcMethod} failed`, {
-					reason: err.message,
-				});
-			} else {
-				this.logger.error(`Req ${requestId} ${rpcMethod} error`, {}, err);
-			}
-
-			// Return JSON-RPC error response
-			const stacktraces = opts.stacktraces ? err.stack?.split("\n") : undefined;
-			const error = {
-				code: INTERNAL_ERROR,
-				message: err.message ?? "Internal error",
-				data: stacktraces,
-			};
-
-			return getRpcErrorResponse(c as Context<RpcApiEnv>, error, 500);
-		});
-
-		// 404 handler for unknown routes
-		app.notFound((c) => {
-			const message = `Route ${c.req.method}:${c.req.url} not found`;
-			this.logger.warn(message);
-			const error = {
-				code: INVALID_REQUEST,
-				message,
-			};
-			return getRpcErrorResponse(c as Context<RpcApiEnv>, error, 404);
-		});
-
+		app.use("*", cors({ origin: opts.cors ?? "*" }));
+		app.onError(this.onError.bind(this));
+		app.notFound(this.onNotFound.bind(this));
 		this.app = app;
 	}
 
-	/**
-	 * Start the RPC server.
-	 */
 	async listen(): Promise<void> {
-		if (this.isListening) {
-			return;
-		}
+		if (this.isListening) return;
 
 		return new Promise<void>((resolve, reject) => {
 			try {
-				const host = this.opts.address ?? "127.0.0.1";
-				const port = this.opts.port;
-
 				const server = serve(
 					{
 						fetch: this.app.fetch,
-						port,
-						hostname: host,
+						port: this.opts.port,
+						hostname: this.opts.address ?? "127.0.0.1",
 					},
-					(info) => {
-						if (info) {
-							const address = `http://${host}:${port}`;
-							this.logger.info("Started RPC server", { address });
-							if (!isLocalhostIP(host)) {
-								this.logger.warn(
-									"RPC server is exposed, ensure untrusted traffic cannot reach this API",
-								);
-							}
-							this.isListening = true;
-							(this as any).server = server;
-							resolve();
-						} else {
-							reject(new Error("Failed to start RPC server"));
-						}
-					},
+					(info) => this.onListening(server, info, resolve, reject),
 				);
 			} catch (e) {
 				this.logger.error("Error starting RPC server", this.opts, e as Error);
@@ -133,29 +61,11 @@ export class RpcServerBase {
 		});
 	}
 
-	/**
-	 * Close the server instance.
-	 */
 	async close(): Promise<void> {
-		if (!this.isListening || !this.server) {
-			return;
-		}
-
 		try {
-			// @hono/node-server's serve returns a ServerType
-			// ServerType is typically a Node.js http.Server or similar
-			const server = this.server as any;
-			if (server && typeof server.close === "function") {
-				await new Promise<void>((resolve, reject) => {
-					server.close((err?: Error) => {
-						if (err) {
-							reject(err);
-						} else {
-							resolve();
-						}
-					});
-				});
-			}
+			if (!this.isListening) return;
+
+			await this.server.close?.();
 			this.isListening = false;
 			this.logger.debug("RPC server closed");
 		} catch (e) {
@@ -164,9 +74,61 @@ export class RpcServerBase {
 		}
 	}
 
-	/** For child classes to override */
 	protected shouldIgnoreError(_err: Error): boolean {
 		return false;
 	}
-}
 
+	private onError(err: Error, c: Context<RpcApiEnv>) {
+		const requestId = c.get("requestId");
+		const rpcMethod = c.get?.("rpcMethod");
+
+		if (this.shouldIgnoreError(err)) return;
+
+		this.logger.error(
+			`Req ${requestId} ${rpcMethod} error`,
+			{ reason: err.message },
+			err,
+		);
+
+		const error = {
+			code: INTERNAL_ERROR,
+			message: err.message ?? "Internal error",
+			data: this.opts.stacktraces && err.stack?.split("\n"),
+		};
+
+		return getRpcErrorResponse(c as Context<RpcApiEnv>, error, 500);
+	}
+
+	private onNotFound(c: Context<RpcApiEnv>) {
+		const message = `Route ${c.req.method}:${c.req.url} not found`;
+		this.logger.warn(message);
+		const error = {
+			code: INVALID_REQUEST,
+			message,
+		};
+		return getRpcErrorResponse(c as Context<RpcApiEnv>, error, 404);
+	}
+
+	private onListening<T extends ServerType>(
+		server: T,
+		info: ReturnType<T["address"]> | null,
+		resolve: () => void,
+		reject: (error: Error) => void,
+	) {
+		if (!info) return reject(new Error("Failed to start RPC server"));
+		const host = this.opts.address ?? "127.0.0.1";
+		const port = this.opts.port;
+
+		if (!isLocalhostIP(host)) {
+			this.logger.warn(
+				"RPC server is exposed, ensure untrusted traffic cannot reach this API",
+			);
+		}
+		this.isListening = true;
+		this.server = server;
+
+		const address = `http://${host}:${port}`;
+		this.logger.info("Started RPC server", { address });
+		resolve();
+	}
+}

@@ -53,4 +53,3 @@ export async function handleGetBlockBodies(
 		throw error;
 	}
 }
-

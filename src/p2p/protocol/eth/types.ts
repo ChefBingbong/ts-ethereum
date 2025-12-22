@@ -35,4 +35,3 @@ export interface RequestResolver {
 	reject: (error: Error) => void;
 	timeout: NodeJS.Timeout;
 }
-

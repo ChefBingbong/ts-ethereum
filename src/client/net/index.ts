@@ -5,4 +5,3 @@ export type { NetworkCoreOptions } from "./core/index.ts";
 export * from "./discovery/index.ts";
 export * from "./peer/index.ts";
 export * from "./protocol/index.ts";
-

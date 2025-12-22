@@ -33,4 +33,3 @@ export type HeaderResult = {
 export type BodyResult = {
 	payload: Uint8Array;
 };
-

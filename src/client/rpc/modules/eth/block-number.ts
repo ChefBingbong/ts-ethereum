@@ -6,6 +6,8 @@ import { blockNumberSchema } from "./schema.ts";
 
 export const blockNumber = (node: ExecutionNode) => {
 	return createRpcMethod(blockNumberSchema, async (_params, _c) => {
-		return safeResult(bigIntToHex(node.chain.headers.latest?.number ?? BIGINT_0));
+		return safeResult(
+			bigIntToHex(node.chain.headers.latest?.number ?? BIGINT_0),
+		);
 	});
 };

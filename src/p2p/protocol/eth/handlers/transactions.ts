@@ -21,13 +21,10 @@ export function handleTransactions(
 	payload: unknown,
 ): void {
 	try {
-		const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(
-			payload,
-			{
-				chainCommon: handler.config.chainCommon,
-				synchronized: handler.isReady,
-			},
-		);
+		const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(payload, {
+			chainCommon: handler.config.chainCommon,
+			synchronized: handler.isReady,
+		});
 		handler.emit("message", {
 			code: EthMessageCode.TRANSACTIONS,
 			name: "Transactions",
@@ -39,4 +36,3 @@ export function handleTransactions(
 		handler.emit("error", err);
 	}
 }
-

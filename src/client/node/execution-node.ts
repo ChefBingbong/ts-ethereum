@@ -87,7 +87,6 @@ export class ExecutionNode {
 		node.network.txPool.checkRunState();
 
 		if (node.running) return;
-
 		void node.synchronizer?.start();
 
 		if (!node.v8Engine) {
@@ -104,21 +103,14 @@ export class ExecutionNode {
 
 		void node.buildHeadState();
 		node.txFetcher.start();
-
 		await node.config.node.start();
-
-
-		// Create and start RPC server
-		// Use defaults: RPC enabled by default, port + 300, localhost
-		const rpcPort = (node.config.options.port ?? 8000) + 300;
-		const rpcAddr = "127.0.0.1";
 
 		const rpcServer = new RpcServer(
 			{
 				enabled: true,
-				address: rpcAddr,
-				port: rpcPort,
-				cors: undefined, // Can be configured via environment or config extension
+				address:  "127.0.0.1",
+				port: options.config.options.port + 300,
+				cors: "*",
 				debug: false,
 				stacktraces: false,
 			},
@@ -128,16 +120,14 @@ export class ExecutionNode {
 			},
 		);
 
-		// Listen for RPC_READY event
-		const onRpcReady = () => {
+		const onRpcReady = async() => {
+            await rpcServer.listen();
+            node.rpcServer = rpcServer;
 			node.isRpcReady = true;
-			node.config.events.off(Event.RPC_READY, onRpcReady);
+			node.config.events.off(Event.SYNC_SYNCHRONIZED, onRpcReady);
 		};
-		node.config.events.on(Event.RPC_READY, onRpcReady);
 
-		await rpcServer.listen();
-		node.rpcServer = rpcServer;
-
+		node.config.events.on(Event.SYNC_SYNCHRONIZED, onRpcReady);
 		return node;
 	}
 
@@ -163,39 +153,14 @@ export class ExecutionNode {
 		});
 	}
 
-
 	async stop(): Promise<boolean> {
 		try {
 			if (!this.running) return false;
-
 			this.config.events.emit(Event.CLIENT_SHUTDOWN);
-
-			this.network.txPool.stop();
-			this.network.miner?.stop();
-
-			await this.synchronizer?.stop();
-			await this.execution.stop();
-
-			if (this.opened) {
-				await this.close();
-				await this.synchronizer?.close();
-			}
-
-			await this.network.stop();
 			clearInterval(this.statsInterval);
-			await this.synchronizer?.stop();
 
-			// Close RPC server if it exists
-			if (this.rpcServer) {
-				await this.rpcServer.close();
-				this.isRpcReady = false;
-			}
-
-			await this.config.node.stop();
-
-			this.running = false;
-			this.txFetcher.stop();
-
+			await this.rpcServer?.close?.();
+			await this.close?.();
 			return true;
 		} catch (error) {
 			this.running = false;
@@ -204,16 +169,14 @@ export class ExecutionNode {
 	}
 
 	async close(): Promise<boolean> {
-		if (!this.opened) return false;
 		try {
-			this.network.txPool.close();
-			const result = !!this.opened;
-			if (this.opened) {
-				await this.network.close();
-				this.opened = false;
-			}
-
-			return result;
+			if (!this.opened) return false;
+			await this.network.close();
+			this.txFetcher.stop();
+			this.opened = false;
+			this.running = false;
+			this.isRpcReady = false;
+			return true;
 		} catch (error) {
 			this.opened = false;
 			return false;
@@ -227,7 +190,8 @@ export class ExecutionNode {
 
 			if (!this.execution.started) return;
 			await this.synchronizer.runExecution();
-		} catch (error) {} finally {
+		} catch (error) {
+		} finally {
 			this.building = false;
 		}
 	}
@@ -238,9 +202,7 @@ export class ExecutionNode {
 		const heapStats = this.v8Engine.getHeapStatistics();
 		const { used_heap_size, heap_size_limit } = heapStats;
 
-		const heapUsed = Math.round(used_heap_size / 1000 / 1000);
 		const percentage = Math.round((100 * used_heap_size) / heap_size_limit);
-
 		if (this.statsCounter % 4 === 0) this.statsCounter = 0;
 
 		if (percentage >= MEMORY_SHUTDOWN_THRESHOLD && !this.config.shutdown) {

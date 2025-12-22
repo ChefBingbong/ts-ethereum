@@ -39,7 +39,8 @@ export class TxIndex extends MetaDBManager {
 				if (operation === IndexOperation.Save) {
 					const withinTxLookupLimit =
 						this.config.options.txLookupLimit === 0 ||
-						this.chain.headers.height - BigInt(this.config.options.txLookupLimit) <
+						this.chain.headers.height -
+							BigInt(this.config.options.txLookupLimit) <
 							block.header.number;
 					if (withinTxLookupLimit) {
 						for (const [i, tx] of block.transactions.entries()) {
@@ -51,7 +52,8 @@ export class TxIndex extends MetaDBManager {
 					if (this.config.options.txLookupLimit > 0) {
 						// Remove tx hashes for one block past txLookupLimit
 						const limit =
-							this.chain.headers.height - BigInt(this.config.options.txLookupLimit);
+							this.chain.headers.height -
+							BigInt(this.config.options.txLookupLimit);
 						if (limit < BIGINT_0) return;
 						const blockDelIndexes = await this.chain.getBlock(limit);
 						void this.updateIndex(

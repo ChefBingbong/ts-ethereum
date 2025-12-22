@@ -116,7 +116,7 @@ export class ReceiptsManager extends MetaDBManager {
 		blocks: Array<{ block: Block; receipts: TxReceipt[] }>,
 	): Promise<void> {
 		if (blocks.length === 0) return;
-		
+
 		// Use batch API if available, otherwise fall back to individual saves
 		// Note: dbKey is private in MetaDBManager, so we'll use individual saves
 		// The batch optimization can be added later if MetaDBManager exposes batch API

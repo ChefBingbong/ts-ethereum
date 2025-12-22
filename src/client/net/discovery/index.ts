@@ -3,4 +3,3 @@ export type {
 	DPTDiscoveryComponents,
 	DPTDiscoveryInit,
 } from "./dpt-discovery.ts";
-

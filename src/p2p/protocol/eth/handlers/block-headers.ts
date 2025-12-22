@@ -16,14 +16,14 @@ const log = debug("p2p:eth:handlers:block-headers");
  * Handle BLOCK_HEADERS response
  * Payload is already decoded: [reqId, headers]
  */
-export function handleBlockHeaders(handler: EthHandler, payload: unknown): void {
+export function handleBlockHeaders(
+	handler: EthHandler,
+	payload: unknown,
+): void {
 	try {
-		const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(
-			payload,
-			{
-				chainCommon: handler.config.chainCommon,
-			},
-		) as [bigint, unknown[]];
+		const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(payload, {
+			chainCommon: handler.config.chainCommon,
+		}) as [bigint, unknown[]];
 		const reqId = decoded[0] as bigint;
 		const headers = decoded[1] as unknown[];
 
@@ -50,4 +50,3 @@ export function handleBlockHeaders(handler: EthHandler, payload: unknown): void 
 		handler.emit("error", err);
 	}
 }
-

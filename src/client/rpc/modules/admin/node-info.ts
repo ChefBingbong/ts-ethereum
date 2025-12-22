@@ -6,9 +6,7 @@ import { getClientVersion } from "../../../util/index.ts";
 import { createRpcMethod } from "../../validation.ts";
 import { nodeInfoSchema } from "./schema.ts";
 
-export const nodeInfo = (
-	node: ExecutionNode,
-) =>
+export const nodeInfo = (node: ExecutionNode) =>
 	createRpcMethod(nodeInfoSchema, async (_params, _c) => {
 		try {
 			const rlpxInfo = node.config.server!.getRlpxInfo();

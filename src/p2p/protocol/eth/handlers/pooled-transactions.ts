@@ -51,4 +51,3 @@ export function handlePooledTransactions(
 		handler.emit("error", err);
 	}
 }
-

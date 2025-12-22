@@ -117,7 +117,11 @@ export class PeerConnectionHandler {
 
 		try {
 			await this.core.waitForPeerStatus(peer, this.peerIdHex);
-			await this.core.sendStatusToPeer(peer, this.rlpxConnection, this.peerIdHex);
+			await this.core.sendStatusToPeer(
+				peer,
+				this.rlpxConnection,
+				this.peerIdHex,
+			);
 		} catch (error) {
 			this.core.pendingPeers.delete(this.peerIdHex);
 			try {
@@ -127,4 +131,3 @@ export class PeerConnectionHandler {
 		}
 	}
 }
-

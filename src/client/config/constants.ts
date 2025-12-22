@@ -18,4 +18,3 @@ export const DEBUGCODE_DEFAULT = false;
 export const SAFE_REORG_DISTANCE = 100;
 export const SYNCED_STATE_REMOVAL_PERIOD = 60000;
 export const TX_LOOKUP_LIMIT_DEFAULT = 2350000;
-

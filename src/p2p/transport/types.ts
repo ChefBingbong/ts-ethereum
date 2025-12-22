@@ -13,7 +13,9 @@ export interface CreateListenerOptions {
 	upgrader: Upgrader;
 }
 
-export interface TCPCreateListenerOptions extends CreateListenerOptions, TCPSocketOptions {}
+export interface TCPCreateListenerOptions
+	extends CreateListenerOptions,
+		TCPSocketOptions {}
 
 export type Status =
 	| { code: "INACTIVE" }

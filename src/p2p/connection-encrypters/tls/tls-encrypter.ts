@@ -41,7 +41,10 @@ export class TLSEncrypter implements ConnectionEncrypter {
 		}
 	}
 
-	async secureOutBound(socket: Socket, peerId?: Uint8Array): Promise<SecureConnection> {
+	async secureOutBound(
+		socket: Socket,
+		peerId?: Uint8Array,
+	): Promise<SecureConnection> {
 		try {
 			const creds = await generateBoundCertificate(this.privateKey);
 			const tlsSocket = await this.upgradeToTlsSocket(socket, creds, false);
@@ -52,7 +55,9 @@ export class TLSEncrypter implements ConnectionEncrypter {
 		}
 	}
 
-	private async onTlsConnected(tlsSocket: TLSSocket): Promise<SecureConnection> {
+	private async onTlsConnected(
+		tlsSocket: TLSSocket,
+	): Promise<SecureConnection> {
 		return new Promise((resolve, reject) => {
 			const onError = (e: Error) => {
 				tlsSocket.destroy();
@@ -79,7 +84,7 @@ export class TLSEncrypter implements ConnectionEncrypter {
 					cleanup();
 					resolve({
 						socket: tlsSocket as unknown as Socket,
-						remotePeer
+						remotePeer,
 					});
 				} catch (err: any) {
 					cleanup();

@@ -1,19 +1,25 @@
-import { CODE_P2P } from '@multiformats/multiaddr'
-import { anySignal, ClearableSignal } from 'any-signal'
-import { setMaxListeners } from 'main-event'
-import { ConnectionEncrypter } from '../connection-encrypters/eccies/types'
-import * as mss from '../multi-stream-select'
-import { MplexStreamMuxer, StreamMuxerFactory } from '../muxer'
-import { AbstractMessageStream } from '../stream/default-message-stream'
-import { AbstractMultiaddrConnection } from './abstract-multiaddr-connection'
-import { BasicConnection, createBasicConnection } from './basic-connection'
-import { Connection, createConnection } from './connection'
-import { Registrar } from './registrar'
-import { AbortOptions, PeerId } from './types'
+import { CODE_P2P } from "@multiformats/multiaddr";
+import { anySignal, ClearableSignal } from "any-signal";
+import { setMaxListeners } from "main-event";
+import { ConnectionEncrypter } from "../connection-encrypters/eccies/types";
+import * as mss from "../multi-stream-select";
+import { MplexStreamMuxer, StreamMuxerFactory } from "../muxer";
+import { AbstractMessageStream } from "../stream/default-message-stream";
+import { AbstractMultiaddrConnection } from "./abstract-multiaddr-connection";
+import { BasicConnection, createBasicConnection } from "./basic-connection";
+import { Connection, createConnection } from "./connection";
+import { Registrar } from "./registrar";
+import { AbortOptions, PeerId } from "./types";
 
 // Debug logging helper
-const DEBUG_LOG_ENDPOINT = "http://127.0.0.1:7242/ingest/0eeace01-3679-4faf-afd2-c243f94d4f5a";
-function debugLog(location: string, message: string, data: any, hypothesisId: string): void {
+const DEBUG_LOG_ENDPOINT =
+	"http://127.0.0.1:7242/ingest/0eeace01-3679-4faf-afd2-c243f94d4f5a";
+function debugLog(
+	location: string,
+	message: string,
+	data: any,
+	hypothesisId: string,
+): void {
 	fetch(DEBUG_LOG_ENDPOINT, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -30,388 +36,477 @@ function debugLog(location: string, message: string, data: any, hypothesisId: st
 }
 
 interface CreateConnectionOptions {
-  id: string
-  cryptoProtocol: string
-  direction: 'inbound' | 'outbound'
-  maConn: AbstractMultiaddrConnection
-  stream: AbstractMessageStream
-  remotePeer: PeerId
-  muxer?: MplexStreamMuxer
-  closeTimeout?: number
+	id: string;
+	cryptoProtocol: string;
+	direction: "inbound" | "outbound";
+	maConn: AbstractMultiaddrConnection;
+	stream: AbstractMessageStream;
+	remotePeer: PeerId;
+	muxer?: MplexStreamMuxer;
+	closeTimeout?: number;
 }
 
 export interface SecuredConnection {
-  connection: AbstractMessageStream
-  remotePeer: PeerId
-  protocol: string
+	connection: AbstractMessageStream;
+	remotePeer: PeerId;
+	protocol: string;
 }
 
 export interface UpgraderInit {
-  privateKey: Uint8Array
-  id: Uint8Array
-  connectionEncrypter: ConnectionEncrypter | null
-  streamMuxerFactory: StreamMuxerFactory
-  inboundUpgradeTimeout?: number
-  inboundStreamProtocolNegotiationTimeout?: number
-  outboundStreamProtocolNegotiationTimeout?: number
-  connectionCloseTimeout?: number
-  skipEncryptionNegotiation?: boolean  // Skip multi-stream-select for encryption (use direct)
-  skipMuxerNegotiation?: boolean       // Skip multi-stream-select for muxer (use direct)
+	privateKey: Uint8Array;
+	id: Uint8Array;
+	connectionEncrypter: ConnectionEncrypter | null;
+	streamMuxerFactory: StreamMuxerFactory;
+	inboundUpgradeTimeout?: number;
+	inboundStreamProtocolNegotiationTimeout?: number;
+	outboundStreamProtocolNegotiationTimeout?: number;
+	connectionCloseTimeout?: number;
+	skipEncryptionNegotiation?: boolean; // Skip multi-stream-select for encryption (use direct)
+	skipMuxerNegotiation?: boolean; // Skip multi-stream-select for muxer (use direct)
 }
 
 export interface UpgraderComponents {
-  registrar: Registrar
+	registrar: Registrar;
 }
 
-export const INBOUND_UPGRADE_TIMEOUT = 10_000
-export const PROTOCOL_NEGOTIATION_TIMEOUT = 10_000
-export const CONNECTION_CLOSE_TIMEOUT = 1_000
+export const INBOUND_UPGRADE_TIMEOUT = 10_000;
+export const PROTOCOL_NEGOTIATION_TIMEOUT = 10_000;
+export const CONNECTION_CLOSE_TIMEOUT = 1_000;
 
 export class Upgrader {
-  private readonly connectionEncrypter: ConnectionEncrypter | null
-  private readonly streamMuxerFactory: StreamMuxerFactory
-  private readonly inboundUpgradeTimeout: number
-  private readonly inboundStreamProtocolNegotiationTimeout: number
-  private readonly outboundStreamProtocolNegotiationTimeout: number
-  private readonly connectionCloseTimeout: number
-  private readonly components: UpgraderComponents
-  private readonly privateKey: Uint8Array
-  private readonly id: Uint8Array
-  private readonly skipEncryptionNegotiation: boolean
-  private readonly skipMuxerNegotiation: boolean
+	private readonly connectionEncrypter: ConnectionEncrypter | null;
+	private readonly streamMuxerFactory: StreamMuxerFactory;
+	private readonly inboundUpgradeTimeout: number;
+	private readonly inboundStreamProtocolNegotiationTimeout: number;
+	private readonly outboundStreamProtocolNegotiationTimeout: number;
+	private readonly connectionCloseTimeout: number;
+	private readonly components: UpgraderComponents;
+	private readonly privateKey: Uint8Array;
+	private readonly id: Uint8Array;
+	private readonly skipEncryptionNegotiation: boolean;
+	private readonly skipMuxerNegotiation: boolean;
 
-  constructor (components: UpgraderComponents, init: UpgraderInit) {
-    this.components = components
-    this.privateKey = init.privateKey
-    this.id = init.id
-    this.connectionEncrypter = init.connectionEncrypter
-    this.streamMuxerFactory = init.streamMuxerFactory
-    this.skipEncryptionNegotiation = init.skipEncryptionNegotiation ?? false
-    this.skipMuxerNegotiation = init.skipMuxerNegotiation ?? false
+	constructor(components: UpgraderComponents, init: UpgraderInit) {
+		this.components = components;
+		this.privateKey = init.privateKey;
+		this.id = init.id;
+		this.connectionEncrypter = init.connectionEncrypter;
+		this.streamMuxerFactory = init.streamMuxerFactory;
+		this.skipEncryptionNegotiation = init.skipEncryptionNegotiation ?? false;
+		this.skipMuxerNegotiation = init.skipMuxerNegotiation ?? false;
 
-    this.inboundUpgradeTimeout = init.inboundUpgradeTimeout ?? INBOUND_UPGRADE_TIMEOUT
-    this.inboundStreamProtocolNegotiationTimeout = init.inboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
-    this.outboundStreamProtocolNegotiationTimeout = init.outboundStreamProtocolNegotiationTimeout ?? PROTOCOL_NEGOTIATION_TIMEOUT
-    this.connectionCloseTimeout = init.connectionCloseTimeout ?? CONNECTION_CLOSE_TIMEOUT
-  }
+		this.inboundUpgradeTimeout =
+			init.inboundUpgradeTimeout ?? INBOUND_UPGRADE_TIMEOUT;
+		this.inboundStreamProtocolNegotiationTimeout =
+			init.inboundStreamProtocolNegotiationTimeout ??
+			PROTOCOL_NEGOTIATION_TIMEOUT;
+		this.outboundStreamProtocolNegotiationTimeout =
+			init.outboundStreamProtocolNegotiationTimeout ??
+			PROTOCOL_NEGOTIATION_TIMEOUT;
+		this.connectionCloseTimeout =
+			init.connectionCloseTimeout ?? CONNECTION_CLOSE_TIMEOUT;
+	}
 
-  createInboundAbortSignal (signal?: AbortSignal): ClearableSignal {
-    // #region agent log
-    const timeoutSignal = AbortSignal.timeout(this.inboundUpgradeTimeout)
-    debugLog('upgrader.ts:81', 'Created AbortSignal.timeout for inbound upgrade', { timeout: this.inboundUpgradeTimeout }, 'C');
-    timeoutSignal.addEventListener('abort',()=>{
-      debugLog('upgrader.ts:81', 'AbortSignal fired for inbound upgrade', { reason: timeoutSignal.reason }, 'C');
-    });
-    // #endregion
-    const signals: AbortSignal[] = [timeoutSignal]
-    if (signal) {
-      signals.push(signal)
-    }
-    const output = anySignal(signals)
-    setMaxListeners(Infinity, output)
-    return output
-  }
+	createInboundAbortSignal(signal?: AbortSignal): ClearableSignal {
+		// #region agent log
+		const timeoutSignal = AbortSignal.timeout(this.inboundUpgradeTimeout);
+		debugLog(
+			"upgrader.ts:81",
+			"Created AbortSignal.timeout for inbound upgrade",
+			{ timeout: this.inboundUpgradeTimeout },
+			"C",
+		);
+		timeoutSignal.addEventListener("abort", () => {
+			debugLog(
+				"upgrader.ts:81",
+				"AbortSignal fired for inbound upgrade",
+				{ reason: timeoutSignal.reason },
+				"C",
+			);
+		});
+		// #endregion
+		const signals: AbortSignal[] = [timeoutSignal];
+		if (signal) {
+			signals.push(signal);
+		}
+		const output = anySignal(signals);
+		setMaxListeners(Infinity, output);
+		return output;
+	}
 
-  async upgradeInbound (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<Connection> {
-    const signal = this.createInboundAbortSignal(opts.signal)
+	async upgradeInbound(
+		maConn: AbstractMultiaddrConnection,
+		opts: { signal?: AbortSignal } = {},
+	): Promise<Connection> {
+		const signal = this.createInboundAbortSignal(opts.signal);
 
-    try {
-      return await this._performUpgrade(maConn, 'inbound', { signal })
-    } finally {
-      signal.clear()
-    }
-  }
+		try {
+			return await this._performUpgrade(maConn, "inbound", { signal });
+		} finally {
+			signal.clear();
+		}
+	}
 
-  async upgradeOutbound (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<Connection> {
-    return await this._performUpgrade(maConn, 'outbound', opts)
-  }
+	async upgradeOutbound(
+		maConn: AbstractMultiaddrConnection,
+		opts: { signal?: AbortSignal } = {},
+	): Promise<Connection> {
+		return await this._performUpgrade(maConn, "outbound", opts);
+	}
 
-  /**
-   * Upgrade inbound connection to BasicConnection (no muxing, RLPx compatible)
-   */
-  async upgradeInboundBasic (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<BasicConnection> {
-    const signal = this.createInboundAbortSignal(opts.signal)
-    
-    try {
-      return await this._performBasicUpgrade(maConn, 'inbound', { signal })
-    } finally {
-      signal.clear()
-    }
-  }
+	/**
+	 * Upgrade inbound connection to BasicConnection (no muxing, RLPx compatible)
+	 */
+	async upgradeInboundBasic(
+		maConn: AbstractMultiaddrConnection,
+		opts: { signal?: AbortSignal } = {},
+	): Promise<BasicConnection> {
+		const signal = this.createInboundAbortSignal(opts.signal);
 
-  /**
-   * Upgrade outbound connection to BasicConnection (no muxing, RLPx compatible)
-   */
-  async upgradeOutboundBasic (maConn: AbstractMultiaddrConnection, opts: { signal?: AbortSignal } = {}): Promise<BasicConnection> {
-    return await this._performBasicUpgrade(maConn, 'outbound', opts)
-  }
+		try {
+			return await this._performBasicUpgrade(maConn, "inbound", { signal });
+		} finally {
+			signal.clear();
+		}
+	}
 
-  private async _performUpgrade (
-    maConn: AbstractMultiaddrConnection, 
-    direction: 'inbound' | 'outbound',
-    opts: AbortOptions = {}
-  ): Promise<Connection> {
-    let stream: AbstractMessageStream = maConn
-    let remotePeer: PeerId
-    let muxer: MplexStreamMuxer | undefined
-    let cryptoProtocol: string
+	/**
+	 * Upgrade outbound connection to BasicConnection (no muxing, RLPx compatible)
+	 */
+	async upgradeOutboundBasic(
+		maConn: AbstractMultiaddrConnection,
+		opts: { signal?: AbortSignal } = {},
+	): Promise<BasicConnection> {
+		return await this._performBasicUpgrade(maConn, "outbound", opts);
+	}
 
-    const id = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`
+	private async _performUpgrade(
+		maConn: AbstractMultiaddrConnection,
+		direction: "inbound" | "outbound",
+		opts: AbortOptions = {},
+	): Promise<Connection> {
+		let stream: AbstractMessageStream = maConn;
+		let remotePeer: PeerId;
+		let muxer: MplexStreamMuxer | undefined;
+		let cryptoProtocol: string;
 
-    try {
-      // Try to extract remote peer ID from multiaddr
-      const peerIdString = maConn.remoteAddr.getComponents().findLast(c => c.code === CODE_P2P)?.value
+		const id = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`;
 
-      // Skip encryption if no encrypter configured (testing mode)
-      if (this.connectionEncrypter) {
-        // Encrypt the connection DIRECTLY (no multi-stream-select for ECIES)
-        // ECIES from RLPx uses a custom handshake, not compatible with multistream-select
-        const encrypted = direction === 'inbound'
-          ? await this._encryptInboundDirect(stream, opts)
-          : await this._encryptOutboundDirect(stream, opts)
+		try {
+			// Try to extract remote peer ID from multiaddr
+			const peerIdString = maConn.remoteAddr
+				.getComponents()
+				.findLast((c) => c.code === CODE_P2P)?.value;
 
-        stream = encrypted.connection
-        remotePeer = encrypted.remotePeer
-        cryptoProtocol = encrypted.protocol
-      } else {
-        // No encryption - use peer ID from connection options
-        const maConnAny = maConn as any
-        remotePeer = maConnAny.remotePeerId || this.id
-        cryptoProtocol = 'none'
-        maConn.log('skipping encryption (testing mode), remote peer: %s', Buffer.from(remotePeer).toString('hex').slice(0, 16))
-      }
+			// Skip encryption if no encrypter configured (testing mode)
+			if (this.connectionEncrypter) {
+				// Encrypt the connection DIRECTLY (no multi-stream-select for ECIES)
+				// ECIES from RLPx uses a custom handshake, not compatible with multistream-select
+				const encrypted =
+					direction === "inbound"
+						? await this._encryptInboundDirect(stream, opts)
+						: await this._encryptOutboundDirect(stream, opts);
 
-      // If we had a peer ID in the multiaddr, we could verify it matches here
-      // For now we trust the encrypted connection's peer ID
+				stream = encrypted.connection;
+				remotePeer = encrypted.remotePeer;
+				cryptoProtocol = encrypted.protocol;
+			} else {
+				// No encryption - use peer ID from connection options
+				const maConnAny = maConn as any;
+				remotePeer = maConnAny.remotePeerId || this.id;
+				cryptoProtocol = "none";
+				maConn.log(
+					"skipping encryption (testing mode), remote peer: %s",
+					Buffer.from(remotePeer).toString("hex").slice(0, 16),
+				);
+			}
 
-      // Multiplex the connection
-      let muxerFactory: StreamMuxerFactory
-      
-      if (this.skipMuxerNegotiation) {
-        // Skip multi-stream-select, use muxer directly
-        // This is necessary when ECIES encryption is used because the socket is in frame mode
-        maConn.log('skipping muxer negotiation, using %s directly', this.streamMuxerFactory.protocol)
-        muxerFactory = this.streamMuxerFactory
-      } else {
-        // Standard libp2p flow with multi-stream-select
-        muxerFactory = await (direction === 'inbound'
-          ? this._multiplexInbound(stream, opts)
-          : this._multiplexOutbound(stream, opts))
-      }
+			// If we had a peer ID in the multiaddr, we could verify it matches here
+			// For now we trust the encrypted connection's peer ID
 
-      maConn.log('create muxer %s', muxerFactory.protocol)
-      muxer = muxerFactory.createStreamMuxer(stream)
+			// Multiplex the connection
+			let muxerFactory: StreamMuxerFactory;
 
-    } catch (err: any) {
-      maConn.log.error('failed to upgrade %s connection %s %s - %s', direction, direction === 'inbound' ? 'from' : 'to', maConn.remoteAddr.toString(), err.message)
-      throw err
-    }
+			if (this.skipMuxerNegotiation) {
+				// Skip multi-stream-select, use muxer directly
+				// This is necessary when ECIES encryption is used because the socket is in frame mode
+				maConn.log(
+					"skipping muxer negotiation, using %s directly",
+					this.streamMuxerFactory.protocol,
+				);
+				muxerFactory = this.streamMuxerFactory;
+			} else {
+				// Standard libp2p flow with multi-stream-select
+				muxerFactory = await (direction === "inbound"
+					? this._multiplexInbound(stream, opts)
+					: this._multiplexOutbound(stream, opts));
+			}
 
-    return this._createConnection({
-      id,
-      cryptoProtocol,
-      direction,
-      maConn,
-      stream,
-      muxer,
-      remotePeer,
-      closeTimeout: this.connectionCloseTimeout
-    })
-  }
+			maConn.log("create muxer %s", muxerFactory.protocol);
+			muxer = muxerFactory.createStreamMuxer(stream);
+		} catch (err: any) {
+			maConn.log.error(
+				"failed to upgrade %s connection %s %s - %s",
+				direction,
+				direction === "inbound" ? "from" : "to",
+				maConn.remoteAddr.toString(),
+				err.message,
+			);
+			throw err;
+		}
 
-  /**
-   * A convenience method for generating a new `Connection`
-   */
-  _createConnection (opts: CreateConnectionOptions): Connection {
-    const connection = createConnection(this.components, {
-      ...opts,
-      outboundStreamProtocolNegotiationTimeout: this.outboundStreamProtocolNegotiationTimeout,
-      inboundStreamProtocolNegotiationTimeout: this.inboundStreamProtocolNegotiationTimeout
-    })
+		return this._createConnection({
+			id,
+			cryptoProtocol,
+			direction,
+			maConn,
+			stream,
+			muxer,
+			remotePeer,
+			closeTimeout: this.connectionCloseTimeout,
+		});
+	}
 
-    return connection
-  }
+	/**
+	 * A convenience method for generating a new `Connection`
+	 */
+	_createConnection(opts: CreateConnectionOptions): Connection {
+		const connection = createConnection(this.components, {
+			...opts,
+			outboundStreamProtocolNegotiationTimeout:
+				this.outboundStreamProtocolNegotiationTimeout,
+			inboundStreamProtocolNegotiationTimeout:
+				this.inboundStreamProtocolNegotiationTimeout,
+		});
 
-  /**
-   * Encrypts the incoming connection (DIRECT - no multistream-select)
-   * ECIES uses its own handshake protocol, incompatible with multistream-select
-   */
-  async _encryptInboundDirect (connection: AbstractMessageStream, options: AbortOptions): Promise<SecuredConnection> {
-    try {
-      connection.log('performing ECIES handshake (inbound) - direct, no multistream-select')
+		return connection;
+	}
 
-      // Perform actual ECIES encryption handshake
-      const maConn = connection as any
-      const socket = maConn.socket
-      if (!socket) {
-        throw new Error('No socket available for ECIES encryption')
-      }
+	/**
+	 * Encrypts the incoming connection (DIRECT - no multistream-select)
+	 * ECIES uses its own handshake protocol, incompatible with multistream-select
+	 */
+	async _encryptInboundDirect(
+		connection: AbstractMessageStream,
+		options: AbortOptions,
+	): Promise<SecuredConnection> {
+		try {
+			connection.log(
+				"performing ECIES handshake (inbound) - direct, no multistream-select",
+			);
 
-      const secureConn = await this.connectionEncrypter.secureInBound(socket)
-      
-      connection.log('ECIES handshake complete (inbound), remote peer: %s', Buffer.from(secureConn.remotePeer).toString('hex').slice(0, 16))
+			// Perform actual ECIES encryption handshake
+			const maConn = connection as any;
+			const socket = maConn.socket;
+			if (!socket) {
+				throw new Error("No socket available for ECIES encryption");
+			}
 
-      // Clear any leftover data in the read buffer after ECIES handshake
-      // This ensures a clean stream for multi-stream-select negotiation
-      const connectionAny = connection as any
-      if (connectionAny.readBuffer?.byteLength > 0) {
-        connection.log('clearing %d bytes of leftover data from read buffer after ECIES handshake', connectionAny.readBuffer.byteLength)
-        connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength)
-      }
+			const secureConn = await this.connectionEncrypter.secureInBound(socket);
 
-      return {
-        connection,
-        remotePeer: secureConn.remotePeer,
-        protocol: 'eccies'
-      }
-    } catch (err: any) {
-      throw new Error(`Failed to encrypt inbound connection: ${err.message}`)
-    }
-  }
+			connection.log(
+				"ECIES handshake complete (inbound), remote peer: %s",
+				Buffer.from(secureConn.remotePeer).toString("hex").slice(0, 16),
+			);
 
-  /**
-   * Encrypts the outgoing connection (DIRECT - no multistream-select)
-   * ECIES uses its own handshake protocol, incompatible with multistream-select
-   */
-  async _encryptOutboundDirect (connection: AbstractMessageStream, options: AbortOptions): Promise<SecuredConnection> {
-    try {
-      connection.log('performing ECIES handshake (outbound) - direct, no multistream-select')
+			// Clear any leftover data in the read buffer after ECIES handshake
+			// This ensures a clean stream for multi-stream-select negotiation
+			const connectionAny = connection as any;
+			if (connectionAny.readBuffer?.byteLength > 0) {
+				connection.log(
+					"clearing %d bytes of leftover data from read buffer after ECIES handshake",
+					connectionAny.readBuffer.byteLength,
+				);
+				connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength);
+			}
 
-      // Perform actual ECIES encryption handshake
-      const maConn = connection as any
-      const socket = maConn.socket
-      if (!socket) {
-        throw new Error('No socket available for ECIES encryption')
-      }
+			return {
+				connection,
+				remotePeer: secureConn.remotePeer,
+				protocol: "eccies",
+			};
+		} catch (err: any) {
+			throw new Error(`Failed to encrypt inbound connection: ${err.message}`);
+		}
+	}
 
-      // For outbound, we need the remote peer ID that was passed to the transport
-      const remotePeerId = maConn.remotePeerId
-      if (!remotePeerId) {
-        throw new Error('No remote peer ID available for ECIES encryption')
-      }
+	/**
+	 * Encrypts the outgoing connection (DIRECT - no multistream-select)
+	 * ECIES uses its own handshake protocol, incompatible with multistream-select
+	 */
+	async _encryptOutboundDirect(
+		connection: AbstractMessageStream,
+		options: AbortOptions,
+	): Promise<SecuredConnection> {
+		try {
+			connection.log(
+				"performing ECIES handshake (outbound) - direct, no multistream-select",
+			);
 
-      connection.log('performing ECIES handshake (outbound) with peer %s...', Buffer.from(remotePeerId).toString('hex').slice(0, 16))
-      const secureConn = await this.connectionEncrypter.secureOutBound(socket, remotePeerId)
-      
-      connection.log('ECIES handshake complete (outbound), remote peer: %s', Buffer.from(secureConn.remotePeer).toString('hex').slice(0, 16))
+			// Perform actual ECIES encryption handshake
+			const maConn = connection as any;
+			const socket = maConn.socket;
+			if (!socket) {
+				throw new Error("No socket available for ECIES encryption");
+			}
 
-      // Clear any leftover data in the read buffer after ECIES handshake
-      // This ensures a clean stream for multi-stream-select negotiation
-      const connectionAny = connection as any
-      if (connectionAny.readBuffer?.byteLength > 0) {
-        connection.log('clearing %d bytes of leftover data from read buffer after ECIES handshake', connectionAny.readBuffer.byteLength)
-        connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength)
-      }
+			// For outbound, we need the remote peer ID that was passed to the transport
+			const remotePeerId = maConn.remotePeerId;
+			if (!remotePeerId) {
+				throw new Error("No remote peer ID available for ECIES encryption");
+			}
 
-      return {
-        connection,
-        remotePeer: secureConn.remotePeer,
-        protocol: 'eccies'
-      }
-    } catch (err: any) {
-      throw new Error(`Failed to encrypt outbound connection: ${err.message}`)
-    }
-  }
+			connection.log(
+				"performing ECIES handshake (outbound) with peer %s...",
+				Buffer.from(remotePeerId).toString("hex").slice(0, 16),
+			);
+			const secureConn = await this.connectionEncrypter.secureOutBound(
+				socket,
+				remotePeerId,
+			);
 
-  /**
-   * Selects one of the given muxers via multistream-select for outbound
-   */
-  async _multiplexOutbound (maConn: AbstractMessageStream, options: AbortOptions): Promise<StreamMuxerFactory> {
-    const protocols = [this.streamMuxerFactory.protocol]
+			connection.log(
+				"ECIES handshake complete (outbound), remote peer: %s",
+				Buffer.from(secureConn.remotePeer).toString("hex").slice(0, 16),
+			);
 
-    try {
-      const protocol = await mss.select(maConn, protocols, options)
+			// Clear any leftover data in the read buffer after ECIES handshake
+			// This ensures a clean stream for multi-stream-select negotiation
+			const connectionAny = connection as any;
+			if (connectionAny.readBuffer?.byteLength > 0) {
+				connection.log(
+					"clearing %d bytes of leftover data from read buffer after ECIES handshake",
+					connectionAny.readBuffer.byteLength,
+				);
+				connectionAny.readBuffer.consume(connectionAny.readBuffer.byteLength);
+			}
 
-      if (protocol !== this.streamMuxerFactory.protocol) {
-        throw new Error(`No muxer configured for protocol "${protocol}"`)
-      }
+			return {
+				connection,
+				remotePeer: secureConn.remotePeer,
+				protocol: "eccies",
+			};
+		} catch (err: any) {
+			throw new Error(`Failed to encrypt outbound connection: ${err.message}`);
+		}
+	}
 
-      return this.streamMuxerFactory
-    } catch (err: any) {
-      throw new Error(`Failed to negotiate muxer: ${err.message}`)
-    }
-  }
+	/**
+	 * Selects one of the given muxers via multistream-select for outbound
+	 */
+	async _multiplexOutbound(
+		maConn: AbstractMessageStream,
+		options: AbortOptions,
+	): Promise<StreamMuxerFactory> {
+		const protocols = [this.streamMuxerFactory.protocol];
 
-  /**
-   * Registers support for one of the given muxers via multistream-select for inbound
-   */
-  async _multiplexInbound (maConn: AbstractMessageStream, options: AbortOptions): Promise<StreamMuxerFactory> {
-    const protocols = [this.streamMuxerFactory.protocol]
+		try {
+			const protocol = await mss.select(maConn, protocols, options);
 
-    try {
-      const protocol = await mss.handle(maConn, protocols, options)
+			if (protocol !== this.streamMuxerFactory.protocol) {
+				throw new Error(`No muxer configured for protocol "${protocol}"`);
+			}
 
-      if (protocol !== this.streamMuxerFactory.protocol) {
-        throw new Error(`No muxer configured for protocol "${protocol}"`)
-      }
+			return this.streamMuxerFactory;
+		} catch (err: any) {
+			throw new Error(`Failed to negotiate muxer: ${err.message}`);
+		}
+	}
 
-      return this.streamMuxerFactory
-    } catch (err: any) {
-      throw new Error(`Failed to negotiate muxer: ${err.message}`)
-    }
-  }
+	/**
+	 * Registers support for one of the given muxers via multistream-select for inbound
+	 */
+	async _multiplexInbound(
+		maConn: AbstractMessageStream,
+		options: AbortOptions,
+	): Promise<StreamMuxerFactory> {
+		const protocols = [this.streamMuxerFactory.protocol];
 
-  getConnectionEncrypter (): ConnectionEncrypter | null {
-    return this.connectionEncrypter
-  }
+		try {
+			const protocol = await mss.handle(maConn, protocols, options);
 
-  getStreamMuxerFactory (): StreamMuxerFactory {
-    return this.streamMuxerFactory
-  }
+			if (protocol !== this.streamMuxerFactory.protocol) {
+				throw new Error(`No muxer configured for protocol "${protocol}"`);
+			}
 
-  getComponents (): UpgraderComponents {
-    return this.components
-  }
+			return this.streamMuxerFactory;
+		} catch (err: any) {
+			throw new Error(`Failed to negotiate muxer: ${err.message}`);
+		}
+	}
 
-  /**
-   * Perform basic upgrade (encryption only, no muxing)
-   * Creates a BasicConnection compatible with RLPx
-   */
-  private async _performBasicUpgrade(
-    maConn: AbstractMultiaddrConnection,
-    direction: 'inbound' | 'outbound',
-    opts: AbortOptions = {}
-  ): Promise<BasicConnection> {
-    let stream: AbstractMessageStream = maConn
-    let remotePeer: PeerId
-    let cryptoProtocol: string
+	getConnectionEncrypter(): ConnectionEncrypter | null {
+		return this.connectionEncrypter;
+	}
 
-    const id = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`
+	getStreamMuxerFactory(): StreamMuxerFactory {
+		return this.streamMuxerFactory;
+	}
 
-    try {
-      // Encrypt if encrypter configured
-      if (this.connectionEncrypter) {
-        const encrypted = direction === 'inbound'
-          ? await this._encryptInboundDirect(stream, opts)
-          : await this._encryptOutboundDirect(stream, opts)
+	getComponents(): UpgraderComponents {
+		return this.components;
+	}
 
-        stream = encrypted.connection
-        remotePeer = encrypted.remotePeer
-        cryptoProtocol = encrypted.protocol
-      } else {
-        // No encryption - use peer ID from connection options
-        const maConnAny = maConn as any
-        remotePeer = maConnAny.remotePeerId || this.id
-        cryptoProtocol = 'none'
-        maConn.log('skipping encryption (testing mode), remote peer: %s', Buffer.from(remotePeer).toString('hex').slice(0, 16))
-      }
+	/**
+	 * Perform basic upgrade (encryption only, no muxing)
+	 * Creates a BasicConnection compatible with RLPx
+	 */
+	private async _performBasicUpgrade(
+		maConn: AbstractMultiaddrConnection,
+		direction: "inbound" | "outbound",
+		opts: AbortOptions = {},
+	): Promise<BasicConnection> {
+		let stream: AbstractMessageStream = maConn;
+		let remotePeer: PeerId;
+		let cryptoProtocol: string;
 
-      return createBasicConnection({
-        id,
-        cryptoProtocol,
-        direction,
-        maConn,
-        stream,
-        remotePeer,
-        closeTimeout: this.connectionCloseTimeout
-      })
-    } catch (err: any) {
-      maConn.log.error('failed to upgrade %s basic connection: %s', direction, err.message)
-      throw err
-    }
-  }
+		const id = `${(parseInt(String(Math.random() * 1e9))).toString(36)}${Date.now()}`;
+
+		try {
+			// Encrypt if encrypter configured
+			if (this.connectionEncrypter) {
+				const encrypted =
+					direction === "inbound"
+						? await this._encryptInboundDirect(stream, opts)
+						: await this._encryptOutboundDirect(stream, opts);
+
+				stream = encrypted.connection;
+				remotePeer = encrypted.remotePeer;
+				cryptoProtocol = encrypted.protocol;
+			} else {
+				// No encryption - use peer ID from connection options
+				const maConnAny = maConn as any;
+				remotePeer = maConnAny.remotePeerId || this.id;
+				cryptoProtocol = "none";
+				maConn.log(
+					"skipping encryption (testing mode), remote peer: %s",
+					Buffer.from(remotePeer).toString("hex").slice(0, 16),
+				);
+			}
+
+			return createBasicConnection({
+				id,
+				cryptoProtocol,
+				direction,
+				maConn,
+				stream,
+				remotePeer,
+				closeTimeout: this.connectionCloseTimeout,
+			});
+		} catch (err: any) {
+			maConn.log.error(
+				"failed to upgrade %s basic connection: %s",
+				direction,
+				err.message,
+			);
+			throw err;
+		}
+	}
 }
 
-export function createUpgrader (components: UpgraderComponents, init: UpgraderInit): Upgrader {
-  return new Upgrader(components, init)
+export function createUpgrader(
+	components: UpgraderComponents,
+	init: UpgraderInit,
+): Upgrader {
+	return new Upgrader(components, init);
 }

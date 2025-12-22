@@ -36,4 +36,3 @@ export function handleNewPooledTransactionHashes(
 		handler.emit("error", err);
 	}
 }
-

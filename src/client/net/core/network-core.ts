@@ -105,6 +105,7 @@ export class NetworkCore {
 			this.onPeerDisconnect.bind(this),
 		);
 
+		await this.node.stop();
 		this.config.events.removeAllListeners(Event.PEER_CONNECTED);
 		this.config.events.removeAllListeners(Event.PEER_DISCONNECTED);
 		this.config.events.removeAllListeners(Event.PEER_ERROR);
@@ -241,7 +242,10 @@ export class NetworkCore {
 		}
 	}
 
-	public async waitForPeerStatus(peer: P2PPeer, peerIdHex: string): Promise<void> {
+	public async waitForPeerStatus(
+		peer: P2PPeer,
+		peerIdHex: string,
+	): Promise<void> {
 		if (!peer.eth) {
 			this.pendingPeers.delete(peerIdHex);
 			this.addPeer(peer);
@@ -317,7 +321,8 @@ export class NetworkCore {
 		try {
 			const connection = evt.detail;
 			const peerIdHex = peerIdToString(connection.remotePeer);
-			const peer = this.peers.get(peerIdHex) || this.pendingPeers.get(peerIdHex);
+			const peer =
+				this.peers.get(peerIdHex) || this.pendingPeers.get(peerIdHex);
 			if (peer) {
 				this.removePeer(peer);
 				this.config.events.emit(Event.PEER_DISCONNECTED, peer);
@@ -329,7 +334,8 @@ export class NetworkCore {
 		try {
 			const peerId = evt.detail;
 			const peerIdHex = peerIdToString(peerId);
-			const peer = this.peers.get(peerIdHex) || this.pendingPeers.get(peerIdHex);
+			const peer =
+				this.peers.get(peerIdHex) || this.pendingPeers.get(peerIdHex);
 			if (peer) {
 				this.removePeer(peer);
 				this.config.events.emit(Event.PEER_DISCONNECTED, peer);

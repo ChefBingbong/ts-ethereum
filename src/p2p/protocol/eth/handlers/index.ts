@@ -31,9 +31,7 @@ import { handleNewPooledTransactionHashes } from "./new-pooled-transaction-hashe
  * Register all default handlers with the registry
  * This function is called by EthHandler during initialization
  */
-export function registerDefaultHandlers(
-	registry: EthHandlerRegistry,
-): void {
+export function registerDefaultHandlers(registry: EthHandlerRegistry): void {
 	// Register request handlers
 	registry.registerRequestHandler(
 		EthMessageCode.GET_BLOCK_HEADERS,
@@ -111,4 +109,3 @@ export {
 	handleNewBlock,
 	handleNewPooledTransactionHashes,
 };
-

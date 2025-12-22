@@ -53,7 +53,10 @@ export class AddressManager implements AddressManagerInterface {
 
 	readonly [Symbol.toStringTag] = "@p2p/address-manager";
 
-	constructor(components: AddressManagerComponents, init: AddressManagerInit = {}) {
+	constructor(
+		components: AddressManagerComponents,
+		init: AddressManagerInit = {},
+	) {
 		const { listen = [], announce = [] } = init;
 
 		this.components = components;
@@ -112,4 +115,3 @@ export function createAddressManager(
 ): AddressManager {
 	return new AddressManager(components, init);
 }
-

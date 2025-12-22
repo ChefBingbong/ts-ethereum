@@ -1,12 +1,12 @@
 /**
  * @packageDocumentation
  *
- * multistream-select is protocol multiplexing per connection/stream. 
+ * multistream-select is protocol multiplexing per connection/stream.
  * Full spec: https://github.com/multiformats/multistream-select
  *
  * ## Select a protocol flow
  *
- * The caller will send "interactive" messages, expecting for some acknowledgement 
+ * The caller will send "interactive" messages, expecting for some acknowledgement
  * from the callee, which will "select" the handler for the desired and supported protocol:
  *
  * ```
@@ -22,33 +22,32 @@
  * ```
  */
 
-import type { AbortOptions } from '../connection/types'
-import { PROTOCOL_ID } from './constants'
+import type { AbortOptions } from "../connection/types";
+import { PROTOCOL_ID } from "./constants";
 
-export { PROTOCOL_ID }
+export { PROTOCOL_ID };
 
 export interface MultistreamSelectInit extends AbortOptions {
-  /**
-   * When false, and only a single protocol is being negotiated, use optimistic
-   * select to send both the protocol name and the first data buffer in the
-   * initial message, saving a round trip for connection establishment.
-   *
-   * @default true
-   */
-  negotiateFully?: boolean
+	/**
+	 * When false, and only a single protocol is being negotiated, use optimistic
+	 * select to send both the protocol name and the first data buffer in the
+	 * initial message, saving a round trip for connection establishment.
+	 *
+	 * @default true
+	 */
+	negotiateFully?: boolean;
 
-  /**
-   * Max data length for protocol names
-   */
-  maxDataLength?: number
+	/**
+	 * Max data length for protocol names
+	 */
+	maxDataLength?: number;
 
-  /**
-   * Max length for varint prefix
-   */
-  maxLengthLength?: number
+	/**
+	 * Max length for varint prefix
+	 */
+	maxLengthLength?: number;
 }
 
-export { handle } from './handle'
-export { encode, LengthPrefixedStream, lpStream } from './lp-stream'
-export { select } from './select'
-
+export { handle } from "./handle";
+export { encode, LengthPrefixedStream, lpStream } from "./lp-stream";
+export { select } from "./select";

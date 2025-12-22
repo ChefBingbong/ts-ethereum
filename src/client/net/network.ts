@@ -257,12 +257,29 @@ export class Network {
 	};
 
 	async stop(): Promise<boolean> {
-		return this.core.stop();
+		try {
+			this.txPool.stop();
+			this.miner?.stop();
+
+			await this.synchronizer?.stop();
+			await this.execution.stop();
+			return await this.core.stop();
+		} catch (error) {
+			return false;
+		}
 	}
 
 	async close(): Promise<void> {
-		this.removeEventListeners();
-		return this.core.close();
+		try {
+			this.txPool.close();
+			await this.synchronizer?.close();
+			
+			this.removeEventListeners();
+			await this.core.close();
+			await this.stop();
+		} catch (error) {
+			this.removeEventListeners();
+		}
 	}
 
 	get running(): boolean {

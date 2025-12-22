@@ -34,4 +34,3 @@ export function handleNewBlock(handler: EthHandler, payload: unknown): void {
 		handler.emit("error", err);
 	}
 }
-

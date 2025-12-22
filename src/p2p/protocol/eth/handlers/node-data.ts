@@ -45,4 +45,3 @@ export function handleNodeData(handler: EthHandler, payload: unknown): void {
 		handler.emit("error", err);
 	}
 }
-

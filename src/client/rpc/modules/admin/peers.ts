@@ -13,8 +13,8 @@ export const peers = (node: ExecutionNode) =>
 
 			return safeResult(
 				peers?.map((peer) => {
-				// P2PPeer doesn't expose connection.getHelloMessage() - use peer info instead
-				const name = null; // TODO: Get client ID from P2PPeer if available
+					// P2PPeer doesn't expose connection.getHelloMessage() - use peer info instead
+					const name = null; // TODO: Get client ID from P2PPeer if available
 					return {
 						id: peer.id,
 						name,

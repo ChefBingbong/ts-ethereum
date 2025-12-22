@@ -63,7 +63,10 @@ export function decodeStatus(data: Uint8Array): EthStatus {
 	const td = bytesToBigInt(decoded[2] as Uint8Array);
 	const bestHash = decoded[3] as Uint8Array;
 	const genesisHash = decoded[4] as Uint8Array;
-	const forkId = decoded.length > 5 ? (decoded[5] as unknown as [Uint8Array, Uint8Array]) : undefined;
+	const forkId =
+		decoded.length > 5
+			? (decoded[5] as unknown as [Uint8Array, Uint8Array])
+			: undefined;
 
 	return {
 		chainId,
@@ -106,4 +109,3 @@ export function validateStatus(
 		}
 	}
 }
-

@@ -89,4 +89,3 @@ export type ExecutionNodeModules = {
 	miner?: Miner;
 	txFetcher: TxFetcher;
 };
-

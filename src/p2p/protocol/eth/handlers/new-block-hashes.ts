@@ -34,4 +34,3 @@ export function handleNewBlockHashes(
 		handler.emit("error", err);
 	}
 }
-

@@ -75,4 +75,3 @@ export class FixedSizeAccumulator {
 		this.expectedSize = size;
 	}
 }
-
