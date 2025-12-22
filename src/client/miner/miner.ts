@@ -7,11 +7,12 @@ import {
 } from "../../eth-hash";
 import { BIGINT_0, BIGINT_1, bytesToHex } from "../../utils";
 import { buildBlock, type TxReceipt } from "../../vm";
+import { Chain } from "../blockchain/chain.ts";
 import type { Config } from "../config/index.ts";
 import type { VMExecution } from "../execution";
 import { LevelDB } from "../execution/level.ts";
 import { IndexOperation, IndexType } from "../execution/txIndex.ts";
-import type { FullEthereumServiceLike } from "../service/fullethereumservice-types.ts";
+import { TxPool } from "../service/txpool.ts";
 import type { FullSynchronizer } from "../sync";
 import { Event } from "../types.ts";
 
@@ -19,9 +20,10 @@ export interface MinerOptions {
 	/* Config */
 	config: Config;
 
-	/* FullEthereumService or P2PFullEthereumService */
-	service: FullEthereumServiceLike;
-
+	txPool: TxPool;
+	chain: Chain;
+	execution: VMExecution;
+	synchronizer: FullSynchronizer;
 	/* Skip hardfork validation */
 	skipHardForkValidation?: boolean;
 }
@@ -41,8 +43,10 @@ export class Miner {
 		| undefined; /* global NodeJS */
 	private _boundChainUpdatedHandler: (() => void) | undefined;
 	private config: Config;
-	private service: FullEthereumServiceLike;
+	private txPool: TxPool;
+	private chain: Chain;
 	private execution: VMExecution;
+	private synchronizer: FullSynchronizer;
 	private assembling: boolean;
 	private period: number;
 	private ethash: Ethash | undefined;
@@ -56,8 +60,10 @@ export class Miner {
 	 */
 	constructor(options: MinerOptions) {
 		this.config = options.config;
-		this.service = options.service;
-		this.execution = this.service.execution;
+		this.txPool = options.txPool;
+		this.chain = options.chain;
+		this.execution = options.execution;
+		this.synchronizer = options.synchronizer;
 		this.running = false;
 		this.assembling = false;
 		this.skipHardForkValidation = options.skipHardForkValidation;
@@ -73,7 +79,7 @@ export class Miner {
 	 * Convenience alias to return the latest block in the blockchain
 	 */
 	private latestBlockHeader(): BlockHeader {
-		return this.service.chain.headers.latest!;
+		return this.chain.headers.latest!;
 	}
 
 	/**
@@ -198,7 +204,7 @@ export class Miner {
 		_boundSetInterruptHandler = setInterrupt.bind(this);
 		this.config.events.once(Event.CHAIN_UPDATED, _boundSetInterruptHandler);
 
-		const parentBlock = this.service.chain.blocks.latest!;
+		const parentBlock = this.chain.blocks.latest!;
 
 		const number = parentBlock.header.number + BIGINT_1;
 		const { gasLimit } = parentBlock.header;
@@ -243,7 +249,7 @@ export class Miner {
 		});
 
 		// Frontier/Chainstart - no base fee
-		const txs = await this.service.txPool.txsByPriceAndNonce(vmCopy, {});
+		const txs = await this.txPool.txsByPriceAndNonce(vmCopy, {});
 		this.config.options.logger?.info(
 			`Miner: Assembling block from ${txs.length} eligible txs`,
 		);
@@ -323,18 +329,18 @@ export class Miner {
 		this.assembling = false;
 		if (interrupt) return;
 		// Put block in blockchain
-		await (this.service.synchronizer as FullSynchronizer).handleNewBlock(block);
+		await (this.synchronizer as FullSynchronizer).handleNewBlock(block);
 		// Remove included txs from TxPool
-		this.service.txPool.removeNewBlockTxs([block]);
+		this.txPool.removeNewBlockTxs([block]);
 
 		// Clear nonce cache for affected addresses and promote queued txs
 		for (const tx of block.transactions) {
 			const addr = tx.getSenderAddress().toString().slice(2);
-			this.service.txPool.clearNonceCache(addr);
+			this.txPool.clearNonceCache(addr);
 		}
 		// Re-evaluate pool state after block is mined
-		await this.service.txPool.demoteUnexecutables();
-		await this.service.txPool.promoteExecutables();
+		await this.txPool.demoteUnexecutables();
+		await this.txPool.promoteExecutables();
 
 		this.config.events.removeListener(
 			Event.CHAIN_UPDATED,

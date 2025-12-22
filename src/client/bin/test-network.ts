@@ -34,9 +34,6 @@ import { DataDirectory, SyncMode } from "../config/types.ts";
 import { LevelDB } from "../execution/level.ts";
 import { getLogger, type Logger } from "../logging.ts";
 import { ETH } from "../net/protocol/eth/eth.ts";
-import { createP2PRpcManager, RPCArgs } from "../rpc/index.ts";
-import type { P2PFullEthereumService } from "../service/p2p-fullethereumservice.ts";
-import { Event } from "../types.ts";
 import { setupMetrics } from "../util/metrics.ts";
 
 debug.enable("p2p:*");
@@ -540,61 +537,12 @@ async function startClient() {
 		metaDB,
 	});
 
-	await client.open();
-
-	// Update sync status
-	client.config.updateSynchronizedState(client.chain.headers.latest, true);
-
-	// Ensure txPool is running
-	const fullService = client.service as P2PFullEthereumService;
-	fullService.txPool?.checkRunState();
-
 	await client.start();
-
-	// Add peer connection monitoring
-	config.events.on(Event.PEER_CONNECTED, (peer) => {
-		console.log(
-			`\n🤝 PEER CONNECTED: ${peer.id?.slice(0, 16)}... from ${peer.address}`,
-		);
-		console.log(`   Total peers: ${client.service.pool.size}\n`);
-	});
-
-	config.events.on(Event.PEER_DISCONNECTED, (peer) => {
-		console.log(`\n👋 PEER DISCONNECTED: ${peer.id?.slice(0, 16)}...`);
-		console.log(`   Total peers: ${client.service.pool.size}\n`);
-	});
-
-	// Log peer count periodically
-	setInterval(() => {
-		const peerCount = client.service.pool.size;
-		const blockHeight = client.chain.headers.height;
-		if (peerCount > 0) {
-			console.log(
-				`📊 Status: ${peerCount} peer(s) connected, block height: ${blockHeight}`,
-			);
-		}
-	}, 30000); // Every 30 seconds
-
-	// Open execution layer FIRST (creates receiptsManager)
-	const service = client.service;
-	await service.execution.open();
-	await service.execution.run();
-
-	// Start RPC server AFTER execution is ready (so receiptsManager exists)
-	const rpcPort = RPC_BASE_PORT + (port - BOOTNODE_PORT);
-	console.log(`Starting RPC server on port ${rpcPort}`);
-	const rpcArgs: RPCArgs = {
-		rpc: true,
-		rpcAddr: "127.0.0.1",
-		rpcPort,
-	};
-
-	createP2PRpcManager(client, rpcArgs);
 
 	console.log("\n" + "=".repeat(60));
 	console.log("✅ Node started successfully!");
 	console.log(`   P2P port:  ${port}`);
-	console.log(`   RPC URL:   http://127.0.0.1:${rpcPort}`);
+	console.log(`   RPC URL:   http://127.0.0.1:${port + 300}`);
 	console.log(`   Account:   ${nodeAccount[0]}`);
 	if (isBootnode) {
 		console.log(`   Mining:    YES (rewards → ${nodeAccount[0]})`);

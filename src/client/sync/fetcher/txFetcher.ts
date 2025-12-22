@@ -1,5 +1,5 @@
 import { bytesToUnprefixedHex, hexToBytes } from "../../../utils";
-import type { Config } from "../../config.ts";
+import type { Config } from "../../config/index.ts";
 import type { Peer } from "../../net/peer/peer.ts";
 import type { PeerPoolLike } from "../../net/peerpool-types.ts";
 import type { TxPool } from "../../service/txpool.ts";

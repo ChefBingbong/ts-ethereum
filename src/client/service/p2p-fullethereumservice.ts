@@ -1,81 +1,66 @@
-import debug from "debug";
 import type { Block } from "../../block";
-import { concatBytes } from "../../utils";
-import { encodeReceipt } from "../../vm";
-import { SyncMode } from "../config/index.ts";
 import { Miner } from "../miner";
 import type { Peer } from "../net/peer/peer.ts";
-// EthProtocol removed - P2P uses EthHandler directly
+import {
+	type EthHandlerContext,
+	handleGetBlockBodies,
+	handleGetBlockHeaders,
+	handleGetPooledTransactions,
+	handleGetReceipts,
+	handleNewBlock,
+	handleNewBlockHashes,
+	handleNewPooledTransactionHashes,
+	handleTransactions,
+} from "../net/protocol/eth/handlers.ts";
 import { FullSynchronizer } from "../sync";
 import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
-import type { ServiceOptions } from "./service.ts";
-import { Service } from "./service.ts";
+import { getV8Engine } from "../util/index.ts";
+import { ServiceOptions } from "./fullethereumservice-types.ts";
+import { Service, STATS_INTERVAL } from "./service.ts";
 import { TxPool } from "./txpool.ts";
 
-const log = debug("p2p:full-ethereum-service");
+export type ProtocolMessage = {
+	message: { name: string; data: unknown };
+	protocol: string;
+	peer: Peer;
+};
 
-/**
- * Full Ethereum service using P2P networking
- * Extends Service and implements all ETH protocol message handlers
- *
- * Extends Service and implements all ETH protocol message handlers
- *
- * @memberof module:service
- */
 export class P2PFullEthereumService extends Service {
-	/* synchronizer for syncing the chain */
-	public declare synchronizer?: FullSynchronizer;
-	public miner: Miner | undefined;
+	public miner?: Miner;
 	public txPool: TxPool;
-
-	/** building head state via vmexecution */
-	private building = false;
-
 	public txFetcher: TxFetcher;
 
-	/**
-	 * Create new P2P ETH service
-	 */
+	private building = false;
+
 	constructor(options: ServiceOptions) {
-		log("Creating P2PFullEthereumService");
 		super(options);
-
-		this.config.options.logger?.info("Full sync mode (P2P)");
-		log("Full sync mode (P2P)");
-
-		// Set execution in peer pool so peers can create EthHandler instances
-		log("Setting execution in P2PPeerPool");
 		this.pool.setExecution(this.execution);
 
-		log("Creating TxPool");
 		this.txPool = new TxPool({
 			config: this.config,
-			service: this,
+			pool: this.pool,
+			chain: this.chain,
+			execution: this.execution,
 		});
 
-		if (this.config.options.syncmode === SyncMode.Full) {
-			log("Creating FullSynchronizer");
-			// PoW-only mode - use full synchronizer
-			this.synchronizer = new FullSynchronizer({
-				config: this.config,
-				pool: this.pool,
-				chain: this.chain,
-				txPool: this.txPool,
-				execution: this.execution,
-				interval: this.interval,
-			});
+		this.synchronizer = new FullSynchronizer({
+			config: this.config,
+			pool: this.pool,
+			chain: this.chain,
+			txPool: this.txPool,
+			execution: this.execution,
+			interval: this.interval,
+		});
 
-			if (this.config.options.mine) {
-				log("Creating Miner");
-				this.miner = new Miner({
-					config: this.config,
-					service: this,
-				});
-			}
-		}
+		this.miner = new Miner({
+			config: this.config,
+			txPool: this.txPool,
+			synchronizer: this.synchronizer,
+			chain: this.chain,
+			execution: this.execution,
+		});
 
-		log("Creating TxFetcher");
 		this.txFetcher = new TxFetcher({
 			config: this.config,
 			pool: this.pool,
@@ -83,340 +68,292 @@ export class P2PFullEthereumService extends Service {
 		});
 	}
 
-	override async open() {
-		log("Opening P2PFullEthereumService");
-		if (this.synchronizer !== undefined) {
-			log(
-				"Preparing for sync using P2PFullEthereumService with FullSynchronizer",
-			);
-			this.config.options.logger?.info(
-				"Preparing for sync using P2PFullEthereumService with FullSynchronizer.",
-			);
-		} else {
-			log("Starting P2PFullEthereumService with no syncing");
-			this.config.options.logger?.info(
-				"Starting P2PFullEthereumService with no syncing.",
-			);
-		}
-		// Broadcast pending txs to newly connected peer
-		this.config.events.on(Event.POOL_PEER_ADDED, (peer) => {
-			// TODO: Should we do this if the txPool isn't started?
-			const txs: [number[], number[], Uint8Array[]] = [[], [], []];
-			// Iterate over pending pool (executable txs)
-			for (const [_addr, txObjs] of this.txPool.pending) {
-				for (const txObj of txObjs) {
-					const rawTx = txObj.tx;
-					txs[0].push(rawTx.type);
-					txs[1].push(rawTx.serialize().byteLength);
-					txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
-				}
-			}
-			// Also include queued pool txs
-			for (const [_addr, txObjs] of this.txPool.queued) {
-				for (const txObj of txObjs) {
-					const rawTx = txObj.tx;
-					txs[0].push(rawTx.type);
-					txs[1].push(rawTx.serialize().byteLength);
-					txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
-				}
-			}
-			if (txs[0].length > 0) this.txPool.sendNewTxHashes(txs, [peer]);
-		});
+	async open() {
+		try {
+			this.setupBasicEventListeners();
+			if (this.opened) return false;
 
-		this.config.events.on(
-			Event.SYNC_FETCHED_BLOCKS,
-			async (blocks: Block[]) => {
-				// Remove mined txs
-				this.txPool.removeNewBlockTxs(blocks);
+			await this.pool.open();
+			await this.chain.open();
+			await this.synchronizer?.open();
+			this.opened = true;
 
-				// Clear nonce cache for affected addresses
-				for (const block of blocks) {
-					for (const tx of block.transactions) {
-						const addr = tx.getSenderAddress().toString().slice(2);
-						this.txPool.clearNonceCache(addr);
-					}
-				}
-
-				// Re-evaluate pool state
-				await this.txPool.demoteUnexecutables();
-				await this.txPool.promoteExecutables();
-			},
-		);
-
-		this.config.events.on(Event.CHAIN_REORG, async (oldBlocks, newBlocks) => {
-			await this.txPool.handleReorg(oldBlocks, newBlocks);
-		});
-
-		await super.open();
-
-		log("Opening execution");
-		await this.execution.open();
-
-		log("Opening txPool");
-		this.txPool.open();
-		if (this.config.options.mine) {
-			log("Starting txPool (mining enabled)");
-			// Start the TxPool immediately if mining
+			await this.execution.open();
+			this.txPool.open();
 			this.txPool.start();
-		}
-		log("P2PFullEthereumService opened");
-		return true;
-	}
-
-	/**
-	 * Start service
-	 */
-	override async start(): Promise<boolean> {
-		if (this.running) {
-			log("Service already running");
+			return true;
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`Error opening: ${error.message}`);
+			this.opened = false;
 			return false;
 		}
-		log("Starting P2PFullEthereumService");
-		await super.start();
-		if (this.miner) {
-			log("Starting miner");
-			this.miner.start();
-		}
-		log("Starting execution");
-		await this.execution.start();
-		log("Building head state");
-		void this.buildHeadState();
-		log("Starting txFetcher");
-		this.txFetcher.start();
-		log("P2PFullEthereumService started");
-		return true;
 	}
 
-	/**
-	 * if the vm head is not recent enough, trigger building a recent state by running
-	 * vm execution
-	 */
-	async buildHeadState(): Promise<void> {
-		if (this.building) return;
-		this.building = true;
+	async start(): Promise<boolean> {
+		if (this.running) return false;
 
 		try {
-			if (this.execution.started && this.synchronizer !== undefined) {
-				await this.synchronizer.runExecution();
-			} else {
-				this.config.options.logger?.warn(
-					"skipping building head state as execution is not started",
-				);
+			await this.pool.start();
+			void this.synchronizer?.start();
+
+			if (!this.v8Engine) {
+				this.v8Engine = await getV8Engine();
 			}
-		} catch (error) {
-			this.config.options.logger?.error(
-				`Error building headstate error=${error}`,
+
+			this.statsInterval = setInterval(
+				await this.stats.bind(this),
+				STATS_INTERVAL,
 			);
+
+			this.running = true;
+			this.miner.start();
+			await this.execution.start();
+
+			void this.buildHeadState();
+			this.txFetcher.start();
+			return true;
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`${error.message}`);
+			this.running = false;
+			return false;
+		}
+	}
+
+	async stop(): Promise<boolean> {
+		if (!this.running) return false;
+
+		try {
+			this.txPool.stop();
+			this.miner.stop();
+
+			await this.synchronizer?.stop();
+			await this.execution.stop();
+
+			if (!this.running) return false;
+			if (this.opened) {
+				await this.close();
+				await this.synchronizer?.close();
+			}
+
+			await this.pool.stop();
+			clearInterval(this.statsInterval);
+			await this.synchronizer?.stop();
+
+			this.running = false;
+			this.txFetcher.stop();
+			return true;
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`${error.message}`);
+			this.running = false;
+			return false;
+		}
+	}
+
+	async close(): Promise<boolean> {
+		if (!this.opened) return false;
+		try {
+			this.closeEventListeners();
+			this.txPool.close();
+
+			const result = !!this.opened;
+			if (this.opened) {
+				await this.pool.close();
+				this.opened = false;
+			}
+
+			return result;
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`${error.message}`);
+			this.opened = false;
+			return false;
+		}
+	}
+
+	async buildHeadState(): Promise<void> {
+		try {
+			if (this.building) return;
+			this.building = true;
+
+			if (!this.execution.started) return;
+			await this.synchronizer.runExecution();
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`${error.message}`);
 		} finally {
 			this.building = false;
 		}
 	}
 
-	/**
-	 * Stop service
-	 */
-	override async stop(): Promise<boolean> {
-		if (!this.running) {
-			log("Service not running");
-			return false;
-		}
-		log("Stopping P2PFullEthereumService");
-		this.txPool.stop();
-		if (this.miner) {
-			log("Stopping miner");
-			this.miner.stop();
-		}
-		await this.synchronizer?.stop();
+	override async handle(_message: ProtocolMessage): Promise<void> {
+		if (_message.protocol !== "eth") return;
+		const { message, peer } = _message;
 
-		// independently close execution
-		log("Stopping execution");
-		await this.execution.stop();
+		console.log("Handling message", _message);
+		const context: EthHandlerContext = {
+			chain: this.chain,
+			txPool: this.txPool,
+			synchronizer: this.synchronizer,
+			execution: this.execution,
+			pool: this.pool,
+		};
 
-		await super.stop();
-		log("Stopping txFetcher");
-		this.txFetcher.stop();
-		log("P2PFullEthereumService stopped");
-		return true;
-	}
-
-	/**
-	 * Close service
-	 */
-	override async close(): Promise<boolean> {
-		if (!this.opened) {
-			log("Service not opened");
-			return false;
-		}
-		log("Closing P2PFullEthereumService");
-		this.txPool.close();
-		const result = await super.close();
-		log("P2PFullEthereumService closed");
-		return result;
-	}
-
-	/**
-	 * Handles incoming message from connected peer
-	 * @param message message object
-	 * @param protocol protocol name
-	 * @param peer peer
-	 */
-	override async handle(
-		message: any,
-		protocol: string,
-		peer: Peer,
-	): Promise<any> {
-		if (protocol === "eth") {
-			return this.handleEth(message, peer);
-		}
-	}
-
-	/**
-	 * Handles incoming ETH message from connected peer
-	 * @param message message object
-	 * @param peer peer
-	 */
-	async handleEth(message: any, peer: Peer): Promise<void> {
-		log(
-			"Handling ETH message: %s from peer %s",
-			message.name,
-			peer.id.slice(0, 8),
-		);
-		switch (message.name) {
-			case "GetBlockHeaders": {
-				const { reqId, block, max, skip, reverse } = message.data;
-				log(
-					"GetBlockHeaders: reqId=%d, block=%s, max=%d",
-					reqId,
-					typeof block === "bigint" ? block.toString() : "hash",
-					max,
-				);
-				if (typeof block === "bigint") {
-					if (
-						(reverse === true && block > this.chain.headers.height) ||
-						(reverse !== true &&
-							block + BigInt(max * skip) > this.chain.headers.height)
-					) {
-						log("Block range exceeds chain height, sending empty headers");
-						// Respond with an empty list in case the header is higher than the current height
-						// This is to ensure Geth does not disconnect with "useless peer"
-						// TODO: in batch queries filter out the headers we do not have and do not send
-						// the empty list in case one or more headers are not available
-						peer.eth!.send("BlockHeaders", { reqId, headers: [] });
-						return;
-					}
-				}
-				const headers = await this.chain.getHeaders(block, max, skip, reverse);
-				log("Sending %d headers in response", headers.length);
-				peer.eth!.send("BlockHeaders", { reqId, headers });
-				break;
-			}
-
-			case "GetBlockBodies": {
-				const { reqId, hashes } = message.data;
-				log("GetBlockBodies: reqId=%d, hashes=%d", reqId, hashes.length);
-				const blocks: Block[] = await Promise.all(
-					hashes.map((hash: Uint8Array) => this.chain.getBlock(hash)),
-				);
-				const bodies = blocks.map((block) => block.raw().slice(1));
-				peer.eth!.send("BlockBodies", { reqId, bodies });
-				break;
-			}
-			case "NewBlockHashes": {
-				log(
-					"NewBlockHashes: %d hashes",
-					Array.isArray(message.data) ? message.data.length : 0,
-				);
-				if (this.synchronizer instanceof FullSynchronizer) {
-					this.synchronizer.handleNewBlockHashes(message.data);
-				}
-				break;
-			}
-			case "Transactions": {
-				log(
-					"Transactions: %d transactions",
-					Array.isArray(message.data) ? message.data.length : 0,
-				);
-				await this.txPool.handleAnnouncedTxs(message.data, peer, this.pool);
-				break;
-			}
-			case "NewBlock": {
-				if (this.synchronizer instanceof FullSynchronizer) {
-					const blockHeight = message.data[0]?.header?.number;
-					log("NewBlock: height=%d", blockHeight);
-					this.config.options.logger?.info(
-						`📦 Handling NewBlock message: height=${blockHeight}, peer=${peer?.id?.slice(0, 8) || "null"}`,
+		try {
+			switch (message.name) {
+				case "GetBlockHeaders":
+					await handleGetBlockHeaders(
+						message.data as Parameters<typeof handleGetBlockHeaders>[0],
+						peer,
+						context,
 					);
-					await this.synchronizer.handleNewBlock(message.data[0], peer);
-				}
-				break;
-			}
-			case "NewPooledTransactionHashes": {
-				let hashes = [];
-				log(
-					"NewPooledTransactionHashes: eth/%d",
-					peer.eth!["versions"]?.[0] || "unknown",
-				);
-				if (peer.eth!["versions"].includes(68)) {
-					// eth/68 message data format - [tx_types: number[], tx_sizes: number[], tx_hashes: uint8array[]]
-					// With eth/68, we can check transaction types and transaction sizes to
-					// decide whether or not to download the transactions announced by this message.  This
-					// can be used to prevent mempool spamming or decide whether or not to filter out certain
-					// transactions - though this is not prescribed in eth/68 (EIP 5793)
-					// https://eips.ethereum.org/EIPS/eip-5793
-					hashes = message.data[2] as Uint8Array[];
-				} else {
-					hashes = message.data;
-				}
-				await this.txPool.handleAnnouncedTxHashes(hashes, peer, this.pool);
-				break;
-			}
-			case "GetPooledTransactions": {
-				const { reqId, hashes } = message.data;
-				log("GetPooledTransactions: reqId=%d, hashes=%d", reqId, hashes.length);
-				const txs = this.txPool.getByHash(hashes);
-				log("Sending %d pooled transactions in response", txs.length);
-				// Always respond, also on an empty list
-				peer.eth?.send("PooledTransactions", { reqId, txs });
-				break;
-			}
-			case "GetReceipts": {
-				const [reqId, hashes] = message.data;
-				log("GetReceipts: reqId=%d, hashes=%d", reqId, hashes.length);
-				const { receiptsManager } = this.execution;
-				if (!receiptsManager) {
-					log("ReceiptsManager not available");
-					return;
-				}
-				const receipts = [];
-				let receiptsSize = 0;
-				for (const hash of hashes) {
-					const blockReceipts = await receiptsManager.getReceipts(
-						hash,
-						true,
-						true,
+					break;
+
+				case "GetBlockBodies":
+					await handleGetBlockBodies(
+						message.data as Parameters<typeof handleGetBlockBodies>[0],
+						peer,
+						context,
 					);
-					if (blockReceipts === undefined) continue;
-					receipts.push(...blockReceipts);
-					const receiptsBytes = concatBytes(
-						...receipts.map((r) => encodeReceipt(r, r.txType)),
+					break;
+
+				case "NewBlockHashes":
+					handleNewBlockHashes(
+						message.data as Parameters<typeof handleNewBlockHashes>[0],
+						context,
 					);
-					receiptsSize += receiptsBytes.byteLength;
-					// From spec: The recommended soft limit for Receipts responses is 2 MiB.
-					if (receiptsSize >= 2097152) {
-						log("Receipts size limit reached (2 MiB), stopping");
-						break;
-					}
-				}
-				log("Sending %d receipts in response", receipts.length);
-				peer.eth?.send("Receipts", { reqId, receipts });
-				break;
+					break;
+
+				case "Transactions":
+					await handleTransactions(
+						message.data as Parameters<typeof handleTransactions>[0],
+						peer,
+						context,
+					);
+					break;
+
+				case "NewBlock":
+					await handleNewBlock(
+						message.data as Parameters<typeof handleNewBlock>[0],
+						peer,
+						context,
+					);
+					break;
+
+				case "NewPooledTransactionHashes":
+					await handleNewPooledTransactionHashes(
+						message.data as Parameters<
+							typeof handleNewPooledTransactionHashes
+						>[0],
+						peer,
+						context,
+					);
+					break;
+
+				case "GetPooledTransactions":
+					handleGetPooledTransactions(
+						message.data as Parameters<typeof handleGetPooledTransactions>[0],
+						peer,
+						context,
+					);
+					break;
+
+				case "GetReceipts":
+					await handleGetReceipts(
+						message.data as Parameters<typeof handleGetReceipts>[0],
+						peer,
+						context,
+					);
+					break;
 			}
+		} catch (error) {
+			const err = error as Error;
+			this.error(`${err.message}`);
+			this.debug(`Error handling ${message.name}: ${err.message}`);
 		}
 	}
 
-	override get protocols(): any[] {
-		// For P2P, protocols are handled via EthHandler instances on peers
-		// Return empty array as Protocol instances are not used in P2P mode
-		return [];
+	private onProtocolMessage = async (message: ProtocolMessage) => {
+		try {
+			if (!this.running) return;
+			await this.handle(message);
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`Error handling message: ${error.message}`);
+		}
+	};
+
+	private onPoolPeerAdded = (peer: Peer) => {
+		const txs: [number[], number[], Uint8Array[]] = [[], [], []];
+		for (const [_addr, txObjs] of this.txPool.pending) {
+			for (const txObj of txObjs) {
+				const rawTx = txObj.tx;
+				txs[0].push(rawTx.type);
+				txs[1].push(rawTx.serialize().byteLength);
+				txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
+			}
+		}
+		for (const [_addr, txObjs] of this.txPool.queued) {
+			for (const txObj of txObjs) {
+				const rawTx = txObj.tx;
+				txs[0].push(rawTx.type);
+				txs[1].push(rawTx.serialize().byteLength);
+				txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
+			}
+		}
+		if (txs[0].length > 0) this.txPool.sendNewTxHashes(txs, [peer]);
+	};
+
+	private onSyncNewBlocks = async (blocks: Block[]) => {
+		this.txPool.removeNewBlockTxs(blocks);
+
+		for (const block of blocks) {
+			for (const tx of block.transactions) {
+				this.txPool.clearNonceCache(tx.getSenderAddress().toString().slice(2));
+			}
+		}
+		try {
+			await Promise.all([
+				this.txPool.demoteUnexecutables(),
+				this.txPool.promoteExecutables(),
+			]);
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`${error.message}`);
+		}
+	};
+
+	private onChainReorg = async (oldBlocks: Block[], newBlocks: Block[]) => {
+		try {
+			await this.txPool.handleReorg(oldBlocks, newBlocks);
+		} catch (error) {
+			this.error(`${error.message}`);
+			this.debug(`${error.message}`);
+		}
+	};
+
+	setupBasicEventListeners() {
+		this.config.events.on(Event.PROTOCOL_MESSAGE, this.onProtocolMessage);
+		this.config.events.on(Event.POOL_PEER_ADDED, this.onPoolPeerAdded);
+		this.config.events.on(Event.SYNC_FETCHED_BLOCKS, this.onSyncNewBlocks);
+		this.config.events.on(Event.CHAIN_REORG, this.onChainReorg);
+	}
+
+	closeEventListeners() {
+		this.config.events.off(Event.PROTOCOL_MESSAGE, this.onProtocolMessage);
+		this.config.events.off(Event.POOL_PEER_ADDED, this.onPoolPeerAdded);
+		this.config.events.off(Event.SYNC_FETCHED_BLOCKS, this.onSyncNewBlocks);
+		this.config.events.off(Event.CHAIN_REORG, this.onChainReorg);
+	}
+
+	protected override error(err: Error | string) {
+		const message = err instanceof Error ? err.message : err;
+		this.config.options.logger?.error(message);
+	}
+
+	protected override debug(message: string, _method = "debug") {
+		this.config.options.logger?.debug(message);
 	}
 }

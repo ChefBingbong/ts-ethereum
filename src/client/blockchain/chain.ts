@@ -189,6 +189,10 @@ export class Chain {
 		return new this(options);
 	}
 
+	public static createSync(options: ChainOptions) {
+		return new this(options);
+	}
+
 	/**
 	 * Creates new chain
 	 *

@@ -117,9 +117,14 @@ export class P2PPeer extends Peer {
 				});
 
 				// Forward messages from EthHandler to service via PROTOCOL_MESSAGE event
-				ethHandler.on("message", (message: any) => {
+				ethHandler.on("message", (_message: any) => {
 					// Emit PROTOCOL_MESSAGE event so service can handle it
-					this.config.events.emit(Event.PROTOCOL_MESSAGE, message, "eth", this);
+					const message = {
+						message: _message,
+						protocol: "eth",
+						peer: this,
+					};
+					this.config.events.emit(Event.PROTOCOL_MESSAGE, message);
 				});
 
 				// Use handler directly (it implements EthProtocolMethods)

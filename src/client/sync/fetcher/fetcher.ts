@@ -1,7 +1,7 @@
 import type { Debugger } from "debug";
 import debug from "debug";
 import { Readable, Writable } from "stream";
-import type { Config } from "../../config.ts";
+import type { Config } from "../../config/index.ts";
 import type { QHeap } from "../../ext/qheap.ts";
 import { Heap } from "../../ext/qheap.ts";
 import type { Peer } from "../../net/peer";

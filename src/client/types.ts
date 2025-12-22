@@ -1,7 +1,9 @@
 import type { Multiaddr } from "@multiformats/multiaddr";
+import type { AbstractLevel } from "abstract-level";
 import type * as promClient from "prom-client";
-import type { SyncMode } from ".";
+import type { Config, SyncMode } from ".";
 import type { Block, BlockHeader } from "../block";
+import { Blockchain } from "../blockchain";
 import type { Address } from "../utils";
 import type { Peer } from "./net/peer";
 
@@ -56,9 +58,11 @@ export interface EventParams {
 	[Event.POOL_PEER_BANNED]: [bannedPeer: Peer];
 	[Event.PROTOCOL_ERROR]: [boundProtocolError: Error, peerCausingError: Peer];
 	[Event.PROTOCOL_MESSAGE]: [
-		messageDetails: unknown,
-		protocolName: string,
-		sendingPeer: Peer,
+		{
+			message: { name: string; data: unknown };
+			protocol: string;
+			peer: Peer;
+		},
 	];
 }
 
@@ -140,3 +144,59 @@ export interface ClientOpts {
 export type PrometheusMetrics = {
 	legacyTxGauge: promClient.Gauge<string>;
 };
+
+export interface P2PEthereumClientOptions {
+	/** Client configuration */
+	config: Config;
+
+	/** Custom blockchain (optional) */
+	blockchain?: Blockchain;
+
+	/**
+	 * Database to store blocks and metadata.
+	 * Should be an abstract-leveldown compliant store.
+	 *
+	 * Default: Database created by the Blockchain class
+	 */
+	chainDB?: AbstractLevel<
+		string | Uint8Array,
+		string | Uint8Array,
+		string | Uint8Array
+	>;
+
+	/**
+	 * Database to store the state.
+	 * Should be an abstract-leveldown compliant store.
+	 *
+	 * Default: Database created by the MerklePatriciaTrie class
+	 */
+	stateDB?: AbstractLevel<
+		string | Uint8Array,
+		string | Uint8Array,
+		string | Uint8Array
+	>;
+
+	/**
+	 * Database to store tx receipts, logs, and indexes.
+	 * Should be an abstract-leveldown compliant store.
+	 *
+	 * Default: Database created in datadir folder
+	 */
+	metaDB?: AbstractLevel<
+		string | Uint8Array,
+		string | Uint8Array,
+		string | Uint8Array
+	>;
+
+	/* List of bootnodes to use for discovery */
+	bootnodes?: MultiaddrLike[];
+
+	/* List of supported clients */
+	clientFilter?: string[];
+
+	/* How often to discover new peers */
+	refreshInterval?: number;
+
+	/* custom genesisState if any for the chain */
+	genesisState?: GenesisState;
+}

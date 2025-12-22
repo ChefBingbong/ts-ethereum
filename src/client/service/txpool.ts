@@ -12,12 +12,13 @@ import {
 	hexToBytes,
 } from "../../utils";
 import type { VM } from "../../vm";
+import { Chain } from "../blockchain/chain.ts";
 import type { Config } from "../config/index.ts";
+import { VMExecution } from "../execution/vmexecution.ts";
 import type { QHeap } from "../ext/qheap.ts";
 import { Heap } from "../ext/qheap.ts";
 import type { Peer } from "../net/peer/peer.ts";
 import type { PeerPoolLike } from "../net/peerpool-types.ts";
-import type { FullEthereumServiceLike } from "./fullethereumservice-types.ts";
 
 // Configuration constants
 const MIN_GAS_PRICE_BUMP_PERCENT = 10;
@@ -33,9 +34,9 @@ const ACCOUNT_QUEUE = 64; // Max queued per account
 export interface TxPoolOptions {
 	/* Config */
 	config: Config;
-
-	/* FullEthereumService or P2PFullEthereumService */
-	service: FullEthereumServiceLike;
+	pool: PeerPoolLike;
+	chain: Chain;
+	execution: VMExecution;
 }
 
 type TxPoolObject = {
@@ -76,7 +77,9 @@ type GasPrice = {
  */
 export class TxPool {
 	private config: Config;
-	private service: FullEthereumServiceLike;
+	private pool: PeerPoolLike;
+	private chain: Chain;
+	private execution: VMExecution;
 
 	private opened: boolean;
 
@@ -177,7 +180,9 @@ export class TxPool {
 	 */
 	constructor(options: TxPoolOptions) {
 		this.config = options.config;
-		this.service = options.service;
+		this.pool = options.pool;
+		this.chain = options.chain;
+		this.execution = options.execution;
 
 		// Dual pool structure
 		this.pending = new Map<UnprefixedAddress, TxPoolObject[]>();
@@ -211,7 +216,7 @@ export class TxPool {
 	private rebroadcast(): void {
 		if (!this.running) return;
 
-		const peers = this.service.pool.peers;
+		const peers = this.pool.peers;
 		if (peers.length === 0) return;
 
 		// Collect all pending tx hashes
@@ -252,8 +257,8 @@ export class TxPool {
 
 		if (accountNonce === undefined) {
 			// Fetch from state
-			const block = await this.service.chain.getCanonicalHeadHeader();
-			const vmCopy = await this.service.execution.vm.shallowCopy();
+			const block = await this.chain.getCanonicalHeadHeader();
+			const vmCopy = await this.execution.vm.shallowCopy();
 			await vmCopy.stateManager.setStateRoot(block.stateRoot);
 			const address = new Address(hexToBytes(`0x${senderAddress}`));
 			let account = await vmCopy.stateManager.getAccount(address);
@@ -475,7 +480,7 @@ export class TxPool {
 				this.validateTxGasBump(existingTxn.tx, tx);
 			}
 		}
-		const block = await this.service.chain.getCanonicalHeadHeader();
+		const block = await this.chain.getCanonicalHeadHeader();
 		if (tx.gasLimit > block.gasLimit) {
 			throw EthereumJSErrorWithoutCode(
 				`Tx gaslimit of ${tx.gasLimit} exceeds block gas limit of ${block.gasLimit} (exceeds last block gas limit)`,
@@ -483,7 +488,7 @@ export class TxPool {
 		}
 
 		// Copy VM in order to not overwrite the state root of the VMExecution module which may be concurrently running blocks
-		const vmCopy = await this.service.execution.vm.shallowCopy();
+		const vmCopy = await this.execution.vm.shallowCopy();
 		// Set state root to latest block so that account balance is correct when doing balance check
 		await vmCopy.stateManager.setStateRoot(block.stateRoot);
 		let account = await vmCopy.stateManager.getAccount(senderAddress);
@@ -601,8 +606,8 @@ export class TxPool {
 			// Get current account nonce
 			let accountNonce = this.accountNonces.get(addr);
 			if (accountNonce === undefined) {
-				const block = await this.service.chain.getCanonicalHeadHeader();
-				const vmCopy = await this.service.execution.vm.shallowCopy();
+				const block = await this.chain.getCanonicalHeadHeader();
+				const vmCopy = await this.execution.vm.shallowCopy();
 				await vmCopy.stateManager.setStateRoot(block.stateRoot);
 				const addrObj = new Address(hexToBytes(`0x${addr}`));
 				const account =
@@ -680,8 +685,8 @@ export class TxPool {
 	 * Called after chain reorgs or when account state changes.
 	 */
 	async demoteUnexecutables(): Promise<void> {
-		const block = await this.service.chain.getCanonicalHeadHeader();
-		const vmCopy = await this.service.execution.vm.shallowCopy();
+		const block = await this.chain.getCanonicalHeadHeader();
+		const vmCopy = await this.execution.vm.shallowCopy();
 
 		try {
 			await vmCopy.stateManager.setStateRoot(block.stateRoot);
@@ -949,7 +954,7 @@ export class TxPool {
 	broadcastTransactions(txs: TypedTransaction[], peers?: Peer[]) {
 		if (txs.length === 0) return;
 
-		const targetPeers = peers ?? this.service.pool.peers;
+		const targetPeers = peers ?? this.pool.peers;
 		const numPeers = targetPeers.length;
 		if (numPeers === 0) return;
 
@@ -1481,7 +1486,7 @@ export class TxPool {
 			}
 		}
 		this.config.options.logger?.info(
-			`TxPool Statistics pending=${this.pendingCount} queued=${this.queuedCount} senders=${totalSenders} peers=${this.service.pool.peers.length}`,
+			`TxPool Statistics pending=${this.pendingCount} queued=${this.queuedCount} senders=${totalSenders} peers=${this.pool.peers.length}`,
 		);
 		this.config.options.logger?.info(
 			`TxPool Statistics broadcasts=${broadcasts}/tx/peer broadcasterrors=${broadcasterrors}/tx/peer knownpeers=${knownpeers} since minutes=${this.POOLED_STORAGE_TIME_LIMIT}`,
