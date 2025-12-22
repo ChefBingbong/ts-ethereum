@@ -538,8 +538,6 @@ async function startClient() {
 		metaDB,
 	});
 
-	await node.start();
-
 	console.log("\n" + "=".repeat(60));
 	console.log("✅ Node started successfully!");
 	console.log(`   P2P port:  ${port}`);

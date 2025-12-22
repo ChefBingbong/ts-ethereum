@@ -56,9 +56,9 @@ export const sendRawTransaction = (node: ExecutionNode) => {
 			}
 
 			const network = node.network;
-			console.log("network", network.getConnectedPeers());
+			console.log("network", network.core.getConnectedPeers());
 			if (
-				network.getPeerCount() === 0 &&
+				network.core.getPeerCount() === 0 &&
 				!node.config.options.mine &&
 				node.config.options.isSingleNode === false
 			) {

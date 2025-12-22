@@ -24,11 +24,11 @@ const log = debug("p2p:network-core");
 export class NetworkCore {
 	public readonly config: Config;
 	private readonly node: P2PNode;
-	private readonly chain?: Chain;
-	private execution?: VMExecution;
+	public readonly chain?: Chain;
+	private readonly execution: VMExecution;
 
 	// Peer management (from P2PPeerPool)
-	private readonly peers: Map<string, Peer> = new Map();
+	public readonly peers: Map<string, Peer> = new Map();
 	private readonly pendingPeers: Map<string, P2PPeer> = new Map();
 	private noPeerPeriods: number = 0;
 	private opened: boolean = false;
@@ -48,6 +48,59 @@ export class NetworkCore {
 	private peerBestHeaderUpdateInterval: NodeJS.Timeout | undefined;
 	private reconnectTimeout: NodeJS.Timeout | undefined;
 
+	/**
+	 * Initialize NetworkCore with static init method (following lodestar pattern)
+	 */
+	static async init(options: NetworkCoreOptions): Promise<NetworkCore> {
+		log("Initializing NetworkCore");
+		const core = new NetworkCore(options);
+
+		// Handle open logic (event listeners)
+		log("Opening NetworkCore");
+		core.node.addEventListener(
+			"connection:open",
+			core.onConnectionOpen.bind(core),
+		);
+		core.node.addEventListener(
+			"connection:close",
+			core.onConnectionClose.bind(core),
+		);
+		core.node.addEventListener(
+			"peer:disconnect",
+			core.onPeerDisconnect.bind(core),
+		);
+
+		core.config.events.on(Event.PEER_CONNECTED, (peer) => core.connected(peer));
+		core.config.events.on(Event.PEER_DISCONNECTED, (peer) =>
+			core.disconnected(peer),
+		);
+		core.config.events.on(Event.PEER_ERROR, (error, peer) => {
+			if (core.peers.get(peer.id)) {
+				core.config.options.logger?.warn(`Peer error: ${error} ${peer}`);
+				core.banPeer(peer);
+			}
+		});
+
+		core.opened = true;
+		log("NetworkCore opened");
+
+		// Handle start logic (intervals)
+		log("Starting NetworkCore");
+		core.statusCheckInterval = setInterval(
+			() => core.statusCheck(),
+			core.DEFAULT_STATUS_CHECK_INTERVAL,
+		);
+		core.peerBestHeaderUpdateInterval = setInterval(
+			() => core.peerBestHeaderUpdate(),
+			core.DEFAULT_PEER_BEST_HEADER_UPDATE_INTERVAL,
+		);
+		core.running = true;
+		log("NetworkCore started");
+
+		await options.chain.open();
+		return core;
+	}
+
 	constructor(options: NetworkCoreOptions) {
 		log("Creating NetworkCore");
 		this.config = options.config;
@@ -55,82 +108,6 @@ export class NetworkCore {
 		this.chain = options.chain;
 		this.execution = options.execution;
 		log("NetworkCore created");
-	}
-
-	/**
-	 * Set execution instance (called after service creates it)
-	 */
-	setExecution(execution: VMExecution): void {
-		log("Setting execution instance in NetworkCore");
-		this.execution = execution;
-	}
-
-	/**
-	 * Open network core
-	 */
-	async open(): Promise<boolean> {
-		if (this.opened) {
-			log("NetworkCore already opened");
-			return false;
-		}
-
-		log("Opening NetworkCore");
-		// Listen for P2PNode connection events
-		this.node.addEventListener(
-			"connection:open",
-			this.onConnectionOpen.bind(this),
-		);
-		this.node.addEventListener(
-			"connection:close",
-			this.onConnectionClose.bind(this),
-		);
-		this.node.addEventListener(
-			"peer:disconnect",
-			this.onPeerDisconnect.bind(this),
-		);
-
-		// Also listen to client events for compatibility
-		this.config.events.on(Event.PEER_CONNECTED, (peer) => {
-			this.connected(peer);
-		});
-		this.config.events.on(Event.PEER_DISCONNECTED, (peer) => {
-			this.disconnected(peer);
-		});
-		this.config.events.on(Event.PEER_ERROR, (error, peer) => {
-			if (this.peers.get(peer.id)) {
-				this.config.options.logger?.warn(`Peer error: ${error} ${peer}`);
-				this.banPeer(peer);
-			}
-		});
-
-		this.opened = true;
-		log("NetworkCore opened");
-		return true;
-	}
-
-	/**
-	 * Start network core
-	 */
-	async start(): Promise<boolean> {
-		if (this.running) {
-			log("NetworkCore already running");
-			return false;
-		}
-
-		log("Starting NetworkCore");
-		this.statusCheckInterval = setInterval(
-			() => this.statusCheck(),
-			this.DEFAULT_STATUS_CHECK_INTERVAL,
-		);
-
-		this.peerBestHeaderUpdateInterval = setInterval(
-			() => this.peerBestHeaderUpdate(),
-			this.DEFAULT_PEER_BEST_HEADER_UPDATE_INTERVAL,
-		);
-
-		this.running = true;
-		log("NetworkCore started");
-		return true;
 	}
 
 	/**

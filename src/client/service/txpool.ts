@@ -17,6 +17,7 @@ import type { Config } from "../config/index.ts";
 import { VMExecution } from "../execution/vmexecution.ts";
 import type { QHeap } from "../ext/qheap.ts";
 import { Heap } from "../ext/qheap.ts";
+import { NetworkCore } from "../net/index.ts";
 import type { Peer } from "../net/peer/peer.ts";
 import type { PeerPoolLike } from "../net/peerpool-types.ts";
 
@@ -34,7 +35,7 @@ const ACCOUNT_QUEUE = 64; // Max queued per account
 export interface TxPoolOptions {
 	/* Config */
 	config: Config;
-	pool: PeerPoolLike;
+	pool: NetworkCore;
 	chain: Chain;
 	execution: VMExecution;
 }
@@ -77,7 +78,7 @@ type GasPrice = {
  */
 export class TxPool {
 	private config: Config;
-	private pool: PeerPoolLike;
+	private pool: NetworkCore;
 	private chain: Chain;
 	private execution: VMExecution;
 
@@ -216,7 +217,7 @@ export class TxPool {
 	private rebroadcast(): void {
 		if (!this.running) return;
 
-		const peers = this.pool.peers;
+		const peers = this.pool.getConnectedPeers();
 		if (peers.length === 0) return;
 
 		// Collect all pending tx hashes
@@ -954,7 +955,7 @@ export class TxPool {
 	broadcastTransactions(txs: TypedTransaction[], peers?: Peer[]) {
 		if (txs.length === 0) return;
 
-		const targetPeers = peers ?? this.pool.peers;
+		const targetPeers = peers ?? this.pool.getConnectedPeers();
 		const numPeers = targetPeers.length;
 		if (numPeers === 0) return;
 
@@ -1108,7 +1109,7 @@ export class TxPool {
 		// Geth-style sqrt propagation:
 		// - Send full transactions to sqrt(n) peers (minimum MIN_BROADCAST_PEERS)
 		// - Send only hashes to remaining peers
-		const peers = peerPool.peers;
+		const peers = peerPool.getConnectedPeers();
 		const numPeers = peers.length;
 		const numFullBroadcast = Math.max(
 			this.MIN_BROADCAST_PEERS,
@@ -1215,7 +1216,7 @@ export class TxPool {
 			newTxHashes[1].push(tx.serialize().length);
 			newTxHashes[2].push(tx.hash());
 		}
-		this.sendNewTxHashes(newTxHashes, peerPool.peers);
+		this.sendNewTxHashes(newTxHashes, peerPool.getConnectedPeers());
 	}
 
 	/**
@@ -1486,7 +1487,7 @@ export class TxPool {
 			}
 		}
 		this.config.options.logger?.info(
-			`TxPool Statistics pending=${this.pendingCount} queued=${this.queuedCount} senders=${totalSenders} peers=${this.pool.peers.length}`,
+			`TxPool Statistics pending=${this.pendingCount} queued=${this.queuedCount} senders=${totalSenders} peers=${this.pool.getPeerCount()}`,
 		);
 		this.config.options.logger?.info(
 			`TxPool Statistics broadcasts=${broadcasts}/tx/peer broadcasterrors=${broadcasterrors}/tx/peer knownpeers=${knownpeers} since minutes=${this.POOLED_STORAGE_TIME_LIMIT}`,

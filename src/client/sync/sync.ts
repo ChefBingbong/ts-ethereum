@@ -1,24 +1,16 @@
 import { BIGINT_0 } from "../../utils";
 import type { Chain } from "../blockchain";
 import type { Config } from "../config/index.ts";
+import { NetworkCore } from "../net/index.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import type { PeerPoolLike } from "../net/peerpool-types.ts";
 import { Event } from "../types.ts";
 import { wait } from "../util/wait.ts";
 import type { BlockFetcher } from "./fetcher";
 
 export interface SynchronizerOptions {
-	/* Config */
-	config: Config;
-
-	/* Peer pool */
-	pool: PeerPoolLike;
-
-	/* Blockchain */
-	chain: Chain;
-
 	/* Refresh interval in ms (default: 1000) */
 	interval?: number;
+	core: NetworkCore;
 }
 
 /**
@@ -28,7 +20,7 @@ export interface SynchronizerOptions {
 export abstract class Synchronizer {
 	public config: Config;
 
-	protected pool: PeerPoolLike;
+	protected pool: NetworkCore;
 	protected chain: Chain;
 
 	protected interval: number;
@@ -49,10 +41,9 @@ export abstract class Synchronizer {
 	 * Create new node
 	 */
 	constructor(options: SynchronizerOptions) {
-		this.config = options.config;
-
-		this.pool = options.pool;
-		this.chain = options.chain;
+		this.config = options.core.config;
+		this.pool = options.core;
+		this.chain = options.core.chain;
 		this._fetcher = null;
 
 		this.interval = options.interval ?? 1000;

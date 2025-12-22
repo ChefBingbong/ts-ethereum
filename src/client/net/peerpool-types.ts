@@ -1,5 +1,5 @@
 import type { Config } from "../config/index.ts";
-import type { Network } from "./network.ts";
+import { NetworkCore } from "./core/network-core.ts";
 import type { Peer } from "./peer/peer.ts";
 
 /**
@@ -26,4 +26,4 @@ export interface IPeerPool {
  * Type alias for peer pool implementations
  * Now only Network is supported (replaces P2PPeerPool)
  */
-export type PeerPoolLike = Network;
+export type PeerPoolLike = NetworkCore;

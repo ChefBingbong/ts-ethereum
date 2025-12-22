@@ -118,7 +118,7 @@ export class TxFetcher {
 
 		// Fetch from each peer
 		for (const [peerId, announcements] of byPeer) {
-			const peer = this.pool.peers.find((p) => p.id === peerId);
+			const peer = this.pool.getConnectedPeers().find((p) => p.id === peerId);
 			if (!peer || !peer.eth) continue;
 
 			const batch = announcements.slice(0, this.BATCH_SIZE);

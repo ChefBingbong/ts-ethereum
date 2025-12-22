@@ -10,7 +10,6 @@ import type { SynchronizerOptions } from "./sync.ts";
 import { Synchronizer } from "./sync.ts";
 
 interface FullSynchronizerOptions extends SynchronizerOptions {
-	/** Tx Pool */
 	txPool: TxPool;
 	execution: VMExecution;
 }
@@ -94,7 +93,6 @@ export class FullSynchronizer extends Synchronizer {
 			this.config.events.on(Event.CHAIN_UPDATED, this.runExecution);
 		}
 
-		await this.pool.open();
 		const { height: number, td } = this.chain.blocks;
 		const hash = this.chain.blocks.latest!.hash();
 		this.startingBlock = number;
@@ -118,7 +116,7 @@ export class FullSynchronizer extends Synchronizer {
 	 * blockchain. Returns null if no valid peer is found.
 	 */
 	async best(): Promise<Peer | undefined> {
-		const peers = this.pool.peers.filter(this.syncable.bind(this));
+		const peers = this.pool.getConnectedPeers().filter(this.syncable.bind(this));
 		if (peers.length < this.config.options.minPeers && !this.forceSync) return;
 
 		// For PoW (Ethash) chains we want to select the peer with the highest TD
@@ -232,7 +230,7 @@ export class FullSynchronizer extends Synchronizer {
 			`Imported blocks count=${
 				blocks.length
 			} first=${first} last=${last} hash=${hash} hardfork=${this.config.chainCommon.hardfork()} peers=${
-				this.pool.size
+				this.pool.getPeerCount()
 			}`,
 		);
 
@@ -311,11 +309,11 @@ export class FullSynchronizer extends Synchronizer {
 		}
 		// Send NEW_BLOCK to square root of total number of peers in pool
 		// https://github.com/ethereum/devp2p/blob/master/caps/eth.md#block-propagation
-		const numPeersToShareWith = this.pool.peers.length;
+		const numPeersToShareWith = this.pool.getPeerCount();
 
 		await this.sendNewBlock(
 			block,
-			this.pool.peers.slice(0, numPeersToShareWith),
+			this.pool.getConnectedPeers().slice(0, numPeersToShareWith),
 		);
 		const latestBlockHash = this.chain.blocks.latest?.hash();
 
@@ -338,7 +336,7 @@ export class FullSynchronizer extends Synchronizer {
 			// Call handleNewBlockHashes to retrieve all blocks between chain tip and new block
 			this.handleNewBlockHashes([[block.hash(), block.header.number]]);
 		}
-		for (const peer of this.pool.peers.slice(numPeersToShareWith)) {
+		for (const peer of this.pool.getConnectedPeers().slice(numPeersToShareWith)) {
 			// Send `NEW_BLOCK_HASHES` message for received block to all other peers
 			const alreadyKnownByPeer = this.addToKnownByPeer(block.hash(), peer);
 			if (!alreadyKnownByPeer) {

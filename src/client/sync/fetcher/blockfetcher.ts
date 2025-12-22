@@ -189,6 +189,6 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
 	 * Returns an idle peer that can process a next job.
 	 */
 	peer(): Peer | undefined {
-		return this.pool.idle((peer) => "eth" in peer);
+		return this.pool.getIdlePeer((peer) => "eth" in peer);
 	}
 }

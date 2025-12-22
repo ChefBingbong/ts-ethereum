@@ -2,24 +2,12 @@ import { ServerType, serve } from "@hono/node-server";
 import debug from "debug";
 import { Env, Hono } from "hono";
 import { requestId } from "hono/request-id";
-import type { Block } from "../../block";
 import { Chain } from "../blockchain";
 import { Config } from "../config/index.ts";
 import { VMExecution } from "../execution/vmexecution.ts";
 import { Miner } from "../miner";
 import { Network } from "../net/network.ts";
 import type { Peer } from "../net/peer/peer.ts";
-import {
-	type EthHandlerContext,
-	handleGetBlockBodies,
-	handleGetBlockHeaders,
-	handleGetPooledTransactions,
-	handleGetReceipts,
-	handleNewBlock,
-	handleNewBlockHashes,
-	handleNewPooledTransactionHashes,
-	handleTransactions,
-} from "../net/protocol/eth/handlers.ts";
 import { RPCArgs } from "../rpc/index.ts";
 import { createRpcHandlers } from "../rpc/modules/index.ts";
 import { rpcRequestSchema } from "../rpc/types.ts";
@@ -29,10 +17,10 @@ import { FullSynchronizer } from "../sync";
 import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
 import type { V8Engine } from "../util/index.ts";
-import { getPackageJSON, getV8Engine } from "../util/index.ts";
+import { getV8Engine } from "../util/index.ts";
 import type {
-	ExecutionNodeInitOptions,
-	ExecutionNodeModules,
+    ExecutionNodeInitOptions,
+    ExecutionNodeModules,
 } from "./types.ts";
 
 const log = debug("p2p:node");
@@ -63,8 +51,6 @@ export class ExecutionNode {
 	public execution: VMExecution;
 	public network: Network;
 	public synchronizer: FullSynchronizer;
-	public txPool: TxPool;
-	public miner?: Miner;
 	public txFetcher: TxFetcher;
 	public rpcManager?: RpcManager;
 
@@ -80,10 +66,7 @@ export class ExecutionNode {
 	protected statsCounter = 0;
 	private building = false;
 	private started = false;
-	/**
-	 * Initialize an ExecutionNode. Creates and initializes all components.
-	 * Following lodestar's static init() pattern.
-	 */
+
 	public static async init(
 		options: ExecutionNodeInitOptions,
 	): Promise<ExecutionNode> {
@@ -97,55 +80,86 @@ export class ExecutionNode {
 		});
 
 		log("Creating Network");
-		const network = new Network({
+		const network = await Network.init({
 			config: options.config,
 			node: options.config.node,
 			chain,
 			execution,
 		});
 
-		network.setExecution(execution);
-
-		const txPool = new TxPool({
-			config: options.config,
-			pool: network,
-			chain,
-			execution,
-		});
-
-		const synchronizer = new FullSynchronizer({
-			config: options.config,
-			pool: network,
-			chain,
-			txPool,
-			execution,
-			interval: options.interval ?? 200,
-		});
-
-		const miner = new Miner({
-			config: options.config,
-			txPool,
-			synchronizer,
-			chain,
-			execution,
-		});
-
 		const txFetcher = new TxFetcher({
 			config: options.config,
-			pool: network,
-			txPool,
+			pool: network.core,
+			txPool: network.txPool,
 		});
 
-		return new ExecutionNode({
+		const node = new ExecutionNode({
 			config: options.config,
 			chain,
 			execution,
 			network,
-			synchronizer,
-			txPool,
-			miner,
-			txFetcher,
+			synchronizer: network.synchronizer,
+			txFetcher: txFetcher,
+			txPool: network.txPool,
 		});
+
+		node.config.updateSynchronizedState(node.chain.headers.latest, true);
+		node.network.txPool.checkRunState();
+
+		if (node.running) return;
+
+		void node.synchronizer?.start();
+
+		if (!node.v8Engine) {
+			node.v8Engine = await getV8Engine();
+		}
+
+		node.statsInterval = setInterval(node.stats.bind(node), STATS_INTERVAL);
+
+		node.running = true;
+		node.network.miner?.start();
+
+		await node.execution.start();
+		await node.execution.run();
+
+		void node.buildHeadState();
+		node.txFetcher.start();
+
+		await node.config.node.start();
+
+		node.log("Waiting for synchronization...");
+
+		const chainHeight = await new Promise<bigint | null>((resolve) => {
+			const timeout = setTimeout(() => {
+				cleanup();
+				resolve(null);
+			}, 30000);
+
+			const onSynchronized = (chainHeight: bigint) => {
+				cleanup();
+				resolve(chainHeight);
+			};
+
+			const cleanup = () => {
+				clearTimeout(timeout);
+				node.config.events.off(Event.SYNC_SYNCHRONIZED, onSynchronized);
+			};
+			node.config.events.on(Event.SYNC_SYNCHRONIZED, onSynchronized);
+		});
+
+		node.started = true;
+		if (chainHeight === null) return;
+
+		node.rpcManager = await node.createRpcManager({
+			rpc: true,
+			rpcAddr: "127.0.0.1",
+			rpcPort: node.config.options.port + 300,
+		});
+		node.log(
+			`RPC server listening on http://127.0.0.1:${node.config.options.port + 300}`,
+		);
+
+		return node;
 	}
 
 	protected constructor(modules: ExecutionNodeModules) {
@@ -154,8 +168,6 @@ export class ExecutionNode {
 		this.execution = modules.execution;
 		this.network = modules.network;
 		this.synchronizer = modules.synchronizer;
-		this.txPool = modules.txPool;
-		this.miner = modules.miner;
 		this.txFetcher = modules.txFetcher;
 
 		this.name = "eth";
@@ -164,20 +176,6 @@ export class ExecutionNode {
 		this.running = false;
 		this.interval = 200;
 		this.timeout = 6000;
-
-		// Set up RPC manager on sync completion
-		this.config.events.once(Event.SYNC_SYNCHRONIZED, async () => {
-			if (this.rpcManager || !this.started) return;
-			this.started = true;
-			this.rpcManager = await this.createRpcManager({
-				rpc: true,
-				rpcAddr: "127.0.0.1",
-				rpcPort: this.config.options.port + 300,
-			});
-			this.log(
-				`RPC server listening on http://127.0.0.1:${this.config.options.port + 300}`,
-			);
-		});
 
 		this.config.events.on(Event.CLIENT_SHUTDOWN, async () => {
 			if (this.rpcManager !== undefined) return;
@@ -217,115 +215,14 @@ export class ExecutionNode {
 		});
 	};
 
-	async open(): Promise<boolean> {
-		try {
-			if (this.opened) return false;
-
-			const name = this.config.chainCommon.chainName();
-			const chainId = this.config.chainCommon.chainId();
-			const packageJSON = getPackageJSON();
-
-			this.config.options.logger?.info(
-				`Initializing P2P Ethereumjs node version=v${packageJSON.version} network=${name} chainId=${chainId}`,
-			);
-
-			this.setupBasicEventListeners();
-
-			await this.network.open();
-			await this.chain.open();
-			await this.synchronizer?.open();
-			this.opened = true;
-
-			await this.execution.open();
-			this.txPool.open();
-			this.txPool.start();
-
-			return true;
-		} catch (error) {
-			this.error(error as Error);
-			this.debug(`Error opening: ${(error as Error).message}`);
-			this.opened = false;
-			return false;
-		}
-	}
-
-	async start(): Promise<boolean> {
-		try {
-			if (!this.opened) await this.open();
-
-			this.config.updateSynchronizedState(this.chain.headers.latest, true);
-			this.txPool.checkRunState();
-
-			if (this.running) return false;
-
-			await this.network.start();
-			void this.synchronizer?.start();
-
-			if (!this.v8Engine) {
-				this.v8Engine = await getV8Engine();
-			}
-
-			this.statsInterval = setInterval(this.stats.bind(this), STATS_INTERVAL);
-
-			this.running = true;
-			this.miner?.start();
-			await this.execution.start();
-			await this.execution.run();
-
-			void this.buildHeadState();
-			this.txFetcher.start();
-
-			await this.config.node.start();
-
-			this.log("Waiting for synchronization...");
-
-			const chainHeight = await new Promise<bigint | null>((resolve) => {
-				const timeout = setTimeout(() => {
-					cleanup();
-					resolve(null);
-				}, 30000);
-
-				const onSynchronized = (chainHeight: bigint) => {
-					cleanup();
-					resolve(chainHeight);
-				};
-
-				const cleanup = () => {
-					clearTimeout(timeout);
-					this.config.events.off(Event.SYNC_SYNCHRONIZED, onSynchronized);
-				};
-				this.config.events.on(Event.SYNC_SYNCHRONIZED, onSynchronized);
-			});
-
-			this.started = true;
-			if (chainHeight === null) return;
-
-			this.rpcManager = await this.createRpcManager({
-				rpc: true,
-				rpcAddr: "127.0.0.1",
-				rpcPort: this.config.options.port + 300,
-			});
-			this.log(
-				`RPC server listening on http://127.0.0.1:${this.config.options.port + 300}`,
-			);
-			return true;
-		} catch (error) {
-			this.error(error as Error);
-			this.debug(`Error starting: ${(error as Error).message}`);
-			this.running = false;
-			await this.close();
-			return false;
-		}
-	}
-
 	async stop(): Promise<boolean> {
 		try {
 			if (!this.running) return false;
 
 			this.config.events.emit(Event.CLIENT_SHUTDOWN);
 
-			this.txPool.stop();
-			this.miner?.stop();
+			this.network.txPool.stop();
+			this.network.miner?.stop();
 
 			await this.synchronizer?.stop();
 			await this.execution.stop();
@@ -357,9 +254,7 @@ export class ExecutionNode {
 	async close(): Promise<boolean> {
 		if (!this.opened) return false;
 		try {
-			this.closeEventListeners();
-			this.txPool.close();
-
+			this.network.txPool.close();
 			const result = !!this.opened;
 			if (this.opened) {
 				await this.network.close();
@@ -388,165 +283,6 @@ export class ExecutionNode {
 		} finally {
 			this.building = false;
 		}
-	}
-
-	async handle(_message: ProtocolMessage): Promise<void> {
-		if (_message.protocol !== "eth") return;
-		const { message, peer } = _message;
-
-		const context: EthHandlerContext = {
-			chain: this.chain,
-			txPool: this.txPool,
-			synchronizer: this.synchronizer,
-			execution: this.execution,
-			pool: this.network,
-		};
-
-		try {
-			switch (message.name) {
-				case "GetBlockHeaders":
-					await handleGetBlockHeaders(
-						message.data as Parameters<typeof handleGetBlockHeaders>[0],
-						peer,
-						context,
-					);
-					break;
-
-				case "GetBlockBodies":
-					await handleGetBlockBodies(
-						message.data as Parameters<typeof handleGetBlockBodies>[0],
-						peer,
-						context,
-					);
-					break;
-
-				case "NewBlockHashes":
-					handleNewBlockHashes(
-						message.data as Parameters<typeof handleNewBlockHashes>[0],
-						context,
-					);
-					break;
-
-				case "Transactions":
-					await handleTransactions(
-						message.data as Parameters<typeof handleTransactions>[0],
-						peer,
-						context,
-					);
-					break;
-
-				case "NewBlock":
-					await handleNewBlock(
-						message.data as Parameters<typeof handleNewBlock>[0],
-						peer,
-						context,
-					);
-					break;
-
-				case "NewPooledTransactionHashes":
-					await handleNewPooledTransactionHashes(
-						message.data as Parameters<
-							typeof handleNewPooledTransactionHashes
-						>[0],
-						peer,
-						context,
-					);
-					break;
-
-				case "GetPooledTransactions":
-					handleGetPooledTransactions(
-						message.data as Parameters<typeof handleGetPooledTransactions>[0],
-						peer,
-						context,
-					);
-					break;
-
-				case "GetReceipts":
-					await handleGetReceipts(
-						message.data as Parameters<typeof handleGetReceipts>[0],
-						peer,
-						context,
-					);
-					break;
-			}
-		} catch (error) {
-			const err = error as Error;
-			this.error(err);
-			this.debug(`Error handling ${message.name}: ${err.message}`);
-		}
-	}
-
-	private onProtocolMessage = async (message: ProtocolMessage) => {
-		try {
-			if (!this.running) return;
-			await this.handle(message);
-		} catch (error) {
-			this.error(error as Error);
-			this.debug(`Error handling message: ${(error as Error).message}`);
-		}
-	};
-
-	private onPoolPeerAdded = (peer: Peer) => {
-		const txs: [number[], number[], Uint8Array[]] = [[], [], []];
-		for (const [_addr, txObjs] of this.txPool.pending) {
-			for (const txObj of txObjs) {
-				const rawTx = txObj.tx;
-				txs[0].push(rawTx.type);
-				txs[1].push(rawTx.serialize().byteLength);
-				txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
-			}
-		}
-		for (const [_addr, txObjs] of this.txPool.queued) {
-			for (const txObj of txObjs) {
-				const rawTx = txObj.tx;
-				txs[0].push(rawTx.type);
-				txs[1].push(rawTx.serialize().byteLength);
-				txs[2].push(new Uint8Array(Buffer.from(txObj.hash, "hex")));
-			}
-		}
-		if (txs[0].length > 0) this.txPool.sendNewTxHashes(txs, [peer]);
-	};
-
-	private onSyncNewBlocks = async (blocks: Block[]) => {
-		this.txPool.removeNewBlockTxs(blocks);
-
-		for (const block of blocks) {
-			for (const tx of block.transactions) {
-				this.txPool.clearNonceCache(tx.getSenderAddress().toString().slice(2));
-			}
-		}
-		try {
-			await Promise.all([
-				this.txPool.demoteUnexecutables(),
-				this.txPool.promoteExecutables(),
-			]);
-		} catch (error) {
-			this.error(error as Error);
-			this.debug(`${(error as Error).message}`);
-		}
-	};
-
-	private onChainReorg = async (oldBlocks: Block[], newBlocks: Block[]) => {
-		try {
-			await this.txPool.handleReorg(oldBlocks, newBlocks);
-		} catch (error) {
-			this.error(error as Error);
-			this.debug(`${(error as Error).message}`);
-		}
-	};
-
-	setupBasicEventListeners() {
-		this.config.events.on(Event.PROTOCOL_MESSAGE, this.onProtocolMessage);
-		this.config.events.on(Event.POOL_PEER_ADDED, this.onPoolPeerAdded);
-		this.config.events.on(Event.SYNC_FETCHED_BLOCKS, this.onSyncNewBlocks);
-		this.config.events.on(Event.CHAIN_REORG, this.onChainReorg);
-	}
-
-	closeEventListeners() {
-		this.config.events.off(Event.PROTOCOL_MESSAGE, this.onProtocolMessage);
-		this.config.events.off(Event.POOL_PEER_ADDED, this.onPoolPeerAdded);
-		this.config.events.off(Event.SYNC_FETCHED_BLOCKS, this.onSyncNewBlocks);
-		this.config.events.off(Event.CHAIN_REORG, this.onChainReorg);
 	}
 
 	protected stats() {
@@ -592,4 +328,14 @@ export class ExecutionNode {
 	public node = () => this.config.node;
 	public server = () => this.config.node;
 	public peerCount = () => this.network.getPeerCount();
+
+	// Access txPool through network
+	public get txPool(): TxPool {
+		return this.network.txPool;
+	}
+
+	// Access miner through network
+	public get miner(): Miner | undefined {
+		return this.network.miner;
+	}
 }

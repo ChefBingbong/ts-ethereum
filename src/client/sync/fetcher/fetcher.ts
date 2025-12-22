@@ -4,6 +4,7 @@ import { Readable, Writable } from "stream";
 import type { Config } from "../../config/index.ts";
 import type { QHeap } from "../../ext/qheap.ts";
 import { Heap } from "../../ext/qheap.ts";
+import { NetworkCore } from "../../net/core/network-core.ts";
 import type { Peer } from "../../net/peer/index.ts";
 import type { PeerPoolLike } from "../../net/peerpool-types.ts";
 import { Event } from "../../types.ts";
@@ -15,7 +16,7 @@ export interface FetcherOptions {
 	config: Config;
 
 	/* Peer pool */
-	pool: PeerPoolLike;
+	pool: PeerPoolLike | NetworkCore;
 
 	/* Fetch task timeout in ms (default: 8000) */
 	timeout?: number;
@@ -52,7 +53,7 @@ export abstract class Fetcher<
 	protected debug: Debugger;
 	protected DEBUG: boolean;
 
-	protected pool: PeerPoolLike;
+	protected pool: PeerPoolLike | NetworkCore;
 	protected timeout: number;
 	protected interval: number;
 	protected banTime: number;
@@ -310,7 +311,7 @@ export abstract class Fetcher<
 	) {
 		const jobItems = job instanceof Array ? job : [job];
 		if (irrecoverable === true || banPeer === true) {
-			this.pool.ban(jobItems[0].peer!, this.banTime);
+			this.pool.banPeer(jobItems[0].peer!, this.banTime);
 		}
 		if (!(irrecoverable === true)) {
 			void this.wait().then(() => {
@@ -601,7 +602,7 @@ export abstract class Fetcher<
 	 * Returns an idle peer that can process a next job.
 	 */
 	peer() {
-		return this.pool.idle();
+		return this.pool.getIdlePeer();
 	}
 
 	/**
@@ -611,10 +612,10 @@ export abstract class Fetcher<
 	expire(job: Job<JobTask, JobResult, StorageItem>) {
 		job.state = "expired";
 		const jobStr = this.jobStr(job, true);
-		if (this.pool.contains(job.peer!)) {
+		if (this.pool.containsPeer(job.peer!)) {
 			this.DEBUG &&
 				this.debug(`Task timed out for peer (banning) ${jobStr} ${job.peer}`);
-			this.pool.ban(job.peer!, this.banTime);
+			this.pool.banPeer(job.peer!, this.banTime);
 		} else {
 			this.DEBUG &&
 				this.debug(

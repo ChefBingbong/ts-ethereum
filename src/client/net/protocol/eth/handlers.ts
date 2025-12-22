@@ -104,7 +104,7 @@ export async function handleTransactions(
 	context: EthHandlerContext,
 ) {
 	const { txPool, pool } = context;
-	await txPool.handleAnnouncedTxs(data, peer, pool);
+	await txPool.handleAnnouncedTxs(data, peer, pool.core);
 }
 
 /**
@@ -137,7 +137,7 @@ export async function handleNewPooledTransactionHashes(
 		hashes = data as Uint8Array[];
 	}
 
-	await txPool.handleAnnouncedTxHashes(hashes, peer, pool);
+	await txPool.handleAnnouncedTxHashes(hashes, peer, pool.core);
 }
 
 /**
