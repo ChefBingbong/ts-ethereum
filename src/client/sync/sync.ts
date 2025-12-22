@@ -1,6 +1,8 @@
-import { BIGINT_0 } from "../../utils";
+import { BlockHeader } from "../../block/index.ts";
+import { BIGINT_0, short } from "../../utils";
 import type { Chain } from "../blockchain";
 import type { Config } from "../config/index.ts";
+import { timestampToMilliseconds } from "../config/utils.ts";
 import { NetworkCore } from "../net/index.ts";
 import type { Peer } from "../net/peer/peer.ts";
 import { Event } from "../types.ts";
@@ -31,6 +33,12 @@ export abstract class Synchronizer {
 	public running: boolean;
 	public startingBlock: bigint;
 
+	public lastSyncDate: number = 0;
+	public syncTargetHeight: bigint = BIGINT_0;
+	public synchronized: boolean;
+	public lastSynchronized: boolean;
+	public isAbleToSync: boolean;
+
 	// Time (in ms) after which the synced state is reset
 	private SYNCED_STATE_REMOVAL_PERIOD = 60000;
 	private _syncedStatusCheckInterval:
@@ -52,6 +60,13 @@ export abstract class Synchronizer {
 		this.forceSync = false;
 		this.startingBlock = BIGINT_0;
 
+		const isSingleNode = this.config.options.isSingleNode;
+		const mine = this.config.options.mine;
+
+		this.isAbleToSync = isSingleNode && mine;
+		this.synchronized = isSingleNode ?? mine;
+		this.lastSynchronized = this.synchronized;
+
 		this.config.events.on(Event.POOL_PEER_ADDED, (peer) => {
 			if (this.syncable(peer)) {
 				this.config.options.logger?.debug(`Found ${this.type} peer: ${peer}`);
@@ -59,8 +74,77 @@ export abstract class Synchronizer {
 		});
 
 		this.config.events.on(Event.CHAIN_UPDATED, () => {
-			this.config.updateSynchronizedState(this.chain.headers.latest, true);
+			this.updateSynchronizedState(this.chain.headers.latest, true);
 		});
+	}
+
+	updateSynchronizedState(latest?: BlockHeader, emitSync?: boolean): void {
+		this.updateConfigSynchronizedState(latest, emitSync);
+		this.config.updateSynchronizedState({
+			synchronized: this.synchronized,
+			lastSynchronized: this.lastSynchronized,
+			isAbleToSync: this.isAbleToSync,
+			syncTargetHeight: this.syncTargetHeight,
+			lastSyncDate: this.lastSyncDate,
+		});
+	}
+	/**
+	 * Update synchronized state based on latest block header
+	 * Migrated from Config
+	 */
+	updateConfigSynchronizedState(
+		latest?: BlockHeader,
+		emitSync?: boolean,
+	): void {
+		// Early return only if we have no latest block AND no sync target AND can't sync
+		// This allows non-miners to update sync state once they have blocks
+		if (!latest && this.syncTargetHeight === 0n && !this.isAbleToSync) return;
+
+		// If we have a latest block but syncTargetHeight is still 0, update it
+		// This handles the case where non-miners haven't discovered peers yet
+		if (latest && this.syncTargetHeight === 0n) {
+			this.syncTargetHeight = latest.number;
+		}
+
+		// Check if we've reached or exceeded the sync target
+		if (latest && latest.number >= this.syncTargetHeight) {
+			const newSyncTargetHeight = latest.number;
+			this.syncTargetHeight = newSyncTargetHeight;
+
+			this.lastSyncDate = timestampToMilliseconds(latest.timestamp);
+			const timeSinceLastSyncDate = Date.now() - this.lastSyncDate;
+
+			if (
+				timeSinceLastSyncDate < this.config.options.syncedStateRemovalPeriod
+			) {
+				if (!this.synchronized) this.synchronized = true;
+				if (emitSync)
+					this.config.events.emit(Event.SYNC_SYNCHRONIZED, newSyncTargetHeight);
+
+				this.config.superMsg(
+					`Synchronized blockchain at height=${newSyncTargetHeight} hash=${short(latest.hash())} 🎉`,
+				);
+			}
+			if (this.synchronized !== this.lastSynchronized) {
+				this.lastSynchronized = this.synchronized;
+			}
+			return;
+		}
+
+		// If synchronized but not able to sync, check if we should mark as unsynchronized
+		if (this.synchronized && !this.isAbleToSync) {
+			const timeSinceLastSyncDate = Date.now() - this.lastSyncDate;
+
+			if (
+				timeSinceLastSyncDate >= this.config.options.syncedStateRemovalPeriod
+			) {
+				this.synchronized = false;
+			}
+		}
+
+		if (this.synchronized !== this.lastSynchronized) {
+			this.lastSynchronized = this.synchronized;
+		}
 	}
 
 	/**
@@ -217,6 +301,6 @@ export abstract class Synchronizer {
 	 * Reset synced status after a certain time with no chain updates
 	 */
 	_syncedStatusCheck() {
-		this.config.updateSynchronizedState();
+		this.updateSynchronizedState(this.chain.headers.latest, false);
 	}
 }

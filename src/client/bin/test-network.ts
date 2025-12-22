@@ -14,7 +14,6 @@ import { getDbPaths, initDatabases } from "../../db/index.ts";
 import { Config } from "../config/index.ts";
 import { LevelDB } from "../execution/level.ts";
 import { getLogger, type Logger } from "../logging.ts";
-import { createP2PNodeFromConfig } from "../node/createP2pNode.ts";
 import { ExecutionNode } from "../node/index.ts";
 
 debug.enable("p2p:*");
@@ -103,7 +102,6 @@ async function startClient() {
 
 	const config = new Config({
 		...clientConfig,
-		node: createP2PNodeFromConfig(clientConfig),
 	});
 
 	const blockchain = await createBlockchain({

@@ -1,5 +1,6 @@
+import type { P2PNode as P2PNodeType } from "../../p2p/libp2p/types.ts";
 import { Chain } from "../blockchain";
-import { Config } from "../config/index.ts";
+import type { Config } from "../config/index.ts";
 import { ExecutionService } from "../execution/execution-service.ts";
 import { VMExecution } from "../execution/vmexecution.ts";
 import { NetworkService } from "../net/network-service.ts";
@@ -9,6 +10,7 @@ import { TxFetcher } from "../sync/fetcher/txFetcher.ts";
 import { Event } from "../types.ts";
 import type { V8Engine } from "../util/index.ts";
 import { getV8Engine } from "../util/index.ts";
+import { createP2PNodeFromConfig } from "./createP2pNode.ts";
 import type {
 	ExecutionNodeInitOptions,
 	ExecutionNodeModules,
@@ -29,6 +31,7 @@ export class ExecutionNode {
 	public network: NetworkService;
 	public execution: ExecutionService;
 	public txFetcher: TxFetcher;
+	public p2pNode: P2PNodeType;
 	public rpcServer?: RpcServer;
 	public isRpcReady: boolean;
 
@@ -50,6 +53,17 @@ export class ExecutionNode {
 	): Promise<ExecutionNode> {
 		const chain = await Chain.create(options);
 
+		// Create P2P node first (needed for NetworkService)
+		const bootnodes =
+			options.config.options.bootnodes ??
+			options.config.chainCommon.bootstrapNodes();
+
+		const p2pNode = createP2PNodeFromConfig({
+			...options.config.options,
+			accounts: [...options.config.options.accounts],
+			bootnodes: [...bootnodes],
+		});
+
 		// Create Execution first (needed for NetworkService protocol handlers)
 		const execution = new VMExecution({
 			config: options.config,
@@ -61,7 +75,7 @@ export class ExecutionNode {
 		// Create NetworkService (needs Chain and Execution for protocol handlers)
 		const network = await NetworkService.init({
 			config: options.config,
-			node: options.config.node,
+			node: p2pNode,
 			chain,
 			execution,
 		});
@@ -97,10 +111,8 @@ export class ExecutionNode {
 			network,
 			execution: executionService,
 			txFetcher: txFetcher,
+			p2pNode,
 		});
-
-		node.config.updateSynchronizedState(node.chain.headers.latest, true);
-		node.execution.txPool.checkRunState();
 
 		if (node.running) return;
 		void node.execution.synchronizer?.start();
@@ -119,7 +131,7 @@ export class ExecutionNode {
 
 		void node.buildHeadState();
 		node.txFetcher.start();
-		await node.config.node.start();
+		await node.p2pNode.start();
 
 		const rpcServer = new RpcServer(
 			{
@@ -153,6 +165,7 @@ export class ExecutionNode {
 		this.network = modules.network;
 		this.execution = modules.execution;
 		this.txFetcher = modules.txFetcher;
+		this.p2pNode = modules.p2pNode;
 
 		this.name = "eth";
 		this.protocols = [];
@@ -168,6 +181,15 @@ export class ExecutionNode {
 		});
 
 		this.setHandlerContext();
+
+		// Update sync state if synchronizer is available
+		if (this.synchronizer) {
+			this.synchronizer.updateSynchronizedState(
+				this.chain.headers.latest,
+				true,
+			);
+		}
+		this.execution.txPool.checkRunState();
 	}
 
 	private setHandlerContext(): void {
@@ -195,7 +217,7 @@ export class ExecutionNode {
 			this.running = false;
 			this.isRpcReady = false;
 			return true;
-		} catch (error) {
+		} catch {
 			this.running = false;
 			return false;
 		}
@@ -211,7 +233,7 @@ export class ExecutionNode {
 			this.running = false;
 			this.isRpcReady = false;
 			return true;
-		} catch (error) {
+		} catch {
 			this.opened = false;
 			return false;
 		}
@@ -224,7 +246,8 @@ export class ExecutionNode {
 
 			if (!this.execution.execution.started) return;
 			await this.execution.synchronizer.runExecution();
-		} catch (error) {
+		} catch {
+			// Ignore errors during head state building
 		} finally {
 			this.building = false;
 		}
@@ -249,8 +272,8 @@ export class ExecutionNode {
 		return this.network.core.getConnectedPeers().map((p) => p.id);
 	};
 
-	public node = () => this.config.node;
-	public server = () => this.config.node;
+	public node = () => this.p2pNode;
+	public server = () => this.p2pNode;
 	public peerCount = () => this.network.core.getPeerCount();
 
 	public get txPool() {

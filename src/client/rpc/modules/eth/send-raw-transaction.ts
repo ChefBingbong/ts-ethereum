@@ -18,8 +18,8 @@ export const sendRawTransaction = (node: ExecutionNode) => {
 		async (params: [PrefixedHexString], _c) => {
 			const [serializedTx] = params;
 
-			const { syncTargetHeight } = node.config;
-			if (!node.config.synchronized) {
+			const syncTargetHeight = node.synchronizer.syncTargetHeight;
+			if (!node.synchronizer.synchronized) {
 				return safeError(
 					new Error(
 						"node is not aware of the current chain height yet (give sync some more time)",

@@ -82,4 +82,5 @@ export type ExecutionNodeModules = {
 	network: NetworkService;
 	execution: ExecutionService;
 	txFetcher: TxFetcher;
+	p2pNode: import("../../p2p/libp2p/types.ts").P2PNode;
 };

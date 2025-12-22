@@ -16,7 +16,7 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
 				privateKey: options.key,
 				bindAddr: options.extIP ?? "127.0.0.1",
 				bindPort: options.port,
-				bootstrapNodes: options.bootnodes,
+				bootstrapNodes: [...options.bootnodes],
 				autoDial: true,
 				autoDialBootstrap: true,
 			}),

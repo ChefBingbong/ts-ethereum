@@ -19,7 +19,7 @@ export const syncing = (node: ExecutionNode) => {
 		if (!synchronizer) {
 			return safeResult(false);
 		}
-		const { syncTargetHeight } = node.config;
+		const syncTargetHeight = node.synchronizer.syncTargetHeight;
 		const startingBlock = bigIntToHex(synchronizer.startingBlock);
 
 		let highestBlock: string | undefined;
