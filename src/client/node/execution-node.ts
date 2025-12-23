@@ -1,3 +1,5 @@
+import { getHttpMetricsServer } from "../../metrics/index.ts";
+import type { HttpMetricsServer } from "../../metrics/server/http.js";
 import type { P2PNode as P2PNodeType } from "../../p2p/libp2p/types.ts";
 import { Chain } from "../blockchain";
 import type { Config } from "../config/index.ts";
@@ -47,6 +49,8 @@ export class ExecutionNode {
 	protected statsCounter = 0;
 	private building = false;
 	private started = false;
+	protected metricsServer?: HttpMetricsServer;
+	private startTime = Date.now();
 
 	public static async init(
 		options: ExecutionNodeInitOptions,
@@ -114,6 +118,26 @@ export class ExecutionNode {
 			p2pNode,
 		});
 
+		// Initialize metrics if enabled
+		if (options.config.options.metrics?.enabled !== false) {
+			const metricsOptions = options.config.options.metrics;
+			const port = node.config.options.port + 500;
+			const address =
+				metricsOptions?.host ?? metricsOptions?.address ?? "127.0.0.1";
+
+			const metricsServer = await getHttpMetricsServer(
+				{
+					port,
+					address,
+				},
+				{
+					register: options.config.metrics.register,
+					getOtherMetrics: async () => [],
+				},
+			);
+			node.metricsServer = metricsServer;
+		}
+
 		if (node.running) return;
 		void node.execution.synchronizer?.start();
 
@@ -174,11 +198,15 @@ export class ExecutionNode {
 		this.interval = 200;
 		this.timeout = 6000;
 		this.isRpcReady = false;
+		this.startTime = Date.now();
 
 		this.config.events.on(Event.CLIENT_SHUTDOWN, async () => {
 			if (this.rpcServer !== undefined) return;
 			await this.close();
 		});
+
+		// Setup metrics event listeners
+		this.setupMetricsListeners();
 
 		this.setHandlerContext();
 
@@ -190,6 +218,67 @@ export class ExecutionNode {
 			);
 		}
 		this.execution.txPool.checkRunState();
+	}
+
+	private setupMetricsListeners(): void {
+		if (!this.config.metrics) return;
+
+		this.config.events.on(Event.CHAIN_UPDATED, () => {
+			this.config.updateChainMetrics(this.chain);
+		});
+
+		this.config.events.on(Event.PEER_CONNECTED, () => {
+			this.config.metrics.network.peerConnections.inc({ direction: "inbound" });
+			this.config.updateNetworkMetrics(this.network);
+		});
+
+		this.config.events.on(Event.PEER_DISCONNECTED, () => {
+			this.config.metrics.network.peerDisconnections.inc();
+			this.config.updateNetworkMetrics(this.network);
+		});
+
+		this.config.events.on(Event.POOL_PEER_BANNED, () => {
+			this.config.metrics.network.peerBans.inc();
+			this.config.updateNetworkMetrics(this.network);
+		});
+
+		// Sync events
+		this.config.events.on(Event.SYNC_SYNCHRONIZED, () => {
+			this.config.metrics.sync.syncStatus.set(0);
+			this.config.updateSyncMetrics(this.chain);
+		});
+
+		this.config.events.on(Event.SYNC_FETCHED_BLOCKS, () => {
+			this.config.metrics.sync.blocksFetched.inc();
+		});
+
+		this.config.events.on(Event.SYNC_ERROR, () => {
+			this.config.metrics.sync.syncErrors.inc({ error_type: "sync_error" });
+		});
+
+		this.config.events.on(Event.SYNC_FETCHER_ERROR, () => {
+			this.config.metrics.sync.fetcherErrors.inc();
+		});
+
+		// Protocol events
+		this.config.events.on(Event.PROTOCOL_MESSAGE, (message) => {
+			this.config.metrics.network.protocolMessages.inc({
+				protocol: message.protocol,
+				message_type: message.message.name,
+			});
+		});
+
+		this.config.events.on(Event.PROTOCOL_ERROR, () => {
+			this.config.metrics.network.protocolErrors.inc({
+				protocol: "eth",
+				error_type: "protocol_error",
+			});
+		});
+
+		// Chain reorg
+		this.config.events.on(Event.CHAIN_REORG, () => {
+			this.config.metrics.chain.reorgsDetected.inc();
+		});
 	}
 
 	private setHandlerContext(): void {
@@ -210,6 +299,7 @@ export class ExecutionNode {
 			this.config.events.emit(Event.CLIENT_SHUTDOWN);
 			clearInterval(this.statsInterval);
 
+			await this.metricsServer?.close();
 			await this.rpcServer?.close?.();
 			await this.execution.stop();
 			await this.network.stop();
@@ -261,6 +351,19 @@ export class ExecutionNode {
 
 		const percentage = Math.round((100 * used_heap_size) / heap_size_limit);
 		if (this.statsCounter % 4 === 0) this.statsCounter = 0;
+
+		// Update metrics
+		if (this.config.metrics) {
+			this.config.metrics.system.memoryUsage.set(used_heap_size);
+			this.config.metrics.system.memoryLimit.set(heap_size_limit);
+			this.config.metrics.system.uptime.set(
+				Math.floor((Date.now() - this.startTime) / 1000),
+			);
+			this.config.metrics.system.nodeStatus.set(this.running ? 1 : 0);
+			this.config.updateChainMetrics(this.chain);
+			this.config.updateNetworkMetrics(this.network);
+			this.config.updateSyncMetrics(this.chain);
+		}
 
 		if (percentage >= MEMORY_SHUTDOWN_THRESHOLD && !this.config.shutdown) {
 			process.kill(process.pid, "SIGINT");

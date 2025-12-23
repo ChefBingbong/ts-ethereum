@@ -7,9 +7,9 @@ import { createRpcHandlers } from "../modules/index.ts";
 import { RpcApiEnv, rpcRequestSchema } from "../types.ts";
 import { rpcValidator } from "../validation.ts";
 import {
-    RpcServerBase,
-    type RpcServerModules,
-    type RpcServerOpts,
+	RpcServerBase,
+	type RpcServerModules,
+	type RpcServerOpts,
 } from "./base.ts";
 
 export type RpcServerOptsExtended = RpcServerOpts & {

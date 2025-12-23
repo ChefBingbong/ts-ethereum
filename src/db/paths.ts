@@ -16,4 +16,3 @@ export function getDbPaths(clientPaths: ClientPaths): DbPaths {
 		metaDbPath: clientPaths.metaDir,
 	};
 }
-

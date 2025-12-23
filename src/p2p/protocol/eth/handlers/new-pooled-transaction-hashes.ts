@@ -8,9 +8,8 @@ import {
 	ETH_MESSAGES,
 	EthMessageCode,
 } from "../../../../client/net/protocol/eth/definitions";
-import type { EthHandler } from "../handler";
 import { handleNewPooledTransactionHashes as handleNewPooledTransactionHashesExec } from "../../../../client/net/protocol/eth/handlers.ts";
-import type { Peer } from "../../../../client/net/peer/peer.ts";
+import type { EthHandler } from "../handler";
 
 const log = debug("p2p:eth:handlers:new-pooled-transaction-hashes");
 
@@ -20,7 +19,13 @@ const log = debug("p2p:eth:handlers:new-pooled-transaction-hashes");
  */
 export async function handleNewPooledTransactionHashes(
 	handler: EthHandler,
-	payload: unknown,
+	payload:
+		| Uint8Array<ArrayBufferLike>[]
+		| [
+				types: `0x${string}`,
+				sizes: number[],
+				hashes: Uint8Array<ArrayBufferLike>[],
+		  ],
 ): Promise<void> {
 	try {
 		const decoded =
@@ -32,7 +37,11 @@ export async function handleNewPooledTransactionHashes(
 		if (handler.context) {
 			const peer = handler.findPeer();
 			if (peer) {
-				await handleNewPooledTransactionHashesExec(decoded, peer, handler.context);
+				await handleNewPooledTransactionHashesExec(
+					decoded,
+					peer,
+					handler.context,
+				);
 				return;
 			}
 		}

@@ -189,6 +189,7 @@ export async function initClientConfig(
 		prometheusMetrics: args.prometheusMetrics,
 		useP2PServer: args.useP2PServer,
 		node: args.node,
+		metrics: args.metrics,
 	};
 
 	return createConfigOptions(config) as unknown as ClientConfig;

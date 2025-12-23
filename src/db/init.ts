@@ -57,4 +57,3 @@ export async function initDatabases(
 		metaDB: metaController.getDb(),
 	};
 }
-

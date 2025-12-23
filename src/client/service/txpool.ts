@@ -1441,10 +1441,10 @@ export class TxPool {
 				this.txGasPrice(a.tx).tip < this.txGasPrice(b.tx).tip,
 		}) as QHeap<TxPoolObject>;
 
-		if (this.config.options.prometheusMetrics !== undefined) {
+		if (this.config.options.metrics !== undefined) {
 			// TODO: Only clear the metrics related to the transaction pool here
 			for (const [_, metric] of Object.entries(
-				this.config.options.prometheusMetrics,
+				this.config.options.metrics.prometheus,
 			)) {
 				metric.set(0);
 			}

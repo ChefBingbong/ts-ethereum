@@ -14,7 +14,7 @@ export const getRawTransaction = (node: ExecutionNode) => {
 	return createRpcMethod(
 		getRawTransactionSchema,
 		async (params: [PrefixedHexString], _c) => {
-			const [txHash] = params;	
+			const [txHash] = params;
 			if (!node.execution.execution.receiptsManager)
 				return safeError(EthereumJSErrorWithoutCode("missing receiptsManager"));
 			if (!node.execution.execution.txIndex)

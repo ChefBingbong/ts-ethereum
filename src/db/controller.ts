@@ -6,7 +6,11 @@ export interface DbOptions {
 	/** Database path */
 	name: string;
 	/** Optional existing DB instance */
-	db?: AbstractLevel<string | Uint8Array, string | Uint8Array, string | Uint8Array>;
+	db?: AbstractLevel<
+		string | Uint8Array,
+		string | Uint8Array,
+		string | Uint8Array
+	>;
 }
 
 export interface DbModules {
@@ -155,4 +159,3 @@ export class DbController {
 		return this.db;
 	}
 }
-

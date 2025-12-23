@@ -1,5 +1,6 @@
 import type { Common } from "../../chain-config";
-import { P2PNode } from "../../p2p/libp2p/types.ts";
+import type { MetricsOptions } from "../../metrics/options.js";
+import type { P2PNode } from "../../p2p/libp2p/types.ts";
 import type { Address } from "../../utils";
 import type { VM } from "../../vm";
 import type { Logger } from "../logging.ts";
@@ -245,8 +246,14 @@ export interface ConfigOptions {
 
 	/**
 	 * Enables Prometheus Metrics that can be collected for monitoring client health
+	 * @deprecated Use metrics option instead
 	 */
 	prometheusMetrics?: PrometheusMetrics;
+
+	/**
+	 * Prometheus metrics configuration
+	 */
+	metrics?: MetricsOptions;
 
 	/**
 	 * Use the new P2P server implementation with Transport + Mplex + Multi-stream-select

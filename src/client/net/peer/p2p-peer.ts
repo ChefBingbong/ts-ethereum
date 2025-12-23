@@ -50,7 +50,7 @@ export class P2PPeer extends Peer {
 	/**
 	 * Create new P2P peer
 	 */
-constructor(options: P2PPeerOptions) {
+	constructor(options: P2PPeerOptions) {
 		// Derive ID from remote peer
 		const peerIdHex = peerIdToString(options.connection.remotePeer);
 

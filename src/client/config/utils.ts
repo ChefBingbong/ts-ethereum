@@ -1,7 +1,13 @@
 import { Common } from "../../chain-config";
 import { PeerInfo } from "../../kademlia/types.ts";
+import {
+	defaultMetricsOptions,
+	MetricsOptions,
+} from "../../metrics/options.ts";
+import { Address } from "../../utils";
 import { genPrivateKey } from "../../utils/utils.ts";
 import type { VM, VMProfilerOpts } from "../../vm";
+import { Logger } from "../logging.ts";
 import * as constants from "./constants.ts";
 import type { ConfigOptions, SyncMode } from "./types.ts";
 
@@ -33,20 +39,17 @@ export interface ResolvedConfigOptions {
 	readonly discV4: boolean;
 	readonly mine: boolean;
 	readonly isSingleNode: boolean;
-	readonly accounts: readonly [
-		address: import("../../utils").Address,
-		privKey: Uint8Array,
-	][];
-	readonly minerCoinbase?: import("../../utils").Address;
+	readonly accounts: readonly [address: Address, privKey: Uint8Array][];
+	readonly minerCoinbase?: Address;
 	readonly vmProfilerOpts?: VMProfilerOpts;
 	readonly safeReorgDistance: number;
 	readonly syncedStateRemovalPeriod: number;
 	readonly prefixStorageTrieKeys: boolean;
 	readonly useStringValueTrieDB: boolean;
 	readonly savePreimages: boolean;
-	readonly prometheusMetrics?: import("../types.ts").PrometheusMetrics;
-	readonly common: import("../../chain-config").Common;
-	readonly logger?: import("../logging.ts").Logger;
+	readonly metrics?: MetricsOptions;
+	readonly common: Common;
+	readonly logger?: Logger;
 }
 
 /**
@@ -84,6 +87,7 @@ export function createConfigFromDefaults(
 		useStringValueTrieDB: false,
 		savePreimages: false,
 		common,
+		metrics: defaultMetricsOptions,
 	};
 }
 
@@ -140,9 +144,9 @@ export function createConfigOptions(
 		useStringValueTrieDB:
 			options.useStringValueTrieDB ?? defaults.useStringValueTrieDB,
 		savePreimages: options.savePreimages ?? defaults.savePreimages,
-		prometheusMetrics: options.prometheusMetrics,
-		common: options.common,
-		logger: options.logger,
+		metrics: options.metrics ?? defaultMetricsOptions,
+		common: options.common ?? defaults.common,
+		logger: options.logger ?? defaults.logger,
 	};
 }
 

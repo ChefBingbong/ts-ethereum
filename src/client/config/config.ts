@@ -2,9 +2,12 @@ import { EventEmitter } from "eventemitter3";
 import { Level } from "level";
 import { Logger } from "winston";
 import type { Common } from "../../chain-config";
+import { createMetrics, Metrics } from "../../metrics/metrics.ts";
 import { BIGINT_0 } from "../../utils/index.ts";
 import { safeTry } from "../../utils/safe.ts";
 import { genPrivateKey } from "../../utils/utils.ts";
+import { Chain } from "../blockchain/chain.ts";
+import { NetworkService } from "../net/network-service.ts";
 import { Event, type EventParams } from "../types.ts";
 import type { ConfigOptions } from "./types.ts";
 import { DataDirectory } from "./types.ts";
@@ -30,6 +33,8 @@ export class Config {
 	public isAbleToSync: boolean;
 	public syncTargetHeight: bigint;
 	public lastSyncDate: number;
+	public metrics?: Metrics;
+	protected startTime: number;
 
 	public shutdown: boolean;
 
@@ -48,11 +53,57 @@ export class Config {
 		this.lastSynchronized = this.synchronized;
 		this.syncTargetHeight = BIGINT_0;
 		this.lastSyncDate = 0;
+		this.startTime = Date.now();
+
+		if (this.options.metrics?.enabled) {
+			this.metrics = createMetrics({
+				enabled: true,
+				port: this.options.port,
+				address: this.options.metrics.address,
+				prefix: this.options.metrics.prefix,
+				metadata: this.options.metrics.metadata,
+			});
+		}
 
 		this.events.on(Event.CLIENT_SHUTDOWN, () => {
 			this.logger.warn(`CLIENT_SHUTDOWN event received `);
 			this.shutdown = true;
 		});
+	}
+
+	public updateChainMetrics(chain: Chain): void {
+		if (!this.metrics) return;
+		const latest = chain.headers.latest;
+		if (latest) {
+			this.metrics.chain.blockHeight.set(Number(latest.number));
+			this.metrics.chain.totalDifficulty.set(Number(chain.blocks.td));
+			this.metrics.chain.chainId.set(
+				Number(chain.config.chainCommon.chainId()),
+			);
+			this.metrics.chain.blocksImported.inc();
+			this.metrics.chain.blockHash.set(Number(latest.hash.toString()));
+			this.metrics.chain.blockProcessingTime.observe(
+				Date.now() - this.startTime,
+			);
+			this.metrics.chain.blocksProcessed.inc();
+		}
+	}
+
+	public updateNetworkMetrics(network: NetworkService): void {
+		if (!this.metrics) return;
+		this.metrics.network.peerCount.set(network.core.getPeerCount());
+	}
+
+	public updateSyncMetrics(chain: Chain): void {
+		if (!this.metrics) return;
+		const latest = chain.headers.latest;
+		if (latest) {
+			this.metrics.sync.syncCurrentHeight.set(Number(latest.number));
+		}
+		if (this.syncTargetHeight) {
+			this.metrics.sync.syncTargetHeight.set(Number(this.syncTargetHeight));
+		}
+		this.metrics.sync.syncStatus.set(this.synchronized ? 0 : 1);
 	}
 
 	updateSynchronizedState(newState: SynchronizedState): void {

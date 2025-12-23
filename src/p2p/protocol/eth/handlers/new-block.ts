@@ -17,7 +17,10 @@ const log = debug("p2p:eth:handlers:new-block");
  * Handle NEW_BLOCK announcement
  * Payload is already decoded: [blockBytes, tdBytes]
  */
-export async function handleNewBlock(handler: EthHandler, payload: unknown): Promise<void> {
+export async function handleNewBlock(
+	handler: EthHandler,
+	payload: unknown,
+): Promise<void> {
 	try {
 		const decoded = ETH_MESSAGES[EthMessageCode.NEW_BLOCK].decode(payload, {
 			chainCommon: handler.config.chainCommon,

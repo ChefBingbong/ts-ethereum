@@ -76,10 +76,7 @@ export function registerDefaultHandlers(registry: EthHandlerRegistry): void {
 		EthMessageCode.TRANSACTIONS,
 		handleTransactions,
 	);
-	registry.registerProtocolHandler(
-		EthMessageCode.NEW_BLOCK,
-		handleNewBlock,
-	);
+	registry.registerProtocolHandler(EthMessageCode.NEW_BLOCK, handleNewBlock);
 	registry.registerProtocolHandler(
 		EthMessageCode.NEW_POOLED_TRANSACTION_HASHES,
 		handleNewPooledTransactionHashes,
@@ -90,12 +87,19 @@ export function registerDefaultHandlers(registry: EthHandlerRegistry): void {
 export {
 	handleBlockBodies,
 	// Responses
-	handleBlockHeaders, handleGetBlockBodies,
+	handleBlockHeaders,
+	handleGetBlockBodies,
 	// Requests
-	handleGetBlockHeaders, handleGetNodeData,
-	handleGetPooledTransactions, handleGetReceipts, handleNewBlock,
+	handleGetBlockHeaders,
+	handleGetNodeData,
+	handleGetPooledTransactions,
+	handleGetReceipts,
+	handleNewBlock,
 	// Announcements
-	handleNewBlockHashes, handleNewPooledTransactionHashes, handleNodeData,
-	handlePooledTransactions, handleReceipts, handleTransactions
+	handleNewBlockHashes,
+	handleNewPooledTransactionHashes,
+	handleNodeData,
+	handlePooledTransactions,
+	handleReceipts,
+	handleTransactions,
 };
-
