@@ -1,23 +1,27 @@
 {
-	"name": "networking",
+	"name": "ts-ethereum",
 	"module": "index.ts",
 	"type": "module",
 	"private": true,
+	"workspaces": [
+		"packages/*"
+	],
 	"scripts": {
+		"build": "turbo run build",
+		"build:packages": "turbo run build  --filter='./packages/*'",
+		"check": "turbo run check --cache=local:r,remote:r",
+		"clean": "turbo run clean && rm -rf node_modules",
+		"lint": "biome check .",
+		"lint:fix": "biome check . --write",
 		"format": "biome format . --write",
-		"test": "vitest",
-		"test:run": "vitest run -c",
-		"examples": "tsx examples/simple.ts",
-		"local-network": "tsx script/local-network.ts",
-		"test-network": "tsx script/test-network.ts",
-		"test:eccies": "tsx script/test-eccies.ts",
-		"peer": "tsx script/createPeer.ts"
+		"test": "turbo run test --concurrency=100%"
 	},
 	"devDependencies": {
 		"@paulmillr/trusted-setups": "0.2.0",
 		"@types/bun": "latest",
 		"micro-eth-signer": "0.15.0",
 		"tsx": "^4.20.6",
+		"turbo": "^2.7.1",
 		"vitest": "^4.0.13"
 	},
 	"peerDependencies": {
