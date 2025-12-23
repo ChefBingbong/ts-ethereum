@@ -1,4 +1,4 @@
-import { KeyEncoding, ValueEncoding } from '../../utils'
+import { KeyEncoding, ValueEncoding } from '@ts-ethereum/utils'
 
 import {
 	HEADS_KEY,

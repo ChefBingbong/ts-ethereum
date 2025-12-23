@@ -1,16 +1,16 @@
+import type { BlockData } from '@ts-ethereum/block'
+import { createBlock } from '@ts-ethereum/block'
+import { BIGINT_0, bytesToHex, equalsBytes } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import type { BlockchainOptions, DBOp } from '.'
 import {
-  Blockchain,
-  DBSaveLookups,
-  DBSetBlockOrHeader,
-  DBSetTD,
-  genGenesisStateRoot,
-  getGenesisStateRoot,
+	Blockchain,
+	DBSaveLookups,
+	DBSetBlockOrHeader,
+	DBSetTD,
+	genGenesisStateRoot,
+	getGenesisStateRoot,
 } from '.'
-import type { BlockData } from '../block'
-import { createBlock } from '../block'
-import { BIGINT_0, bytesToHex, equalsBytes } from '../utils'
 
 const DEBUG = true
 const debug = debugDefault('blockchain:#')

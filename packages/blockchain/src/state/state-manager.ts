@@ -1,5 +1,5 @@
-import { BIGINT_0 } from '../../utils/constants'
-import type { Address } from '../../utils/index'
+import { BIGINT_0 } from '@ts-ethereum/utils'
+import type { Address } from '@ts-ethereum/utils'
 
 export interface AccountState {
   balance: bigint

@@ -1,4 +1,4 @@
-import { bigIntToBytes, concatBytes, utf8ToBytes } from '../../utils'
+import { bigIntToBytes, concatBytes, utf8ToBytes } from '@ts-ethereum/utils'
 
 // Geth compatible DB keys
 

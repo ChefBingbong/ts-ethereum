@@ -1,5 +1,5 @@
-import type { Common, GenesisState } from '../chain-config'
-import { genesisMPTStateRoot } from '../mpt/util/genesisState'
+import type { Common, GenesisState } from '@ts-ethereum/chain-config'
+import { genesisMPTStateRoot } from '@ts-ethereum/mpt'
 
 export async function genGenesisStateRoot(
   genesisState: GenesisState,

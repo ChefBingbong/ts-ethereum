@@ -1,5 +1,5 @@
 import { LRUCache } from 'lru-cache'
-import { bytesToUnprefixedHex } from '../../utils'
+import { bytesToUnprefixedHex } from '@ts-ethereum/utils'
 
 /**
  * Simple LRU Cache that allows for keys of type Uint8Array

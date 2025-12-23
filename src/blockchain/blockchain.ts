@@ -8,34 +8,34 @@ import { Common, ConsensusAlgorithm } from '../chain-config'
 import { Ethash } from '../eth-hash/index.ts'
 import type { BigIntLike, DB, DBObject } from '../utils'
 import {
-  BIGINT_0,
-  BIGINT_1,
-  BIGINT_8,
-  bigIntToHex,
-  bytesToHex,
-  bytesToUnprefixedHex,
-  equalsBytes,
-  Lock,
-  MapDB,
+	BIGINT_0,
+	BIGINT_1,
+	BIGINT_8,
+	bigIntToHex,
+	bytesToHex,
+	bytesToUnprefixedHex,
+	equalsBytes,
+	Lock,
+	MapDB,
 } from '../utils'
 import { EthashConsensus } from './consensus/ethash.ts'
 // PoW/Ethash only - no Casper or Clique consensus
 import {
-  DBOp,
-  DBSaveLookups,
-  DBSetBlockOrHeader,
-  DBSetHashToNumber,
-  DBSetTD,
+	DBOp,
+	DBSaveLookups,
+	DBSetBlockOrHeader,
+	DBSetHashToNumber,
+	DBSetTD,
 } from './db/helpers.ts'
 import { DBManager } from './db/manager.ts'
 import { DBTarget } from './db/operation.ts'
 import type {
-  BlockchainEvent,
-  BlockchainInterface,
-  BlockchainOptions,
-  Consensus,
-  ConsensusDict,
-  OnBlock,
+	BlockchainEvent,
+	BlockchainInterface,
+	BlockchainOptions,
+	Consensus,
+	ConsensusDict,
+	OnBlock,
 } from './types.ts'
 
 /**
@@ -110,7 +110,7 @@ export class Blockchain implements BlockchainInterface {
     this.DEBUG = true
     this._debug = debugDefault('blockchain:#')
 
-    this.common = opts.common
+    this.common = opts.common as Common
 
     this._hardforkByHeadBlockNumber = opts.hardforkByHeadBlockNumber ?? false
     this._validateBlocks = opts.validateBlocks ?? true
@@ -264,7 +264,7 @@ export class Blockchain implements BlockchainInterface {
    */
   async putBlocks(blocks: Block[]) {
     for (let i = 0; i < blocks.length; i++) {
-      await this.putBlock(blocks[i])
+      await this.putBlock(blocks[i] as Block)
     }
 
     this.DEBUG && this._debug(`put ${blocks.length} blocks`)
@@ -770,7 +770,7 @@ export class Blockchain implements BlockchainInterface {
       while (max >= min) {
         let number
         try {
-          number = await this.dbManager.hashToNumber(hashes[mid])
+          number = await this.dbManager.hashToNumber(hashes[mid] as Uint8Array)
         } catch (err: any) {
           if (err.message.includes('not found in DB') === true) {
             number = undefined
@@ -1106,7 +1106,7 @@ export class Blockchain implements BlockchainInterface {
         // executed block) blocks to verify the chain up to the current, actual,
         // head.
         for (const name of Object.keys(this._heads)) {
-          if (equalsBytes(this._heads[name], hash)) {
+          if (this._heads[name] && equalsBytes(this._heads[name], hash)) {
             this._heads[name] = headHash
           }
         }
@@ -1192,7 +1192,7 @@ export class Blockchain implements BlockchainInterface {
       // mark each key `_heads` which is currently set to the hash in the DB as
       // stale to overwrite later in `_deleteCanonicalChainReferences`.
       for (const name of Object.keys(this._heads)) {
-        if (staleHash && equalsBytes(this._heads[name], staleHash)) {
+        if (this._heads[name] && staleHash && equalsBytes(this._heads[name], staleHash)) {
           staleHeads.push(name)
         }
       }

@@ -1,41 +1,41 @@
+import type { HeaderData } from '@ts-ethereum/block'
+import { Block, BlockHeader, createBlock } from '@ts-ethereum/block'
+import type { GenesisState } from '@ts-ethereum/chain-config'
+import { Common, ConsensusAlgorithm } from '@ts-ethereum/chain-config'
+import { Ethash } from '@ts-ethereum/consensus'
+import type { BigIntLike, DB, DBObject } from '@ts-ethereum/utils'
+import {
+  BIGINT_0,
+  BIGINT_1,
+  BIGINT_8,
+  bigIntToHex,
+  bytesToHex,
+  bytesToUnprefixedHex,
+  equalsBytes,
+  Lock,
+  MapDB,
+} from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debugDefault from 'debug'
 import { EventEmitter } from 'eventemitter3'
-import type { HeaderData } from '../block'
-import { Block, BlockHeader, createBlock } from '../block'
-import type { GenesisState } from '../chain-config'
-import { Common, ConsensusAlgorithm } from '../chain-config'
-import { Ethash } from '../eth-hash/index'
-import type { BigIntLike, DB, DBObject } from '../utils'
-import {
-	BIGINT_0,
-	BIGINT_1,
-	BIGINT_8,
-	bigIntToHex,
-	bytesToHex,
-	bytesToUnprefixedHex,
-	equalsBytes,
-	Lock,
-	MapDB,
-} from '../utils'
 import { EthashConsensus } from './consensus/ethash'
 // PoW/Ethash only - no Casper or Clique consensus
 import {
-	DBOp,
-	DBSaveLookups,
-	DBSetBlockOrHeader,
-	DBSetHashToNumber,
-	DBSetTD,
+  DBOp,
+  DBSaveLookups,
+  DBSetBlockOrHeader,
+  DBSetHashToNumber,
+  DBSetTD,
 } from './db/helpers'
 import { DBManager } from './db/manager'
 import { DBTarget } from './db/operation'
 import type {
-	BlockchainEvent,
-	BlockchainInterface,
-	BlockchainOptions,
-	Consensus,
-	ConsensusDict,
-	OnBlock,
+  BlockchainEvent,
+  BlockchainInterface,
+  BlockchainOptions,
+  Consensus,
+  ConsensusDict,
+  OnBlock,
 } from './types'
 
 /**
@@ -110,7 +110,7 @@ export class Blockchain implements BlockchainInterface {
     this.DEBUG = true
     this._debug = debugDefault('blockchain:#')
 
-    this.common = opts.common
+    this.common = opts.common as Common
 
     this._hardforkByHeadBlockNumber = opts.hardforkByHeadBlockNumber ?? false
     this._validateBlocks = opts.validateBlocks ?? true

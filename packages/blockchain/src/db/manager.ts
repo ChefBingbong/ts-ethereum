@@ -1,28 +1,28 @@
 import {
-	createBlockFromBytesArray,
-	createBlockHeaderFromBytesArray,
-} from '../../block'
-import * as RLP from '../../rlp'
+  createBlockFromBytesArray,
+  createBlockHeaderFromBytesArray,
+} from '@ts-ethereum/block'
+import { RLP } from '@ts-ethereum/rlp'
 import {
-	KECCAK256_RLP,
-	KECCAK256_RLP_ARRAY,
-	bytesToBigInt,
-	bytesToHex,
-	equalsBytes,
-	unprefixedHexToBytes,
-} from '../../utils'
+  KECCAK256_RLP,
+  KECCAK256_RLP_ARRAY,
+  bytesToBigInt,
+  bytesToHex,
+  equalsBytes,
+  unprefixedHexToBytes,
+} from '@ts-ethereum/utils'
 
 import { Cache } from './cache'
 import { DBOp, DBTarget } from './operation'
 
 import type {
-	Block,
-	BlockBodyBytes,
-	BlockBytes,
-	BlockOptions,
-} from '../../block'
-import type { Common } from '../../chain-config'
-import type { BatchDBOp, DB, DBObject, DelBatch, PutBatch } from '../../utils'
+  Block,
+  BlockBodyBytes,
+  BlockBytes,
+  BlockOptions,
+} from '@ts-ethereum/block'
+import type { Common } from '@ts-ethereum/chain-config'
+import type { BatchDBOp, DB, DBObject, DelBatch, PutBatch } from '@ts-ethereum/utils'
 import type { DatabaseKey } from './operation'
 
 /**
