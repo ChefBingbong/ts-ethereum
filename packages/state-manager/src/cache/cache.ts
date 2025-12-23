@@ -29,7 +29,6 @@ export class Cache {
 		// Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
 		// Additional window check is to prevent vite browser bundling (and potentially other) to break
 		this.DEBUG =
-			// @ts-expect-error - window is not available in Node.js
 			typeof window === "undefined"
 				? (process?.env?.DEBUG?.includes("ethjs") ?? false)
 				: false;

@@ -1,13 +1,13 @@
 import { OrderedMap } from "@js-sdsl/ordered-map";
 import debugDefault from "debug";
 import { LRUCache } from "lru-cache";
-import { bytesToUnprefixedHex } from "../../utils";
+import { bytesToUnprefixedHex } from "@ts-ethereum/utils";
 
-import { Cache } from "./cache.ts";
-import { CacheType } from "./types.ts";
+import { Cache } from "./cache";
+import { CacheType } from "./types";
 
-import type { Account, Address } from "../../utils";
-import type { CacheOpts } from "./types.ts";
+import type { Account, Address } from "@ts-ethereum/utils";
+import type { CacheOpts } from "./types";
 
 /**
  * account: undefined

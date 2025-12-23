@@ -1,11 +1,7 @@
-import type { Debugger } from 'debug'
-import debugDefault from 'debug'
-import { keccak256 } from 'ethereum-cryptography/keccak.js'
-import type { RPCStateManagerOpts } from '.'
-import type { AccountFields, StateManagerInterface } from '../chain-config'
-import { Common } from '../chain-config'
-import * as RLP from '../rlp'
-import type { Address } from '../utils'
+import type { AccountFields, StateManagerInterface } from '@ts-ethereum/chain-config'
+import { Common } from '@ts-ethereum/chain-config'
+import { RLP } from '@ts-ethereum/rlp'
+import type { Address } from '@ts-ethereum/utils'
 import {
 	Account,
 	bigIntToHex,
@@ -17,7 +13,11 @@ import {
 	hexToBytes,
 	intToHex,
 	toBytes,
-} from '../utils'
+} from '@ts-ethereum/utils'
+import type { Debugger } from 'debug'
+import debugDefault from 'debug'
+import { keccak256 } from 'ethereum-cryptography/keccak.js'
+import type { RPCStateManagerOpts } from '.'
 import { Caches } from './cache'
 import { modifyAccountFields } from './util'
 

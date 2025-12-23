@@ -1,11 +1,11 @@
-import { AccountCache } from "./account.ts";
+import { AccountCache } from "./account";
 import {
 	type CacheOpts,
 	CacheType,
 	type CachesStateManagerOpts,
-} from "./types.ts";
+} from "./types";
 
-import type { Address } from "../../utils";
+import type { Address } from "@ts-ethereum/utils";
 
 export class Caches {
 	account?: AccountCache;

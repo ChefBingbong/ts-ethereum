@@ -1,3 +1,4 @@
+import { Common } from '@ts-ethereum/chain-config'
 import { EVMMockBlockchain, createEVM } from '@ts-ethereum/evm'
 import { MerkleStateManager } from '@ts-ethereum/state-manager'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
@@ -17,7 +18,7 @@ export async function createVM(opts: VMOpts = {}): Promise<VM> {
 
   if (opts.stateManager === undefined) {
     opts.stateManager = new MerkleStateManager({
-      common: opts.common,
+      common: opts.common as Common,
     })
   }
 

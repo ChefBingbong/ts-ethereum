@@ -1,15 +1,15 @@
-import type { Account } from '../utils'
-import { EthereumJSErrorWithoutCode } from '../utils'
+import type { Account } from '@ts-ethereum/utils'
+import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 
 import { modifyAccountFields } from './util'
 
-import type { SimpleStateManagerOpts } from '.'
 import type {
-	AccountFields,
-	Common,
-	StateManagerInterface,
-} from '../chain-config'
-import type { Address, PrefixedHexString } from '../utils'
+  AccountFields,
+  Common,
+  StateManagerInterface,
+} from '@ts-ethereum/chain-config'
+import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
+import type { SimpleStateManagerOpts } from '.'
 
 /**
  * Simple and dependency-free state manager for basic state access use cases
@@ -26,7 +26,7 @@ export class SimpleStateManager implements StateManagerInterface {
 
   public readonly common?: Common
 
-  constructor(opts: SimpleStateManagerOpts = {}) {
+  constructor(opts: SimpleStateManagerOpts = {} as any) {
     this.checkpointSync()
     this.common = opts.common
   }
@@ -89,7 +89,7 @@ export class SimpleStateManager implements StateManagerInterface {
   clearCaches(): void {}
 
   shallowCopy(): StateManagerInterface {
-    const copy = new SimpleStateManager({ common: this.common })
+    const copy = new SimpleStateManager({ common: this.common as Common })
     for (let i = 0; i < this.accountStack.length; i++) {
       copy.accountStack.push(new Map(this.accountStack[i]))
     }

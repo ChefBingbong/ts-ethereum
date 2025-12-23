@@ -1,3 +1,2 @@
-export * from './merkle'
-export * from './rpc'
+export * from './rpc';
 
