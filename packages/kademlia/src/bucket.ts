@@ -4,13 +4,13 @@
 // Based on k-bucket by Tristan Slominski (MIT License)
 // https://github.com/tristanls/k-bucket
 
+import { bytesToUnprefixedHex, equalsBytes, randomBytes } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
-import { equalsBytes, randomBytes } from '../utils'
 import type {
-	Contact,
-	KBucketEvent,
-	KBucketOptions,
-	PeerInfo,
+  Contact,
+  KBucketEvent,
+  KBucketOptions,
+  PeerInfo,
 } from './types'
 
 function createNode(): KBucketNode {
@@ -451,6 +451,3 @@ export class KBucket {
     }
   }
 }
-
-// Import for the helper
-import { bytesToUnprefixedHex } from '../utils'

@@ -1,8 +1,8 @@
 // src/kademlia/xor.ts
 // XOR distance calculations for Kademlia DHT
 
+import { bytesToUnprefixedHex, concatBytes } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
-import { bytesToUnprefixedHex, concatBytes } from '../utils'
 
 /**
  * XOR two Uint8Arrays of potentially different lengths.

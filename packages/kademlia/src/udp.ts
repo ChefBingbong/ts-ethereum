@@ -1,27 +1,27 @@
 // src/kademlia/udp.ts
 // UDP transport for Ethereum-compatible Kademlia discovery protocol
 
+import type { Common } from '@ts-ethereum/chain-config'
+import { bytesToHex, bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import * as dgram from 'dgram'
 import { EventEmitter } from 'eventemitter3'
 import { LRUCache } from 'lru-cache'
-import type { Common } from '../chain-config'
-import { bytesToHex, bytesToUnprefixedHex } from '../utils'
 
 import {
-	decode,
-	type DecodedMessage,
-	encode,
-	type MessageTypeName,
+  decode,
+  type DecodedMessage,
+  encode,
+  type MessageTypeName,
 } from './message'
 import {
-	createDeferred,
-	type Deferred,
-	DISCOVERY_VERSION,
-	type KademliaTransport,
-	type KademliaTransportEvent,
-	type KademliaTransportOptions,
-	type PeerInfo,
+  createDeferred,
+  type Deferred,
+  DISCOVERY_VERSION,
+  type KademliaTransport,
+  type KademliaTransportEvent,
+  type KademliaTransportOptions,
+  type PeerInfo,
 } from './types'
 import { pk2id } from './xor'
 

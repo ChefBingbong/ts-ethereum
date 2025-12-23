@@ -1,23 +1,23 @@
 // src/kademlia/message.ts
 // RLP-encoded, secp256k1-signed message encoding for Ethereum-compatible discovery protocol
 
+import { RLP } from '@ts-ethereum/rlp'
+import {
+  bigIntToBytes,
+  bytesToHex,
+  bytesToInt,
+  bytesToUtf8,
+  concatBytes,
+  equalsBytes,
+  intToBytes,
+  setLengthLeft,
+} from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1'
 import { ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
-import * as RLP from '../rlp'
-import {
-	bigIntToBytes,
-	bytesToHex,
-	bytesToInt,
-	bytesToUtf8,
-	concatBytes,
-	equalsBytes,
-	intToBytes,
-	setLengthLeft,
-} from '../utils'
 
-import type { Common } from '../chain-config'
+import type { Common } from '@ts-ethereum/chain-config'
 import type { PeerInfo } from './types'
 
 const debug = debugDefault('kad:message')
@@ -410,9 +410,9 @@ export function decode(bytes: Uint8Array, common?: Common): DecodedMessage {
 
 // Re-export types for external use
 export type {
-	OutFindNeighbours as FindNeighboursData,
-	InNeighbours as NeighboursData,
-	OutPing as PingData,
-	OutPong as PongData
+  OutFindNeighbours as FindNeighboursData,
+  InNeighbours as NeighboursData,
+  OutPing as PingData,
+  OutPong as PongData
 }
 

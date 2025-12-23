@@ -1,14 +1,14 @@
 // src/kademlia/routing-table.ts
 // Wrapper around the tree-based KBucket with peer lookup helpers
 
+import { bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
-import { bytesToUnprefixedHex } from '../utils'
 import { KBucket } from './bucket'
 import type {
-	Contact,
-	KBucketEvent,
-	PeerInfo,
-	RoutingTableConfig,
+  Contact,
+  KBucketEvent,
+  PeerInfo,
+  RoutingTableConfig,
 } from './types'
 
 const KBUCKET_SIZE = 16

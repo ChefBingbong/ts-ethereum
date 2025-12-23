@@ -1,8 +1,9 @@
 // src/kademlia/types.ts
 // Types for Ethereum-compatible Kademlia DHT discovery protocol
 
+import type { Common } from '@ts-ethereum/chain-config'
+import { bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
-import type { Common } from '../chain-config'
 
 // ---------- Peer identification ----------
 
@@ -243,5 +244,3 @@ export function getPeerKeys(obj: string | Uint8Array | PeerInfo): string[] {
   return keys
 }
 
-// Import for the helper above
-import { bytesToUnprefixedHex } from '../utils'

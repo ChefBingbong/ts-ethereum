@@ -1,18 +1,18 @@
 // src/kademlia/kademlia.ts
 // Ethereum-compatible Kademlia DHT node for peer discovery
 
+import type { Common } from '@ts-ethereum/chain-config'
+import { bytesToInt, bytesToUnprefixedHex, randomBytes } from '@ts-ethereum/utils'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { EventEmitter } from 'eventemitter3'
-import type { Common } from '../chain-config'
-import { bytesToInt, bytesToUnprefixedHex, randomBytes } from '../utils'
 
 import { BanList } from './ban-list'
 import { RoutingTable } from './routing-table'
 import {
-	type KademliaConfig,
-	type KademliaEvent,
-	type KademliaTransport,
-	type PeerInfo,
+  type KademliaConfig,
+  type KademliaEvent,
+  type KademliaTransport,
+  type PeerInfo,
 } from './types'
 import { UdpTransport } from './udp'
 import { pk2id } from './xor'
@@ -128,7 +128,7 @@ export class KademliaNode {
 
         // Send neighbours response (limit to k peers as per Ethereum discovery)
         if (closestPeers.length > 0 && 'sendNeighbours' in this._transport) {
-          this._transport.sendNeighbours(peer, closestPeers.slice(0, k))
+          this._transport.sendNeighbours?.(peer, closestPeers.slice(0, k))
         }
       },
     )
@@ -348,7 +348,7 @@ export class KademliaNode {
       if (confirmed && selector === this._refreshIntervalSelectionCounter) {
         // Use a random target ID for refresh (or our own ID to refresh nearby buckets)
         const targetId = Math.random() > 0.5 ? this.id : randomBytes(64)
-        this._transport.findneighbours(peer, targetId)
+        this._transport.findneighbours?.(peer, targetId as Uint8Array)
       }
     }
   }
