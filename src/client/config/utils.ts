@@ -48,6 +48,7 @@ export interface ResolvedConfigOptions {
 	readonly useStringValueTrieDB: boolean;
 	readonly savePreimages: boolean;
 	readonly metrics?: MetricsOptions;
+	readonly rateLimit?: import("../rpc/rate-limit/types.ts").RateLimitOptions;
 	readonly common: Common;
 	readonly logger?: Logger;
 }
@@ -145,6 +146,7 @@ export function createConfigOptions(
 			options.useStringValueTrieDB ?? defaults.useStringValueTrieDB,
 		savePreimages: options.savePreimages ?? defaults.savePreimages,
 		metrics: options.metrics ?? defaultMetricsOptions,
+		rateLimit: options.rateLimit,
 		common: options.common ?? defaults.common,
 		logger: options.logger ?? defaults.logger,
 	};

@@ -7,6 +7,7 @@ import { BIGINT_0 } from "../../utils/index.ts";
 import { safeTry } from "../../utils/safe.ts";
 import { genPrivateKey } from "../../utils/utils.ts";
 import { Chain } from "../blockchain/chain.ts";
+import { classifyError, type ClientError } from "../errors/index.ts";
 import { NetworkService } from "../net/network-service.ts";
 import { Event, type EventParams } from "../types.ts";
 import type { ConfigOptions } from "./types.ts";
@@ -104,6 +105,41 @@ export class Config {
 			this.metrics.sync.syncTargetHeight.set(Number(this.syncTargetHeight));
 		}
 		this.metrics.sync.syncStatus.set(this.synchronized ? 0 : 1);
+	}
+
+	public trackError(error: unknown): ClientError {
+		const clientError = classifyError(error);
+		if (!this.metrics) return clientError;
+
+		const { category, code, severity, recoveryType } = clientError;
+
+		// Track error by category, code, and severity
+		this.metrics.errors.errorsTotal.inc({
+			category,
+			code,
+			severity,
+		});
+
+		// Track by category
+		this.metrics.errors.errorsByCategory.inc({ category });
+
+		// Track by recovery type
+		this.metrics.errors.errorsByRecoveryType.inc({
+			recovery_type: recoveryType,
+		});
+
+		// Track by recovery type flags
+		if (recoveryType === "recoverable") {
+			this.metrics.errors.recoverableErrors.inc();
+		} else if (recoveryType === "fatal") {
+			this.metrics.errors.fatalErrors.inc();
+		} else if (recoveryType === "transient") {
+			this.metrics.errors.transientErrors.inc();
+		} else if (recoveryType === "permanent") {
+			this.metrics.errors.permanentErrors.inc();
+		}
+
+		return clientError;
 	}
 
 	updateSynchronizedState(newState: SynchronizedState): void {

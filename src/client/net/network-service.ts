@@ -91,7 +91,8 @@ export class NetworkService {
 			if (!handler) return;
 			await handler(ethHandler, message.message.data);
 		} catch (error) {
-			this.config.events.emit(Event.PEER_ERROR, error, message.peer);
+			const clientError = this.config.trackError(error);
+			this.config.events.emit(Event.PEER_ERROR, clientError, message.peer);
 		}
 	};
 

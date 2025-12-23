@@ -256,6 +256,11 @@ export interface ConfigOptions {
 	metrics?: MetricsOptions;
 
 	/**
+	 * Rate limiting configuration for RPC server
+	 */
+	rateLimit?: import("../rpc/rate-limit/types.ts").RateLimitOptions;
+
+	/**
 	 * Use the new P2P server implementation with Transport + Mplex + Multi-stream-select
 	 * instead of the legacy RLPx server (default: false for backward compatibility)
 	 */

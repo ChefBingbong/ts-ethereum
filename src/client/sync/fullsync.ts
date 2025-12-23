@@ -299,12 +299,12 @@ export class FullSynchronizer extends Synchronizer {
 		try {
 			await this.chain.blockchain.validateHeader(block.header);
 		} catch (err) {
+			const clientError = this.config.trackError(err);
 			this.config.options.logger?.debug(
 				`Error processing new block from peer ${
 					peer ? `id=${peer.id.slice(0, 8)}` : "(no peer)"
-				} hash=${short(block.hash())}`,
+				} hash=${short(block.hash())}: ${clientError.message}`,
 			);
-			this.config.options.logger?.debug(err);
 			return;
 		}
 		// Send NEW_BLOCK to square root of total number of peers in pool
@@ -401,7 +401,10 @@ export class FullSynchronizer extends Synchronizer {
 				});
 				// Start the fetcher
 				this.fetcher.fetch().catch((e) => {
-					this.config.options.logger?.error(`Block fetcher error`, {}, e);
+					const clientError = this.config.trackError(e);
+					this.config.options.logger?.error(
+						`Block fetcher error: ${clientError.message}`,
+					);
 				});
 			}
 			return;
@@ -423,10 +426,9 @@ export class FullSynchronizer extends Synchronizer {
 			this.config.syncTargetHeight !== BIGINT_0 &&
 			this.chain.blocks.height <= this.config.syncTargetHeight - BigInt(50);
 		this.execution.run(true, shouldRunOnlyBatched).catch((e) => {
+			const clientError = this.config.trackError(e);
 			this.config.options.logger?.error(
-				`Full sync execution trigger errored`,
-				{},
-				e,
+				`Full sync execution trigger errored: ${clientError.message}`,
 			);
 		});
 	}

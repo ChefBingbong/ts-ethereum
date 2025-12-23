@@ -3,9 +3,17 @@ import type { AddressInfo } from "node:net";
 import type { Registry } from "prom-client";
 import { RegistryMetricCreator } from "../utils/registryMetricCreator.js";
 
+export type HealthCheckFn = () => Promise<{
+	healthy: boolean;
+	ready: boolean;
+	live: boolean;
+	details?: Record<string, unknown>;
+}>;
+
 export type HttpMetricsServerOpts = {
 	port: number;
 	address?: string;
+	healthCheck?: HealthCheckFn;
 };
 
 export type HttpMetricsServer = {
@@ -107,7 +115,103 @@ export async function getHttpMetricsServer(
 		req: http.IncomingMessage,
 		res: http.ServerResponse,
 	): Promise<void> {
-		if (req.method === "GET" && req.url && req.url.includes("/metrics")) {
+		const url = req.url?.split("?")[0]; // Remove query params
+
+		// Health endpoints
+		if (req.method === "GET" && url === "/health") {
+			const healthCheck = opts.healthCheck;
+			if (healthCheck) {
+				const healthRes = await wrapError(healthCheck());
+				if (healthRes.err) {
+					res.writeHead(500, { "content-type": "application/json" }).end(
+						JSON.stringify({
+							status: "error",
+							error: healthRes.err.message,
+						}),
+					);
+				} else {
+					const { healthy, details } = healthRes.result ?? {
+						healthy: false,
+					};
+					const statusCode = healthy ? 200 : 503;
+					res.writeHead(statusCode, { "content-type": "application/json" }).end(
+						JSON.stringify({
+							status: healthy ? "healthy" : "unhealthy",
+							...details,
+						}),
+					);
+				}
+			} else {
+				// Default health check - server is running
+				res
+					.writeHead(200, { "content-type": "application/json" })
+					.end(JSON.stringify({ status: "healthy" }));
+			}
+			return;
+		}
+
+		if (req.method === "GET" && url === "/ready") {
+			const healthCheck = opts.healthCheck;
+			if (healthCheck) {
+				const healthRes = await wrapError(healthCheck());
+				if (healthRes.err) {
+					res.writeHead(500, { "content-type": "application/json" }).end(
+						JSON.stringify({
+							status: "error",
+							error: healthRes.err.message,
+						}),
+					);
+				} else {
+					const { ready, details } = healthRes.result ?? { ready: false };
+					const statusCode = ready ? 200 : 503;
+					res.writeHead(statusCode, { "content-type": "application/json" }).end(
+						JSON.stringify({
+							status: ready ? "ready" : "not_ready",
+							...details,
+						}),
+					);
+				}
+			} else {
+				// Default ready check - server is running
+				res
+					.writeHead(200, { "content-type": "application/json" })
+					.end(JSON.stringify({ status: "ready" }));
+			}
+			return;
+		}
+
+		if (req.method === "GET" && url === "/live") {
+			const healthCheck = opts.healthCheck;
+			if (healthCheck) {
+				const healthRes = await wrapError(healthCheck());
+				if (healthRes.err) {
+					res.writeHead(500, { "content-type": "application/json" }).end(
+						JSON.stringify({
+							status: "error",
+							error: healthRes.err.message,
+						}),
+					);
+				} else {
+					const { live, details } = healthRes.result ?? { live: false };
+					const statusCode = live ? 200 : 503;
+					res.writeHead(statusCode, { "content-type": "application/json" }).end(
+						JSON.stringify({
+							status: live ? "alive" : "dead",
+							...details,
+						}),
+					);
+				}
+			} else {
+				// Default liveness check - server is running
+				res
+					.writeHead(200, { "content-type": "application/json" })
+					.end(JSON.stringify({ status: "alive" }));
+			}
+			return;
+		}
+
+		// Metrics endpoint
+		if (req.method === "GET" && url === "/metrics") {
 			const timer = scrapeTimeMetric.startTimer({
 				status: RequestStatus.success,
 			});
@@ -137,9 +241,11 @@ export async function getHttpMetricsServer(
 					.writeHead(200, { "content-type": register.contentType })
 					.end(metricsStr);
 			}
-		} else {
-			res.writeHead(404).end();
+			return;
 		}
+
+		// 404 for unknown routes
+		res.writeHead(404).end();
 	});
 
 	const socketsMetrics = {

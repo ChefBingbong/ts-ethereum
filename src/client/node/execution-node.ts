@@ -1,5 +1,8 @@
 import { getHttpMetricsServer } from "../../metrics/index.ts";
-import type { HttpMetricsServer } from "../../metrics/server/http.js";
+import type {
+	HealthCheckFn,
+	HttpMetricsServer,
+} from "../../metrics/server/http.js";
 import type { P2PNode as P2PNodeType } from "../../p2p/libp2p/types.ts";
 import { Chain } from "../blockchain";
 import type { Config } from "../config/index.ts";
@@ -125,10 +128,50 @@ export class ExecutionNode {
 			const address =
 				metricsOptions?.host ?? metricsOptions?.address ?? "127.0.0.1";
 
+			// Create health check function
+			const healthCheck: HealthCheckFn = async () => {
+				const isRunning = node.running;
+				const isChainInitialized = node.chain !== undefined;
+				const isExecutionRunning = node.execution?.execution?.started ?? false;
+				const isNetworkRunning = node.network !== undefined;
+				const isRpcReady = node.isRpcReady;
+				const peerCount = node.peerCount();
+
+				// Health: basic check - node is running
+				const healthy = isRunning && isChainInitialized;
+
+				// Ready: node is fully operational and ready to serve requests
+				const ready =
+					isRunning &&
+					isChainInitialized &&
+					isExecutionRunning &&
+					isNetworkRunning &&
+					isRpcReady;
+
+				// Live: node process is alive (always true if server is responding)
+				const live = isRunning;
+
+				return {
+					healthy,
+					ready,
+					live,
+					details: {
+						running: isRunning,
+						chainInitialized: isChainInitialized,
+						executionRunning: isExecutionRunning,
+						networkRunning: isNetworkRunning,
+						rpcReady: isRpcReady,
+						peerCount,
+						uptime: Math.floor((Date.now() - node.startTime) / 1000),
+					},
+				};
+			};
+
 			const metricsServer = await getHttpMetricsServer(
 				{
 					port,
 					address,
+					healthCheck,
 				},
 				{
 					register: options.config.metrics.register,

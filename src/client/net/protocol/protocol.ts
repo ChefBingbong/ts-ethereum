@@ -161,9 +161,10 @@ export abstract class Protocol {
 			const result = handler(code, data);
 			if (result instanceof Promise) {
 				result.catch((err: Error) => {
+					const clientError = this.config.trackError(err);
 					this.debug(
 						`HANDLER_ERROR`,
-						`Error in handler for code ${code}: ${err.message}`,
+						`Error in handler for code ${code}: ${clientError.message}`,
 					);
 					// Note: ProtocolEvent doesn't have error, so we can't emit it
 					// Subclasses can handle errors in their own way

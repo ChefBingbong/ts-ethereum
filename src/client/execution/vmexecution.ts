@@ -29,6 +29,12 @@ import {
 	TxReceipt,
 	VM,
 } from "../../vm";
+import {
+	classifyError,
+	createErrorContext,
+	ErrorCode,
+	ExecutionError,
+} from "../errors/index.ts";
 import { Event } from "../types.ts";
 import { short } from "../util";
 import { debugCodeReplayBlock } from "../util/debug.ts";
@@ -524,9 +530,14 @@ export class VMExecution extends Execution {
 			try {
 				await this.vmPromise;
 			} catch (error) {
-				// Ignore errors from previous execution, we're starting fresh
+				// Track error but continue with fresh execution
+				const context = createErrorContext("VMExecution", "run", {
+					operation: "wait_for_previous_execution",
+				});
+				const clientError = classifyError(error, context);
+				this.config.trackError(clientError);
 				this.config.options.logger?.debug(
-					"Previous VM execution completed with error, continuing",
+					`Previous VM execution completed with error, continuing: ${clientError.message}`,
 				);
 			}
 		}
@@ -689,17 +700,30 @@ export class VMExecution extends Execution {
 									// set as new head block
 									headBlock = block;
 									parentState = block.header.stateRoot;
-								} catch (error: any) {
+								} catch (error: unknown) {
 									// only marked the block as invalid if it was an actual execution error
 									// for e.g. absence of executionWitness doesn't make a block invalid
-									if (
-										!`${error.message}`.includes(
-											"Invalid executionWitness=null",
-										)
-									) {
+									const errorMessage =
+										error instanceof Error ? error.message : String(error);
+									if (!errorMessage.includes("Invalid executionWitness=null")) {
 										errorBlock = block;
 									}
-									throw error;
+
+									// Track and rethrow structured error
+									const clientError = new ExecutionError(
+										`Block execution failed: ${errorMessage}`,
+										{
+											code: ErrorCode.VM_EXECUTION_ERROR,
+											context: createErrorContext("VMExecution", "runBlock", {
+												blockNumber: Number(block.header.number),
+												blockHash: bytesToHex(block.hash()),
+											}),
+											retryable: false,
+											cause: error instanceof Error ? error : undefined,
+										},
+									);
+									this.config.trackError(clientError);
+									throw clientError;
 								}
 							},
 							this.config.options.numBlocksPerIteration,
@@ -708,6 +732,13 @@ export class VMExecution extends Execution {
 						)
 						// Ensure to catch and not throw as this would lead to unCaughtException with process exit
 						.catch(async (error) => {
+							// Track error
+							const context = createErrorContext("VMExecution", "run", {
+								hardfork: this.hardfork,
+							});
+							const clientError = classifyError(error, context);
+							this.config.trackError(clientError);
+
 							if (errorBlock !== undefined) {
 								const { number } = errorBlock.header;
 								const hash = short(errorBlock.hash());
@@ -715,8 +746,10 @@ export class VMExecution extends Execution {
 
 								// check if the vmHead 's backstepping can resolve this issue, headBlock is parent of the
 								// current block which is trying to be executed and should equal current vmHead
+								const errorMessage =
+									error instanceof Error ? error.message : String(error);
 								if (
-									`${error}`
+									errorMessage
 										.toLowerCase()
 										.includes("does not contain state root") &&
 									number > BIGINT_1
@@ -760,7 +793,7 @@ export class VMExecution extends Execution {
 												backStepToHash ?? "na",
 											)} hasParentStateRoot=${hasParentStateRoot} backStepToRoot=${short(
 												backStepToRoot ?? "na",
-											)}:\n${error}`,
+											)}:\n${clientError.message}`,
 										);
 									}
 								} else {
@@ -771,21 +804,26 @@ export class VMExecution extends Execution {
 										status: ExecStatus.INVALID,
 									};
 
-									this.config.options.logger?.warn(`${errorMsg}:\n${error}`);
+									this.config.options.logger?.warn(
+										`${errorMsg}:\n${clientError.message}`,
+									);
 								}
 
 								if (this.config.options.debugCode) {
 									await debugCodeReplayBlock(this, errorBlock);
 								}
-								this.config.events.emit(Event.SYNC_EXECUTION_VM_ERROR, error);
+								this.config.events.emit(
+									Event.SYNC_EXECUTION_VM_ERROR,
+									clientError,
+								);
 								const actualExecuted = Number(
 									errorBlock.header.number - startHeadBlock.header.number,
 								);
 								return actualExecuted;
 							} else {
 								this.config.options.logger?.error(
-									`VM execution failed with error`,
-									error,
+									`VM execution failed with error: ${clientError.message}`,
+									clientError,
 								);
 								return null;
 							}

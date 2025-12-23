@@ -1,5 +1,6 @@
 import { Metric, Registry } from "prom-client";
 import { ChainMetrics, createChainMetrics } from "./metrics/chain.js";
+import { createErrorMetrics, ErrorMetrics } from "./metrics/errors.js";
 import {
 	createExecutionMetrics,
 	ExecutionMetrics,
@@ -24,6 +25,7 @@ export type Metrics = {
 	miner: MinerMetrics;
 	system: SystemMetrics;
 	rpc: RPCMetrics;
+	errors: ErrorMetrics;
 	register: RegistryMetricCreator;
 	prometheus: ReturnType<typeof createPrometheusMetrics>;
 	close: () => void;
@@ -42,6 +44,7 @@ export function createMetrics(
 	const miner = createMinerMetrics(register);
 	const system = createSystemMetrics(register);
 	const rpc = createRPCMetrics(register);
+	const errors = createErrorMetrics(register);
 	const prometheus = createPrometheusMetrics(register);
 
 	// Set metadata if provided
@@ -71,6 +74,7 @@ export function createMetrics(
 		miner,
 		system,
 		rpc,
+		errors,
 		register,
 		prometheus,
 		close,

@@ -32,5 +32,15 @@ export function createRPCMetrics(register: RegistryMetricCreator) {
 			help: "Total number of RPC method calls",
 			labelNames: ["method"],
 		}),
+		rateLimitHits: register.counter<{ method: string }>({
+			name: "eth_rpc_rate_limit_hits_total",
+			help: "Total number of rate limit hits",
+			labelNames: ["method"],
+		}),
+		rateLimitBlocked: register.counter<{ method: string }>({
+			name: "eth_rpc_rate_limit_blocked_total",
+			help: "Total number of rate-limited blocked requests",
+			labelNames: ["method"],
+		}),
 	};
 }

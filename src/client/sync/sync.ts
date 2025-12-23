@@ -197,8 +197,9 @@ export abstract class Synchronizer {
 		while (this.running) {
 			try {
 				await this.sync();
-			} catch (error: any) {
-				this.config.events.emit(Event.SYNC_ERROR, error);
+			} catch (error: unknown) {
+				const clientError = this.config.trackError(error);
+				this.config.events.emit(Event.SYNC_ERROR, clientError);
 			}
 			await wait(this.interval);
 		}
@@ -229,12 +230,13 @@ export abstract class Synchronizer {
 			}
 			this.config.options.logger?.debug(`Fetcher finished fetching...`);
 			return this.resolveSync();
-		} catch (error: any) {
+		} catch (error: unknown) {
+			const clientError = this.config.trackError(error);
 			this.config.options.logger?.error(
-				`Received sync error, stopping sync and clearing fetcher: ${error.message ?? error}`,
+				`Received sync error, stopping sync and clearing fetcher: ${clientError.message}`,
 			);
 			this.clearFetcher();
-			throw error;
+			throw clientError;
 		}
 	}
 
