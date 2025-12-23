@@ -1,22 +1,23 @@
-import debugDefault from 'debug'
 import type { Block } from '@ts-ethereum/block'
 import type { Common } from '@ts-ethereum/chain-config'
 import type { LegacyTx, TypedTransaction } from '@ts-ethereum/tx'
 import {
-	Account,
-	BIGINT_0,
-	bytesToHex,
-	EthereumJSErrorWithoutCode,
-	short,
+  Account,
+  Address,
+  BIGINT_0,
+  bytesToHex,
+  EthereumJSErrorWithoutCode,
+  short,
 } from '@ts-ethereum/utils'
+import debugDefault from 'debug'
 import { Bloom } from './bloom'
 import type {
-	AfterTxEvent,
-	BaseTxReceipt,
-	PreByzantiumTxReceipt,
-	RunTxOpts,
-	RunTxResult,
-	TxReceipt,
+  AfterTxEvent,
+  BaseTxReceipt,
+  PreByzantiumTxReceipt,
+  RunTxOpts,
+  RunTxResult,
+  TxReceipt,
 } from './types'
 import type { VM } from './vm'
 
@@ -34,7 +35,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   const gasLimit = opts.block?.header.gasLimit
   if (
     opts.skipBlockGasLimitValidation !== true &&
-    gasLimit < opts.tx.gasLimit
+    gasLimit && gasLimit < opts.tx.gasLimit
   ) {
     const msg = _errorMsg(
       'tx has a higher gas limit than the block',
@@ -299,7 +300,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   // Update miner's balance
   const miner = block?.header.coinbase
 
-  let minerAccount = await state.getAccount(miner)
+  let minerAccount = await state.getAccount(miner as Address)
   if (minerAccount === undefined) {
     minerAccount = new Account()
   }
@@ -307,7 +308,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   results.minerValue = results.amountSpent
   minerAccount.balance += results.minerValue
 
-  await vm.evm.journal.putAccount(miner, minerAccount)
+  await vm.evm.journal.putAccount(miner as Address, minerAccount)
   if (vm.DEBUG) {
     debug(
       `tx update miner account (${miner}) balance (-> ${minerAccount.balance})`,
@@ -322,7 +323,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
 
   // Generate the tx receipt
   const gasUsed = opts.blockGasUsed ?? block?.header.gasUsed
-  const cumulativeGasUsed = gasUsed + results.totalGasSpent
+  const cumulativeGasUsed = gasUsed ? gasUsed + results.totalGasSpent : results.totalGasSpent
   results.receipt = await generateTxReceipt(vm, tx, results, cumulativeGasUsed)
 
   /**
@@ -407,7 +408,7 @@ function _errorMsg(
 ) {
   const blockOrHeader = block
   const blockErrorStr =
-    'errorStr' in blockOrHeader ? blockOrHeader.errorStr() : 'block'
+    blockOrHeader && 'errorStr' in blockOrHeader ? blockOrHeader?.errorStr() || 'block' : 'block'
   const txErrorStr = 'errorStr' in tx ? tx.errorStr() : 'tx'
 
   const errorMsg = `${msg} (${vm.errorStr()} -> ${blockErrorStr} -> ${txErrorStr})`
