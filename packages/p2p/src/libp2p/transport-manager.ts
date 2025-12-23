@@ -6,21 +6,21 @@
  */
 
 import {
-	FaultTolerance,
-	type Listener,
-	type Transport,
+  FaultTolerance,
+  type Listener,
+  type Transport,
 } from '@libp2p/interface'
 import { type Multiaddr, multiaddr } from '@multiformats/multiaddr'
 import type { TypedEventTarget } from 'main-event'
 import type { RLPxConnection } from '../transport/rlpx/connection'
 import { ConnectionWrapper } from './connection-manager'
 import type {
-	AddressManager,
-	ComponentLogger,
-	Logger,
-	P2PNodeEvents,
-	TransportManagerDialOptions,
-	TransportManager as TransportManagerInterface,
+  AddressManager,
+  ComponentLogger,
+  Logger,
+  P2PNodeEvents,
+  TransportManagerDialOptions,
+  TransportManager as TransportManagerInterface,
 } from './types'
 
 // Debug logging helper to avoid verbose fetch calls
@@ -227,7 +227,7 @@ export class TransportManager implements TransportManagerInterface {
             'A',
           )
           // #endregion
-          abortController.abort()
+          abortController?.abort()
         }, 10000)
         // #region agent log
         debugLog(

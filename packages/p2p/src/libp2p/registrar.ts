@@ -10,24 +10,24 @@
 
 import type { TypedEventTarget } from 'main-event'
 import type {
-	ComponentLogger,
-	Connection,
-	IdentifyResult,
-	Logger,
-	P2PNodeEvents,
-	Peer,
-	PeerId,
-	PeerUpdate,
-	Registrar as RegistrarInterface,
-	StreamHandler,
-	StreamHandlerOptions,
-	StreamHandlerRecord,
-	Topology,
+  ComponentLogger,
+  Connection,
+  IdentifyResult,
+  Logger,
+  P2PNodeEvents,
+  Peer,
+  PeerId,
+  PeerUpdate,
+  Registrar as RegistrarInterface,
+  StreamHandler,
+  StreamHandlerOptions,
+  StreamHandlerRecord,
+  Topology,
 } from './types'
 import {
-	DEFAULT_MAX_INBOUND_STREAMS,
-	DEFAULT_MAX_OUTBOUND_STREAMS,
-	peerIdToString,
+  DEFAULT_MAX_INBOUND_STREAMS,
+  DEFAULT_MAX_OUTBOUND_STREAMS,
+  peerIdToString,
 } from './types'
 
 /**
@@ -110,15 +110,15 @@ export class Registrar implements RegistrarInterface {
     // Subscribe to events
     this.components.events.addEventListener(
       'peer:disconnect',
-      this._onDisconnect as EventListener,
+      this._onDisconnect as any,
     )
     this.components.events.addEventListener(
       'peer:update',
-      this._onPeerUpdate as EventListener,
+      this._onPeerUpdate as any,
     )
     this.components.events.addEventListener(
       'peer:identify',
-      this._onPeerIdentify as EventListener,
+      this._onPeerIdentify as any,
     )
   }
 
@@ -457,15 +457,15 @@ export class Registrar implements RegistrarInterface {
   stop(): void {
     this.components.events.removeEventListener(
       'peer:disconnect',
-      this._onDisconnect as EventListener,
+        this._onDisconnect as any,
     )
     this.components.events.removeEventListener(
       'peer:update',
-      this._onPeerUpdate as EventListener,
+      this._onPeerUpdate as any,
     )
     this.components.events.removeEventListener(
       'peer:identify',
-      this._onPeerIdentify as EventListener,
+      this._onPeerIdentify as any,
     )
   }
 }

@@ -15,6 +15,96 @@ import path from 'path'
 import { bytesToHex, bytesToUnprefixedHex, concatBytes, equalsBytes } from '.'
 import { getNetConfig } from './getNetConfig'
 
+const FAMILIES = { 4: 'IPv4', 6: 'IPv6' }
+
+function isLinkLocalIp(ip: string) {
+  if (ip.startsWith('169.254.')) {
+    return true
+  }
+
+  if (ip.toLowerCase().startsWith('fe80')) {
+    return true
+  }
+  return false
+}
+function isWildcard(ip: string): boolean {
+  return ['0.0.0.0', '::'].includes(ip)
+}
+
+function getNetworkAddrs(family: 4 | 6): string[] {
+  const addresses: string[] = []
+  const networks = os.networkInterfaces()
+
+  for (const [, netAddrs] of Object.entries(networks)) {
+    if (netAddrs != null) {
+      for (const netAddr of netAddrs) {
+        if (isLinkLocalIp(netAddr.address)) {
+          continue
+        }
+
+        if (netAddr.family === FAMILIES[family]) {
+          addresses.push(netAddr.address)
+        }
+      }
+    }
+  }
+
+  return addresses
+}
+
+export function netConfigToMultiaddr(
+  config: any,
+  port?: number | string,
+  host?: string,
+): Multiaddr {
+  const parts: Array<string | number> = [config.type, host ?? config.host]
+
+  if (config.protocol != null) {
+    const p = port ?? config.port
+
+    if (p != null) {
+      parts.push(config.protocol, p)
+    }
+  }
+
+  if (config.type === 'ip6' && config.zone != null) {
+    parts.unshift('ip6zone', config.zone)
+  }
+
+  if (config.cidr != null) {
+    parts.push('ipcidr', config.cidr)
+  }
+
+  return multiaddr(`/${parts.join('/')}`)
+}
+
+/**
+ * Get all thin waist addresses on the current host that match the family of the
+ * passed multiaddr and optionally override the port.
+ *
+ * Wildcard IP4/6 addresses will be expanded into all available interfaces.
+ */
+export function getThinWaistAddresses(
+  ma?: Multiaddr,
+  port?: number | string,
+): Multiaddr[] {
+  if (ma == null) {
+    return []
+  }
+
+  const config = getNetConfig(ma)
+
+  if (
+    (config.type === 'ip4' || config.type === 'ip6') &&
+    isWildcard(config.host)
+  ) {
+    return getNetworkAddrs(config.type === 'ip4' ? 4 : 6).map((host) =>
+      netConfigToMultiaddr(config, port, host),
+    )
+  }
+
+  return [netConfigToMultiaddr(config, port)]
+}
 // Do not use :# here, no logging without sub namespace occurring and current code structure
 // otherwise creates loggers like `devp2p:#:eth`
 export const devp2pDebug = debug('devp2p')

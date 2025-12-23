@@ -1,6 +1,5 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { NetConfig } from '@ts-ethereum/utils'
-import { Upgrader } from '../connection/upgrader'
 
 export interface TCPSocketOptions {
   noDelay?: boolean
@@ -10,7 +9,7 @@ export interface TCPSocketOptions {
 }
 
 export interface CreateListenerOptions {
-  upgrader: Upgrader
+  upgrader: any
 }
 
 export interface TCPCreateListenerOptions

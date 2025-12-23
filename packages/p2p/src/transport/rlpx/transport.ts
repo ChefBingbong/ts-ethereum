@@ -8,10 +8,10 @@
 
 import type { Listener, Logger, Transport } from '@libp2p/interface'
 import {
-	AbortError,
-	serviceCapabilities,
-	TimeoutError,
-	transportSymbol,
+  AbortError,
+  serviceCapabilities,
+  TimeoutError,
+  transportSymbol,
 } from '@libp2p/interface'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { TCP as TCPMatcher } from '@multiformats/multiaddr-matcher'
@@ -22,17 +22,16 @@ import net from 'net'
 import os from 'os'
 import { CustomProgressEvent } from 'progress-events'
 // import type { ProtocolStream } from "../../../client/net/protocol/protocol-stream.ts";
-import { bytesToUnprefixedHex, utf8ToBytes } from '@ts-ethereum/utils'
-import { multiaddrToNetConfig } from '../tcp/utils'
+import { bytesToUnprefixedHex, multiaddrToNetConfig, utf8ToBytes } from '@ts-ethereum/utils'
 import { RLPxConnection } from './connection'
 import { RLPxListener } from './listener'
 import type {
-	RLPxComponents,
-	RLPxCreateListenerOptions,
-	RLPxDialEvents,
-	RLPxDialOptions,
-	RLPxMetrics,
-	RLPxTransportOptions,
+  RLPxComponents,
+  RLPxCreateListenerOptions,
+  RLPxDialEvents,
+  RLPxDialOptions,
+  RLPxMetrics,
+  RLPxTransportOptions,
 } from './types'
 
 const log = debug('p2p:rlpx:transport1')
@@ -113,7 +112,7 @@ export class RLPxTransport implements Transport<RLPxDialEvents> {
    * @param options - Dial options including required remoteId
    * @returns Promise resolving to RLPxConnection after Hello exchange
    */
-  async dial(ma: Multiaddr, options: RLPxDialOptions): Promise<RLPxConnection> {
+  async dial(ma: Multiaddr, options: RLPxDialOptions){
     options.keepAlive = options.keepAlive ?? true
     options.noDelay = options.noDelay ?? true
     options.allowHalfOpen = options.allowHalfOpen ?? false
@@ -177,7 +176,7 @@ export class RLPxTransport implements Transport<RLPxDialEvents> {
 
       this.metrics?.events.increment({ connect: true })
 
-      return connection
+      return connection as any
     } catch (err: any) {
       this.metrics?.errors.increment({ outbound_upgrade: true })
       this.log.error('error connecting to peer - %e', err)
@@ -400,7 +399,7 @@ export class RLPxTransport implements Transport<RLPxDialEvents> {
    * Create an RLPx listener for inbound connections
    */
   createListener(
-    options: RLPxCreateListenerOptions & { listeningPort?: number },
+    options: RLPxCreateListenerOptions & { listeningPort?: number } | any,
   ): Listener {
     return new RLPxListener({
       ...options,

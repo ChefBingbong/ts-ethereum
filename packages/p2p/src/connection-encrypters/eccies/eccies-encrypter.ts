@@ -1,11 +1,9 @@
+import { concatBytes, genPrivateKey, id2pk } from '@ts-ethereum/utils'
 import debug from 'debug'
 import { getRandomBytesSync } from 'ethereum-cryptography/random'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1'
 import crypto from 'node:crypto'
 import type { Socket } from 'node:net'
-import { concatBytes } from '@ts-ethereum/utils'
-import { genPrivateKey, id2pk } from '@ts-ethereum/utils'
-import type { SecureConnection } from '../../connection/types'
 import { sendAuthGetAck, waitAuthSendAck } from './handlers'
 import { MAC } from './mac'
 import type { ConnectionEncrypter } from './types'
@@ -39,7 +37,7 @@ export class EcciesEncrypter implements ConnectionEncrypter {
   protected egressMac: MAC | null = null
   protected bodySize: number | null = null
   protected initMsg: Uint8Array | null = null
-  public socket: Socket
+  public socket: Socket | null = null
   private _buffer: Uint8Array = new Uint8Array(0)
   public readonly options: EcciesEncrypterOptions
 
@@ -56,7 +54,7 @@ export class EcciesEncrypter implements ConnectionEncrypter {
     )
   }
 
-  async secureInBound(socket: Socket): Promise<SecureConnection> {
+  async secureInBound(socket: Socket) {
     this.socket = socket
     const ctx = this.createContext()
     const { authResult, ackMsg } = await waitAuthSendAck(ctx)
@@ -75,8 +73,8 @@ export class EcciesEncrypter implements ConnectionEncrypter {
   async secureOutBound(
     socket: Socket,
     remotePeerId?: Uint8Array,
-  ): Promise<SecureConnection> {
-    this.remotePublicKey = id2pk(remotePeerId)
+  ) {
+    this.remotePublicKey = id2pk(remotePeerId as Uint8Array)
     this.socket = socket
     const ctx = this.createContext()
     const { authMsg, ackMsg, ackResult, gotEIP8Ack } = await sendAuthGetAck(ctx)
@@ -116,7 +114,7 @@ export class EcciesEncrypter implements ConnectionEncrypter {
     this.egressMac = result.egressMac
   }
 
-  private createResult(): SecureConnection {
+  private createResult() {
     // Convert remotePublicKey to peer ID (64 bytes without 0x04 prefix)
     const remotePeer = this.remotePublicKey
       ? this.remotePublicKey.length === 65
@@ -132,7 +130,7 @@ export class EcciesEncrypter implements ConnectionEncrypter {
 
   private createContext(): HandlerContext {
     return {
-      socket: this.socket,
+      socket: this.socket as Socket,
       privateKey: this.privateKey,
       publicKey: this.publicKey,
       remotePublicKey: this.remotePublicKey,

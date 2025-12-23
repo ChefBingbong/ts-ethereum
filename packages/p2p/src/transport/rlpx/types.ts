@@ -3,17 +3,17 @@
  */
 
 import type {
-	ComponentLogger,
-	CounterGroup,
-	DialTransportOptions,
-	Metrics,
-	OutboundConnectionUpgradeEvents,
+  ComponentLogger,
+  CounterGroup,
+  DialTransportOptions,
+  Metrics,
+  OutboundConnectionUpgradeEvents,
 } from '@libp2p/interface'
+import type { Common } from '@ts-ethereum/chain-config'
 import type { Socket } from 'net'
 import type { ProgressEvent } from 'progress-events'
-import type { Common } from '@ts-ethereum/chain-config'
-import type { Capabilities } from '../../../client/net/dpt-1/types'
-import type { Protocol } from '../../../client/net/protocol/protocol'
+// import type { Capabilities } from '../../../client/net/dpt-1/types'
+// import type { Protocol } from '../../../client/net/protocol/protocol'
 
 /**
  * Hello message structure received from remote peer
@@ -21,7 +21,7 @@ import type { Protocol } from '../../../client/net/protocol/protocol'
 export interface HelloMessage {
   protocolVersion: number
   clientId: string
-  capabilities: Capabilities[]
+  capabilities: any[]
   port: number
   id: Uint8Array
 }
@@ -30,7 +30,7 @@ export interface HelloMessage {
  * Protocol descriptor for negotiated subprotocols
  */
 export interface ProtocolDescriptor {
-  protocol: Protocol
+  protocol: any
   offset: number
   length?: number
 }
@@ -83,7 +83,7 @@ export interface RLPxTransportOptions extends RLPxSocketOptions {
   /**
    * Supported protocol capabilities (e.g., ETH/68)
    */
-  capabilities: Capabilities[]
+  capabilities: any[]
 
   /**
    * Chain configuration for protocol compatibility
@@ -213,7 +213,7 @@ export interface RLPxCreateListenerOptions extends RLPxSocketOptions {
   /**
    * Supported protocol capabilities
    */
-  capabilities: Capabilities[]
+  capabilities: any[]
 
   /**
    * Chain configuration
@@ -328,7 +328,7 @@ export interface RLPxConnectionOptions {
   /**
    * Supported capabilities
    */
-  capabilities: Capabilities[]
+  capabilities: any[]
 
   /**
    * Chain configuration
@@ -375,7 +375,7 @@ export interface RLPxConnectionOptions {
  * RLPx connection events
  */
 export interface RLPxConnectionEvents {
-  'protocols:ready': [protocols: Protocol[]]
+  'protocols:ready': [protocols: any[]]
   /**
    * Emitted when Hello exchange is complete
    */
@@ -444,15 +444,3 @@ export const BASE_PROTOCOL_LENGTH = 16
  * Default ping interval in milliseconds
  */
 export const PING_INTERVAL = 35000
-
-/**
- * Disconnect reasons (re-exported for convenience)
- */
-export {
-	DISCONNECT_REASON,
-	DisconnectReasonNames
-} from '../../../client/net/dpt-1/types'
-/**
- * Protocol stream type (re-exported for convenience)
- */
-export type { ProtocolStream } from '../../../client/net/protocol/protocol-stream'

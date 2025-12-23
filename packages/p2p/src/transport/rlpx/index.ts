@@ -63,9 +63,4 @@ export type {
 	RLPxTransportOptions
 } from './types'
 
-// Constants
-export {
-	BASE_PROTOCOL_LENGTH, BASE_PROTOCOL_VERSION, DISCONNECT_REASON,
-	DisconnectReasonNames, PING_INTERVAL, RLPX_PREFIXES
-} from './types'
 

@@ -10,38 +10,38 @@ import debug from 'debug'
 import { EventEmitter } from 'eventemitter3'
 import type { Socket } from 'net'
 import * as snappy from 'snappyjs'
-import type { Capabilities } from '../../../client/net/dpt-1/types'
-import {
-	DISCONNECT_REASON,
-	DisconnectReasonNames,
-} from '../../../client/net/dpt-1/types'
+// import type { Capabilities } from '../../../client/net/dpt-1/types'
+// import {
+//   DISCONNECT_REASON,
+//   DisconnectReasonNames,
+// } from '../../../client/net/dpt-1/types'
 // import type { ProtocolStream } from "../../../client/net/protocol/protocol-stream.ts";
 // import { RLPxProtocolStream } from "../../../client/net/protocol/protocol-stream.ts";
-import type { Protocol } from '../../../client/net/protocol/protocol'
 import { RLP } from '@ts-ethereum/rlp'
 import {
-	bytesToInt,
-	bytesToUtf8,
-	concatBytes,
-	equalsBytes,
-	hexToBytes,
-	intToBytes,
-	utf8ToBytes,
+  bytesToInt,
+  bytesToUtf8,
+  concatBytes,
+  equalsBytes,
+  hexToBytes,
+  intToBytes,
+  utf8ToBytes,
 } from '@ts-ethereum/utils'
+// import type { Protocol } from '../../../client/net/protocol/protocol'
 import { ECIES } from '../../connection-encrypters/eccies/ecies'
 import type {
-	HelloMessage,
-	ProtocolDescriptor,
-	RLPxConnectionEvents,
-	RLPxConnectionOptions,
-	RLPxConnectionState,
-	RLPxPrefix,
+  HelloMessage,
+  ProtocolDescriptor,
+  RLPxConnectionEvents,
+  RLPxConnectionOptions,
+  RLPxConnectionState,
+  RLPxPrefix,
 } from './types'
 import {
-	BASE_PROTOCOL_LENGTH,
-	BASE_PROTOCOL_VERSION,
-	PING_INTERVAL,
-	RLPX_PREFIXES,
+  BASE_PROTOCOL_LENGTH,
+  BASE_PROTOCOL_VERSION,
+  PING_INTERVAL,
+  RLPX_PREFIXES,
 } from './types'
 
 const log = debug('p2p:rlpx:connection')
@@ -54,6 +54,36 @@ type HelloMsg = {
   length: 5
 }
 
+export type DISCONNECT_REASON =
+  (typeof DISCONNECT_REASON)[keyof typeof DISCONNECT_REASON]
+
+export const DISCONNECT_REASON = {
+  DISCONNECT_REQUESTED: 0x00,
+  NETWORK_ERROR: 0x01,
+  PROTOCOL_ERROR: 0x02,
+  USELESS_PEER: 0x03,
+  TOO_MANY_PEERS: 0x04,
+  ALREADY_CONNECTED: 0x05,
+  INCOMPATIBLE_VERSION: 0x06,
+  INVALID_IDENTITY: 0x07,
+  CLIENT_QUITTING: 0x08,
+  UNEXPECTED_IDENTITY: 0x09,
+  SAME_IDENTITY: 0x0a,
+  TIMEOUT: 0x0b,
+  SUBPROTOCOL_ERROR: 0x10,
+} as const
+
+// Create a reverse mapping: numeric value -> key name
+export const DisconnectReasonNames: { [key in DISCONNECT_REASON]: string } =
+  Object.entries(DISCONNECT_REASON).reduce(
+    (acc, [key, value]) => {
+      acc[value as DISCONNECT_REASON] = key
+      return acc
+    },
+    {} as { [key in DISCONNECT_REASON]: string },
+  )
+
+
 /**
  * RLPx Connection - Manages ECIES encryption and Hello handshake
  */
@@ -64,7 +94,7 @@ export class RLPxConnection extends EventEmitter<RLPxConnectionEvents> {
   public readonly direction: 'inbound' | 'outbound'
 
   // Configuration - exposed for subprotocol access (ETH protocol needs common)
-  private readonly _capabilities: Capabilities[]
+  private readonly _capabilities: any[]
   public readonly common: RLPxConnectionOptions['common']
   private readonly _listenPort: number
   private readonly _remoteClientIdFilter?: string[]
@@ -149,7 +179,7 @@ export class RLPxConnection extends EventEmitter<RLPxConnectionEvents> {
     this._pingTimeoutId = null
     this._protocols = []
 
-    this.log = log
+    this.log = log as any
 
     // Setup socket handlers
     this._setupSocketHandlers()
@@ -464,7 +494,7 @@ export class RLPxConnection extends EventEmitter<RLPxConnectionEvents> {
     }
 
     // Negotiate shared capabilities
-    const shared: { [name: string]: Capabilities } = {}
+    const shared: { [name: string]: any } = {}
     for (const item of this._hello.capabilities) {
       for (const c of this._capabilities) {
         if (c.name !== item.name || c.version !== item.version) continue
@@ -745,7 +775,7 @@ export class RLPxConnection extends EventEmitter<RLPxConnectionEvents> {
    */
   private _getProtocol(code: number): ProtocolDescriptor | undefined {
     if (code < BASE_PROTOCOL_LENGTH) {
-      return { protocol: this as unknown as Protocol, offset: 0 }
+      return { protocol: this as unknown as any, offset: 0 }
     }
     for (const obj of this._protocols) {
       if (code >= obj.offset && code < obj.offset + obj.length!) return obj
@@ -771,7 +801,7 @@ export class RLPxConnection extends EventEmitter<RLPxConnectionEvents> {
   /**
    * Get negotiated protocols
    */
-  getProtocols(): Protocol[] {
+  getProtocols(): any[] {
     return this._protocols.map((obj) => obj.protocol)
   }
 

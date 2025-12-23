@@ -5,29 +5,30 @@
  */
 
 import type {
-	AbortOptions,
-	CounterGroup,
-	Listener,
-	ListenerEvents,
-	Logger,
-	MetricGroup,
+  AbortOptions,
+  CounterGroup,
+  Listener,
+  ListenerEvents,
+  Logger,
+  MetricGroup,
 } from '@libp2p/interface'
 import {
-	AlreadyStartedError,
-	InvalidParametersError,
-	NotStartedError,
+  AlreadyStartedError,
+  InvalidParametersError,
+  NotStartedError,
 } from '@libp2p/interface'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { multiaddr } from '@multiformats/multiaddr'
 import { setMaxListeners, TypedEventEmitter } from 'main-event'
 import net from 'node:net'
 import { pEvent } from 'p-event'
-import type { NetConfig } from '../tcp/utils'
-import { getThinWaistAddresses, multiaddrToNetConfig } from '../tcp/utils'
+// import type { NetConfig } from '../tcp/utils'
+// import { getThinWaistAddresses, multiaddrToNetConfig } from '../tcp/utils'
+import { getThinWaistAddresses, multiaddrToNetConfig, NetConfig } from '@ts-ethereum/utils'
 import { RLPxConnection } from './connection'
 import type {
-	CloseServerOnMaxConnectionsOpts,
-	RLPxCreateListenerOptions,
+  CloseServerOnMaxConnectionsOpts,
+  RLPxCreateListenerOptions,
 } from './types'
 
 interface RLPxListenerContext extends RLPxCreateListenerOptions {
