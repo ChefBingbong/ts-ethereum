@@ -1,8 +1,10 @@
 import { Common } from '@ts-ethereum/chain-config'
 import { PeerInfo } from '@ts-ethereum/kademlia'
-import { defaultMetricsOptions, MetricsOptions } from '@ts-ethereum/metrics'
-import { Address } from '@ts-ethereum/utils'
-import { genPrivateKey } from '@ts-ethereum/utils'
+import {
+  defaultMetricsOptions,
+  type MetricsOptions,
+} from '@ts-ethereum/metrics'
+import { Address, genPrivateKey } from '@ts-ethereum/utils'
 import type { VM, VMProfilerOpts } from '@ts-ethereum/vm'
 import { Logger } from '../logging'
 import * as constants from './constants'
