@@ -1,12 +1,12 @@
-import * as RLP from '../../rlp/index.ts'
+import { RLP } from '@ts-ethereum/rlp'
 import {
   createTx,
   createTxFromBlockBodyData,
   normalizeTxParams,
   type TxOptions,
   type TypedTransaction,
-} from '../../tx/index.ts'
-import type { EthersProvider } from '../../utils/index.ts'
+} from '@ts-ethereum/tx'
+import type { EthersProvider } from '@ts-ethereum/utils'
 import {
   bigIntToHex,
   EthereumJSErrorWithoutCode,
@@ -14,20 +14,20 @@ import {
   getProvider,
   intToHex,
   isHexString,
-} from '../../utils/index.ts'
+} from '@ts-ethereum/utils'
 import {
   Block,
   createBlockHeader,
   createBlockHeaderFromBytesArray,
   createBlockHeaderFromRPC,
-} from '../index.ts'
+} from '../index'
 import type {
   BlockBytes,
   BlockData,
   BlockOptions,
   HeaderData,
   JSONRPCBlock,
-} from '../types.ts'
+} from '../types'
 
 /**
  * Static constructor to create a block from a block data dictionary

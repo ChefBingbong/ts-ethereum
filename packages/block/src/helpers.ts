@@ -1,9 +1,9 @@
-import * as RLP from '../rlp/index.ts'
+import { RLP } from '@ts-ethereum/rlp'
 
-import type { TypedTransaction } from '../tx/types.ts'
-import type { PrefixedHexString } from '../utils/index.ts'
-import { isHexString, toType, TypeOutput } from '../utils/index.ts'
-import type { BlockHeaderBytes, HeaderData } from './types.ts'
+import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { PrefixedHexString } from '@ts-ethereum/utils'
+import { isHexString, toType, TypeOutput } from '@ts-ethereum/utils'
+import type { BlockHeaderBytes, HeaderData } from './types'
 
 /**
  * Returns a 0x-prefixed hex number string from a hex string or string integer.

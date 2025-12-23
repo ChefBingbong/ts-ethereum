@@ -1,15 +1,15 @@
-import * as RLP from '../../rlp/index.ts'
-import { EthereumJSErrorWithoutCode } from '../../utils/index.ts'
+import { RLP } from '@ts-ethereum/rlp'
+import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 
-import { numberToHex, valuesArrayToHeaderData } from '../helpers.ts'
-import { BlockHeader } from '../index.ts'
+import { numberToHex, valuesArrayToHeaderData } from '../helpers'
+import { BlockHeader } from '../index'
 
 import type {
   BlockHeaderBytes,
   BlockOptions,
   HeaderData,
   JSONRPCBlock,
-} from '../types.ts'
+} from '../types'
 
 /**
  * Static constructor to create a block header from a header data dictionary

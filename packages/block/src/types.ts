@@ -1,13 +1,13 @@
-import type { Common, ParamsDict } from '../chain-config/index.ts'
-import type { JSONRPCTx, JSONTx, TransactionType, TxData } from '../tx/index.ts'
+import type { Common, ParamsDict } from '@ts-ethereum/chain-config'
+import type { JSONRPCTx, JSONTx, TransactionType, TxData } from '@ts-ethereum/tx'
 import type {
   AddressLike,
   BigIntLike,
   BytesLike,
   NumericString,
   PrefixedHexString,
-} from '../utils/index.ts'
-import type { BlockHeader } from './index.ts'
+} from '@ts-ethereum/utils'
+import type { BlockHeader } from './index'
 
 /**
  * An object to set to which blockchain the blocks and their headers belong. This could be specified

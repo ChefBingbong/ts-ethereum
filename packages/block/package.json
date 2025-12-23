@@ -24,6 +24,14 @@
     "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
     "test": "vitest run -c ./vitest.config.mjs"
   },
+  "dependencies": {
+    "@ts-ethereum/chain-config": "workspace:*",
+    "@ts-ethereum/mpt": "workspace:*",
+    "@ts-ethereum/rlp": "workspace:*",
+    "@ts-ethereum/tx": "workspace:*",
+    "@ts-ethereum/utils": "workspace:*",
+    "ethereum-cryptography": "^3.2.0"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

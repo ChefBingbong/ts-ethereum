@@ -1,16 +1,16 @@
-import { keccak256 } from 'ethereum-cryptography/keccak.js'
-import { sha256 } from 'ethereum-cryptography/sha256.js'
-import type { Common } from '../../chain-config/common.ts'
-import { MerklePatriciaTrie } from '../../mpt/index.ts'
-import * as RLP from '../../rlp/index.ts'
-import type { TypedTransaction } from '../../tx/index.ts'
+import type { Common } from '@ts-ethereum/chain-config'
+import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
+import { RLP } from '@ts-ethereum/rlp'
+import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
   bytesToHex,
   equalsBytes,
   EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
-} from '../../utils/index.ts'
+} from '@ts-ethereum/utils'
+import { keccak256 } from 'ethereum-cryptography/keccak.js'
+import { sha256 } from 'ethereum-cryptography/sha256.js'
 /* eslint-disable */
 // This is to allow for a proper and linked collection of constructors for the class header.
 // For tree shaking/code size this should be no problem since types go away on transpilation.
@@ -24,9 +24,9 @@ import {
   type createBlockFromRLP,
   type createBlockFromRPC,
   genTransactionsTrieRoot,
-} from '../index.ts'
+} from '../index'
 /* eslint-enable */
-import type { BlockBytes, BlockOptions, JSONBlock } from '../types.ts'
+import type { BlockBytes, BlockOptions, JSONBlock } from '../types'
 
 /**
  * Class representing a block in the Ethereum network. The {@link BlockHeader} has its own

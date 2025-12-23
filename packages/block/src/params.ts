@@ -1,4 +1,4 @@
-import type { ParamsDict } from '../chain-config/index.ts'
+import type { ParamsDict } from '@ts-ethereum/chain-config'
 
 /**
  * Block parameters for Frontier/Chainstart only.

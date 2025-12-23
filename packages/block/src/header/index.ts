@@ -1,2 +1,3 @@
-export * from './constructors.ts'
-export * from './header.ts'
+export * from './constructors'
+export * from './header'
+

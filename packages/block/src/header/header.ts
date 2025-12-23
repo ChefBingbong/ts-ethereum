@@ -1,10 +1,9 @@
-import { keccak256 } from 'ethereum-cryptography/keccak'
 import {
   Common,
   ConsensusAlgorithm,
   ConsensusType,
-} from '../../chain-config/index.ts'
-import * as RLP from '../../rlp/index.ts'
+} from '@ts-ethereum/chain-config'
+import * as RLP from '@ts-ethereum/rlp'
 import {
   Address,
   BIGINT_0,
@@ -18,14 +17,15 @@ import {
   KECCAK256_RLP_ARRAY,
   toType,
   TypeOutput,
-} from '../../utils/index.ts'
+} from '@ts-ethereum/utils'
+import { keccak256 } from 'ethereum-cryptography/keccak'
 
 import type {
   BlockHeaderBytes,
   BlockOptions,
   HeaderData,
   JSONHeader,
-} from '../types.ts'
+} from '../types'
 
 interface HeaderCache {
   hash: Uint8Array | undefined
