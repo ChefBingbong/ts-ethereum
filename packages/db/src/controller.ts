@@ -1,6 +1,5 @@
 import type { AbstractLevel } from 'abstract-level'
 import { Level } from 'level'
-import type { Logger } from '../client/logging'
 
 export interface DbOptions {
   /** Database path */
@@ -14,7 +13,7 @@ export interface DbOptions {
 }
 
 export interface DbModules {
-  logger?: Logger
+  logger?: any
   // metrics?: DbMetrics; // Optional for now
 }
 
@@ -36,7 +35,7 @@ export class DbController {
   >
 
   constructor(
-    private readonly logger: Logger | undefined,
+    private readonly logger: any,
     db: AbstractLevel<
       string | Uint8Array,
       string | Uint8Array,

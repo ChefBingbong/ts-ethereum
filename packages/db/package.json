@@ -24,6 +24,9 @@
     "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
     "test": "vitest run -c ./vitest.config.mjs"
   },
+  "dependencies": {
+    "@ts-ethereum/chain-config": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

@@ -1,4 +1,4 @@
-import type { ClientPaths } from '../chain-config/paths'
+import type { ClientPaths } from '@ts-ethereum/chain-config'
 
 export type DbPaths = {
   chainDbPath: string

@@ -3,7 +3,7 @@ import {
   ConsensusAlgorithm,
   ConsensusType,
 } from '@ts-ethereum/chain-config'
-import * as RLP from '@ts-ethereum/rlp'
+import { RLP } from '@ts-ethereum/rlp'
 import {
   Address,
   BIGINT_0,
@@ -67,9 +67,9 @@ export class BlockHeader {
    * @deprecated Use the public static factory methods to assist in creating a Header object from
    * varying data types. For a default empty header, use {@link createBlockHeader}.
    *
-   */
+   */ 
   constructor(headerData: HeaderData, opts: BlockOptions = {}) {
-    this.common = opts.common.copy()
+    this.common = opts.common?.copy() ?? new Common({} as any)
 
     this.keccakFunction = keccak256
     const skipValidateConsensusFormat =

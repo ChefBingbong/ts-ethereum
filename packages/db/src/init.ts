@@ -1,6 +1,5 @@
 import type { AbstractLevel } from 'abstract-level'
 import { mkdirSync } from 'node:fs'
-import type { Logger } from '../client/logging'
 import { DbController } from './controller'
 import type { DbPaths } from './paths'
 
@@ -28,7 +27,7 @@ export interface Databases {
  */
 export async function initDatabases(
   paths: DbPaths,
-  logger?: Logger,
+  logger?: any,
 ): Promise<Databases> {
   // Create directories
   mkdirSync(paths.chainDbPath, { recursive: true })
