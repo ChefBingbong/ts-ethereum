@@ -1,4 +1,4 @@
-import type { ParamsDict } from '../chain-config'
+import type { ParamsDict } from '@ts-ethereum/chain-config'
 
 // Frontier/Chainstart EVM parameters only
 export const paramsEVM: ParamsDict = {

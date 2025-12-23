@@ -4,10 +4,10 @@ import {
   bytesToHex,
   bytesToUnprefixedHex,
   unprefixedHexToBytes,
-} from '../utils'
+} from '@ts-ethereum/utils'
 
-import type { StateManagerInterface } from '../chain-config'
-import type { Account, Address, PrefixedHexString } from '../utils'
+import type { StateManagerInterface } from '@ts-ethereum/chain-config'
+import type { Account, Address, PrefixedHexString } from '@ts-ethereum/utils'
 
 type AddressString = string
 type SlotString = string

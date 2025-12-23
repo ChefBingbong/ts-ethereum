@@ -1,4 +1,4 @@
-import type { PrefixedHexString } from '../utils'
+import type { PrefixedHexString } from '@ts-ethereum/utils'
 import type {
 	BinaryStemAccessEvent,
 	BinaryStemMeta,

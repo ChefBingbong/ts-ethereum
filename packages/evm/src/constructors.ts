@@ -1,6 +1,6 @@
 import type { EVMOpts } from '.'
 import { EVM } from '.'
-import { SimpleStateManager } from '../state-manager'
+import { SimpleStateManager } from '@ts-ethereum/state-manager'
 import { EVMMockBlockchain } from './types'
 
 /**

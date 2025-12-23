@@ -4,8 +4,8 @@ import type {
 	Common,
 	ParamsDict,
 	StateManagerInterface,
-} from '../chain-config'
-import type { Account, Address, PrefixedHexString } from '../utils'
+} from '@ts-ethereum/chain-config'
+import type { Account, Address, PrefixedHexString } from '@ts-ethereum/utils'
 import type { BinaryTreeAccessWitness } from './binaryTreeAccessWitness'
 import type { EVMError } from './errors'
 import type { Message } from './message'

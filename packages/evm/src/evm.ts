@@ -1,15 +1,15 @@
+import type { Common, StateManagerInterface } from '@ts-ethereum/chain-config'
+import { Hardfork } from '@ts-ethereum/chain-config'
+import {
+  Account,
+  type Address,
+  BIGINT_0,
+  createZeroAddress,
+  EthereumJSErrorWithoutCode,
+  MAX_INTEGER,
+} from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import { EventEmitter } from 'eventemitter3'
-import type { Common, StateManagerInterface } from '../chain-config'
-import { Hardfork } from '../chain-config'
-import {
-	Account,
-	type Address,
-	BIGINT_0,
-	createZeroAddress,
-	EthereumJSErrorWithoutCode,
-	MAX_INTEGER,
-} from '../utils'
 import type { BinaryTreeAccessWitness } from './binaryTreeAccessWitness'
 import { EVMError } from './errors'
 import { Journal } from './journal'
@@ -17,14 +17,14 @@ import type { MessageWithTo } from './message'
 import { Message } from './message'
 import { paramsEVM } from './params'
 import type {
-	Block,
-	EVMEvent,
-	EVMInterface,
-	EVMMockBlockchainInterface,
-	EVMOpts,
-	EVMResult,
-	EVMRunCallOpts,
-	ExecResult,
+  Block,
+  EVMEvent,
+  EVMInterface,
+  EVMMockBlockchainInterface,
+  EVMOpts,
+  EVMResult,
+  EVMRunCallOpts,
+  ExecResult,
 } from './types'
 
 const debug = debugDefault('evm:evm')
@@ -370,7 +370,7 @@ export class EVM implements EVMInterface {
       ...this._optsCached,
       common,
       stateManager: this.stateManager.shallowCopy(),
-    }
+    } as any
     opts.stateManager['common'] = common
     return new EVM(opts)
   }

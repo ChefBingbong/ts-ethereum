@@ -24,6 +24,12 @@
     "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
     "test": "vitest run -c ./vitest.config.mjs"
   },
+  "dependencies": {
+    "@ts-ethereum/chain-config": "workspace:*",
+    "@ts-ethereum/state-manager": "workspace:*",
+    "@ts-ethereum/utils": "workspace:*",
+    "eventemitter3": "^5.0.1"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
