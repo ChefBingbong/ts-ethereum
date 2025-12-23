@@ -8,7 +8,7 @@ import {
   ETH_MESSAGES,
   EthMessageCode,
 } from '../../../../client/net/protocol/eth/definitions'
-import type { TypedTransaction } from '../../../../tx'
+import type { TypedTransaction } from '@ts-ethereum/tx'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:get-pooled-transactions')

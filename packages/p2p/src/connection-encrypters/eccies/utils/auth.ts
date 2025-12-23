@@ -2,21 +2,21 @@ import { keccak256 } from 'ethereum-cryptography/keccak'
 import { getRandomBytesSync } from 'ethereum-cryptography/random.js'
 import { ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
-import * as RLP from '../../../../rlp/index'
+import { RLP } from '@ts-ethereum/rlp'
 import {
 	bigIntToBytes,
 	bytesToInt,
 	concatBytes,
 	intToBytes,
 	setLengthLeft,
-} from '../../../../utils/index'
+} from '@ts-ethereum/utils'
 import {
 	assertEq,
 	id2pk,
 	pk2id,
 	unstrictDecode,
 	xor,
-} from '../../../../utils/utils'
+} from '@ts-ethereum/utils'
 import { decryptMessage, eccieEncryptMessage, ecdhX } from './crypto'
 import type { AuthResult } from './types'
 

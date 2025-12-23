@@ -5,8 +5,8 @@ import { secp256k1 } from 'ethereum-cryptography/secp256k1'
 import { ecdh } from 'ethereum-cryptography/secp256k1-compat.js'
 import { hexToBytes } from 'ethereum-cryptography/utils'
 import crypto from 'node:crypto'
-import { concatBytes } from '../../../../utils/index'
-import { assertEq, genPrivateKey, xor } from '../../../../utils/utils'
+import { concatBytes } from '@ts-ethereum/utils'
+import { assertEq, genPrivateKey, xor } from '@ts-ethereum/utils'
 import { MAC } from '../mac'
 
 const SHA256_BLOCK_SIZE = 64

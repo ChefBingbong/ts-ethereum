@@ -18,7 +18,7 @@ import {
 // import type { ProtocolStream } from "../../../client/net/protocol/protocol-stream.ts";
 // import { RLPxProtocolStream } from "../../../client/net/protocol/protocol-stream.ts";
 import type { Protocol } from '../../../client/net/protocol/protocol'
-import * as RLP from '../../../rlp/index'
+import { RLP } from '@ts-ethereum/rlp'
 import {
 	bytesToInt,
 	bytesToUtf8,
@@ -27,7 +27,7 @@ import {
 	hexToBytes,
 	intToBytes,
 	utf8ToBytes,
-} from '../../../utils/index'
+} from '@ts-ethereum/utils'
 import { ECIES } from '../../connection-encrypters/eccies/ecies'
 import type {
 	HelloMessage,

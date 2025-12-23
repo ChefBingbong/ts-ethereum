@@ -1,10 +1,10 @@
-import * as RLP from '../../../rlp'
+import { RLP } from '@ts-ethereum/rlp'
 import {
   bigIntToUnpaddedBytes,
   bytesToBigInt,
   bytesToHex,
   equalsBytes,
-} from '../../../utils'
+} from '@ts-ethereum/utils'
 import type { Chain } from '../../../client/blockchain'
 import type { Config } from '../../../client/config'
 import type { EthStatus } from './types'

@@ -14,7 +14,7 @@
  */
 
 import * as snappy from 'snappyjs'
-import * as RLP from '../../../rlp'
+import { RLP } from '@ts-ethereum/rlp'
 import {
   bigIntToBytes,
   bigIntToUnpaddedBytes,
@@ -25,7 +25,7 @@ import {
   intToBytes,
   isHexString,
   type PrefixedHexString,
-} from '../../../utils'
+} from '@ts-ethereum/utils'
 import type { RLPxConnection } from '../../transport/rlpx/connection'
 import { EthMessageCode } from '../../../client/net/protocol/eth/definitions'
 

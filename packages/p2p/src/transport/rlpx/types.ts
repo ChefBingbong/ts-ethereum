@@ -11,7 +11,7 @@ import type {
 } from '@libp2p/interface'
 import type { Socket } from 'net'
 import type { ProgressEvent } from 'progress-events'
-import type { Common } from '../../../chain-config/index'
+import type { Common } from '@ts-ethereum/chain-config'
 import type { Capabilities } from '../../../client/net/dpt-1/types'
 import type { Protocol } from '../../../client/net/protocol/protocol'
 

@@ -24,8 +24,23 @@
     "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
     "test": "vitest run -c ./vitest.config.mjs"
   },
+  "dependencies": {
+    "@libp2p/interface": "^3.1.0",
+    "@ts-ethereum/block": "workspace:*",
+    "@ts-ethereum/chain-config": "workspace:*",
+    "@ts-ethereum/kademlia": "workspace:*",
+    "@ts-ethereum/rlp": "workspace:*",
+    "@ts-ethereum/tx": "workspace:*",
+    "@ts-ethereum/utils": "workspace:*",
+    "@ts-ethereum/vm": "workspace:*",
+    "debug": "^4.3.4",
+    "ethereum-cryptography": "^3.2.0",
+    "eventemitter3": "^5.0.1",
+    "snappyjs": "^0.7.0"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/debug": "^4.1.12"
   },
   "peerDependencies": {
     "typescript": "^5"

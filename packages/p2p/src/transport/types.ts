@@ -1,5 +1,5 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
-import type { NetConfig } from '../../utils/getNetConfig'
+import type { NetConfig } from '@ts-ethereum/utils'
 import { Upgrader } from '../connection/upgrader'
 
 export interface TCPSocketOptions {

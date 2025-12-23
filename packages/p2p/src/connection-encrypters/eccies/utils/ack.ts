@@ -1,13 +1,13 @@
 import { getRandomBytesSync } from 'ethereum-cryptography/random'
-import * as RLP from '../../../../rlp/index'
-import { concatBytes } from '../../../../rlp/index'
-import { bytesToInt, intToBytes } from '../../../../utils/index'
+import { RLP } from '@ts-ethereum/rlp'
+import { concatBytes } from '@ts-ethereum/rlp'
+import { bytesToInt, intToBytes } from '@ts-ethereum/utils'
 import {
 	assertEq,
 	id2pk,
 	pk2id,
 	unstrictDecode,
-} from '../../../../utils/utils'
+} from '@ts-ethereum/utils'
 import { decryptMessage, eccieEncryptMessage, ecdhX } from './crypto'
 import type { AckResult } from './types'
 

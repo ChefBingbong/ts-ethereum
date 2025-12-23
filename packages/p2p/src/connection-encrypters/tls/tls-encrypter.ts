@@ -6,7 +6,7 @@ import {
   type TLSSocketOptions,
   connect as tlsConnect,
 } from 'node:tls'
-import { pk2id } from '../../../kademlia'
+import { pk2id } from '@ts-ethereum/kademlia'
 import type { SecureConnection } from '../../connection/types'
 import { ConnectionEncrypter } from '../eccies/types'
 import { generateBoundCertificate, verifyPeerCertificate } from './cert'

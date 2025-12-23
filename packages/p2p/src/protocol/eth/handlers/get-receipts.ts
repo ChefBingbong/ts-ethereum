@@ -8,7 +8,7 @@ import {
   ETH_MESSAGES,
   EthMessageCode,
 } from '../../../../client/net/protocol/eth/definitions'
-import type { TxReceipt } from '../../../../../vm'
+import type { TxReceipt } from '@ts-ethereum/vm'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:get-receipts')

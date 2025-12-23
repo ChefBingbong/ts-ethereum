@@ -22,7 +22,7 @@ import net from 'net'
 import os from 'os'
 import { CustomProgressEvent } from 'progress-events'
 // import type { ProtocolStream } from "../../../client/net/protocol/protocol-stream.ts";
-import { bytesToUnprefixedHex, utf8ToBytes } from '../../../utils/index'
+import { bytesToUnprefixedHex, utf8ToBytes } from '@ts-ethereum/utils'
 import { multiaddrToNetConfig } from '../tcp/utils'
 import { RLPxConnection } from './connection'
 import { RLPxListener } from './listener'

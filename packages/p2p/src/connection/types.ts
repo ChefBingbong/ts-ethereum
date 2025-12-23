@@ -1,4 +1,4 @@
-import type { PeerInfo } from '../../kademlia'
+import type { PeerInfo } from '@ts-ethereum/kademlia'
 
 // Re-export PeerInfo for convenience
 export type { PeerInfo }
