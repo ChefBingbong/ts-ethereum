@@ -1,12 +1,36 @@
 {
   "name": "@ts-ethereum/evm",
-  "module": "index.ts",
-  "type": "module",
-  "private": true,
+  "version": "0.0.0",
+  "license": "ISC",
+  "main": "./_cjs/index.js",
+  "module": "./_esm/index.js",
+  "types": "./_types/index.d.ts",
+  "typings": "./_types/index.d.ts",
+  "files": [
+    "*"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChefBingbong/simple-p2p-blockchain.git",
+    "directory": "packages/block"
+  },
+  "scripts": {
+    "check": "tsc --pretty --noEmit",
+    "clean": "rm -rf ./_esm ./_cjs ./_types node_modules",
+    "build": "bun build:cjs && bun build:esm && bun build:types",
+    "build:cjs": "tsc --project ./tsconfig.json --module commonjs --moduleResolution node --outDir ./_cjs --removeComments --verbatimModuleSyntax false && printf '{\"type\":\"commonjs\"}' > ./_cjs/package.json",
+    "build:esm": "tsc --project ./tsconfig.json --outDir ./_esm && printf '{\"type\": \"module\",\"sideEffects\":false}' > ./_esm/package.json",
+    "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
+    "test": "vitest run -c ./vitest.config.mjs"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
