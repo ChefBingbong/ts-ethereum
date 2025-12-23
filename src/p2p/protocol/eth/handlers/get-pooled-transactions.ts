@@ -8,7 +8,7 @@ import {
 	ETH_MESSAGES,
 	EthMessageCode,
 } from "../../../../client/net/protocol/eth/definitions";
-import type { TypedTransaction } from "../../../../../tx";
+import type { TypedTransaction } from "../../../../tx";
 import type { EthHandler } from "../handler";
 
 const log = debug("p2p:eth:handlers:get-pooled-transactions");
@@ -33,9 +33,9 @@ export async function handleGetPooledTransactions(
 		let txs: TypedTransaction[] = [];
 		if (handler.context?.txPool) {
 			for (const hash of hashes) {
-				const tx = handler.context.txPool.get(hash);
+				const tx = handler.context.txPool.getByHash([hash]);
 				if (tx) {
-					txs.push(tx);
+					txs.push(...tx);
 				}
 			}
 		} else {
