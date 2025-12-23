@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import debug from "debug";
 import { existsSync, rmSync } from "fs";
 import { createBlockchain } from "../../blockchain/index.ts";
 import { readAccounts } from "../../chain-config/accounts.ts";
@@ -16,7 +15,7 @@ import { LevelDB } from "../execution/level.ts";
 import { getLogger, type Logger } from "../logging.ts";
 import { ExecutionNode } from "../node/index.ts";
 
-debug.enable("p2p:*");
+// debug.enable("p2p:*");
 
 const BOOTNODE_PORT = 8000;
 const SHARED_DIR = "../../test-network-data";

@@ -43,7 +43,7 @@ export class RpcServerBase {
 
 	async listen(): Promise<void> {
 		if (this.isListening) return;
-
+		this.isListening = true;
 		return new Promise<void>((resolve, reject) => {
 			try {
 				const server = serve(
@@ -56,6 +56,7 @@ export class RpcServerBase {
 				);
 			} catch (e) {
 				this.logger.error("Error starting RPC server", this.opts, e as Error);
+				this.isListening = false;
 				reject(e);
 			}
 		});
