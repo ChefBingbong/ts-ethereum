@@ -11,7 +11,7 @@ dist
 .env.node2
 .env.node3
 .env.send
-
+.turbo
 test-network-old-data/
 test-network-data/
 test-network-data-p2p/

@@ -1,0 +1,26 @@
+import z from 'zod'
+
+// Simple methods that take no parameters or use z.any()
+export const blockNumberSchema = z.any()
+export const chainIdSchema = z.any()
+export const coinbaseSchema = z.any()
+export const protocolVersionSchema = z.any()
+export const gasPriceSchema = z.any()
+export const syncingSchema = z.any()
+
+// Methods with specific parameter schemas
+export const estimateGasSchema = z.any()
+export const getBalanceSchema = z.any()
+export const getBlockByHashSchema = z.any()
+export const getBlockByNumberSchema = z.any()
+export const getBlockTransactionCountByHashSchema = z.any()
+export const getBlockTransactionCountByNumberSchema = z.any()
+export const getUncleCountByBlockNumberSchema = z.any()
+export const getTransactionByBlockHashAndIndexSchema = z.any()
+export const getTransactionByBlockNumberAndIndexSchema = z.any()
+export const getTransactionByHashSchema = z.any()
+export const getTransactionCountSchema = z.any()
+export const getBlockReceiptsSchema = z.any()
+export const getTransactionReceiptSchema = z.any()
+export const sendRawTransactionSchema = z.any()
+export const getProofSchema = z.any()

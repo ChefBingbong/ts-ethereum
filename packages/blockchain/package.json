@@ -1,0 +1,56 @@
+{
+  "name": "@ts-ethereum/blockchain",
+  "version": "0.0.0",
+  "license": "ISC",
+  "type": "module",
+  "main": "./index.ts",
+  "module": "./_esm/index.js",
+  "types": "./_types/index.d.ts",
+  "typings": "./_types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./_types/index.d.ts",
+      "import": "./index.ts",
+      "require": "./_cjs/index.js",
+      "default": "./index.ts"
+    }
+  },
+  "files": [
+    "*"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChefBingbong/simple-p2p-blockchain.git",
+    "directory": "packages/blockchain"
+  },
+  "scripts": {
+    "check": "tsc --pretty --noEmit",
+    "clean": "rm -rf ./_esm ./_cjs ./_types node_modules",
+    "build": "bun build:cjs && bun build:esm && bun build:types",
+    "build:cjs": "tsc --project ./tsconfig.json --module commonjs --moduleResolution node --outDir ./_cjs --removeComments --verbatimModuleSyntax false && printf '{\"type\":\"commonjs\"}' > ./_cjs/package.json",
+    "build:esm": "tsc --project ./tsconfig.json --outDir ./_esm && printf '{\"type\": \"module\",\"sideEffects\":false}' > ./_esm/package.json",
+    "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
+    "test": "vitest run -c ./vitest.config.mjs"
+  },
+  "dependencies": {
+    "@ts-ethereum/block": "workspace:*",
+    "@ts-ethereum/chain-config": "workspace:*",
+    "@ts-ethereum/mpt": "workspace:*",
+    "@ts-ethereum/rlp": "workspace:*",
+    "@ts-ethereum/utils": "workspace:*",
+    "debug": "^4.3.4",
+    "eventemitter3": "^5.0.1",
+    "lru-cache": "^11.2.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/debug": "^4.1.12"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
