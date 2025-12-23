@@ -41,7 +41,7 @@ export function classifyError(
 				retryable: error.retryable,
 				maxRetries: error.maxRetries,
 				backoffMs: error.backoffMs,
-				cause: error.cause,
+				cause: error?.cause as Error,
 			});
 		}
 		return error;
@@ -128,8 +128,6 @@ export function classifyError(
 			code: ErrorCode.SYSTEM_ERROR,
 			context,
 			retryable: true,
-			maxRetries: 3,
-			backoffMs: 1000,
 			cause: error,
 		});
 	}

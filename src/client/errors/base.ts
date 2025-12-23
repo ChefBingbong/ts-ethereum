@@ -4,7 +4,7 @@
  * Provides structured error handling with categories, codes, and recovery strategies
  */
 
-import type {
+import {
 	ErrorCategory,
 	ErrorCode,
 	ErrorContext,
@@ -48,8 +48,7 @@ export class ClientError extends Error {
 		this.code = options.code;
 		this.category = options.category;
 		this.severity = options.severity ?? ErrorSeverity.MEDIUM;
-		this.recoveryType =
-			options.recoveryType ?? ErrorRecoveryType.RECOVERABLE;
+		this.recoveryType = options.recoveryType ?? ErrorRecoveryType.RECOVERABLE;
 		this.metadata = options.metadata;
 		this.context = options.context;
 		this.retryable = options.retryable ?? false;
@@ -92,8 +91,10 @@ export class ClientError extends Error {
 		if (this.maxRetries !== undefined && attemptCount >= this.maxRetries) {
 			return false;
 		}
-		return this.recoveryType === ErrorRecoveryType.RECOVERABLE ||
-			this.recoveryType === ErrorRecoveryType.TRANSIENT;
+		return (
+			this.recoveryType === ErrorRecoveryType.RECOVERABLE ||
+			this.recoveryType === ErrorRecoveryType.TRANSIENT
+		);
 	}
 
 	/**
@@ -128,9 +129,10 @@ export class NetworkError extends ClientError {
 		super(message, {
 			...options,
 			category: ErrorCategory.NETWORK,
-			recoveryType: options.retryable !== false
-				? ErrorRecoveryType.TRANSIENT
-				: ErrorRecoveryType.PERMANENT,
+			recoveryType:
+				options.retryable !== false
+					? ErrorRecoveryType.TRANSIENT
+					: ErrorRecoveryType.PERMANENT,
 			severity: ErrorSeverity.MEDIUM,
 		});
 	}
@@ -179,9 +181,10 @@ export class SyncError extends ClientError {
 		super(message, {
 			...options,
 			category: ErrorCategory.SYNC,
-			recoveryType: options.retryable !== false
-				? ErrorRecoveryType.RECOVERABLE
-				: ErrorRecoveryType.FATAL,
+			recoveryType:
+				options.retryable !== false
+					? ErrorRecoveryType.RECOVERABLE
+					: ErrorRecoveryType.FATAL,
 			severity: ErrorSeverity.HIGH,
 		});
 	}
@@ -251,9 +254,10 @@ export class SystemError extends ClientError {
 		super(message, {
 			...options,
 			category: ErrorCategory.SYSTEM,
-			recoveryType: options.retryable !== false
-				? ErrorRecoveryType.RECOVERABLE
-				: ErrorRecoveryType.FATAL,
+			recoveryType:
+				options.retryable !== false
+					? ErrorRecoveryType.RECOVERABLE
+					: ErrorRecoveryType.FATAL,
 			severity: ErrorSeverity.CRITICAL,
 		});
 	}
@@ -282,4 +286,3 @@ export class RpcError extends ClientError {
 		});
 	}
 }
-
