@@ -263,7 +263,7 @@ export async function getHttpMetricsServer(
     }),
   }
 
-  const activeSockets = new SimpleSocketTracker(server, socketsMetrics)
+  const activeSockets = new SimpleSocketTracker(server, socketsMetrics as any)
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', (err) => {

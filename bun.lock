@@ -104,6 +104,9 @@
     "packages/chain-config": {
       "name": "@ts-ethereum/chain-config",
       "version": "0.0.0",
+      "dependencies": {
+        "@ts-ethereum/utils": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -174,6 +177,9 @@
     "packages/metrics": {
       "name": "@ts-ethereum/metrics",
       "version": "0.0.0",
+      "dependencies": {
+        "prom-client": "^15.1.3",
+      },
       "devDependencies": {
         "@types/bun": "latest",
       },
@@ -184,6 +190,11 @@
     "packages/mpt": {
       "name": "@ts-ethereum/mpt",
       "version": "0.0.0",
+      "dependencies": {
+        "@ts-ethereum/chain-config": "workspace:*",
+        "@ts-ethereum/rlp": "workspace:*",
+        "@ts-ethereum/utils": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "latest",
       },
