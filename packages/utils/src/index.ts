@@ -70,4 +70,5 @@ export * from './provider'
  */
 export * from './request'
 
+export * from './safe'
 export * from './utils'

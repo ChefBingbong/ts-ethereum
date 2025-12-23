@@ -6,7 +6,7 @@ import {
 	KademliaNode,
 	type KademliaNodeConfig,
 	type PeerInfo,
-} from '../../../kademlia/index'
+} from '@ts-ethereum/kademlia'
 import type { DPTEvent, DPTOptions } from './types'
 
 /**

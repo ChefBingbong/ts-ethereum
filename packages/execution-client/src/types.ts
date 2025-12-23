@@ -1,11 +1,11 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
+import type { Block, BlockHeader } from '@ts-ethereum/block'
+import { Blockchain } from '@ts-ethereum/blockchain'
+import type { GenesisState } from '@ts-ethereum/chain-config'
+import type { Address } from '@ts-ethereum/utils'
 import type { AbstractLevel } from 'abstract-level'
 import type * as promClient from 'prom-client'
 import type { Config, SyncMode } from '.'
-import type { Block, BlockHeader } from '../block'
-import { Blockchain } from '../blockchain'
-import type { GenesisState } from '../chain-config'
-import type { Address } from '../utils'
 import type { Peer } from './net/peer'
 
 export type Event = (typeof Event)[keyof typeof Event]

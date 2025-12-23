@@ -4,7 +4,8 @@ export const peerInfoSchema = z.object({
   id: z
     .string()
     .transform(
-      (val) => new Uint8Array(val.split(':').map((byte) => parseInt(byte, 16))),
+      (val) =>
+        new Uint8Array(val.split(':').map((byte) => Number.parseInt(byte, 16))),
     )
     .optional(),
   address: z.string().optional(),

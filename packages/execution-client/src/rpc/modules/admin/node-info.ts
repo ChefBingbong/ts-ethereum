@@ -1,5 +1,4 @@
-import { bytesToHex } from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
+import { bytesToHex, safeError, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { getClientVersion } from '../../../util/index'
 import { createRpcMethod } from '../../validation'
@@ -8,7 +7,10 @@ import { nodeInfoSchema } from './schema'
 export const nodeInfo = (node: ExecutionNode) =>
   createRpcMethod(nodeInfoSchema, async (_params, _c) => {
     try {
-      const rlpxInfo = node.config.server!.getRlpxInfo()
+      const rlpxInfo = {} as any
+      if (!rlpxInfo) {
+        return safeError(new Error('RLPx info not found'))
+      }
       const latestHeader = node.chain.headers.latest!
       const clientName = getClientVersion()
 
@@ -32,6 +34,6 @@ export const nodeInfo = (node: ExecutionNode) =>
         },
       })
     } catch (error) {
-      return safeError(error)
+      return safeError(error as Error)
     }
   })

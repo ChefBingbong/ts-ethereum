@@ -1,9 +1,13 @@
-import type { Block } from '../../../../block/index'
-import type { LegacyTx } from '../../../../tx/index'
-import { hexToBytes, isHexString } from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
-import type { VM } from '../../../../vm/index'
-import { runBlock } from '../../../../vm/index'
+import type { Block } from '@ts-ethereum/block'
+import type { LegacyTx } from '@ts-ethereum/tx'
+import {
+  hexToBytes,
+  isHexString,
+  safeError,
+  safeResult,
+} from '@ts-ethereum/utils'
+import type { VM } from '@ts-ethereum/vm'
+import { runBlock } from '@ts-ethereum/vm'
 import type { ReceiptsManager } from '../../../execution/receipt'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
@@ -15,7 +19,7 @@ export const getBlockReceipts = (node: ExecutionNode) => {
   const chain = node.chain
   const vm: VM | undefined = node.execution?.vm
   const receiptsManager: ReceiptsManager | undefined =
-    node.execution?.receiptsManager
+    node.execution.execution.receiptsManager
   return createRpcMethod(
     getBlockReceiptsSchema,
     async (params: [string], _c) => {

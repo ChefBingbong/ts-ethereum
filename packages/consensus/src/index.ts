@@ -1,5 +1,10 @@
 import type { BlockData, HeaderData } from '@ts-ethereum/block'
-import { Block, BlockHeader, createBlock, createBlockHeader } from '@ts-ethereum/block'
+import {
+  Block,
+  BlockHeader,
+  createBlock,
+  createBlockHeader,
+} from '@ts-ethereum/block'
 import { RLP } from '@ts-ethereum/rlp'
 import type { DB, DBObject, PrefixedHexString } from '@ts-ethereum/utils'
 import {
@@ -85,7 +90,7 @@ export class Miner {
    * @returns - `undefined` if no solution was found within the iterations, or a `BlockHeader` or `Block`
    *           with valid PoW based upon what was passed in the constructor
    */
-  async mine(iterations: number = 0): Promise<undefined | BlockHeader | Block> {
+  async mine(iterations = 0): Promise<undefined | BlockHeader | Block> {
     const solution = await this.iterate(iterations)
 
     if (solution) {
@@ -108,7 +113,7 @@ export class Miner {
    * @param iterations - Number of iterations to iterate over. If `-1` is passed, the loop runs until a solution is found
    * @returns - `undefined` if no solution was found, or otherwise a `Solution` object
    */
-  async iterate(iterations: number = 0): Promise<undefined | Solution> {
+  async iterate(iterations = 0): Promise<undefined | Solution> {
     if (this.solution) {
       return this.solution
     }

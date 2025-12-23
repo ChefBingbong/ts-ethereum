@@ -5,10 +5,10 @@
 
 import debug from 'debug'
 import {
-	ETH_MESSAGES,
-	EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
-import { handleNewPooledTransactionHashes as handleNewPooledTransactionHashesExec } from '../../../../client/net/protocol/eth/handlers'
+  ETH_MESSAGES,
+  EthMessageCode,
+} from '../../../net/protocol/eth/definitions'
+import { handleNewPooledTransactionHashes as handleNewPooledTransactionHashesExec } from '../../../net/protocol/eth/handlers'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:new-pooled-transaction-hashes')
@@ -28,15 +28,16 @@ export async function handleNewPooledTransactionHashes(
       ],
 ): Promise<void> {
   try {
-    const decoded =
-      ETH_MESSAGES[EthMessageCode.NEW_POOLED_TRANSACTION_HASHES].decode(payload)
+    const decoded = ETH_MESSAGES[
+      EthMessageCode.NEW_POOLED_TRANSACTION_HASHES
+    ].decode(payload as any)
 
     // If context is available, call execution handler directly
     if (handler.context) {
       const peer = handler.findPeer()
       if (peer) {
         await handleNewPooledTransactionHashesExec(
-          decoded,
+          decoded as any,
           peer,
           handler.context,
         )

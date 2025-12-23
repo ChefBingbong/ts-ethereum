@@ -6,22 +6,22 @@
  */
 
 import { multiaddr } from '@multiformats/multiaddr'
+import type {
+  ComponentLogger,
+  ConnectionManager,
+  Logger,
+  P2PNodeComponents,
+  PeerDiscovery,
+  PeerDiscoveryEvents,
+  PeerInfo,
+} from '@ts-ethereum/p2p'
+import {
+  peerDiscoverySymbol,
+  peerIdEquals,
+  peerIdToString,
+} from '@ts-ethereum/p2p'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { TypedEventEmitter } from 'main-event'
-import type {
-	ComponentLogger,
-	ConnectionManager,
-	Logger,
-	P2PNodeComponents,
-	PeerDiscovery,
-	PeerDiscoveryEvents,
-	PeerInfo,
-} from '../../../p2p/libp2p/types'
-import {
-	peerDiscoverySymbol,
-	peerIdEquals,
-	peerIdToString,
-} from '../../../p2p/libp2p/types'
 import { DPT, type PeerInfo as DPTPeerInfo } from '../dpt-1/index'
 import type { DPTOptions } from '../dpt-1/types'
 
@@ -613,7 +613,7 @@ export function dptDiscovery(
     return new DPTDiscovery(
       {
         logger: components.logger,
-        connectionManager: components.connectionManager,
+        connectionManager: components.connectionManager as any,
       },
       init,
     )

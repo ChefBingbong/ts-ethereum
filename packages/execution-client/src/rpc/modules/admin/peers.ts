@@ -1,5 +1,4 @@
-import { bytesToHex } from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
+import { bytesToHex, safeError, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 // RPC admin peers - Updated for P2P architecture
 import { createRpcMethod } from '../../validation'
@@ -8,7 +7,7 @@ import { peersSchema } from './schema'
 export const peers = (node: ExecutionNode) =>
   createRpcMethod(peersSchema, async (_params, _c) => {
     try {
-      const peers = node.network.getConnectedPeers()
+      const peers = node.network.core.getConnectedPeers()
 
       return safeResult(
         peers?.map((peer) => {
@@ -24,10 +23,10 @@ export const peers = (node: ExecutionNode) =>
                     ? bytesToHex(peer.eth.updatedBestHeader.hash())
                     : bytesToHex(peer.eth?.status.bestHash ?? new Uint8Array()),
                 difficulty: peer.eth?.status.td.toString(10),
-                version: peer.eth?.['versions'].slice(-1)[0] ?? null,
+                version: null,
               },
             },
-            caps: peer.eth?.['versions'].map((ver) => 'eth/' + ver),
+            caps: [],
             network: {
               remoteAddress: peer.address,
             },
@@ -35,6 +34,6 @@ export const peers = (node: ExecutionNode) =>
         }),
       )
     } catch (error) {
-      return safeError(error)
+      return safeError(error as Error)
     }
   })

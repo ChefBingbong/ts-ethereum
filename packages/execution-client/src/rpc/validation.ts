@@ -1,20 +1,20 @@
+import { Context } from 'hono'
 import { z } from 'zod'
-import {
-	INTERNAL_ERROR,
-	INVALID_PARAMS,
-	METHOD_NOT_FOUND,
-} from './error-code'
+import { INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND } from './error-code'
 import { getRpcErrorResponse, getRpcResponse } from './helpers'
-import {
-	RPCError,
-	RpcHandler,
-	RpcHandlerOptions,
-	RpcMethodFn,
-	RpcRequest,
+import type {
+  RPCError,
+  RpcHandler,
+  RpcHandlerOptions,
+  RpcMethodFn,
+  RpcRequest,
 } from './types'
 
 export const rpcValidator =
-  (schema: z.ZodType<RpcRequest>) => async (c, next) => {
+  (
+    schema: z.ZodType<RpcRequest>,
+  ): ((c: Context, next: any) => Promise<Response>) =>
+  async (c, next) => {
     const requestId = c.get('requestId')
     const body = await c.req.json()
     const parsed = schema.safeParse(body)
@@ -26,7 +26,7 @@ export const rpcValidator =
           id: requestId,
           error: {
             code: INVALID_PARAMS,
-            message: parsed.error.issues[0].message,
+            message: parsed.error.issues?.[0]?.message ?? 'Invalid parameters',
           },
         },
         400,
@@ -53,7 +53,7 @@ export const createRpcHandler =
   (
     methods: Record<string, RpcMethodFn>,
     { debug = false }: RpcHandlerOptions = {},
-  ) =>
+  ): ((c: Context, next: any) => Promise<Response>) =>
   async (c) => {
     const rpcMethod = c.get('rpcMethod')
     const rpcParams = c.get('rpcParams')
@@ -112,7 +112,7 @@ export const createRpcMethod =
     if (!parsed.success) {
       const error: RPCError = {
         code: INVALID_PARAMS,
-        message: parsed.error.issues[0].message,
+        message: parsed.error.issues?.[0]?.message ?? 'Invalid parameters',
       }
       throw error
     }

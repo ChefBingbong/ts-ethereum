@@ -1,14 +1,14 @@
-import { createBlock } from '../../../../block/index'
-import { createTx } from '../../../../tx/index'
+import { createBlock } from '@ts-ethereum/block'
+import { createTx } from '@ts-ethereum/tx'
 import {
 	BIGINT_1,
 	createAddressFromString,
 	createZeroAddress,
 	EthereumJSErrorWithoutCode,
-} from '../../../../utils/index'
-import { safeResult } from '../../../../utils/safe'
-import type { VM } from '../../../../vm/index'
-import { runTx } from '../../../../vm/index'
+} from '@ts-ethereum/utils'
+import { safeResult } from '@ts-ethereum/utils'
+import type { VM } from '@ts-ethereum/vm'
+import { runTx } from '@ts-ethereum/vm'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import type { RPCTx } from '../../types'

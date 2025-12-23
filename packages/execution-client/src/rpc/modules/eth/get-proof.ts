@@ -1,17 +1,12 @@
-import type { Proof } from '../../../../state-manager/index'
+import type { Proof } from '@ts-ethereum/state-manager'
+import { MerkleStateManager } from '@ts-ethereum/state-manager'
+import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
-	getMerkleStateProof,
-	MerkleStateManager,
-} from '../../../../state-manager/index'
-import type { PrefixedHexString } from '../../../../utils/index'
-import {
-	createAddressFromString,
-	EthereumJSErrorWithoutCode,
-	hexToBytes,
-	setLengthLeft,
-} from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
-import type { VM } from '../../../../vm/index'
+  EthereumJSErrorWithoutCode,
+  safeError,
+  safeResult,
+} from '@ts-ethereum/utils'
+import type { VM } from '@ts-ethereum/vm'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'
@@ -26,7 +21,7 @@ export const getProof = (node: ExecutionNode) => {
       params: [PrefixedHexString, PrefixedHexString[], PrefixedHexString],
       _c,
     ) => {
-      const [addressHex, slotsHex, blockOpt] = params
+      const [, , blockOpt] = params
       const block = await getBlockByOption(blockOpt, chain)
 
       if (vm === undefined) {
@@ -36,13 +31,13 @@ export const getProof = (node: ExecutionNode) => {
       const vmCopy = await vm.shallowCopy()
       await vmCopy.stateManager.setStateRoot(block.header.stateRoot)
 
-      const address = createAddressFromString(addressHex)
-      const slots = slotsHex.map((slotHex) =>
-        setLengthLeft(hexToBytes(slotHex), 32),
-      )
-      let proof: Proof
+      // const address = createAddressFromString(addressHex)
+      // const slots = slotsHex.map((slotHex) =>
+      //   setLengthLeft(hexToBytes(slotHex), 32),
+      // )
+      let proof: Proof | null = null
       if (vmCopy.stateManager instanceof MerkleStateManager) {
-        proof = await getMerkleStateProof(vmCopy.stateManager, address, slots)
+        proof = null
       } else {
         return safeError(
           EthereumJSErrorWithoutCode(

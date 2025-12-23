@@ -1,8 +1,8 @@
+import type { BlockHeader } from '@ts-ethereum/block'
+import { BIGINT_0, BIGINT_1, short } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
-import type { BlockHeader } from '../../../block/index'
-import { EthHandler } from '../../../p2p/protocol/eth/handler'
-import { BIGINT_0, BIGINT_1, short } from '../../../utils/index'
 import type { Config } from '../../config/config'
+import { EthHandler } from '../../protocol/eth'
 
 export interface PeerOptions {
   /* Config */
@@ -49,7 +49,7 @@ export abstract class Peer extends EventEmitter {
     If false, adds incoming messages to handleMessageQueue,
     which are handled after the peer is added to the pool.
   */
-  public pooled: boolean = false
+  public pooled = false
 
   /**
    * Create new peer
@@ -91,9 +91,9 @@ export abstract class Peer extends EventEmitter {
       return
     }
     let block: bigint | Uint8Array
-    if (!this.eth!.updatedBestHeader) {
+    if (!this.eth!.updatedBestHeader && this.eth!.status?.bestHash) {
       // If there is no updated best header stored yet, start with the status hash
-      block = this.eth!.status.bestHash
+      block = this.eth!.status?.bestHash
     } else {
       // Try forward-calculated number first, but fall back to last known header if it doesn't exist
       block = this.getPotentialBestHeaderNum()

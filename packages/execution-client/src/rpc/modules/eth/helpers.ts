@@ -1,12 +1,12 @@
-import type { Block, JSONRPCBlock } from '../../../../block/index'
-import type { TypedTransaction } from '../../../../tx/index'
-import type { Address } from '../../../../utils/index'
-import { bigIntToHex, bytesToHex, intToHex } from '../../../../utils/index'
+import type { Block, JSONRPCBlock } from '@ts-ethereum/block'
+import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { Address } from '@ts-ethereum/utils'
+import { bigIntToHex, bytesToHex, intToHex } from '@ts-ethereum/utils'
 import type {
 	PostByzantiumTxReceipt,
 	PreByzantiumTxReceipt,
 	TxReceipt,
-} from '../../../../vm/index'
+} from '@ts-ethereum/vm'
 import type { Chain } from '../../../blockchain/index'
 import { toJSONRPCTx } from '../../helpers'
 

@@ -1,17 +1,21 @@
-import type { Block } from '../../block'
-import { isLegacyTx, type LegacyTx, type TypedTransaction } from '../../tx'
+import type { Block } from '@ts-ethereum/block'
 import {
-	Account,
-	Address,
-	BIGINT_0,
-	BIGINT_1,
-	bytesToHex,
-	bytesToUnprefixedHex,
-	equalsBytes,
-	EthereumJSErrorWithoutCode,
-	hexToBytes,
-} from '../../utils'
-import type { VM } from '../../vm'
+  isLegacyTx,
+  type LegacyTx,
+  type TypedTransaction,
+} from '@ts-ethereum/tx'
+import {
+  Account,
+  Address,
+  BIGINT_0,
+  BIGINT_1,
+  bytesToHex,
+  bytesToUnprefixedHex,
+  equalsBytes,
+  EthereumJSErrorWithoutCode,
+  hexToBytes,
+} from '@ts-ethereum/utils'
+import type { VM } from '@ts-ethereum/vm'
 import { Chain } from '../blockchain/chain'
 import type { Config } from '../config/index'
 import { VMExecution } from '../execution/vmexecution'
@@ -419,10 +423,7 @@ export class TxPool {
    * Validates a transaction against the pool and other constraints
    * @param tx The tx to validate
    */
-  private async validate(
-    tx: TypedTransaction,
-    isLocalTransaction: boolean = false,
-  ) {
+  private async validate(tx: TypedTransaction, isLocalTransaction = false) {
     if (!tx.isSigned()) {
       throw EthereumJSErrorWithoutCode(
         'Attempting to add tx to txpool which is not signed',
@@ -518,7 +519,7 @@ export class TxPool {
    * @param tx Transaction
    * @param isLocalTransaction if this is a local transaction (loosens some constraints) (default: false)
    */
-  async add(tx: TypedTransaction, isLocalTransaction: boolean = false) {
+  async add(tx: TypedTransaction, isLocalTransaction = false) {
     const hash: UnprefixedHash = bytesToUnprefixedHex(tx.hash())
     const added = Date.now()
     const address: UnprefixedAddress = tx.getSenderAddress().toString().slice(2)
@@ -1038,8 +1039,8 @@ export class TxPool {
       if (hashesToSend.length > 0) {
         if (
           peer.eth !== undefined &&
-          peer.eth['versions'] !== undefined &&
-          peer.eth['versions'].includes(68)
+          (peer.eth as any)['versions'] !== undefined &&
+          (peer.eth as any)['versions'].includes(68)
         ) {
           // If peer supports eth/68, send eth/68 formatted message (tx_types[], tx_sizes[], hashes[])
           const txsToSend: [number[], number[], Uint8Array[]] = [[], [], []]
@@ -1440,9 +1441,9 @@ export class TxPool {
     if (this.config.options.metrics !== undefined) {
       // TODO: Only clear the metrics related to the transaction pool here
       for (const [_, metric] of Object.entries(
-        this.config.options.metrics.prometheus,
+        this.config.options.metrics as any,
       )) {
-        metric.set(0)
+        ;(metric as any).set(0)
       }
     }
     this.opened = false

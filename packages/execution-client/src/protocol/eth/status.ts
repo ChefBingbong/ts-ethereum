@@ -5,8 +5,8 @@ import {
   bytesToHex,
   equalsBytes,
 } from '@ts-ethereum/utils'
-import type { Chain } from '../../../client/blockchain'
-import type { Config } from '../../../client/config'
+import type { Chain } from '../../blockchain'
+import type { Config } from '../../config'
 import type { EthStatus } from './types'
 
 /**

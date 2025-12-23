@@ -17,7 +17,6 @@
 
 import { existsSync, readFileSync } from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import {
   createWalletClient,
   defineChain,
@@ -29,7 +28,7 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const __filename = fileURLToPath(import.meta.url)
+const __filename = '../../test-network-data/accounts.json'
 const __dirname = path.dirname(__filename)
 
 // Parse command line arguments
@@ -129,9 +128,9 @@ async function main() {
 
   // Config
   const rpcUrl = args.rpc || 'http://127.0.0.1:8545'
-  const chainId = parseInt(args.chainId || '12345', 10)
-  const fromIndex = parseInt(args.from || '0', 10)
-  const toIndex = parseInt(args.to || '', 10)
+  const chainId = Number.parseInt(args.chainId || '12345', 10)
+  const fromIndex = Number.parseInt(args.from || '0', 10)
+  const toIndex = Number.parseInt(args.to || '', 10)
   const amount = args.amount || '1.0'
 
   if (Number.isNaN(toIndex)) {

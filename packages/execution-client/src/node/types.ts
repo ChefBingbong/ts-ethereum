@@ -1,6 +1,7 @@
+import type { Blockchain } from '@ts-ethereum/blockchain'
+import type { GenesisState } from '@ts-ethereum/chain-config'
+import { P2PNode } from '@ts-ethereum/p2p'
 import type { AbstractLevel } from 'abstract-level'
-import type { Blockchain } from '../../blockchain'
-import type { GenesisState } from '../../chain-config'
 import type { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 import type { ExecutionService } from '../execution/execution-service'
@@ -82,5 +83,5 @@ export type ExecutionNodeModules = {
   network: NetworkService
   execution: ExecutionService
   txFetcher: TxFetcher
-  p2pNode: import('../../p2p/libp2p/types').P2PNode
+  p2pNode: P2PNode
 }

@@ -1,10 +1,10 @@
-import type { Block, BlockBytes } from '../../../block'
-import { createBlockFromBytesArray } from '../../../block'
+import type { Block, BlockBytes } from '@ts-ethereum/block'
+import { createBlockFromBytesArray } from '@ts-ethereum/block'
 import {
-	equalsBytes,
-	KECCAK256_RLP,
-	KECCAK256_RLP_ARRAY,
-} from '../../../utils'
+  equalsBytes,
+  KECCAK256_RLP,
+  KECCAK256_RLP_ARRAY,
+} from '@ts-ethereum/utils'
 import type { Peer } from '../../net/peer/peer'
 import { Event } from '../../types'
 import type { BlockFetcherOptions, JobTask } from './blockfetcherbase'

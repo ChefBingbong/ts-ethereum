@@ -1,11 +1,11 @@
-import type { Block, BlockHeader } from '../../block'
+import { type Block, type BlockHeader, createBlock } from '@ts-ethereum/block'
 import {
-	Ethash,
-	type Miner as EthashMiner,
-	type Solution,
-} from '../../eth-hash'
-import { BIGINT_0, BIGINT_1, bytesToHex } from '../../utils'
-import { buildBlock, type TxReceipt } from '../../vm'
+  Ethash,
+  type Miner as EthashMiner,
+  type Solution,
+} from '@ts-ethereum/consensus'
+import { BIGINT_0, BIGINT_1, bytesToHex } from '@ts-ethereum/utils'
+import { buildBlock, type TxReceipt } from '@ts-ethereum/vm'
 import { Chain } from '../blockchain/chain'
 import type { Config } from '../config/index'
 import type { VMExecution } from '../execution/index'
@@ -298,7 +298,6 @@ export class Miner {
     if (interrupt) return
 
     // Create the final sealed block with the PoW solution
-    const { createBlock } = await import('../../block')
     const sealedBlockData = unsealedBlock.toJSON()
     sealedBlockData.header!.nonce = bytesToHex(solution.nonce)
     sealedBlockData.header!.mixHash = bytesToHex(solution.mixHash)

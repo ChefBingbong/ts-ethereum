@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
-import { existsSync, rmSync } from 'fs'
-import { createBlockchain } from '../../blockchain/index'
-import { readAccounts } from '../../chain-config/accounts'
-import type { ChainConfig } from '../../chain-config/index'
+import { createBlockchain } from '@ts-ethereum/blockchain'
+import type { ChainConfig } from '@ts-ethereum/chain-config'
 import {
-	type ClientInitArgs,
-	getClientPaths,
-	initClientConfig,
-} from '../../chain-config/index'
-import { getDbPaths, initDatabases } from '../../db/index'
-import { Config } from '../config/index'
+  getClientPaths,
+  initClientConfig,
+  readAccounts,
+} from '@ts-ethereum/chain-config'
+import { getDbPaths, initDatabases } from '@ts-ethereum/db'
+import debug from 'debug'
+import { existsSync, rmSync } from 'fs'
+import { Config, createConfigOptions } from '../config/index'
 import { LevelDB } from '../execution/level'
 import { getLogger, type Logger } from '../logging'
 import { ExecutionNode } from '../node/index'
 
-// debug.enable("p2p:*");
+debug.enable('p2p:*')
 
 const BOOTNODE_PORT = 8000
 const SHARED_DIR = '../../test-network-data'
@@ -49,7 +49,7 @@ export const customChainConfig: ChainConfig = {
 }
 
 function createGenesisState(
-  accounts: Array<[address: string, privateKey: Uint8Array]>,
+  accounts: [address: string, privateKey: Uint8Array][],
 ): Record<string, string> {
   const genesisState: Record<string, string> = {}
   const initialBalance = '0x3635c9adc5dea00000' // 1000 ETH in hex
@@ -72,13 +72,13 @@ function cleanDataDir(dataDir: string): void {
 }
 
 async function startClient() {
-  const port = parseInt(process.env.PORT || '8000', 10)
+  const port = Number.parseInt(process.env.PORT || '8000', 10)
   const cleanStart = process.env.CLEAN === 'true'
   const isMiner = [8002, 8001].includes(port)
   const isBootnode = port === BOOTNODE_PORT
   const nodeLogger: Logger | undefined = getLogger()
 
-  const clientConfig = await initClientConfig({
+  const _clientConfig = await initClientConfig({
     dataDir: process.env.DATA_DIR || `${SHARED_DIR}/node-${port}`,
     network: 'testnet',
     port,
@@ -89,8 +89,9 @@ async function startClient() {
     accountSeeds: ACCOUNT_SEEDS,
     logger: nodeLogger,
     persistNetworkIdentity: true,
-  } as ClientInitArgs)
+  })
 
+  const clientConfig = await createConfigOptions(_clientConfig)
   if (cleanStart) cleanDataDir(clientConfig.datadir)
 
   const paths = getClientPaths({ dataDir: clientConfig.datadir }, 'testnet')
@@ -101,7 +102,7 @@ async function startClient() {
   const genesisState = createGenesisState(allAccounts)
 
   const config = new Config({
-    ...clientConfig,
+    ..._clientConfig,
   })
 
   const blockchain = await createBlockchain({

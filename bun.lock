@@ -172,8 +172,28 @@
     "packages/execution-client": {
       "name": "@ts-ethereum/execution-client",
       "version": "0.0.0",
+      "dependencies": {
+        "@multiformats/multiaddr": "^13.0.1",
+        "@multiformats/multiaddr-matcher": "^3.0.1",
+        "@ts-ethereum/block": "workspace:*",
+        "@ts-ethereum/blockchain": "workspace:*",
+        "@ts-ethereum/chain-config": "workspace:*",
+        "@ts-ethereum/kademlia": "workspace:*",
+        "@ts-ethereum/metrics": "workspace:*",
+        "@ts-ethereum/p2p": "workspace:*",
+        "@ts-ethereum/rlp": "workspace:*",
+        "@ts-ethereum/tx": "workspace:*",
+        "@ts-ethereum/utils": "workspace:*",
+        "@ts-ethereum/vm": "workspace:*",
+        "debug": "^4.3.4",
+        "eventemitter3": "^5.0.1",
+        "level": "^10.0.0",
+        "snappyjs": "^0.7.0",
+        "winston": "^3.18.3",
+      },
       "devDependencies": {
         "@types/bun": "latest",
+        "@types/debug": "^4.1.12",
       },
       "peerDependencies": {
         "typescript": "^5",

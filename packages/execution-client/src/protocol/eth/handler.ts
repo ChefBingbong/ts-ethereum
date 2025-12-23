@@ -1,21 +1,25 @@
+import type { BlockBodyBytes, BlockHeader } from '@ts-ethereum/block'
+import type { RLPxConnection } from '@ts-ethereum/p2p'
+import type { TypedTransaction } from '@ts-ethereum/tx'
+import {
+  BIGINT_0,
+  bigIntToUnpaddedBytes,
+  bytesToBigInt,
+} from '@ts-ethereum/utils'
+import type { TxReceipt } from '@ts-ethereum/vm'
 import debug from 'debug'
 import { EventEmitter } from 'eventemitter3'
-import type { BlockBodyBytes, BlockHeader } from '@ts-ethereum/block'
-import type { Chain } from '../../../client/blockchain'
-import type { Config } from '../../../client/config'
-import type { VMExecution } from '../../../client/execution'
-import type { Peer } from '../../../client/net/peer/peer'
+import type { Chain } from '../../blockchain'
+import type { Config } from '../../config'
+import type { VMExecution } from '../../execution'
+import type { Peer } from '../../net/peer'
 import {
-	ETH_MESSAGES,
-	EthMessageCode,
-} from '../../../client/net/protocol/eth/definitions'
-import { ETH } from '../../../client/net/protocol/eth/eth'
-import type { EthProtocolMethods } from '../../../client/net/protocol/eth/eth-methods'
-import type { EthHandlerContext } from '../../../client/net/protocol/eth/handlers'
-import type { TypedTransaction } from '@ts-ethereum/tx'
-import { BIGINT_0, bigIntToUnpaddedBytes, bytesToBigInt } from '@ts-ethereum/utils'
-import type { TxReceipt } from '@ts-ethereum/vm'
-import type { RLPxConnection } from '../../transport/rlpx/connection'
+  ETH_MESSAGES,
+  EthMessageCode,
+} from '../../net/protocol/eth/definitions'
+import { ETH } from '../../net/protocol/eth/eth'
+import type { EthProtocolMethods } from '../../net/protocol/eth/eth-methods'
+import type { EthHandlerContext } from '../../net/protocol/eth/handlers'
 import { registerDefaultHandlers } from './handlers'
 import { EthHandlerRegistry } from './registry'
 import { validateStatus } from './status'
@@ -46,7 +50,7 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
   // Protocol state
   private _status: EthStatus | null = null
   private _peerStatus: EthStatus | null = null
-  private _statusExchanged: boolean = false
+  private _statusExchanged = false
   public updatedBestHeader?: BlockHeader
 
   // Request tracking for async request/response matching
@@ -63,8 +67,8 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
   // - Getting protocol version and offset
   // All message encoding/sending is done via wire module and RLPxConnection directly
   private ethProtocol: ETH | null = null
-  private protocolOffset: number = 0
-  private protocolVersion: number = 68 // Default to ETH/68
+  private protocolOffset = 0
+  private protocolVersion = 68 // Default to ETH/68
 
   // Handler registry for request/response routing
   public readonly registry: EthHandlerRegistry = new EthHandlerRegistry()
@@ -783,8 +787,8 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
   /**
    * Get peer status (for EthProtocolMethods interface)
    */
-  get status(): EthStatus | null {
-    return this._peerStatus
+  get status(): any {
+    return this._peerStatus as any
   }
 
   /**

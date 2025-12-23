@@ -6,14 +6,14 @@ import {
   type BlockHeaderBytes,
   createBlockFromBytesArray,
   createBlockHeaderFromBytesArray,
-} from '../../../../block'
-import * as RLP from '../../../../rlp'
+} from '@ts-ethereum/block'
+import { RLP } from '@ts-ethereum/rlp'
 import {
   createTxFromBlockBodyData,
   createTxFromRLP,
   isLegacyTx,
   type TypedTransaction,
-} from '../../../../tx'
+} from '@ts-ethereum/tx'
 import {
   bigIntToUnpaddedBytes,
   bytesToBigInt,
@@ -23,13 +23,13 @@ import {
   intToUnpaddedBytes,
   isNestedUint8Array,
   type PrefixedHexString,
-} from '../../../../utils'
+} from '@ts-ethereum/utils'
 import {
   encodeReceipt,
   type PostByzantiumTxReceipt,
   type PreByzantiumTxReceipt,
   type TxReceipt,
-} from '../../../../vm'
+} from '@ts-ethereum/vm'
 import type { TxReceiptWithType } from '../../../execution/receipt'
 
 type Log = [address: Uint8Array, topics: Uint8Array[], data: Uint8Array]
@@ -333,7 +333,7 @@ export const ETH_MESSAGES = {
     }) => {
       const serializedReceipts = []
       for (const receipt of receipts) {
-        const encodedReceipt = encodeReceipt(receipt, receipt.txType)
+        const encodedReceipt = encodeReceipt(receipt as any, receipt.txType)
         serializedReceipts.push(encodedReceipt)
       }
       return [bigIntToUnpaddedBytes(reqId), serializedReceipts]

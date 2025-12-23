@@ -3,12 +3,12 @@
  * Processes incoming GET_RECEIPTS requests and sends RECEIPTS response
  */
 
+import type { TxReceipt } from '@ts-ethereum/vm'
 import debug from 'debug'
 import {
   ETH_MESSAGES,
   EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
-import type { TxReceipt } from '@ts-ethereum/vm'
+} from '../../../net/protocol/eth/definitions'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:get-receipts')
@@ -23,7 +23,9 @@ export async function handleGetReceipts(
 ): Promise<void> {
   try {
     // Payload is already decoded: [reqId, hashes]
-    const decoded = ETH_MESSAGES[EthMessageCode.GET_RECEIPTS].decode(payload)
+    const decoded = ETH_MESSAGES[EthMessageCode.GET_RECEIPTS].decode(
+      payload as any,
+    )
     const { reqId, hashes } = decoded
 
     log('GET_RECEIPTS: reqId=%d, hashes=%d', reqId, hashes.length)
@@ -38,7 +40,7 @@ export async function handleGetReceipts(
             false,
             true, // includeTxType for encoding
           )
-        receipts.push((blockReceipts as unknown) || [])
+        receipts.push((blockReceipts as any) || [])
       } else {
         receipts.push([])
       }
@@ -52,7 +54,7 @@ export async function handleGetReceipts(
 
     const responseData = ETH_MESSAGES[EthMessageCode.RECEIPTS].encode({
       reqId,
-      receipts: receipts as unknown, // Type compatibility
+      receipts: receipts as any, // Type compatibility
     })
 
     // Send using handler's sendMessage

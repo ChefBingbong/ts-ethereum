@@ -1,5 +1,5 @@
 import type { ExecutionNode } from '../../node/index'
-import type { RpcHandler, RpcMethodFn } from '../types'
+import type { RpcMethodFn } from '../types'
 import { createRpcHandler } from '../validation'
 import { createAdminRpcMethods } from './admin/admin'
 import { createDebugRpcMethods } from './debug/index'
@@ -20,34 +20,7 @@ export * from './net/index'
 export * from './txpool/index'
 export * from './web3/index'
 
-export const createRpcHandlers = (
-  node: ExecutionNode,
-  debug: boolean,
-): {
-  methods: string[]
-  rpcHandlers: RpcHandler<Record<string, RpcMethodFn>>
-} => {
-  const methods: Record<AllRpcMethods, RpcMethodFn> = {
-    ...createAdminRpcMethods(node),
-    ...createEthRpcMethods(node),
-    ...createNetRpcMethods(node),
-    ...createTxPoolRpcMethods(node),
-    ...createWeb3RpcMethods(node),
-    ...createDebugRpcMethods(node),
-  }
-  return {
-    rpcHandlers: createRpcHandler(methods, { debug }),
-    methods: Object.keys(methods),
-  }
-}
-
-export const createP2PRpcHandlers = (
-  node: ExecutionNode,
-  debug: boolean,
-): {
-  methods: string[]
-  rpcHandlers: RpcHandler<Record<string, RpcMethodFn>>
-} => {
+export const createRpcHandlers = (node: ExecutionNode, debug: boolean) => {
   const methods: Record<AllRpcMethods, RpcMethodFn> = {
     ...createAdminRpcMethods(node),
     ...createEthRpcMethods(node),

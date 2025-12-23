@@ -4,7 +4,7 @@
  * Exports all message handlers and provides registration function
  */
 
-import { EthMessageCode } from '../../../../client/net/protocol/eth/definitions'
+import { EthMessageCode } from '../../../net/protocol/eth/definitions'
 import type { EthHandlerRegistry } from '../registry'
 import { handleBlockBodies } from './block-bodies'
 // Response handlers
@@ -85,21 +85,22 @@ export function registerDefaultHandlers(registry: EthHandlerRegistry): void {
 
 // Export all handlers for direct access if needed
 export {
-  handleBlockBodies,
-  // Responses
-  handleBlockHeaders,
-  handleGetBlockBodies,
-  // Requests
-  handleGetBlockHeaders,
-  handleGetNodeData,
-  handleGetPooledTransactions,
-  handleGetReceipts,
-  handleNewBlock,
-  // Announcements
-  handleNewBlockHashes,
-  handleNewPooledTransactionHashes,
-  handleNodeData,
-  handlePooledTransactions,
-  handleReceipts,
-  handleTransactions,
+    handleBlockBodies,
+    // Responses
+    handleBlockHeaders,
+    handleGetBlockBodies,
+    // Requests
+    handleGetBlockHeaders,
+    handleGetNodeData,
+    handleGetPooledTransactions,
+    handleGetReceipts,
+    handleNewBlock,
+    // Announcements
+    handleNewBlockHashes,
+    handleNewPooledTransactionHashes,
+    handleNodeData,
+    handlePooledTransactions,
+    handleReceipts,
+    handleTransactions
 }
+

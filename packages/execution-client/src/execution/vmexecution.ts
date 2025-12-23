@@ -1,39 +1,41 @@
+import type { Block } from '@ts-ethereum/block'
+import {
+  DBSaveLookups,
+  DBSetBlockOrHeader,
+  DBSetHashToNumber,
+  DBSetTD,
+} from '@ts-ethereum/blockchain'
+import { createMPT } from '@ts-ethereum/mpt'
+import {
+  Caches,
+  CacheType,
+  MerkleStateManager,
+} from '@ts-ethereum/state-manager'
+import {
+  BIGINT_0,
+  BIGINT_1,
+  bytesToHex,
+  equalsBytes,
+  EthereumJSErrorWithoutCode,
+  hexToBytes,
+  Lock,
+  type PrefixedHexString,
+  ValueEncoding,
+} from '@ts-ethereum/utils'
+import {
+  createVM,
+  runBlock,
+  type RunBlockOpts,
+  runTx,
+  type TxReceipt,
+  type VM,
+} from '@ts-ethereum/vm'
 import * as mcl from 'mcl-wasm'
-import { initRustBN } from 'rustbn-wasm'
-import type { Block } from '../../block'
 import {
-	DBSaveLookups,
-	DBSetBlockOrHeader,
-	DBSetHashToNumber,
-	DBSetTD,
-} from '../../blockchain'
-import { getGenesis } from '../../genesis'
-import { createMPT } from '../../mpt'
-import { Caches, CacheType, MerkleStateManager } from '../../state-manager'
-import {
-	BIGINT_0,
-	BIGINT_1,
-	bytesToHex,
-	equalsBytes,
-	EthereumJSErrorWithoutCode,
-	hexToBytes,
-	Lock,
-	PrefixedHexString,
-	ValueEncoding,
-} from '../../utils'
-import {
-	createVM,
-	runBlock,
-	RunBlockOpts,
-	runTx,
-	TxReceipt,
-	VM,
-} from '../../vm'
-import {
-	classifyError,
-	createErrorContext,
-	ErrorCode,
-	ExecutionError,
+  classifyError,
+  createErrorContext,
+  ErrorCode,
+  ExecutionError,
 } from '../errors/index'
 import { Event } from '../types'
 import { debugCodeReplayBlock } from '../util/debug'
@@ -65,7 +67,7 @@ export class VMExecution extends Execution {
 
   public vm!: VM
   public merkleVM: VM | undefined
-  public hardfork: string = ''
+  public hardfork = ''
   /* Whether canonical chain execution has stayed valid or ran into an invalid block */
   public chainStatus: ChainStatus | null = null
 
@@ -188,26 +190,26 @@ export class VMExecution extends Execution {
 
     const stateManager = new MerkleStateManager({
       trie,
-      prefixStorageTrieKeys: this.config.options.prefixStorageTrieKeys,
+      // prefixStorageTrieKeys: this.config.options.prefixStorageTrieKeys,
       caches: new Caches({
         account: {
           type: CacheType.LRU,
           size: this.config.options.accountCache,
         },
-        storage: {
-          type: CacheType.LRU,
-          size: this.config.options.storageCache,
-        },
-        code: {
-          type: CacheType.LRU,
-          size: this.config.options.codeCache,
-        },
+        // storage: {
+        //   type: CacheType.LRU,
+        //   size: this.config.options.storageCache,
+        // },
+        // code: {
+        //   type: CacheType.LRU,
+        //   size: this.config.options.codeCache,
+        // },
       }),
       common: this.config.chainCommon,
     })
 
     await mcl.init(mcl.BLS12_381)
-    const rustBN = await initRustBN()
+    // const rustBN = await initRustBN()
     this.merkleVM = await createVM({
       common: this.config.execCommon,
       blockchain: this.chain.blockchain,
@@ -234,7 +236,7 @@ export class VMExecution extends Execution {
         )
       }
       const headBlock = await blockchain.getIteratorHead()
-      const { number, timestamp, stateRoot } = headBlock.header
+      const { number, stateRoot } = headBlock.header
       this.chainStatus = {
         height: number,
         status: ExecStatus.VALID,
@@ -256,9 +258,7 @@ export class VMExecution extends Execution {
       this.vm = this.merkleVM!
 
       if (number === BIGINT_0) {
-        const genesisState =
-          this.chain['_customGenesisState'] ??
-          getGenesis(Number(blockchain.common.chainId()))
+        const genesisState = this.chain['_customGenesisState'] ?? undefined
         if (
           !genesisState &&
           !('generateCanonicalGenesis' in this.vm.stateManager)
@@ -286,7 +286,7 @@ export class VMExecution extends Execution {
       return
     }
 
-    const { number, timestamp, stateRoot } = headBlock.header
+    const { number, stateRoot } = headBlock.header
     this.chainStatus = {
       height: number,
       status: ExecStatus.VALID,
@@ -318,8 +318,8 @@ export class VMExecution extends Execution {
   async runWithoutSetHead(
     opts: RunBlockOpts & { parentBlock?: Block },
     receipts?: TxReceipt[],
-    blocking: boolean = false,
-    skipBlockchain: boolean = false,
+    blocking = false,
+    skipBlockchain = false,
   ): Promise<boolean> {
     // if its not blocking request then return early if its already running else wait to grab the lock
     if ((!blocking && this.running) || !this.started || this.config.shutdown)
@@ -637,7 +637,7 @@ export class VMExecution extends Execution {
 
                 // run block, update head if valid
                 try {
-                  const { number, timestamp } = block.header
+                  const { number } = block.header
 
                   const hardfork = this.config.execCommon.hardfork()
                   if (hardfork !== this.hardfork) {
@@ -760,10 +760,10 @@ export class VMExecution extends Execution {
                   // to parent's parent and so on...
                   //
                   // There can also be a better way to backstep vm to but lets naively step back
-                  let backStepTo,
-                    backStepToHash,
-                    backStepToRoot,
-                    hasParentStateRoot = false
+                  let backStepTo
+                  let backStepToHash
+                  let backStepToRoot
+                  let hasParentStateRoot = false
                   if (headBlock !== undefined) {
                     hasParentStateRoot =
                       await this.vm.stateManager.hasStateRoot(
@@ -1006,14 +1006,7 @@ export class VMExecution extends Execution {
       this.config.options.logger?.info(
         `Account cache stats size=${stats.size} reads=${stats.reads} hits=${stats.hits} writes=${stats.writes}`,
       )
-      stats = sm['_caches']?.storage?.stats() ?? deactivatedStats
-      this.config.options.logger?.info(
-        `Storage cache stats size=${stats.size} reads=${stats.reads} hits=${stats.hits} writes=${stats.writes}`,
-      )
-      stats = sm['_caches']?.code?.stats() ?? deactivatedStats
-      this.config.options.logger?.info(
-        `Code cache stats size=${stats.size} reads=${stats.reads} hits=${stats.hits} writes=${stats.writes}`,
-      )
+
       const tStats = sm['_trie'].database().stats()
       this.config.options.logger?.info(
         `Trie cache stats size=${tStats.size} reads=${tStats.cache.reads} hits=${tStats.cache.hits} ` +

@@ -1,22 +1,20 @@
+import type { Input } from '@ts-ethereum/rlp'
+import { RLP } from '@ts-ethereum/rlp'
+import {
+  assertEq,
+  BIGINT_0,
+  bigIntToBytes,
+  bytesToBigInt,
+  bytesToHex,
+  bytesToInt,
+  bytesToUnprefixedHex,
+  formatLogData,
+  formatLogId,
+  hexToBytes,
+  intToBytes,
+  isHexString,
+} from '@ts-ethereum/utils'
 import * as snappy from 'snappyjs'
-import type { Input } from '../../../../rlp/index'
-import * as RLP from '../../../../rlp/index'
-import {
-	BIGINT_0,
-	bigIntToBytes,
-	bytesToBigInt,
-	bytesToHex,
-	bytesToInt,
-	bytesToUnprefixedHex,
-	hexToBytes,
-	intToBytes,
-	isHexString,
-} from '../../../../utils/index'
-import {
-	assertEq,
-	formatLogData,
-	formatLogId,
-} from '../../../../utils/utils'
 import { ProtocolType } from '../../dpt-1/types'
 import type { ProtocolConnection } from '../protocol'
 import { Protocol } from '../protocol'
@@ -85,12 +83,12 @@ export const EthMessageCodeNames: { [key in EthMessageCodes]: string } =
 export class ETH extends Protocol {
   protected _status: EthStatusMsg | null = null
   public _peerStatus: EthStatusMsg | null = null
-  private DEBUG: boolean = false
+  private DEBUG = false
 
   // Eth64
-  protected _hardfork: string = 'chainstart'
+  protected _hardfork = 'chainstart'
   protected _latestBlock = BIGINT_0
-  protected _forkHash: string = ''
+  protected _forkHash = ''
   protected _nextForkBlock = BIGINT_0
 
   constructor(
@@ -184,7 +182,7 @@ export class ETH extends Protocol {
    */
   private _handleStatusMessage(payload: unknown): void {
     assertEq(
-      this._peerStatus,
+      this._peerStatus as any,
       null,
       'Uncontrolled status message',
       this.debug.bind(this),

@@ -1,5 +1,5 @@
-import { bytesToHex } from '../../../../utils/index'
-import { safeResult } from '../../../../utils/safe'
+import { bytesToHex } from '@ts-ethereum/utils'
+import { safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'

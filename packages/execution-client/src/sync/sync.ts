@@ -1,5 +1,5 @@
-import { BlockHeader } from '../../block/index'
-import { BIGINT_0, short } from '../../utils'
+import { BlockHeader } from '@ts-ethereum/block'
+import { BIGINT_0, short } from '@ts-ethereum/utils'
 import type { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 import { timestampToMilliseconds } from '../config/utils'
@@ -33,7 +33,7 @@ export abstract class Synchronizer {
   public running: boolean
   public startingBlock: bigint
 
-  public lastSyncDate: number = 0
+  public lastSyncDate = 0
   public syncTargetHeight: bigint = BIGINT_0
   public synchronized: boolean
   public lastSynchronized: boolean
@@ -51,7 +51,7 @@ export abstract class Synchronizer {
   constructor(options: SynchronizerOptions) {
     this.config = options.core.config
     this.pool = options.core
-    this.chain = options.core.chain
+    this.chain = options.core.chain as Chain
     this._fetcher = null
 
     this.interval = options.interval ?? 1000
@@ -74,7 +74,7 @@ export abstract class Synchronizer {
     })
 
     this.config.events.on(Event.CHAIN_UPDATED, () => {
-      this.updateSynchronizedState(this.chain.headers.latest, true)
+      this.updateSynchronizedState(this.chain.headers.latest ?? undefined, true)
     })
   }
 
@@ -303,6 +303,6 @@ export abstract class Synchronizer {
    * Reset synced status after a certain time with no chain updates
    */
   _syncedStatusCheck() {
-    this.updateSynchronizedState(this.chain.headers.latest, false)
+    this.updateSynchronizedState(this.chain.headers.latest ?? undefined, false)
   }
 }

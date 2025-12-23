@@ -6,7 +6,7 @@
  */
 
 import debug from 'debug'
-import { EthMessageCode } from '../../../client/net/protocol/eth/definitions'
+import { EthMessageCode } from '../../net/protocol/eth/definitions'
 import type { EthHandler } from './handler'
 
 const log = debug('p2p:eth:registry')

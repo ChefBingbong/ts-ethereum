@@ -1,6 +1,6 @@
-import type { BlockBodyBytes, BlockHeader } from '../../../../block'
-import type { TypedTransaction } from '../../../../tx'
-import type { TxReceipt } from '../../../../vm'
+import type { BlockBodyBytes, BlockHeader } from '@ts-ethereum/block'
+import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxReceipt } from '@ts-ethereum/vm'
 
 type GetBlockHeadersOpts = {
   /* Request id (default: next internal id) */

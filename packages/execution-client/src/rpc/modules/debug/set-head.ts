@@ -1,4 +1,4 @@
-import { safeError, safeResult } from '../../../../utils/safe'
+import { safeError, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { INTERNAL_ERROR, INVALID_PARAMS } from '../../error-code'
 import { getBlockByOption } from '../../helpers'

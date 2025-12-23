@@ -20,7 +20,6 @@
 
 import { existsSync, readFileSync } from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import {
   type Account,
   createWalletClient,
@@ -34,7 +33,7 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const __filename = fileURLToPath(import.meta.url)
+const __filename = '../../../test-network-data/accounts.json'
 const __dirname = path.dirname(__filename)
 
 // Parse command line arguments
@@ -254,18 +253,6 @@ async function sendTxWithNonce(
     console.error(`Transaction failed: ${error}`)
     process.exit(1)
   }
-}
-
-// Wait for user to press enter
-async function waitForEnter(message: string): Promise<void> {
-  console.log(`\n⏸️  ${message}`)
-  console.log('   Press Enter to continue...\n')
-
-  return new Promise((resolve) => {
-    process.stdin.once('data', () => {
-      resolve()
-    })
-  })
 }
 
 // Sleep helper
@@ -500,10 +487,10 @@ async function main() {
 
   // Config
   const rpcUrl = args.rpc || 'http://127.0.0.1:8545'
-  const chainId = parseInt(args.chainId || '12345', 10)
+  const chainId = Number.parseInt(args.chainId || '12345', 10)
   const scenario = args.scenario || 'all'
-  const fromIndex = parseInt(args.from || '0', 10)
-  const toIndex = parseInt(args.to || '1', 10)
+  const fromIndex = Number.parseInt(args.from || '0', 10)
+  const toIndex = Number.parseInt(args.to || '1', 10)
 
   console.log('='.repeat(60))
   console.log('🧪 NONCE GAP TEST SCRIPT')

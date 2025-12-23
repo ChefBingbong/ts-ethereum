@@ -1,10 +1,7 @@
-import type { BlockHeader } from '@ts-ethereum/block'
-import type { TypedTransaction } from '@ts-ethereum/tx'
-import type { TxReceipt } from '@ts-ethereum/vm'
-import type { Chain } from '../../../client/blockchain'
-import type { VMExecution } from '../../../client/execution'
-import type { Config } from '../../../client/config'
-import type { RLPxConnection } from '../../transport/rlpx/connection'
+import type { RLPxConnection } from '@ts-ethereum/p2p'
+import type { Chain } from '../../blockchain'
+import type { Config } from '../../config'
+import type { VMExecution } from '../../execution'
 
 /**
  * ETH Protocol Handler Options

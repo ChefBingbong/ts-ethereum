@@ -5,9 +5,9 @@
 
 import debug from 'debug'
 import {
-  ETH_MESSAGES,
-  EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
+    ETH_MESSAGES,
+    EthMessageCode,
+} from '../../../net/protocol/eth/definitions'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:pooled-transactions')

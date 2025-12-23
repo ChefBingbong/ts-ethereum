@@ -1,7 +1,6 @@
-import type { Connection, P2PNode, PeerId } from '../../../p2p/libp2p/types'
-import { peerIdToString } from '../../../p2p/libp2p/types'
-import type { RLPxConnection } from '../../../p2p/transport/rlpx/connection'
-import { bigIntToUnpaddedBytes } from '../../../utils/index'
+import type { Connection, P2PNode, PeerId, RLPxConnection } from '@ts-ethereum/p2p'
+import { peerIdToString } from '@ts-ethereum/p2p'
+import { bigIntToUnpaddedBytes } from '@ts-ethereum/utils'
 import type { Chain } from '../../blockchain/chain'
 import type { Config } from '../../config/index'
 import type { VMExecution } from '../../execution/index'
@@ -219,7 +218,7 @@ export class NetworkCore {
     }
 
     const protocols = rlpxConnection.getProtocols()
-    const ethProtocol = protocols.find((p) => p.constructor.name === 'ETH') as
+    const ethProtocol = protocols.find((p: any) => p.constructor.name === 'ETH') as
       | ETH
       | undefined
 

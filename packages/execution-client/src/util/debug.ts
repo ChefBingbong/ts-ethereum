@@ -1,8 +1,6 @@
-import { bytesToHex } from '../../utils'
-
+import type { Block } from '@ts-ethereum/block'
+import { bytesToHex } from '@ts-ethereum/utils'
 import { DataDirectory } from '..'
-
-import type { Block } from '../../block'
 import type { VMExecution } from '../execution'
 
 /**

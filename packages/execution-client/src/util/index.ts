@@ -1,17 +1,16 @@
-import { existsSync, readFileSync } from 'fs'
-import { platform } from 'os'
-import { dirname, join as joinPath } from 'path'
-import { fileURLToPath } from 'url'
 /**
  * @module util
  */
-import { bytesToHex } from '../../utils'
+import { bytesToHex } from '@ts-ethereum/utils'
+import { existsSync, readFileSync } from 'fs'
+import { platform } from 'os'
+import { dirname, join as joinPath } from 'path'
 
 export * from './ip'
 export * from './parse'
 
 // See: https://stackoverflow.com/a/50053801
-const __dirname = dirname(fileURLToPath(import.meta.url))
+const __dirname = process.cwd()
 
 export function short(bytes: Uint8Array | string): string {
   if (bytes === null || bytes === undefined || bytes === '') return ''

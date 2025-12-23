@@ -2,10 +2,19 @@
   "name": "@ts-ethereum/db",
   "version": "0.0.0",
   "license": "ISC",
-  "main": "./_cjs/index.js",
+  "type": "module",
+  "main": "./index.ts",
   "module": "./_esm/index.js",
   "types": "./_types/index.d.ts",
   "typings": "./_types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./_types/index.d.ts",
+      "import": "./index.ts",
+      "require": "./_cjs/index.js",
+      "default": "./index.ts"
+    }
+  },
   "files": [
     "*"
   ],

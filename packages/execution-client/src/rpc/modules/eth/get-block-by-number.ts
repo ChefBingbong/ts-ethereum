@@ -1,4 +1,4 @@
-import { safeError, safeResult } from '../../../../utils/safe'
+import { safeError, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'

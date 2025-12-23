@@ -1,5 +1,5 @@
-import type { Block } from '../../block'
-import { BIGINT_0, BIGINT_1, equalsBytes } from '../../utils'
+import type { Block } from '@ts-ethereum/block'
+import { BIGINT_0, BIGINT_1, equalsBytes } from '@ts-ethereum/utils'
 import type { VMExecution } from '../execution/index'
 import type { Peer } from '../net/peer/peer'
 import type { TxPool } from '../service/txpool'
@@ -123,10 +123,10 @@ export class FullSynchronizer extends Synchronizer {
     let best: Peer | undefined
     for (const peer of peers) {
       if (peer.eth?.status !== undefined) {
-        const td = peer.eth.status.td
+        const td = peer.eth.status?.td
         if (
-          (!best && td >= this.chain.blocks.td) ||
-          (best?.eth?.status.td !== undefined && best.eth.status.td < td)
+          (!best && td && td >= this.chain.blocks.td) ||
+          (td && best?.eth?.status?.td !== undefined && best.eth.status.td < td)
         ) {
           best = peer
         }

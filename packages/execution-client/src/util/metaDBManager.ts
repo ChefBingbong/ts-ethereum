@@ -1,5 +1,5 @@
+import { concatBytes, intToBytes } from '@ts-ethereum/utils'
 import type { AbstractLevel } from 'abstract-level'
-import { concatBytes, intToBytes } from '../../utils'
 import type { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 

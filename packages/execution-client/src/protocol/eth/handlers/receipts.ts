@@ -7,7 +7,7 @@ import debug from 'debug'
 import {
   ETH_MESSAGES,
   EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
+} from '../../../net/protocol/eth/definitions'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:receipts')
@@ -18,7 +18,7 @@ const log = debug('p2p:eth:handlers:receipts')
  */
 export function handleReceipts(handler: EthHandler, payload: unknown): void {
   try {
-    const decoded = ETH_MESSAGES[EthMessageCode.RECEIPTS].decode(payload)
+    const decoded = ETH_MESSAGES[EthMessageCode.RECEIPTS].decode(payload as any)
     const reqId = decoded[0] as bigint
     const receipts = decoded[1] as unknown[]
 

@@ -3,12 +3,12 @@
  * Processes incoming GET_POOLED_TRANSACTIONS requests and sends POOLED_TRANSACTIONS response
  */
 
+import type { TypedTransaction } from '@ts-ethereum/tx'
 import debug from 'debug'
 import {
-  ETH_MESSAGES,
-  EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+    ETH_MESSAGES,
+    EthMessageCode,
+} from '../../../net/protocol/eth/definitions'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:get-pooled-transactions')
@@ -24,7 +24,7 @@ export async function handleGetPooledTransactions(
   try {
     // Payload is already decoded: [reqId, hashes]
     const decoded =
-      ETH_MESSAGES[EthMessageCode.GET_POOLED_TRANSACTIONS].decode(payload)
+      ETH_MESSAGES[EthMessageCode.GET_POOLED_TRANSACTIONS].decode(payload as any)
     const { reqId, hashes } = decoded
 
     log('GET_POOLED_TRANSACTIONS: reqId=%d, hashes=%d', reqId, hashes.length)

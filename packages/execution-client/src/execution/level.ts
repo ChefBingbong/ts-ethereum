@@ -1,5 +1,3 @@
-import type { AbstractLevel } from 'abstract-level'
-import { MemoryLevel } from 'memory-level'
 import {
   KeyEncoding,
   ValueEncoding,
@@ -7,7 +5,9 @@ import {
   type DB,
   type DBObject,
   type EncodingOpts,
-} from '../../utils'
+} from '@ts-ethereum/utils'
+import type { AbstractLevel } from 'abstract-level'
+import { MemoryLevel } from 'memory-level'
 
 // Helper to infer the `valueEncoding` option for `putting` a value in a levelDB
 const getEncodings = (opts: EncodingOpts = {}) => {

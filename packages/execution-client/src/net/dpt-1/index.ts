@@ -9,6 +9,6 @@ export {
 	type KademliaConfig,
 	type KademliaEvent,
 	type PeerInfo
-} from '../../../kademlia/index'
+} from '@ts-ethereum/kademlia'
 export * from './dpt'
 

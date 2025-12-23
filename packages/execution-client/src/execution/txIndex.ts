@@ -1,5 +1,5 @@
-import * as RLP from '../../rlp'
-import { BIGINT_0, bytesToInt, intToBytes } from '../../utils'
+import { RLP } from '@ts-ethereum/rlp'
+import { BIGINT_0, bytesToInt, intToBytes } from '@ts-ethereum/utils'
 import { DBKey, MetaDBManager } from '../util/metaDBManager'
 
 export type TxHashIndex = [blockHash: Uint8Array, txIndex: number]

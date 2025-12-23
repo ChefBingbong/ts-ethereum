@@ -1,4 +1,4 @@
-import { BIGINT_0, BIGINT_1 } from '../../../utils'
+import { BIGINT_0, BIGINT_1 } from '@ts-ethereum/utils'
 import type { Chain } from '../../blockchain/index'
 import type { FetcherOptions } from './fetcher'
 import { Fetcher } from './fetcher'
@@ -82,13 +82,21 @@ export abstract class BlockFetcherBase<JobResult, StorageItem> extends Fetcher<
 
     while (count >= BigInt(max) && tasks.length < maxTasks) {
       tasks.push({ first, count: max })
-      !this.reverse ? (first += BigInt(max)) : (first -= BigInt(max))
+      if (!this.reverse) {
+        first += BigInt(max)
+      } else {
+        first -= BigInt(max)
+      }
       count -= BigInt(max)
       pushedCount += BigInt(max)
     }
     if (count > BIGINT_0 && tasks.length < maxTasks) {
       tasks.push({ first, count: Number(count) })
-      !this.reverse ? (first += BigInt(count)) : (first -= BigInt(count))
+      if (!this.reverse) {
+        first += BigInt(count)
+      } else {
+        first -= BigInt(count)
+      }
       pushedCount += count
       count = BIGINT_0
     }

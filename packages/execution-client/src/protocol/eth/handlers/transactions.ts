@@ -3,12 +3,13 @@
  * Processes incoming TRANSACTIONS announcements
  */
 
+import { TypedTransaction } from '@ts-ethereum/tx'
 import debug from 'debug'
 import {
-	ETH_MESSAGES,
-	EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
-import { handleTransactions as handleTransactionsExec } from '../../../../client/net/protocol/eth/handlers'
+  ETH_MESSAGES,
+  EthMessageCode,
+} from '../../../net/protocol/eth/definitions'
+import { handleTransactions as handleTransactionsExec } from '../../../net/protocol/eth/handlers'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:transactions')
@@ -22,16 +23,23 @@ export async function handleTransactions(
   payload: unknown,
 ): Promise<void> {
   try {
-    const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(payload, {
-      chainCommon: handler.config.chainCommon,
-      synchronized: handler.isReady,
-    })
+    const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(
+      payload as any,
+      {
+        chainCommon: handler.config.chainCommon,
+        synchronized: handler.isReady,
+      },
+    )
 
     // If context is available, call execution handler directly
     if (handler.context) {
       const peer = handler.findPeer()
       if (peer) {
-        await handleTransactionsExec(decoded, peer, handler.context)
+        await handleTransactionsExec(
+          decoded as TypedTransaction[],
+          peer,
+          handler.context,
+        )
         return
       }
     }

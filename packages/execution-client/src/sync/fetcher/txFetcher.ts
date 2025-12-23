@@ -1,4 +1,4 @@
-import { bytesToUnprefixedHex, hexToBytes } from '../../../utils'
+import { bytesToUnprefixedHex, hexToBytes } from '@ts-ethereum/utils'
 import type { Config } from '../../config/index'
 import type { Peer } from '../../net/peer/peer'
 import type { PeerPoolLike } from '../../net/peerpool-types'
@@ -35,7 +35,7 @@ export class TxFetcher {
   private readonly ANNOUNCE_TIMEOUT = 60000 // 1 minute
 
   private fetchInterval: NodeJS.Timeout | undefined
-  private running: boolean = false
+  private running = false
 
   constructor(options: TxFetcherOptions) {
     this.config = options.config

@@ -7,7 +7,7 @@ import debug from 'debug'
 import {
   ETH_MESSAGES,
   EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
+} from '../../../net/protocol/eth/definitions'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:block-headers')
@@ -21,9 +21,12 @@ export function handleBlockHeaders(
   payload: unknown,
 ): void {
   try {
-    const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(payload, {
-      chainCommon: handler.config.chainCommon,
-    }) as [bigint, unknown[]]
+    const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(
+      payload as any,
+      {
+        chainCommon: handler.config.chainCommon,
+      },
+    ) as [bigint, unknown[]]
     const reqId = decoded[0] as bigint
     const headers = decoded[1] as unknown[]
 

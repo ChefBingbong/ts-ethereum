@@ -1,8 +1,8 @@
+import type { Common } from '@ts-ethereum/chain-config'
+import { devp2pDebug } from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debugDefault from 'debug'
 import { EventEmitter } from 'eventemitter3'
-import type { Common } from '../../../chain-config/index'
-import { devp2pDebug } from '../../../utils/utils'
 import type { ProtocolEvent, ProtocolType } from '../dpt-1/types'
 
 type MessageCodes = { [key: number | string]: number | string }
@@ -58,7 +58,7 @@ export abstract class Protocol {
   protected _messageCodes: MessageCodes
   private _debug: Debugger
   protected _verbose: boolean
-  protected _protocolOffset: number = 0
+  protected _protocolOffset = 0
   protected _registry: ProtocolHandlerRegistry = new ProtocolHandlerRegistry()
 
   /**
@@ -121,7 +121,7 @@ export abstract class Protocol {
     const ip = this._peer['_socket'].remoteAddress
     if (typeof ip === 'string') {
       this.msgDebuggers[ip] = devp2pDebug.extend('FIRST_PEER')
-      this._peer._addFirstPeerDebugger()
+      this._peer._addFirstPeerDebugger?.()
       this._firstPeer = ip
     }
   }
@@ -160,11 +160,11 @@ export abstract class Protocol {
       // Handler receives decoded payload - subclasses should decode before calling
       const result = handler(code, data)
       if (result instanceof Promise) {
-        result.catch((err: Error) => {
-          const clientError = this.config.trackError(err)
+        result.catch((error: Error) => {
+          // const clientError = this.?.trackError?.(err)
           this.debug(
             `HANDLER_ERROR`,
-            `Error in handler for code ${code}: ${clientError.message}`,
+            `Error in handler for code ${code}: ${error.message}`,
           )
           // Note: ProtocolEvent doesn't have error, so we can't emit it
           // Subclasses can handle errors in their own way

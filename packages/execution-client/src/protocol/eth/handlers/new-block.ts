@@ -3,12 +3,13 @@
  * Processes incoming NEW_BLOCK announcements
  */
 
+import { Block } from '@ts-ethereum/block'
 import debug from 'debug'
 import {
-	ETH_MESSAGES,
-	EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
-import { handleNewBlock as handleNewBlockExec } from '../../../../client/net/protocol/eth/handlers'
+  ETH_MESSAGES,
+  EthMessageCode,
+} from '../../../net/protocol/eth/definitions'
+import { handleNewBlock as handleNewBlockExec } from '../../../net/protocol/eth/handlers'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:new-block')
@@ -22,11 +23,14 @@ export async function handleNewBlock(
   payload: unknown,
 ): Promise<void> {
   try {
-    const decoded = ETH_MESSAGES[EthMessageCode.NEW_BLOCK].decode(payload, {
-      chainCommon: handler.config.chainCommon,
-    })
-    const block = decoded[0]
-    const td = decoded[1]
+    const decoded = ETH_MESSAGES[EthMessageCode.NEW_BLOCK].decode(
+      payload as any,
+      {
+        chainCommon: handler.config.chainCommon,
+      },
+    )
+    const block = decoded[0] as Block
+    const td = decoded[1] as Uint8Array
 
     // If context is available, call execution handler directly
     if (handler.context) {

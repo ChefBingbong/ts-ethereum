@@ -1,6 +1,6 @@
+import type { Block } from '@ts-ethereum/block'
+import type { VM } from '@ts-ethereum/vm'
 import type { AbstractLevel } from 'abstract-level'
-import type { Block } from '../../block/index'
-import type { VM } from '../../vm/index'
 import type { Chain } from '../blockchain/chain'
 import type { Config } from '../config/index'
 import { Miner } from '../miner/index'
@@ -122,9 +122,7 @@ export class ExecutionService {
     this.config.events.off(Event.CHAIN_REORG, this.onChainReorg)
   }
 
-  private onPoolPeerAdded = (
-    peer: import('../net/peer/peer').Peer,
-  ): void => {
+  private onPoolPeerAdded = (peer: import('../net/peer/peer').Peer): void => {
     if (!this.txPool) return
 
     const txs: [number[], number[], Uint8Array[]] = [[], [], []]
@@ -162,7 +160,7 @@ export class ExecutionService {
         this.txPool.demoteUnexecutables(),
         this.txPool.promoteExecutables(),
       ])
-    } catch (error) {
+    } catch {
       // Error handling
     }
   }
@@ -175,7 +173,7 @@ export class ExecutionService {
 
     try {
       await this.txPool.handleReorg(oldBlocks, newBlocks)
-    } catch (error) {
+    } catch {
       // Error handling
     }
   }
@@ -188,7 +186,7 @@ export class ExecutionService {
       await this.execution.stop()
       this.removeEventListeners()
       return true
-    } catch (error) {
+    } catch {
       return false
     }
   }
@@ -198,7 +196,7 @@ export class ExecutionService {
       this.txPool.close()
       await this.synchronizer?.close()
       this.removeEventListeners()
-    } catch (error) {
+    } catch {
       this.removeEventListeners()
     }
   }

@@ -1,21 +1,21 @@
-import type { Block } from '../../block'
-import * as RLP from '../../rlp'
-import type { TransactionType, TypedTransaction } from '../../tx'
+import type { Block } from '@ts-ethereum/block'
+import { RLP } from '@ts-ethereum/rlp'
+import type { TransactionType, TypedTransaction } from '@ts-ethereum/tx'
 import {
-	bigIntToBytes,
-	bytesToBigInt,
-	bytesToInt,
-	equalsBytes,
-	EthereumJSErrorWithoutCode,
-	intToBytes,
-	utf8ToBytes,
-} from '../../utils'
+  bigIntToBytes,
+  bytesToBigInt,
+  bytesToInt,
+  equalsBytes,
+  EthereumJSErrorWithoutCode,
+  intToBytes,
+  utf8ToBytes,
+} from '@ts-ethereum/utils'
 import {
-	Bloom,
-	PostByzantiumTxReceipt,
-	PreByzantiumTxReceipt,
-	TxReceipt,
-} from '../../vm'
+  Bloom,
+  type PostByzantiumTxReceipt,
+  type PreByzantiumTxReceipt,
+  type TxReceipt,
+} from '@ts-ethereum/vm'
 import { DBKey, MetaDBManager } from '../util/metaDBManager'
 
 // Log type for receipts (simplified - logs are always empty in value-transfer-only mode)
@@ -176,12 +176,15 @@ export class ReceiptsManager extends MetaDBManager {
     txHashIndex: TxHashIndex,
   ): Promise<GetReceiptByTxHashReturn | null> {
     const [blockHash, txIndex] = txHashIndex
-    const receipts = await this.getReceipts(blockHash)
+    const receipts = (await this.getReceipts(blockHash)) as TxReceipt[]
     if (receipts.length === 0) return null
     let logIndex = 0
-    receipts.slice(0, txIndex).map((r) => (logIndex += r.logs.length))
+    receipts.slice(0, txIndex).map((r) => {
+      logIndex += (r as TxReceipt).logs.length
+      return logIndex
+    })
     const receipt = receipts[txIndex]
-    receipt.bitvector = this.logsBloom(receipt.logs).bitvector
+    receipt.bitvector = this.logsBloom((receipt as TxReceipt).logs).bitvector
     return [receipt, blockHash, txIndex, logIndex]
   }
 
@@ -198,14 +201,14 @@ export class ReceiptsManager extends MetaDBManager {
     let returnedLogsSize = 0
     for (let i = from.header.number; i <= to.header.number; i++) {
       const block = await this.chain.getBlock(i)
-      const receipts = await this.getReceipts(block.hash())
+      const receipts = (await this.getReceipts(block.hash())) as TxReceipt[]
       if (receipts.length === 0) continue
       let logs: GetLogsReturn = []
       let logIndex = 0
       for (const [receiptIndex, receipt] of receipts.entries()) {
         logs.push(
-          ...receipt.logs.map((log) => ({
-            log,
+          ...receipt.logs.map((log: Log) => ({
+            log: log as Log,
             block,
             tx: block.transactions[receiptIndex],
             txIndex: receiptIndex,
@@ -229,18 +232,21 @@ export class ReceiptsManager extends MetaDBManager {
         //  * [[A, B], [A, B]] - (A OR B) in first position AND (A OR B) in second position (and anything after)
         // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
         logs = logs.filter((l) => {
+          let result = true
           for (const [i, topic] of topics.entries()) {
             if (Array.isArray(topic)) {
               // Can match any items in this array
-              if (!topic.find((t) => equalsBytes(t, l.log[1][i]))) return false
+              if (!topic.find((t) => equalsBytes(t, l.log[1][i])))
+                result = false
             } else if (!topic) {
               // If null then can match any
             } else {
               // If a value is specified then it must match
-              if (!equalsBytes(topic, l.log[1][i])) return false
+              if (!equalsBytes(topic, l.log[1][i])) result = false
             }
-            return true
+            result = true
           }
+          return result
         })
       }
       returnedLogs.push(...logs)

@@ -1,10 +1,8 @@
 import { defaultLogger } from '@libp2p/logger'
-import { P2PNode } from '../../p2p/libp2p/node'
-import { rlpx } from '../../p2p/transport/rlpx/index'
+import { P2PNode, P2PNode as P2PNodeType, rlpx } from '@ts-ethereum/p2p'
 import { ConfigOptions } from '../config/types'
 import { dptDiscovery } from '../net/discovery/dpt-discovery'
 import { ETH } from '../net/protocol/eth/eth'
-import { P2PNode as P2PNodeType } from '../p2p/libp2p/types'
 
 export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
   const kadDiscovery = []
@@ -13,10 +11,10 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
   if (options.discV4) {
     kadDiscovery.push(
       dptDiscovery({
-        privateKey: options.key,
+        privateKey: options.key as any,
         bindAddr: options.extIP ?? '127.0.0.1',
         bindPort: options.port,
-        bootstrapNodes: [...options.bootnodes],
+        bootstrapNodes: [...(options.bootnodes as any)],
         autoDial: true,
         autoDialBootstrap: true,
       }),
@@ -24,7 +22,7 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
   }
 
   const node = new P2PNode({
-    privateKey: options.key,
+    privateKey: options.key as any,
     peerDiscovery: kadDiscovery,
     maxConnections: options.maxPeers,
     logger: componentLogger,
@@ -37,13 +35,13 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
     },
     transports: [
       rlpx({
-        privateKey: options.key,
+        privateKey: options.key as any,
         capabilities: [ETH.eth68],
         common: options.common,
         timeout: 10000,
         maxConnections: options.maxPeers,
       }),
-    ],
+    ] as any,
   })
 
   return node

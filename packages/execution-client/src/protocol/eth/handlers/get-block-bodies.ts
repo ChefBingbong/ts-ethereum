@@ -7,7 +7,7 @@ import debug from 'debug'
 import {
   ETH_MESSAGES,
   EthMessageCode,
-} from '../../../../client/net/protocol/eth/definitions'
+} from '../../../net/protocol/eth/definitions'
 import type { EthHandler } from '../handler'
 
 const log = debug('p2p:eth:handlers:get-block-bodies')
@@ -22,8 +22,9 @@ export async function handleGetBlockBodies(
 ): Promise<void> {
   try {
     // Payload is already decoded: [reqId, hashes]
-    const decoded =
-      ETH_MESSAGES[EthMessageCode.GET_BLOCK_BODIES].decode(payload)
+    const decoded = ETH_MESSAGES[EthMessageCode.GET_BLOCK_BODIES].decode(
+      payload as any,
+    )
     const { reqId, hashes } = decoded
 
     log('GET_BLOCK_BODIES: reqId=%d, hashes=%d', reqId, hashes.length)
@@ -43,7 +44,7 @@ export async function handleGetBlockBodies(
     const responseData = ETH_MESSAGES[EthMessageCode.BLOCK_BODIES].encode({
       reqId,
       bodies,
-    })
+    } as any)
 
     // Send using handler's sendMessage
     handler.sendMessage(EthMessageCode.BLOCK_BODIES, responseData)

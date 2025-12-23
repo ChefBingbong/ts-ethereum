@@ -13,21 +13,16 @@
  *   directly, bypassing devp2p's sendMessage().
  */
 
-import * as snappy from 'snappyjs'
+import type { RLPxConnection } from '@ts-ethereum/p2p'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   bigIntToBytes,
-  bigIntToUnpaddedBytes,
-  bytesToBigInt,
-  bytesToHex,
-  bytesToInt,
   hexToBytes,
   intToBytes,
   isHexString,
-  type PrefixedHexString,
 } from '@ts-ethereum/utils'
-import type { RLPxConnection } from '../../transport/rlpx/connection'
-import { EthMessageCode } from '../../../client/net/protocol/eth/definitions'
+import * as snappy from 'snappyjs'
+import { EthMessageCode } from '../../net/protocol/eth/definitions'
 
 const BIGINT_0 = BigInt(0)
 

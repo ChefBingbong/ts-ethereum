@@ -64,7 +64,7 @@ export function getNodeId(privateKey: Uint8Array): Uint8Array {
 export function initPrivateKey(
   paths: { peerIdFile: string },
   logger?: any,
-  persistNetworkIdentity: boolean = true,
+  persistNetworkIdentity = true,
 ): PrivateKeyInfo {
   const shouldPersist =
     persistNetworkIdentity ?? process.env.PERSIST_NETWORK_IDENTITY !== 'false'

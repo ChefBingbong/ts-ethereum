@@ -5,12 +5,12 @@
  */
 
 import {
-	ErrorCategory,
-	ErrorCode,
-	ErrorContext,
-	ErrorMetadata,
-	ErrorRecoveryType,
-	ErrorSeverity,
+  ErrorCategory,
+  type ErrorCode,
+  type ErrorContext,
+  type ErrorMetadata,
+  ErrorRecoveryType,
+  ErrorSeverity,
 } from './types'
 
 /**

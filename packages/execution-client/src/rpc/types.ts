@@ -1,8 +1,8 @@
+import type { PrefixedHexString } from '@ts-ethereum/utils'
+import { SafePromise } from '@ts-ethereum/utils'
 import { Context } from 'hono'
 import { ContentfulStatusCode } from 'hono/utils/http-status'
 import z from 'zod'
-import type { PrefixedHexString } from '../../utils'
-import { SafePromise } from '../../utils/safe'
 
 export interface RPCTx {
   from?: PrefixedHexString
@@ -46,7 +46,9 @@ export function toRPCTx(t: TxResult): RPCTx {
     maxFeePerGas: t.maxFeePerGas,
     type: t.type,
   }
-  t.to !== null && (rpcTx.to = t.to)
+  if (t.to !== null) {
+    rpcTx.to = t.to
+  }
   return rpcTx
 }
 

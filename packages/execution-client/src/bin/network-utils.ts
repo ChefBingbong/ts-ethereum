@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
 import { multiaddr } from '@multiformats/multiaddr'
+import type { ChainConfig, GenesisState } from '@ts-ethereum/chain-config'
+import {
+  type Address,
+  bytesToHex,
+  bytesToUnprefixedHex,
+  createAddressFromPrivateKey,
+} from '@ts-ethereum/utils'
 import { createHash } from 'crypto'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import type { ChainConfig, GenesisState } from '../../chain-config/index'
-import {
-	type Address,
-	bytesToHex,
-	bytesToUnprefixedHex,
-	createAddressFromPrivateKey,
-} from '../../utils/index'
 
 export type Account = [address: Address, privateKey: Uint8Array]
 
@@ -124,17 +124,17 @@ export function getNodeId(privateKey: Uint8Array): Uint8Array {
 }
 
 export function createGenesisState(accounts: Account[]): GenesisState {
-  const genesisState = {} as GenesisState
+  const genesisState: Record<string, string> = {}
   const initialBalance = '0x3635c9adc5dea00000' // 1000 ETH in hex
 
   for (const account of accounts) {
-    genesisState[account[0].toString()] = initialBalance
+    genesisState[account[0].toString() as keyof GenesisState] = initialBalance
   }
 
   console.log(
     `\n💰 Genesis state: ${accounts.length} accounts prefunded with 1000 ETH each\n`,
   )
-  return genesisState
+  return genesisState as any
 }
 export function writeBootnodeInfo(port: number, nodeKey: Uint8Array): void {
   const nodeId = bytesToUnprefixedHex(getNodeId(nodeKey))

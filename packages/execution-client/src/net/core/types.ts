@@ -1,4 +1,4 @@
-import type { P2PNode } from '../../../p2p/libp2p/types'
+import type { P2PNode } from '@ts-ethereum/p2p'
 import type { Chain } from '../../blockchain/chain'
 import type { Config } from '../../config/index'
 import type { VMExecution } from '../../execution/index'

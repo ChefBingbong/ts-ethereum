@@ -1,9 +1,11 @@
+import { TransactionType } from '@ts-ethereum/tx'
 import {
-	bytesToHex,
-	EthereumJSErrorWithoutCode,
-} from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
-import { encodeReceipt } from '../../../../vm/index'
+  bytesToHex,
+  EthereumJSErrorWithoutCode,
+  safeError,
+  safeResult,
+} from '@ts-ethereum/utils'
+import { encodeReceipt, TxReceipt } from '@ts-ethereum/vm'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'
@@ -22,7 +24,14 @@ export const getRawReceipts = (node: ExecutionNode) => {
       true,
     )
     return safeResult(
-      receipts.map((r) => bytesToHex(encodeReceipt(r, r.txType))),
+      receipts.map((r) =>
+        bytesToHex(
+          encodeReceipt(
+            r as unknown as TxReceipt,
+            r.txType as unknown as TransactionType,
+          ),
+        ),
+      ),
     )
   })
 }

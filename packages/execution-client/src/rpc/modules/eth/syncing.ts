@@ -1,5 +1,5 @@
-import { BIGINT_0, bigIntToHex } from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
+import { BIGINT_0, bigIntToHex } from '@ts-ethereum/utils'
+import { safeError, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { createRpcMethod } from '../../validation'
 import { syncingSchema } from './schema'

@@ -1,4 +1,4 @@
-import { safeResult } from '../../../../utils/safe'
+import { safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { getClientVersion } from '../../../util/index'
 import { createRpcMethod } from '../../validation'

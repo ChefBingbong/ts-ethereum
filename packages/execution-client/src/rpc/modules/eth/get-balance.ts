@@ -2,9 +2,9 @@ import {
 	bigIntToHex,
 	createAddressFromString,
 	EthereumJSErrorWithoutCode,
-} from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
-import type { VM } from '../../../../vm/index'
+} from '@ts-ethereum/utils'
+import { safeError, safeResult } from '@ts-ethereum/utils'
+import type { VM } from '@ts-ethereum/vm'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'

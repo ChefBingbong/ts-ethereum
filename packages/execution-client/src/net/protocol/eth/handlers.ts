@@ -1,7 +1,7 @@
-import type { Block } from '../../../../block'
-import type { TypedTransaction } from '../../../../tx'
-import { concatBytes } from '../../../../utils'
-import { encodeReceipt } from '../../../../vm'
+import type { Block } from '@ts-ethereum/block'
+import type { TransactionType, TypedTransaction } from '@ts-ethereum/tx'
+import { concatBytes } from '@ts-ethereum/utils'
+import { encodeReceipt, TxReceipt } from '@ts-ethereum/vm'
 import type { Chain } from '../../../blockchain/index'
 import type { VMExecution } from '../../../execution/index'
 import type { TxReceiptWithType } from '../../../execution/receipt'
@@ -86,7 +86,7 @@ export async function handleGetBlockBodies(
  * Handle NewBlockHashes announcement
  */
 export function handleNewBlockHashes(
-  data: Array<[Uint8Array, bigint]>,
+  data: [Uint8Array, bigint][],
   context: EthHandlerContext,
 ) {
   const { synchronizer } = context
@@ -117,7 +117,7 @@ export async function handleNewBlock(
 ) {
   const [block] = data
   const { synchronizer } = context
-  await synchronizer.handleNewBlock(block, peer)
+  await synchronizer?.handleNewBlock(block, peer)
 }
 
 /**
@@ -180,7 +180,12 @@ export async function handleGetReceipts(
 
     receipts.push(...blockReceipts)
     const receiptsBytes = concatBytes(
-      ...receipts.map((r) => encodeReceipt(r, r.txType)),
+      ...receipts.map((r) =>
+        encodeReceipt(
+          r as unknown as TxReceipt,
+          r.txType as unknown as TransactionType,
+        ),
+      ),
     )
     receiptsSize += receiptsBytes.byteLength
 

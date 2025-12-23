@@ -3,12 +3,12 @@
  * https://github.com/hokaccha/node-jwt-simple -- MIT licensed
  */
 
-import crypto from 'crypto'
+import crypto from 'crypto';
 /**
  * module dependencies
  */
-import { base64url, base64urlnopad } from '@scure/base' // cspell:disable-line
-import { bytesToUtf8, utf8ToBytes } from '../../utils'
+import { base64url, base64urlnopad } from '@scure/base'; // cspell:disable-line
+import { bytesToUtf8, utf8ToBytes } from '@ts-ethereum/utils';
 
 /**
  * support algorithm mapping

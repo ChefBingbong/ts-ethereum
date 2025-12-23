@@ -36,7 +36,7 @@ export class RpcServerBase {
     this.logger = modules.logger
 
     app.use('*', cors({ origin: opts.cors ?? '*' }))
-    app.onError(this.onError.bind(this))
+    app.onError(this.onError.bind(this) as any)
     app.notFound(this.onNotFound.bind(this))
     this.app = app
   }
@@ -66,7 +66,7 @@ export class RpcServerBase {
     try {
       if (!this.isListening) return
 
-      await this.server.close?.()
+      await this.server?.close?.()
       this.isListening = false
       this.logger.debug('RPC server closed')
     } catch (e) {

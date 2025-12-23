@@ -1,9 +1,6 @@
-import { getHttpMetricsServer } from '../../metrics/index'
-import type {
-	HealthCheckFn,
-	HttpMetricsServer,
-} from '../../metrics/server/http.js'
-import type { P2PNode as P2PNodeType } from '../../p2p/libp2p/types'
+import type { HealthCheckFn, HttpMetricsServer } from '@ts-ethereum/metrics'
+import { getHttpMetricsServer } from '@ts-ethereum/metrics'
+import { P2PNode as P2PNodeType } from '@ts-ethereum/p2p'
 import { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 import { ExecutionService } from '../execution/execution-service'
@@ -121,7 +118,7 @@ export class ExecutionNode {
     // Initialize metrics if enabled
     if (options.config.options.metrics?.enabled !== false) {
       const metricsOptions = options.config.options.metrics
-      const port = node.config.options.port + 500
+      const port = (node.config.options.port ?? 0) + 500
       const address =
         metricsOptions?.host ?? metricsOptions?.address ?? '127.0.0.1'
 
@@ -171,18 +168,18 @@ export class ExecutionNode {
           healthCheck,
         },
         {
-          register: options.config.metrics.register,
+          register: options.config.metrics?.register as any,
           getOtherMetrics: async () => [],
         },
       )
       node.metricsServer = metricsServer
     }
 
-    if (node.running) return
+    if (node.running) return node
     void node.execution.synchronizer?.start()
 
     if (!node.v8Engine) {
-      node.v8Engine = await getV8Engine()
+      node.v8Engine = (await getV8Engine()) ?? undefined
     }
 
     node.statsInterval = setInterval(node.stats.bind(node), STATS_INTERVAL)
@@ -201,7 +198,7 @@ export class ExecutionNode {
       {
         enabled: true,
         address: '127.0.0.1',
-        port: options.config.options.port + 300,
+        port: (options.config.options.port ?? 0) + 300,
         cors: '*',
         debug: false,
         stacktraces: false,
@@ -252,7 +249,10 @@ export class ExecutionNode {
 
     // Update sync state if synchronizer is available
     if (this.synchronizer) {
-      this.synchronizer.updateSynchronizedState(this.chain.headers.latest, true)
+      this.synchronizer.updateSynchronizedState(
+        this.chain.headers.latest ?? undefined,
+        true,
+      )
     }
     this.execution.txPool.checkRunState()
   }
@@ -265,48 +265,50 @@ export class ExecutionNode {
     })
 
     this.config.events.on(Event.PEER_CONNECTED, () => {
-      this.config.metrics.network.peerConnections.inc({ direction: 'inbound' })
+      this.config.metrics?.network?.peerConnections?.inc({
+        direction: 'inbound',
+      })
       this.config.updateNetworkMetrics(this.network)
     })
 
     this.config.events.on(Event.PEER_DISCONNECTED, () => {
-      this.config.metrics.network.peerDisconnections.inc()
+      this.config.metrics?.network?.peerDisconnections?.inc()
       this.config.updateNetworkMetrics(this.network)
     })
 
     this.config.events.on(Event.POOL_PEER_BANNED, () => {
-      this.config.metrics.network.peerBans.inc()
+      this.config.metrics?.network?.peerBans?.inc()
       this.config.updateNetworkMetrics(this.network)
     })
 
     // Sync events
     this.config.events.on(Event.SYNC_SYNCHRONIZED, () => {
-      this.config.metrics.sync.syncStatus.set(0)
+      this.config.metrics?.sync?.syncStatus?.set(0)
       this.config.updateSyncMetrics(this.chain)
     })
 
     this.config.events.on(Event.SYNC_FETCHED_BLOCKS, () => {
-      this.config.metrics.sync.blocksFetched.inc()
+      this.config.metrics?.sync?.blocksFetched?.inc()
     })
 
     this.config.events.on(Event.SYNC_ERROR, () => {
-      this.config.metrics.sync.syncErrors.inc({ error_type: 'sync_error' })
+      this.config.metrics?.sync?.syncErrors?.inc({ error_type: 'sync_error' })
     })
 
     this.config.events.on(Event.SYNC_FETCHER_ERROR, () => {
-      this.config.metrics.sync.fetcherErrors.inc()
+      this.config.metrics?.sync?.fetcherErrors?.inc()
     })
 
     // Protocol events
     this.config.events.on(Event.PROTOCOL_MESSAGE, (message) => {
-      this.config.metrics.network.protocolMessages.inc({
+      this.config.metrics?.network?.protocolMessages?.inc({
         protocol: message.protocol,
         message_type: message.message.name,
       })
     })
 
     this.config.events.on(Event.PROTOCOL_ERROR, () => {
-      this.config.metrics.network.protocolErrors.inc({
+      this.config.metrics?.network?.protocolErrors?.inc({
         protocol: 'eth',
         error_type: 'protocol_error',
       })
@@ -314,7 +316,7 @@ export class ExecutionNode {
 
     // Chain reorg
     this.config.events.on(Event.CHAIN_REORG, () => {
-      this.config.metrics.chain.reorgsDetected.inc()
+      this.config.metrics?.chain?.reorgsDetected?.inc()
     })
   }
 

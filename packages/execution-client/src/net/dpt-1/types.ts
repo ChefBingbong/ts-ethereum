@@ -1,6 +1,6 @@
 import type { Socket } from 'net'
-import type { Common } from '../../../chain-config/index'
-import type { NestedUint8Array } from '../../../rlp/index'
+import type { Common } from '@ts-ethereum/chain-config'
+import type { NestedUint8Array } from '@ts-ethereum/rlp'
 import type { EthMessageCodes } from '../protocol/eth/eth'
 import type { Protocol } from '../protocol/protocol'
 import type { DPT } from './index'

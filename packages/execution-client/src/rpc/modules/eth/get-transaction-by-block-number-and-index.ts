@@ -1,5 +1,5 @@
-import type { PrefixedHexString } from '../../../../utils/index'
-import { safeError, safeResult } from '../../../../utils/safe'
+import type { PrefixedHexString } from '@ts-ethereum/utils'
+import { safeError, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption, toJSONRPCTx } from '../../helpers'
 import { createRpcMethod } from '../../validation'
