@@ -245,8 +245,7 @@ export class Miner {
       this.config.options.minerCoinbase ?? this.config.options.accounts[0][0]
 
     // Apply miner configuration
-    const minerGasCeil =
-      this.config.options.minerGasCeil ?? gasLimit
+    const minerGasCeil = this.config.options.minerGasCeil ?? gasLimit
     const targetGasLimit = minerGasCeil < gasLimit ? minerGasCeil : gasLimit
     const minerExtraData = this.config.options.minerExtraData
     const minerGasPrice = this.config.options.minerGasPrice

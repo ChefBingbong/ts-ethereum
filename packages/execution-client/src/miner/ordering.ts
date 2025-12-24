@@ -196,4 +196,3 @@ export class TransactionsByPriceAndNonce {
     this.txs.clear()
   }
 }
-

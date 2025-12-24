@@ -2,24 +2,24 @@ import type { Block, HeaderData } from '@ts-ethereum/block'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
   BIGINT_1,
-  TypeOutput,
   bigIntToUnpaddedBytes,
   bytesToHex,
   bytesToUnprefixedHex,
   concatBytes,
-  toType
+  TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import {
+  type BlockBuilder,
   BuildStatus,
   buildBlock,
-  type BlockBuilder,
   type TxReceipt,
   type VM,
 } from '@ts-ethereum/vm'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import type { Config } from '../config/index'
 import type { TxPool } from '../service/txpool'
-import { TransactionsByPriceAndNonce } from './ordering'
+import type { TransactionsByPriceAndNonce } from './ordering'
 
 interface PendingBlockOpts {
   /* Config */

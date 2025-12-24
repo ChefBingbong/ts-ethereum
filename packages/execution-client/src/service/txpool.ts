@@ -11,8 +11,8 @@ import {
   BIGINT_1,
   bytesToHex,
   bytesToUnprefixedHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   hexToBytes,
 } from '@ts-ethereum/utils'
 import type { VM } from '@ts-ethereum/vm'
@@ -1374,8 +1374,8 @@ export class TxPool {
     // Only iterate over pending pool - these are executable
     for (const [address, poolObjects] of this.pending) {
       // Sort by nonce
-      const txsSortedByNonce = [...poolObjects].sort(
-        (a, b) => Number(a.tx.nonce - b.tx.nonce),
+      const txsSortedByNonce = [...poolObjects].sort((a, b) =>
+        Number(a.tx.nonce - b.tx.nonce),
       )
 
       // Verify account nonce matches lowest tx nonce
