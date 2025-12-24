@@ -1,4 +1,4 @@
-import type { HttpMetricsServerOpts } from './server/index.js'
+import type { HttpMetricsServerOpts } from './server/index'
 
 export type Metadata = {
   /** Version string, e.g., "v1.0.0" */

@@ -3,7 +3,6 @@
     "module": "commonjs",
     "target": "esnext",
     "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
     "declaration": true,
     "declarationMap": true,
@@ -12,8 +11,25 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ts-ethereum/block": ["../block/src/index.ts"],
+      "@ts-ethereum/blockchain": ["../blockchain/src/index.ts"],
+      "@ts-ethereum/chain-config": ["../chain-config/src/index.ts"],
+      "@ts-ethereum/consensus": ["../consensus/src/index.ts"],
+      "@ts-ethereum/db": ["../db/src/index.ts"],
+      "@ts-ethereum/evm": ["../evm/src/index.ts"],
+      "@ts-ethereum/kademlia": ["../kademlia/src/index.ts"],
+      "@ts-ethereum/metrics": ["../metrics/src/index.ts"],
+      "@ts-ethereum/p2p": ["../p2p/src/index.ts"],
+      "@ts-ethereum/rlp": ["../rlp/src/index.ts"],
+      "@ts-ethereum/state-manager": ["../state-manager/src/index.ts"],
+      "@ts-ethereum/tx": ["../tx/src/index.ts"],
+      "@ts-ethereum/utils": ["../utils/src/index.ts"],
+      "@ts-ethereum/vm": ["../vm/src/index.ts"]
+    }
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "_types", "_cjs", "_esm"]
 }

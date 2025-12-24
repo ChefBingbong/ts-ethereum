@@ -1,5 +1,5 @@
 import { Gauge } from 'prom-client'
-import type { CollectFn, IGauge, LabelKeys, LabelsGeneric } from '../types.js'
+import type { CollectFn, IGauge, LabelKeys, LabelsGeneric } from '../types'
 
 /**
  * Extends the prom-client Gauge to be able to add multiple collect functions after instantiation

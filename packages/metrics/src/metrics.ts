@@ -1,20 +1,20 @@
 import { Metric, Registry } from 'prom-client'
-import { ChainMetrics, createChainMetrics } from './metrics/chain.js'
-import { createErrorMetrics, ErrorMetrics } from './metrics/errors.js'
+import { ChainMetrics, createChainMetrics } from './metrics/chain'
+import { createErrorMetrics, ErrorMetrics } from './metrics/errors'
 import {
   createExecutionMetrics,
   ExecutionMetrics,
-} from './metrics/execution.js'
-import { createMinerMetrics, MinerMetrics } from './metrics/miner.js'
-import { createNetworkMetrics, NetworkMetrics } from './metrics/network.js'
-import { createPrometheusMetrics } from './metrics/prometheus.js'
-import { createRPCMetrics, RPCMetrics } from './metrics/rpc.js'
-import { createSyncMetrics, SyncMetrics } from './metrics/sync.js'
-import { createSystemMetrics, SystemMetrics } from './metrics/system.js'
-import { createTxPoolMetrics, TxPoolMetrics } from './metrics/txPool.js'
-import { collectNodeJSMetrics } from './nodeJsMetrics.js'
-import { MetricsOptions } from './options.js'
-import { RegistryMetricCreator } from './utils/registryMetricCreator.js'
+} from './metrics/execution'
+import { createMinerMetrics, MinerMetrics } from './metrics/miner'
+import { createNetworkMetrics, NetworkMetrics } from './metrics/network'
+import { createPrometheusMetrics } from './metrics/prometheus'
+import { createRPCMetrics, RPCMetrics } from './metrics/rpc'
+import { createSyncMetrics, SyncMetrics } from './metrics/sync'
+import { createSystemMetrics, SystemMetrics } from './metrics/system'
+import { createTxPoolMetrics, TxPoolMetrics } from './metrics/txPool'
+import { collectNodeJSMetrics } from './nodeJsMetrics'
+import { MetricsOptions } from './options'
+import { RegistryMetricCreator } from './utils/registryMetricCreator'
 
 export type Metrics = {
   chain: ChainMetrics

@@ -11,8 +11,8 @@
     ".": {
       "types": "./_types/index.d.ts",
       "import": "./index.ts",
-      "require": "./_cjs/index.js",
-      "default": "./index.ts"
+      "require": "./_esm/index.js",
+      "default": "./_cjs/index.js"
     }
   },
   "files": [
@@ -23,6 +23,12 @@
     "type": "git",
     "url": "https://github.com/ChefBingbong/simple-p2p-blockchain.git",
     "directory": "packages/metrics"
+  },
+  "imports": {
+    "#prometheus-gc-stats-wrapper": {
+      "bun": "./src/metric-wrappers/bun.ts",
+      "default": "./src/metric-wrappers/node.ts"
+    }
   },
   "scripts": {
     "check": "tsc --pretty --noEmit",

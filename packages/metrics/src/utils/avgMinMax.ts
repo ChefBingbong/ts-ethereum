@@ -1,6 +1,6 @@
 import type { GaugeConfiguration } from 'prom-client'
-import type { IAvgMinMax, LabelKeys, LabelsGeneric } from '../types.js'
-import { GaugeExtra } from './gauge.js'
+import type { IAvgMinMax, LabelKeys, LabelsGeneric } from '../types'
+import { GaugeExtra } from './gauge'
 
 type GetValuesFn = () => number[]
 

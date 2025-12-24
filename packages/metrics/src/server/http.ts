@@ -1,7 +1,7 @@
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { Registry } from 'prom-client'
-import { RegistryMetricCreator } from '../utils/registryMetricCreator.js'
+import { RegistryMetricCreator } from '../utils/registryMetricCreator'
 
 export type HealthCheckFn = () => Promise<{
   healthy: boolean

@@ -1,4 +1,4 @@
-import { RegistryMetricCreator } from '../utils/registryMetricCreator.js'
+import { RegistryMetricCreator } from '../utils/registryMetricCreator'
 
 export const createPrometheusMetrics = (register: RegistryMetricCreator) => {
   return {
