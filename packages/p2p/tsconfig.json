@@ -24,6 +24,7 @@
       "@ts-ethereum/metrics": ["../metrics/src/index.ts"],
       "@ts-ethereum/mpt": ["../mpt/src/index.ts"],
       "@ts-ethereum/rlp": ["../rlp/src/index.ts"],
+      "@ts-ethereum/execution-client": ["../execution-client/src/index.ts"],
       "@ts-ethereum/state-manager": ["../state-manager/src/index.ts"],
       "@ts-ethereum/tx": ["../tx/src/index.ts"],
       "@ts-ethereum/utils": ["../utils/src/index.ts"],

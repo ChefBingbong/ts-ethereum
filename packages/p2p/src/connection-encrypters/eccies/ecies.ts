@@ -1,28 +1,26 @@
+import type { Common, CustomCrypto } from '@ts-ethereum/chain-config'
+import { RLP } from '@ts-ethereum/rlp'
+import {
+  assertEq,
+  bigIntToBytes,
+  bytesToInt,
+  concatBytes,
+  genPrivateKey,
+  hexToBytes,
+  id2pk,
+  intToBytes,
+  pk2id,
+  setLengthLeft,
+  unstrictDecode,
+  xor,
+  zfill,
+} from '@ts-ethereum/utils'
 import * as crypto from 'crypto'
 import debugDefault from 'debug'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { getRandomBytesSync } from 'ethereum-cryptography/random.js'
 import { ecdh, ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
-import type { Common, CustomCrypto } from '@ts-ethereum/chain-config'
-import { RLP } from '@ts-ethereum/rlp'
-import {
-	bigIntToBytes,
-	bytesToInt,
-	concatBytes,
-	hexToBytes,
-	intToBytes,
-	setLengthLeft,
-} from '@ts-ethereum/utils'
-import {
-	assertEq,
-	genPrivateKey,
-	id2pk,
-	pk2id,
-	unstrictDecode,
-	xor,
-	zfill,
-} from '@ts-ethereum/utils'
 import { MAC } from './mac'
 
 type Decipher = crypto.Decipheriv

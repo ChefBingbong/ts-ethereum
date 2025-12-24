@@ -454,4 +454,33 @@ export class ETH extends Protocol {
         : undefined,
     }
   }
+
+  /**
+   * Get the peer's status message (received from remote peer)
+   * Returns null if status hasn't been received yet
+   */
+  getPeerStatus(): EthStatusDecoded | null {
+    if (this._peerStatus === null) {
+      return null
+    }
+
+    const status: EthStatusEncoded = {
+      chainId: this._peerStatus[1] as Uint8Array,
+      td: this._peerStatus[2] as Uint8Array,
+      bestHash: this._peerStatus[3] as Uint8Array,
+      genesisHash: this._peerStatus[4] as Uint8Array,
+      forkId: this._version >= 64 && this._peerStatus[5]
+        ? (this._peerStatus[5] as Uint8Array[])
+        : undefined,
+    }
+
+    return this.decodeStatus(status)
+  }
+
+  /**
+   * Check if peer status has been received
+   */
+  hasPeerStatus(): boolean {
+    return this._peerStatus !== null
+  }
 }

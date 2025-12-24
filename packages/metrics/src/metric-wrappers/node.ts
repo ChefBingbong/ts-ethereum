@@ -1,5 +1,27 @@
-import { GCProfiler, GCProfilerResult } from 'node:v8'
 import { Counter, Registry } from 'prom-client'
+
+// Lazy-load GCProfiler to handle cases where it's not available (e.g., Bun)
+let GCProfiler: any
+let GCProfilerResult: any
+
+function getGCProfiler() {
+  if (GCProfiler !== undefined) {
+    return GCProfiler
+  }
+  
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const v8Module = require('node:v8')
+    GCProfiler = v8Module.GCProfiler
+    GCProfilerResult = v8Module.GCProfilerResult
+  } catch {
+    // GCProfiler not available (e.g., in Bun)
+    GCProfiler = null
+    GCProfilerResult = null
+  }
+  
+  return GCProfiler
+}
 
 export function gcStats(
   registry: Registry,
@@ -7,6 +29,12 @@ export function gcStats(
     collectionInterval: 6000,
   },
 ): () => void {
+  // If GCProfiler is not available, return a no-op function
+  const Profiler = getGCProfiler()
+  if (!Profiler) {
+    return () => {}
+  }
+
   const registers = registry ? [registry] : undefined
 
   const labelNames = ['gctype']
@@ -32,9 +60,10 @@ export function gcStats(
     registers,
   })
 
-  const profiler = new GCProfiler()
+  const profiler = new Profiler()
 
-  const processGCStats = (stats: GCProfilerResult['statistics'][0]): void => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const processGCStats = (stats: any): void => {
     const { gcType, cost, beforeGC, afterGC } = stats
 
     gcCount.labels(gcType).inc()

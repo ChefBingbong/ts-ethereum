@@ -3,5 +3,5 @@ export type { NetworkCoreOptions } from './core/index'
 export * from './discovery/index'
 export { NetworkService } from './network-service'
 export * from './peer/index'
+export * from './protocol'
 export * from './protocol/index'
-

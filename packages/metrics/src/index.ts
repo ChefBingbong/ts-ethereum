@@ -1,11 +1,7 @@
-export * from './metrics'
-export { createMetrics } from './metrics'
-export type { Metrics } from './metrics'
-export * from './nodeJsMetrics'
-export * from './options'
-export { defaultMetricsOptions } from './options'
-export { getHttpMetricsServer } from './server/http'
-export type { HttpMetricsServer } from './server/http'
-export * from './server/index'
-export type * from './types'
-export { RegistryMetricCreator } from './utils/registryMetricCreator'
+export * from './metrics';
+export * from './nodeJsMetrics';
+export * from './options';
+export * from './server/http';
+export * from './server/index';
+export * from './types';
+export * from './utils/registryMetricCreator';
