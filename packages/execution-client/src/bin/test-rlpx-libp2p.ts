@@ -3,7 +3,7 @@
 import { generateKeyPair } from '@libp2p/crypto/keys'
 import { multiaddr } from '@multiformats/multiaddr'
 import { Common } from '@ts-ethereum/chain-config'
-import { RLPxConnectionAdapter, rlpx } from '@ts-ethereum/p2p'
+import { RLPxConnectionAdapter, rlpxLibp2p } from '@ts-ethereum/p2p'
 import { bigIntToBytes } from '@ts-ethereum/utils'
 import debug from 'debug'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
@@ -104,7 +104,7 @@ export async function runTwoNodeExample(): Promise<void> {
     privateKey: node1Key,
     addresses: { listen: [`/ip4/127.0.0.1/tcp/${port1}`], announce: [] },
     transports: [
-      rlpx({
+      rlpxLibp2p({
         privateKey: node1RlpxKey,
         capabilities: [ETH.eth68],
         common,
@@ -130,7 +130,7 @@ export async function runTwoNodeExample(): Promise<void> {
     privateKey: node2Key,
     addresses: { listen: [`/ip4/127.0.0.1/tcp/${port2}`], announce: [] },
     transports: [
-      rlpx({
+      rlpxLibp2p({
         privateKey: node2RlpxKey,
         capabilities: [ETH.eth68],
         common,
