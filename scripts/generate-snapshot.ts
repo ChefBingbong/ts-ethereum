@@ -1,27 +1,17 @@
 #!/usr/bin/env bun
 
-/**
- * Generate deterministic snapshot data for sanity check tests
- *
- * Creates:
- * - accounts.json with 5 deterministic test accounts
- * - peer-id.json files for node-1 and node-2
- * - Pre-populated chainDB with Ethash cache for both nodes
- *
- * Usage: bun scripts/generate-snapshot.ts
- */
 
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import {
-  derivePrivateKey,
-  generateAccounts,
-  writeAccounts,
-  writePrivateKey,
+    derivePrivateKey,
+    generateAccounts,
+    writeAccounts,
+    writePrivateKey,
 } from '@ts-ethereum/chain-config'
 import { Ethash } from '@ts-ethereum/consensus'
 import { initDatabases } from '@ts-ethereum/db'
 import { bytesToHex, KeyEncoding, ValueEncoding } from '@ts-ethereum/utils'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import { getCacheSize, getFullSize } from '../packages/consensus/src/util'
 import { LevelDB } from '../packages/execution-client/src/execution/level'
 
@@ -47,7 +37,7 @@ const NODE2_DIR = path.join(FIXTURES_DIR, 'node-2')
 /**
  * Generate Ethash cache data for epoch 0
  */
-async function generateEthashCacheData() {
+async function generateEthashCacheData(chainDb: any) {
   const epoch = 0
   const seed = new Uint8Array(32) // Epoch 0 seed is all zeros
   const cacheSize = await getCacheSize(epoch)
@@ -57,8 +47,9 @@ async function generateEthashCacheData() {
   console.log(`  Full size: ${fullSize.toLocaleString()} bytes`)
 
   // Create Ethash instance and generate cache
-  const ethash = new Ethash()
+  const ethash = new Ethash(new LevelDB(chainDb) as any)
   const cache = ethash.mkcache(cacheSize, seed)
+  await ethash.loadEpoc(BigInt(epoch))
 
   // Return cache in the format expected by LevelDB
   return {
@@ -76,7 +67,7 @@ async function writeEthashCacheToDb(chainDB: any, cacheData: any) {
   const ETHASH_EPOCH_KEY = '0' // Key stored as string (KeyEncoding.Number uses utf8)
   // Wrap with LevelDB to handle encoding conversion
   const db = new LevelDB(chainDB)
-  await db.put(ETHASH_EPOCH_KEY, cacheData, {
+  await db.put(0 as any, cacheData, {
     keyEncoding: KeyEncoding.Number,
     valueEncoding: ValueEncoding.JSON,
   })
@@ -88,7 +79,6 @@ async function writeEthashCacheToDb(chainDB: any, cacheData: any) {
 async function generateNodeDatabases(
   nodeDir: string,
   nodeName: string,
-  cacheData: any,
 ) {
   const dataDir = path.join(nodeDir, 'data')
 
@@ -100,6 +90,15 @@ async function generateNodeDatabases(
 
   console.log(`  Creating databases for ${nodeName}...`)
   const databases = await initDatabases(dbPaths)
+  
+    // Generate Ethash cache
+    console.log('\nGenerating Ethash cache for epoch 0...')
+    console.log('  (This may take 5-10 seconds)')
+  
+    const startTime = Date.now()
+    const cacheData = await generateEthashCacheData(databases.chainDB)
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`  Cache generated in ${elapsed}s`)
 
   // Write Ethash cache to chainDB
   await writeEthashCacheToDb(databases.chainDB, cacheData)
@@ -155,26 +154,15 @@ async function main() {
   writePrivateKey(node2KeyFile, node2Key)
   console.log(`  Node 2 key: ${node2KeyFile}`)
 
-  // Generate Ethash cache
-  console.log('\nGenerating Ethash cache for epoch 0...')
-  console.log('  (This may take 5-10 seconds)')
-
-  const startTime = Date.now()
-  const cacheData = await generateEthashCacheData()
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-  console.log(`  Cache generated in ${elapsed}s`)
-
   // Generate databases for both nodes with Ethash cache
   console.log('\nGenerating node databases with Ethash cache...')
   const node1DataDir = await generateNodeDatabases(
     NODE1_DIR,
     'Node 1',
-    cacheData,
   )
   const node2DataDir = await generateNodeDatabases(
     NODE2_DIR,
     'Node 2',
-    cacheData,
   )
 
   console.log('\n' + '='.repeat(44))
