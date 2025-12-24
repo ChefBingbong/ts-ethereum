@@ -1,3 +1,4 @@
+import * as crypto from 'node:crypto'
 import type { Common, CustomCrypto } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -18,9 +19,8 @@ import {
 import debugDefault from 'debug'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { getRandomBytesSync } from 'ethereum-cryptography/random.js'
-import { ecdh, ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
-import * as crypto from 'node:crypto'
+import { ecdh, ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
 import { MAC } from './mac'
 
 type Decipher = crypto.Decipheriv
