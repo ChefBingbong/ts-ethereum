@@ -100,7 +100,7 @@ export class ECIES {
   ) {
     this._privateKey = privateKey
     this._publicKey = id2pk(id)
-    this._remotePublicKey = remoteId  ? id2pk(remoteId) : null
+    this._remotePublicKey = remoteId !== null ? id2pk(remoteId) : null
 
     this._nonce = getRandomBytesSync(32)
     this._ephemeralPrivateKey = genPrivateKey()

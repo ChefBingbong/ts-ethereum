@@ -30,7 +30,7 @@
  */
 
 // Transport
-export { rlpx, RLPxTransport } from './transport'
+export { rlpxLibp2p, RLPxTransport } from './transport'
 
 // Listener
 export { RLPxListener } from './listener'
@@ -39,7 +39,6 @@ export type { RLPxListenerEvents } from './listener'
 // Connection and Adapter
 export { RLPxConnection } from './connection'
 export { RLPxConnectionAdapter } from './connection-adapter'
-
 // Types
 export type {
 	CloseServerOnMaxConnectionsOpts, HelloMessage,

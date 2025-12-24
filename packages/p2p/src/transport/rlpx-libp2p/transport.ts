@@ -465,7 +465,7 @@ export class RLPxTransport implements Transport<RLPxDialEvents> {
 /**
  * Create an RLPx transport factory function compatible with libp2p
  */
-export function rlpx(
+export function rlpxLibp2p(
   init: RLPxTransportOptions,
 ): (components: Libp2pComponents) => RLPxTransport {
   return (components: Libp2pComponents) => {
