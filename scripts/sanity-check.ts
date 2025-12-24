@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * Node Sanity Check Script
  *
@@ -17,11 +18,13 @@
  *
  * Usage:
  *   bun scripts/sanity-check.ts
- *   
+ *
  * If the snapshot is missing, run first:
  *   bun scripts/generate-snapshot.ts
  */
 
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
@@ -34,18 +37,19 @@ import {
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import {
   createWalletClient,
   defineChain,
   type Hex,
   http,
   parseEther,
-  publicActions
+  publicActions,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { Config, createConfigOptions } from '../packages/execution-client/src/config/index'
+import {
+  Config,
+  createConfigOptions,
+} from '../packages/execution-client/src/config/index'
 import { LevelDB } from '../packages/execution-client/src/execution/level'
 import { getLogger } from '../packages/execution-client/src/logging'
 import { ExecutionNode } from '../packages/execution-client/src/node/index'
@@ -136,10 +140,12 @@ async function bootNode(
   if (existsSync(runtimeDataDir)) {
     rmSync(runtimeDataDir, { recursive: true, force: true })
   }
-  
+
   // Copy snapshot databases to runtime directory
   if (!existsSync(snapshotDataDir)) {
-    throw new Error(`Snapshot not found: ${snapshotDataDir}. Run: bun scripts/generate-snapshot.ts`)
+    throw new Error(
+      `Snapshot not found: ${snapshotDataDir}. Run: bun scripts/generate-snapshot.ts`,
+    )
   }
   cpSync(snapshotDataDir, runtimeDataDir, { recursive: true })
   console.log(`  [Copied snapshot databases]`)
@@ -193,12 +199,16 @@ async function bootNode(
     isSingleNode: false,
     maxPeers: 10,
     minPeers: 1,
-    metrics: {...defaultMetricsOptions, enabled: false},
+    metrics: { ...defaultMetricsOptions, enabled: false },
   })
 
   const _bootnodes = configOptions.bootnodes ? [...configOptions.bootnodes] : []
   const _accounts = configOptions.accounts ? [...configOptions.accounts] : []
-  const config = new Config({...configOptions, bootnodes: _bootnodes, accounts: _accounts})
+  const config = new Config({
+    ...configOptions,
+    bootnodes: _bootnodes,
+    accounts: _accounts,
+  })
 
   // Setup paths and databases (using runtime copy of snapshot)
   const dbPaths = {
@@ -254,7 +264,10 @@ function getEnodeUrl(ctx: NodeContext): string {
 // CHECK IMPLEMENTATIONS
 // ============================================
 
-async function checkServicesStart(): Promise<{ passed: boolean; details: string[] }> {
+async function checkServicesStart(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -277,12 +290,20 @@ async function checkServicesStart(): Promise<{ passed: boolean; details: string[
   )
 
   const passed =
-    node1Running && node1Chain && node1Exec && node2Running && node2Chain && node2Exec
+    node1Running &&
+    node1Chain &&
+    node1Exec &&
+    node2Running &&
+    node2Chain &&
+    node2Exec
 
   return { passed, details }
 }
 
-async function checkPeerDiscovery(): Promise<{ passed: boolean; details: string[] }> {
+async function checkPeerDiscovery(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -300,18 +321,22 @@ async function checkPeerDiscovery(): Promise<{ passed: boolean; details: string[
 
     details.push(`Node 1 peers: ${node1.node.peerCount()}`)
     details.push(`Node 2 peers: ${node2.node.peerCount()}`)
-    
 
     return { passed: true, details }
   } catch (error) {
     details.push(`Node 1 peers: ${node1.node.peerCount()}`)
     details.push(`Node 2 peers: ${node2.node.peerCount()}`)
-    details.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return { passed: false, details }
   }
 }
 
-async function checkEciesHandshake(): Promise<{ passed: boolean; details: string[] }> {
+async function checkEciesHandshake(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -336,12 +361,17 @@ async function checkEciesHandshake(): Promise<{ passed: boolean; details: string
 
     return { passed: false, details: ['ETH protocol not negotiated'] }
   } catch (error) {
-    details.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return { passed: false, details }
   }
 }
 
-async function checkStatusExchange(): Promise<{ passed: boolean; details: string[] }> {
+async function checkStatusExchange(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -364,7 +394,9 @@ async function checkStatusExchange(): Promise<{ passed: boolean; details: string
       if (status) {
         details.push(`ChainId: ${CHAIN_ID}`)
         if (status.genesisHash) {
-          details.push(`Genesis hash: ${truncateHex(bytesToHex(status.genesisHash))}`)
+          details.push(
+            `Genesis hash: ${truncateHex(bytesToHex(status.genesisHash))}`,
+          )
         }
         return { passed: true, details }
       }
@@ -385,12 +417,17 @@ async function checkStatusExchange(): Promise<{ passed: boolean; details: string
 
     return { passed: false, details: ['Status not exchanged'] }
   } catch (error) {
-    details.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return { passed: false, details }
   }
 }
 
-async function checkEthProtocol(): Promise<{ passed: boolean; details: string[] }> {
+async function checkEthProtocol(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -422,12 +459,17 @@ async function checkEthProtocol(): Promise<{ passed: boolean; details: string[] 
 
     return { passed: false, details: ['ETH protocol not active'] }
   } catch (error) {
-    details.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return { passed: false, details }
   }
 }
 
-async function checkSyncAndRpc(): Promise<{ passed: boolean; details: string[] }> {
+async function checkSyncAndRpc(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -472,7 +514,10 @@ async function checkSyncAndRpc(): Promise<{ passed: boolean; details: string[] }
   }
 }
 
-async function checkTransactionProcessing(): Promise<{ passed: boolean; details: string[] }> {
+async function checkTransactionProcessing(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -549,7 +594,9 @@ async function checkTransactionProcessing(): Promise<{ passed: boolean; details:
 
     return { passed: receipt.blockNumber !== null, details }
   } catch (error) {
-    details.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
 
     // Transaction processing is hard without mining being fully active
     // Check if we can at least access txpool
@@ -562,7 +609,10 @@ async function checkTransactionProcessing(): Promise<{ passed: boolean; details:
   }
 }
 
-async function checkChainConsistency(): Promise<{ passed: boolean; details: string[] }> {
+async function checkChainConsistency(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
   const details: string[] = []
 
   if (!node1 || !node2) {
@@ -604,7 +654,9 @@ async function checkChainConsistency(): Promise<{ passed: boolean; details: stri
 
     return { passed: node1Height === node2Height, details }
   } catch (error) {
-    details.push(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return { passed: false, details }
   }
 }
@@ -674,10 +726,10 @@ async function main() {
     console.log('Shutting down nodes...')
 
     if (node1) {
-       node1.node.stop().catch(() => {})
+      node1.node.stop().catch(() => {})
     }
     if (node2) {
-       node2.node.stop().catch(() => {})
+      node2.node.stop().catch(() => {})
     }
 
     const totalTime = Date.now() - startTime
@@ -707,5 +759,3 @@ main().catch((error) => {
   console.error('Unhandled error:', error)
   process.exit(1)
 })
-
-

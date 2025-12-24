@@ -23,7 +23,11 @@ export function waitForEvent<T = unknown>(
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error(`Timeout waiting for event '${eventName}' after ${timeoutMs}ms`))
+      reject(
+        new Error(
+          `Timeout waiting for event '${eventName}' after ${timeoutMs}ms`,
+        ),
+      )
     }, timeoutMs)
 
     const handler = (arg: T) => {
@@ -49,13 +53,13 @@ export async function waitForCondition(
   description = 'condition',
 ): Promise<void> {
   const startTime = Date.now()
-  
+
   while (Date.now() - startTime < timeoutMs) {
     const result = await condition()
     if (result) return
     await sleep(pollIntervalMs)
   }
-  
+
   throw new Error(`Timeout waiting for ${description} after ${timeoutMs}ms`)
 }
 
@@ -68,15 +72,18 @@ export async function runCheck(
   timeoutMs = 30000,
 ): Promise<CheckResult> {
   const startTime = Date.now()
-  
+
   try {
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Check timed out after ${timeoutMs}ms`)), timeoutMs)
+      setTimeout(
+        () => reject(new Error(`Check timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      )
     })
-    
+
     const result = await Promise.race([checkFn(), timeoutPromise])
     const duration = Date.now() - startTime
-    
+
     return {
       name,
       passed: result.passed,
@@ -105,21 +112,27 @@ export function sleep(ms: number): Promise<void> {
 /**
  * Format check result for console output
  */
-export function formatCheckResult(result: CheckResult, index: number, total: number): string {
+export function formatCheckResult(
+  result: CheckResult,
+  index: number,
+  total: number,
+): string {
   const status = result.passed ? '✓ PASS' : '✗ FAIL'
-  const duration = result.duration ? `  (${(result.duration / 1000).toFixed(1)}s)` : ''
+  const duration = result.duration
+    ? `  (${(result.duration / 1000).toFixed(1)}s)`
+    : ''
   const dots = '.'.repeat(Math.max(1, 30 - result.name.length))
-  
+
   let output = `[${index}/${total}] ${result.name}${dots} ${status}${duration}\n`
-  
+
   for (const detail of result.details) {
     output += `      - ${detail}\n`
   }
-  
+
   if (result.error) {
     output += `      ERROR: ${result.error}\n`
   }
-  
+
   return output
 }
 
@@ -129,12 +142,14 @@ export function formatCheckResult(result: CheckResult, index: number, total: num
 export function printSummary(results: CheckResult[], totalTime: number): void {
   const passed = results.filter((r) => r.passed).length
   const failed = results.length - passed
-  
+
   console.log('\n' + '='.repeat(44))
   if (failed === 0) {
     console.log(`  RESULT: ${passed}/${results.length} PASSED`)
   } else {
-    console.log(`  RESULT: ${passed}/${results.length} PASSED, ${failed} FAILED`)
+    console.log(
+      `  RESULT: ${passed}/${results.length} PASSED, ${failed} FAILED`,
+    )
   }
   console.log(`  Time: ${(totalTime / 1000).toFixed(1)}s`)
   console.log('='.repeat(44))
@@ -147,4 +162,3 @@ export function truncateHex(hex: string, chars = 8): string {
   if (hex.length <= chars + 2) return hex
   return `${hex.slice(0, chars + 2)}...`
 }
-
