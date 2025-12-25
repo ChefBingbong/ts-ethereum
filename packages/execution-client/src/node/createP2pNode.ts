@@ -8,12 +8,18 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
   const kadDiscovery = []
   const componentLogger = defaultLogger()
 
+  // extIP is used for binding/listening (0.0.0.0 for Docker)
+  // announceIP is used for advertising to peers (container IP for Docker)
+  const listenIP = options.extIP ?? '0.0.0.0'
+  const announceIP = options.announceIP ?? options.extIP ?? '127.0.0.1'
+
   if (options.discV4) {
     kadDiscovery.push(
       dptDiscovery({
         privateKey: options.key as any,
-        bindAddr: options.extIP ?? '127.0.0.1',
+        bindAddr: listenIP,
         bindPort: options.port,
+        announceAddr: announceIP, // Advertise this IP to peers
         bootstrapNodes: [...(options.bootnodes as any)],
         autoDial: true,
         autoDialBootstrap: true,
@@ -27,11 +33,10 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
     maxConnections: options.maxPeers,
     logger: componentLogger,
     addresses: {
-      listen: [
-        options.extIP
-          ? `/ip4/${options.extIP}/tcp/${options.port}`
-          : `/ip4/0.0.0.0/tcp/${options.port}`,
-      ],
+      // Listen on all interfaces (or specified IP)
+      listen: [`/ip4/${listenIP}/tcp/${options.port}`],
+      // Announce with the routable IP
+      announce: [`/ip4/${announceIP}/tcp/${options.port}`],
     },
     transports: [
       rlpx({

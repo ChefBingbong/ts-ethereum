@@ -1,0 +1,48 @@
+# Monitoring stack - Prometheus + Grafana
+# Usage: docker-compose -f docker-compose.yml -f docker/docker-compose.monitoring.yml up -d
+#
+# Or via quickstart:
+#   ./quickstart/setup.sh --network local-multi --withMonitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - blockchain-net
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+
+  grafana:
+    build:
+      context: ./docker/grafana
+    container_name: grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - blockchain-net
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  blockchain-net:
+    external: true
+    name: simple-p2p-blockchain_blockchain-net

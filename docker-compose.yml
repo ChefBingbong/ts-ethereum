@@ -1,0 +1,155 @@
+# Simple P2P Blockchain - Docker Compose
+# Usage: ./quickstart/setup.sh --network local-multi
+#
+# Or manually:
+#   docker-compose up -d miner
+#   # Wait for miner to start, get enode from logs
+#   BOOTNODE_ENODE="enode://...@172.20.0.10:9000" docker-compose up -d peer
+#
+# All CLI options from packages/cli/src/cmds/node/options.ts are supported via env vars.
+# See quickstart/*.vars files for complete documentation.
+
+services:
+  # Miner node (bootnode)
+  miner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miner
+    ports:
+      - "${MINER_P2P_PORT:-9000}:9000"
+      - "${MINER_RPC_PORT:-9300}:9300"
+      - "${MINER_METRICS_PORT:-9400}:9400"
+    command:
+      - "node"
+      # Data
+      - "--dataDir=/data"
+      # Network
+      - "--p2pPort=9000"
+      - "--rpcPort=9300"
+      - "--metricsPort=9400"
+      - "--chainId=${CHAIN_ID:-99999}"
+      - "--listenIp=0.0.0.0"
+      - "--announceIp=${MINER_IP:-172.20.0.10}"
+      - "--discV4=${DISC_V4:-true}"
+      - "--minPeers=${MIN_PEERS:-0}"
+      - "--maxPeers=${MAX_PEERS:-25}"
+      # Sync
+      - "--syncmode=${SYNCMODE:-full}"
+      - "--safeReorgDistance=${SAFE_REORG_DISTANCE:-100}"
+      - "--syncedStateRemovalPeriod=${SYNCED_STATE_REMOVAL_PERIOD:-60000}"
+      # Fetcher
+      - "--maxPerRequest=${MAX_PER_REQUEST:-100}"
+      - "--maxFetcherJobs=${MAX_FETCHER_JOBS:-100}"
+      - "--maxFetcherRequests=${MAX_FETCHER_REQUESTS:-5}"
+      - "--numBlocksPerIteration=${NUM_BLOCKS_PER_ITERATION:-100}"
+      # Mining
+      - "--mine"
+      # Execution
+      - "--execution=${EXECUTION:-true}"
+      - "--debugCode=${DEBUG_CODE:-false}"
+      - "--isSingleNode=${IS_SINGLE_NODE:-false}"
+      # Cache
+      - "--accountCache=${ACCOUNT_CACHE:-400000}"
+      - "--storageCache=${STORAGE_CACHE:-200000}"
+      - "--codeCache=${CODE_CACHE:-200000}"
+      - "--trieCache=${TRIE_CACHE:-200000}"
+      # Storage
+      - "--saveReceipts=${SAVE_RECEIPTS:-true}"
+      - "--txLookupLimit=${TX_LOOKUP_LIMIT:-2350000}"
+      - "--prefixStorageTrieKeys=${PREFIX_STORAGE_TRIE_KEYS:-true}"
+      - "--useStringValueTrieDB=${USE_STRING_VALUE_TRIE_DB:-false}"
+      - "--savePreimages=${SAVE_PREIMAGES:-true}"
+      # Profiler
+      - "--vmProfileBlocks=${VM_PROFILE_BLOCKS:-false}"
+      - "--vmProfileTxs=${VM_PROFILE_TXS:-false}"
+      # Metrics
+      - "--metricsEnabled=${METRICS_ENABLED:-true}"
+      - "--metricsAddress=${METRICS_ADDRESS:-0.0.0.0}"
+      # Logging
+      - "--logLevel=${LOG_LEVEL:-info}"
+    volumes:
+      - miner-data:/data
+      - ./docker/genesis/accounts.json:/data/accounts.json:ro
+    networks:
+      blockchain-net:
+        ipv4_address: ${MINER_IP:-172.20.0.10}
+
+  # Peer node (connects to miner)
+  peer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: peer
+    ports:
+      - "${PEER_P2P_PORT:-9001}:9000"
+      - "${PEER_RPC_PORT:-9301}:9300"
+      - "${PEER_METRICS_PORT:-9401}:9400"
+    command:
+      - "node"
+      # Data
+      - "--dataDir=/data"
+      # Network
+      - "--p2pPort=9000"
+      - "--rpcPort=9300"
+      - "--metricsPort=9400"
+      - "--chainId=${CHAIN_ID:-99999}"
+      - "--listenIp=0.0.0.0"
+      - "--announceIp=${PEER_IP:-172.20.0.11}"
+      - "--bootnode=${BOOTNODE_ENODE}"
+      - "--discV4=${DISC_V4:-true}"
+      - "--minPeers=${MIN_PEERS:-1}"
+      - "--maxPeers=${MAX_PEERS:-25}"
+      # Sync
+      - "--syncmode=${SYNCMODE:-full}"
+      - "--safeReorgDistance=${SAFE_REORG_DISTANCE:-100}"
+      - "--syncedStateRemovalPeriod=${SYNCED_STATE_REMOVAL_PERIOD:-60000}"
+      # Fetcher
+      - "--maxPerRequest=${MAX_PER_REQUEST:-100}"
+      - "--maxFetcherJobs=${MAX_FETCHER_JOBS:-100}"
+      - "--maxFetcherRequests=${MAX_FETCHER_REQUESTS:-5}"
+      - "--numBlocksPerIteration=${NUM_BLOCKS_PER_ITERATION:-100}"
+      # Execution
+      - "--execution=${EXECUTION:-true}"
+      - "--debugCode=${DEBUG_CODE:-false}"
+      - "--isSingleNode=${IS_SINGLE_NODE:-false}"
+      # Cache
+      - "--accountCache=${ACCOUNT_CACHE:-400000}"
+      - "--storageCache=${STORAGE_CACHE:-200000}"
+      - "--codeCache=${CODE_CACHE:-200000}"
+      - "--trieCache=${TRIE_CACHE:-200000}"
+      # Storage
+      - "--saveReceipts=${SAVE_RECEIPTS:-true}"
+      - "--txLookupLimit=${TX_LOOKUP_LIMIT:-2350000}"
+      - "--prefixStorageTrieKeys=${PREFIX_STORAGE_TRIE_KEYS:-true}"
+      - "--useStringValueTrieDB=${USE_STRING_VALUE_TRIE_DB:-false}"
+      - "--savePreimages=${SAVE_PREIMAGES:-true}"
+      # Profiler
+      - "--vmProfileBlocks=${VM_PROFILE_BLOCKS:-false}"
+      - "--vmProfileTxs=${VM_PROFILE_TXS:-false}"
+      # Metrics
+      - "--metricsEnabled=${METRICS_ENABLED:-true}"
+      - "--metricsAddress=${METRICS_ADDRESS:-0.0.0.0}"
+      # Logging
+      - "--logLevel=${LOG_LEVEL:-info}"
+    volumes:
+      - peer-data:/data
+      - ./docker/genesis/accounts.json:/data/accounts.json:ro
+    networks:
+      blockchain-net:
+        ipv4_address: ${PEER_IP:-172.20.0.11}
+    depends_on:
+      - miner
+    profiles:
+      - multi  # Only starts with --profile multi or when BOOTNODE_ENODE is set
+
+volumes:
+  miner-data:
+  peer-data:
+
+networks:
+  blockchain-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

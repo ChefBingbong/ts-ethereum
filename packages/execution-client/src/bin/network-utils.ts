@@ -153,7 +153,6 @@ export function writeBootnodeInfo(port: number, nodeKey: Uint8Array): void {
   console.log(`\n🌐 Bootnode enode written to ${infoPath}`)
   console.log(`   ${enodeUrl}\n`)
 }
-
 export function readBootnodeInfo(): string | null {
   const infoPath = `${SHARED_DIR}/bootnode.txt`
 

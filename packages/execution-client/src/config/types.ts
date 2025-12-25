@@ -83,9 +83,15 @@ export interface ConfigOptions {
   port?: number
 
   /**
-   * RLPx external IP
+   * RLPx external IP (bind/listen address)
    */
   extIP?: string
+
+  /**
+   * IP address to advertise to peers (for Docker/NAT scenarios)
+   * If not set, defaults to extIP
+   */
+  announceIP?: string
 
   /**
    * Transport server (for testing purposes)

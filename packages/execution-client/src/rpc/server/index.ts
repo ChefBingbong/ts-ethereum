@@ -20,7 +20,7 @@ export type RpcServerOptsExtended = RpcServerOpts & {
 
 export const rpcServerOpts: RpcServerOptsExtended = {
   enabled: true,
-  address: '127.0.0.1',
+  address: '0.0.0.0', // Default to all interfaces for Docker compatibility
   port: 8545,
   cors: undefined,
   bodyLimit: 10 * 1024 * 1024, // 10MB

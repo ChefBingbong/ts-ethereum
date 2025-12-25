@@ -26,7 +26,7 @@ export type MetricsOptions = HttpMetricsServerOpts & {
 export const defaultMetricsOptions: MetricsOptions = {
   enabled: true,
   port: 8008,
-  address: '127.0.0.1',
+  address: '0.0.0.0', // Default to all interfaces for Docker compatibility
   collectDefaultMetrics: true,
   metadata: {
     version: '0.0.1',
@@ -35,5 +35,5 @@ export const defaultMetricsOptions: MetricsOptions = {
   },
   prefix: 'eth',
   path: '/metrics',
-  host: '127.0.0.1',
+  host: '0.0.0.0', // Default to all interfaces for Docker compatibility
 }

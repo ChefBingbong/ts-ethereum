@@ -4,15 +4,16 @@
  * Send funds between accounts from accounts.json
  *
  * Usage:
- *   npx tsx src/client/bin/send-funds.ts --from 0 --to 1 --amount 1.5
- *   npx tsx src/client/bin/send-funds.ts --from 0 --to 1 --amount 1.5 --rpc http://127.0.0.1:8001
+ *   npx tsx src/bin/send-funds.ts --from 0 --to 1 --amount 1.5
+ *   npx tsx src/bin/send-funds.ts --from 0 --to 1 --amount 1.5 --rpc http://localhost:9300
  *
  * Options:
- *   --from     Index of sender account in accounts.json (default: 0 - the miner)
- *   --to       Index of recipient account in accounts.json (required)
- *   --amount   Amount to send in ETH (default: 1.0)
- *   --rpc      RPC URL (default: http://127.0.0.1:8001)
- *   --chainId  Chain ID (default: 12345)
+ *   --from       Index of sender account in accounts.json (default: 0 - the miner)
+ *   --to         Index of recipient account in accounts.json (required)
+ *   --amount     Amount to send in ETH (default: 1.0)
+ *   --rpc        RPC URL (default: http://localhost:9300 for Docker bootnode)
+ *   --chainId    Chain ID (default: 99999)
+ *   --accounts   Path to accounts.json (default: looks in common locations)
  */
 
 import { existsSync, readFileSync } from 'node:fs'
@@ -27,9 +28,6 @@ import {
   publicActions,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-
-const __filename = '../../test-network-data/accounts.json'
-const __dirname = path.dirname(__filename)
 
 // Parse command line arguments
 function parseArgs() {
@@ -53,20 +51,42 @@ interface AccountInfo {
   role: string
 }
 
-function loadAccounts(): AccountInfo[] {
-  const accountsPath = path.resolve(
-    __dirname,
-    '../../../test-network-data/accounts.json',
-  )
-
-  if (!existsSync(accountsPath)) {
-    console.error(`Accounts file not found: ${accountsPath}`)
-    console.error(
-      'Make sure to run the test network first to generate accounts.',
-    )
-    process.exit(1)
+function findAccountsFile(customPath?: string): string {
+  // If custom path provided, use it
+  if (customPath) {
+    if (existsSync(customPath)) {
+      return customPath
+    }
+    throw new Error(`Accounts file not found at: ${customPath}`)
   }
 
+  // Common locations to check (relative to workspace root)
+  const possiblePaths = [
+    // Docker genesis accounts (primary for Docker setup)
+    path.resolve(process.cwd(), 'docker/genesis/accounts.json'),
+    path.resolve(process.cwd(), '../docker/genesis/accounts.json'),
+    path.resolve(process.cwd(), '../../docker/genesis/accounts.json'),
+    // Test network data
+    path.resolve(process.cwd(), 'test-network-data/accounts.json'),
+    path.resolve(process.cwd(), '../test-network-data/accounts.json'),
+    path.resolve(process.cwd(), '../../test-network-data/accounts.json'),
+    // Local data directory
+    path.resolve(process.cwd(), 'data/accounts.json'),
+    path.resolve(process.cwd(), '../data/accounts.json'),
+  ]
+
+  for (const p of possiblePaths) {
+    if (existsSync(p)) {
+      return p
+    }
+  }
+
+  throw new Error(
+    `Accounts file not found. Searched:\n${possiblePaths.map((p) => `  - ${p}`).join('\n')}\n\nUse --accounts <path> to specify the location.`,
+  )
+}
+
+function loadAccounts(accountsPath: string): AccountInfo[] {
   const content = readFileSync(accountsPath, 'utf8')
   return JSON.parse(content) as AccountInfo[]
 }
@@ -126,9 +146,9 @@ export async function getNonce(
 async function main() {
   const args = parseArgs()
 
-  // Config
-  const rpcUrl = args.rpc || 'http://127.0.0.1:8545'
-  const chainId = Number.parseInt(args.chainId || '12345', 10)
+  // Config - updated defaults for Docker setup
+  const rpcUrl = args.rpc || 'http://localhost:9300' // Docker bootnode RPC
+  const chainId = Number.parseInt(args.chainId || '99999', 10) // Docker chainId
   const fromIndex = Number.parseInt(args.from || '0', 10)
   const toIndex = Number.parseInt(args.to || '', 10)
   const amount = args.amount || '1.0'
@@ -137,20 +157,33 @@ async function main() {
     console.error('Error: --to is required (index of recipient account)')
     console.error('')
     console.error(
-      'Usage: npx tsx src/client/bin/send-funds.ts --from 0 --to 1 --amount 1.5',
+      'Usage: npx tsx src/bin/send-funds.ts --from 0 --to 1 --amount 1.5',
     )
     console.error('')
     console.error('Options:')
-    console.error('  --from     Index of sender account (default: 0 - miner)')
-    console.error('  --to       Index of recipient account (required)')
-    console.error('  --amount   Amount to send in ETH (default: 1.0)')
-    console.error('  --rpc      RPC URL (default: http://127.0.0.1:8001)')
-    console.error('  --chainId  Chain ID (default: 12345)')
+    console.error('  --from      Index of sender account (default: 0 - miner)')
+    console.error('  --to        Index of recipient account (required)')
+    console.error('  --amount    Amount to send in ETH (default: 1.0)')
+    console.error('  --rpc       RPC URL (default: http://localhost:9300)')
+    console.error('  --chainId   Chain ID (default: 99999)')
+    console.error('  --accounts  Path to accounts.json')
+    console.error('')
+    console.error('Docker RPC endpoints:')
+    console.error('  Bootnode: http://localhost:9300')
+    console.error('  Node2:    http://localhost:9301')
     process.exit(1)
   }
 
-  // Load accounts
-  const accounts = loadAccounts()
+  // Find and load accounts
+  let accountsPath: string
+  try {
+    accountsPath = findAccountsFile(args.accounts)
+  } catch (error) {
+    console.error((error as Error).message)
+    process.exit(1)
+  }
+
+  const accounts = loadAccounts(accountsPath)
 
   if (fromIndex < 0 || fromIndex >= accounts.length) {
     console.error(
@@ -179,9 +212,10 @@ async function main() {
   console.log('='.repeat(60))
   console.log('')
   console.log('Configuration:')
-  console.log(`  RPC URL:    ${rpcUrl}`)
-  console.log(`  Chain ID:   ${chainId}`)
-  console.log(`  Amount:     ${amount} ETH`)
+  console.log(`  RPC URL:       ${rpcUrl}`)
+  console.log(`  Chain ID:      ${chainId}`)
+  console.log(`  Amount:        ${amount} ETH`)
+  console.log(`  Accounts file: ${accountsPath}`)
   console.log('')
   console.log('From Account:')
   console.log(`  Index:      ${fromAccount.index}`)
@@ -212,7 +246,11 @@ async function main() {
     console.log(`    ${formatEther(toBalanceBefore)} ETH`)
   } catch (error) {
     console.error(`Failed to get balances: ${error}`)
+    console.error('')
     console.error('Make sure the RPC server is running.')
+    console.error(
+      'For Docker: docker-compose -f docker-compose.multi-node.yml up -d',
+    )
     process.exit(1)
   }
 
@@ -264,8 +302,8 @@ async function main() {
       to: toAccount.address as Hex,
       nonce: currentNonce,
       value: amountWei,
-      gasPrice: 2750000000,
-      gas: 21000,
+      gasPrice: 2750000000n,
+      gas: 21000n,
       type: 'legacy',
     } as any)
 
@@ -277,9 +315,8 @@ async function main() {
       hash,
       pollingInterval: 100,
     })
-    console.log(receipt)
-    console.log(`  Block:   ${receipt.blockNumber}`)
-    console.log(`  Status:  ${receipt.status}`)
+    console.log(`  Block:    ${receipt.blockNumber}`)
+    console.log(`  Status:   ${receipt.status}`)
     console.log(`  Gas Used: ${receipt.gasUsed}`)
   } catch (error) {
     console.error(error)

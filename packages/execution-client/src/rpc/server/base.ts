@@ -50,7 +50,7 @@ export class RpcServerBase {
           {
             fetch: this.app.fetch,
             port: this.opts.port,
-            hostname: this.opts.address ?? '127.0.0.1',
+            hostname: this.opts.address ?? '0.0.0.0',
           },
           (info) => this.onListening(server, info, resolve, reject),
         )
@@ -117,7 +117,7 @@ export class RpcServerBase {
     reject: (error: Error) => void,
   ) {
     if (!info) return reject(new Error('Failed to start RPC server'))
-    const host = this.opts.address ?? '127.0.0.1'
+    const host = this.opts.address ?? '0.0.0.0'
     const port = this.opts.port
 
     if (!isLocalhostIP(host)) {

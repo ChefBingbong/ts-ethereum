@@ -67,6 +67,13 @@ export interface DPTDiscoveryInit {
   bindAddr?: string
 
   /**
+   * Address to advertise to peers (for Docker/NAT scenarios)
+   * If not set, defaults to bindAddr
+   * @default bindAddr
+   */
+  announceAddr?: string
+
+  /**
    * Port to bind UDP socket
    * @default 30303
    */
@@ -171,10 +178,13 @@ export class DPTDiscovery
     this.cachedPeerTTL = init.cachedPeerTTL ?? DEFAULT_CACHED_PEER_TTL
 
     // Create DPT instance
+    // Use announceAddr for the endpoint that gets advertised to peers
+    // This allows binding to 0.0.0.0 while advertising a routable IP
+    const announceAddr = init.announceAddr ?? init.bindAddr ?? '0.0.0.0'
     const dptOptions: DPTOptions = {
       ...init.dptOptions,
       endpoint: {
-        address: init.bindAddr ?? '0.0.0.0',
+        address: announceAddr, // This is what peers will see
         udpPort: init.bindPort ?? 30303,
         tcpPort: init.bindPort ?? 30303,
       },

@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Miner node metrics
+  - job_name: 'miner'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['miner:9400']
+        labels:
+          instance: 'miner'
+          role: 'miner'
+          network: 'testnet'
+
+  # Peer node metrics
+  - job_name: 'peer'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['peer:9400']
+        labels:
+          instance: 'peer'
+          role: 'peer'
+          network: 'testnet'

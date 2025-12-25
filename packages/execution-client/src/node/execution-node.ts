@@ -63,7 +63,7 @@ export class ExecutionNode {
       ...options.config.options,
       accounts: [...options.config.options.accounts],
       bootnodes: [...bootnodes],
-    })
+    } as any)
 
     // Create Execution first (needed for NetworkService protocol handlers)
     const execution = new VMExecution({
@@ -119,8 +119,12 @@ export class ExecutionNode {
     if (options.config.options.metrics?.enabled !== false) {
       const metricsOptions = options.config.options.metrics
       const port = (node.config.options.port ?? 0) + 500
+      // Use extIP for metrics binding (0.0.0.0 for Docker accessibility)
       const address =
-        metricsOptions?.host ?? metricsOptions?.address ?? '127.0.0.1'
+        metricsOptions?.host ??
+        metricsOptions?.address ??
+        options.config.options.extIP ??
+        '0.0.0.0'
 
       // Create health check function
       const healthCheck: HealthCheckFn = async () => {
@@ -194,10 +198,12 @@ export class ExecutionNode {
     node.txFetcher.start()
     await node.p2pNode.start()
 
+    // Use extIP for RPC binding (0.0.0.0 for Docker accessibility)
+    const rpcAddress = options.config.options.extIP ?? '0.0.0.0'
     const rpcServer = new RpcServer(
       {
         enabled: true,
-        address: '127.0.0.1',
+        address: rpcAddress,
         port: (options.config.options.port ?? 0) + 300,
         cors: '*',
         debug: false,

@@ -1,0 +1,20 @@
+version: "3.8"
+
+# Development compose file with volume mounts for live code reloading
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  execution-client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      # Mount source code for development
+      - ../packages:/app/packages:ro
+      - ../package.json:/app/package.json:ro
+      - ../turbo.json:/app/turbo.json:ro
+    command:
+      - "node"
+      - "--dataDir=/data"
+      - "--logLevel=debug"
+

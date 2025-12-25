@@ -89,7 +89,7 @@ export function createConfigFromDefaults(
     syncedStateRemovalPeriod: constants.SYNCED_STATE_REMOVAL_PERIOD,
     prefixStorageTrieKeys: true,
     useStringValueTrieDB: false,
-    savePreimages: false,
+    savePreimages: true,
     common,
     metrics: defaultMetricsOptions,
   }

@@ -1,4 +1,6 @@
 export * from './config/index'
+export * from './execution'
+export * from './logging'
 export * from './net'
 export { ETH } from './net/protocol/eth/eth'
 export type { ExecutionNodeInitOptions } from './node/index'
