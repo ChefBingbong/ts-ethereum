@@ -4,8 +4,8 @@ import { RLP } from '@ts-ethereum/rlp'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
 } from '@ts-ethereum/utils'
@@ -183,15 +183,33 @@ export class Block {
    * - The uncle hash is valid
    * @param onlyHeader if only passed the header, skip validating txTrie and unclesHash (default: false)
    */
-  async validateData(onlyHeader = false): Promise<void> {
-    const txErrors = this.getTransactionsValidationErrors()
-    if (txErrors.length > 0) {
-      const msg = this._errorMsg(`invalid transactions: ${txErrors.join(' ')}`)
-      throw EthereumJSErrorWithoutCode(msg)
+  async validateData(
+    onlyHeader = false,
+    skipTxValidation = false,
+  ): Promise<void> {
+    if (!skipTxValidation) {
+      const txErrors = this.getTransactionsValidationErrors()
+      if (txErrors.length > 0) {
+        const msg = this._errorMsg(
+          `invalid transactions: ${txErrors.join(' ')}`,
+        )
+        throw EthereumJSErrorWithoutCode(msg)
+      }
     }
 
     if (onlyHeader) {
       return
+    }
+
+    if (!skipTxValidation) {
+      for (const [index, tx] of this.transactions.entries()) {
+        if (!tx.isSigned()) {
+          const msg = this._errorMsg(
+            `invalid transactions: transaction at index ${index} is unsigned`,
+          )
+          throw EthereumJSErrorWithoutCode(msg)
+        }
+      }
     }
 
     if (!(await this.transactionsTrieIsValid())) {

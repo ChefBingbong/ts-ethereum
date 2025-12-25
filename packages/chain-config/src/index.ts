@@ -1,5 +1,6 @@
 export * from './accounts'
 export * from './bootnodes'
+export * from './chains'
 export * from './common'
 export * from './constructors'
 export * from './init'

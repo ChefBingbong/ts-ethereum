@@ -4,7 +4,11 @@ import { defineProject } from 'vitest/config'
 export const unitTestMinimalProject = defineProject({
   test: {
     name: 'unit',
-    include: ['packages/**/test/unit/**/*.test.ts'],
+    include: [
+      'packages/**/test/unit/**/*.test.ts',
+      'test/unit/**/*.test.ts',
+      '**/test/unit/**/*.test.ts',
+    ],
     setupFiles: [
       path.join(
         import.meta.dirname,
