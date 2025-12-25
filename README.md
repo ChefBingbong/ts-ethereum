@@ -1,4 +1,4 @@
-# Ts-Ethereum
+# ts-ethereum
 
 > Full Ethereum execution and consensus client implementation in TypeScript (WIP).
 
