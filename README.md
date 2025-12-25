@@ -1,4 +1,4 @@
-# simple-p2p-blockchain
+# Ts-Ethereum
 
 > Full Ethereum execution and consensus client implementation in TypeScript (WIP).
 
