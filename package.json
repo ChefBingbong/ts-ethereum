@@ -15,7 +15,8 @@
     "test": "turbo run test --concurrency=100%",
     "prepare": "lefthook install",
     "sanity": "bun scripts/sanity-check.ts",
-    "sanity:generate": "bun scripts/generate-snapshot.ts"
+    "sanity:generate": "bun scripts/generate-snapshot.ts",
+    "test:unit": "vitest run --project unit --project unit"
   },
   "devDependencies": {
     "@paulmillr/trusted-setups": "0.2.0",
@@ -24,7 +25,9 @@
     "micro-eth-signer": "0.15.0",
     "tsx": "^4.20.6",
     "turbo": "^2.7.1",
-    "vitest": "^4.0.13"
+    "@vitest/coverage-v8": "^4.0.16",
+    "vitest": "^4.0.13",
+    "vitest-when": "^0.10.0"
   },
   "peerDependencies": {
     "typescript": "^5"

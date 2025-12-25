@@ -31,7 +31,8 @@
     "build:cjs": "tsc --project ./tsconfig.json --module commonjs --moduleResolution node --outDir ./_cjs --removeComments --verbatimModuleSyntax false && printf '{\"type\":\"commonjs\"}' > ./_cjs/package.json",
     "build:esm": "tsc --project ./tsconfig.json --outDir ./_esm && printf '{\"type\": \"module\",\"sideEffects\":false}' > ./_esm/package.json",
     "build:types": "tsc --project ./tsconfig.json --declarationDir ./_types --emitDeclarationOnly --declaration --declarationMap",
-    "test": "vitest run -c ./vitest.config.mjs"
+    "test": "vitest run -c ./vitest.config.mjs",
+    "test:unit": "vitest run --project unit --project unit"
   },
   "dependencies": {
     "@ts-ethereum/rlp": "workspace:*"
