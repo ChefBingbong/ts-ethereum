@@ -12,11 +12,15 @@ export const testdataFromRPCWithUnclesData: JSONRPCBlock = {
   mixHash: '0x7f2d6b789c8bc3d2f456bc29c53ea48e8da029e0ccc8c25531c7fd6505159669',
   nonce: '0x16d310c81357c5c1',
   number: '0x913156',
-  parentHash: '0xd78ea1ed2f62a798e72cf61c6ef8492f3eca1df687a32b37b23ce9ccdfd63092',
-  receiptsRoot: '0x2ed721e02567831219b3240e5e0ecbc381fd9c5ec8c1347b81eccdb1105676aa',
-  sha3Uncles: '0x588d92e6b6237c9fcb01e2cd459f2c5edadf2eb218027f60983f3cf6afd9ea01',
+  parentHash:
+    '0xd78ea1ed2f62a798e72cf61c6ef8492f3eca1df687a32b37b23ce9ccdfd63092',
+  receiptsRoot:
+    '0x2ed721e02567831219b3240e5e0ecbc381fd9c5ec8c1347b81eccdb1105676aa',
+  sha3Uncles:
+    '0x588d92e6b6237c9fcb01e2cd459f2c5edadf2eb218027f60983f3cf6afd9ea01',
   size: '0x4805',
-  stateRoot: '0x077ab2e8f77626668c696e16320c5508f2841bd2167b326a74d374791ec6bb47',
+  stateRoot:
+    '0x077ab2e8f77626668c696e16320c5508f2841bd2167b326a74d374791ec6bb47',
   timestamp: '0x5e4d814a',
   totalDifficulty: '0x3013324f2bc697dcf8c',
   transactions: [
@@ -90,6 +94,9 @@ export const testdataFromRPCWithUnclesData: JSONRPCBlock = {
     '0x655d024d9f340fcb9557b45f7152e3d4b106e1f286d4e37531c396b5c9877601',
     '0xf69ea7d58f94c7149b90c96c7fb7d48f958e1a499c4e4063c4de165a74a49d6a',
   ],
-  transactionsRoot: '0xa525f622519083e2511a78e650f6911fb97cfeb0d79a94387b00e615d5ac9a0b',
-  uncles: ['0xc9dec5c6801c1db8e096674c91122101fd0808b06db794cc28715098d40596eb'],
+  transactionsRoot:
+    '0xa525f622519083e2511a78e650f6911fb97cfeb0d79a94387b00e615d5ac9a0b',
+  uncles: [
+    '0xc9dec5c6801c1db8e096674c91122101fd0808b06db794cc28715098d40596eb',
+  ],
 }

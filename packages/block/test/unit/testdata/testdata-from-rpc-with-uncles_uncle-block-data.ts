@@ -10,13 +10,18 @@ export const testdataFromRPCWithUnclesUncleBlockData = {
   mixHash: '0x603f145ff9366f37d72dd145fc9d0cb58349b08480478cc3a4acb2e8668d38ce',
   nonce: '0x4eb8239414d7e194',
   number: '0x913154',
-  parentHash: '0xe3c8fa7636c1e943cb90330b697aade2d87ada1fd2cdeab3817ed9d1041fbbe5',
-  receiptsRoot: '0xde0797a5893e59b3ddd8e3eae64fa432efc40d94d364803b3ef3c4ef316affeb',
-  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  parentHash:
+    '0xe3c8fa7636c1e943cb90330b697aade2d87ada1fd2cdeab3817ed9d1041fbbe5',
+  receiptsRoot:
+    '0xde0797a5893e59b3ddd8e3eae64fa432efc40d94d364803b3ef3c4ef316affeb',
+  sha3Uncles:
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
   size: '0x213',
-  stateRoot: '0x5c9306d0abbe90108511b9a954fe1687c2a5fcde90a0b3a1f71df1c5d24137e0',
+  stateRoot:
+    '0x5c9306d0abbe90108511b9a954fe1687c2a5fcde90a0b3a1f71df1c5d24137e0',
   timestamp: '0x5e4d8125',
   totalDifficulty: '0x3013314518ca304d350',
-  transactionsRoot: '0xa92a88edc17fda4eaf8623274e5c1917f48e820c5dde1df239dba99dd1cae9c2',
+  transactionsRoot:
+    '0xa92a88edc17fda4eaf8623274e5c1917f48e820c5dde1df239dba99dd1cae9c2',
   uncles: [],
 }

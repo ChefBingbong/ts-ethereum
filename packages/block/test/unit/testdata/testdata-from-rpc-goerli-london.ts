@@ -14,16 +14,21 @@ export const testdataFromRPCGoerliLondonData: JSONRPCBlock = {
   mixHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
   nonce: '0x0000000000000000',
   number: '0x4ddb6a',
-  parentHash: '0xb8a6ba8f2d6c13be07a0580add9d9ccc8e4301bd1244e3b0da53d025ce926370',
-  receiptsRoot: '0x1e8cf75ab79f5c5bc40035d507a6d26e287fbc0530959afc0edcd84434131288',
-  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  parentHash:
+    '0xb8a6ba8f2d6c13be07a0580add9d9ccc8e4301bd1244e3b0da53d025ce926370',
+  receiptsRoot:
+    '0x1e8cf75ab79f5c5bc40035d507a6d26e287fbc0530959afc0edcd84434131288',
+  sha3Uncles:
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
   size: '0x334',
-  stateRoot: '0x1ce2cb2fc266096dac2d41eda3e74220f693b1f05f963a1fee8e5230cbb9690e',
+  stateRoot:
+    '0x1ce2cb2fc266096dac2d41eda3e74220f693b1f05f963a1fee8e5230cbb9690e',
   timestamp: '0x60e652d7',
   totalDifficulty: '0x71d437',
   transactions: [
     {
-      blockHash: '0xec0b5cf01a11c514e6fecb2577adf82594083a79eda699eeaf7d11ebef226063',
+      blockHash:
+        '0xec0b5cf01a11c514e6fecb2577adf82594083a79eda699eeaf7d11ebef226063',
       blockNumber: '0x4ddb6a',
       from: '0xa121d112a8ca7ee375b537c1b05f0420aa78f790',
       gas: '0x3d090',
@@ -41,6 +46,7 @@ export const testdataFromRPCGoerliLondonData: JSONRPCBlock = {
       value: '0x0',
     },
   ],
-  transactionsRoot: '0x43fd7e89d018b7034792877bfee31aa4aeeeed66a4a770d617a470267a626b7c',
+  transactionsRoot:
+    '0x43fd7e89d018b7034792877bfee31aa4aeeeed66a4a770d617a470267a626b7c',
   uncles: [],
 }

@@ -16,8 +16,8 @@ import {
   EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
-  toType,
   TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import { paramsBlock } from '../params'

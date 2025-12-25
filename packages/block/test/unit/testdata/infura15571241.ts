@@ -13,11 +13,15 @@ export const infura15571241Data: JSONRPCBlock = {
   mixHash: '0x267432789113be7e27e28ef02abdcd044e2303ae8966a92f4c435c4468d87777',
   nonce: '0x0000000000000000',
   number: '0xed9929',
-  parentHash: '0x5b6edff14df30aa779157e2e563e44ab78bb599f2924e9229746fb462b16b57e',
-  receiptsRoot: '0x434dbbb34a1498bae94b21189301f39df847e9f5a776e81c489bef624eef2b3d',
-  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  parentHash:
+    '0x5b6edff14df30aa779157e2e563e44ab78bb599f2924e9229746fb462b16b57e',
+  receiptsRoot:
+    '0x434dbbb34a1498bae94b21189301f39df847e9f5a776e81c489bef624eef2b3d',
+  sha3Uncles:
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
   size: '0x4eea',
-  stateRoot: '0xcdd3a940c3e78ebffaa2b420466d1f12386fa6255686c8222308d572923c292b',
+  stateRoot:
+    '0xcdd3a940c3e78ebffaa2b420466d1f12386fa6255686c8222308d572923c292b',
   timestamp: '0x63290ec7',
   totalDifficulty: '0xc70d815d562d3cfa955',
   transactions: [
@@ -80,6 +84,7 @@ export const infura15571241Data: JSONRPCBlock = {
     '0x5d17d212dfec67e3e9c23c14a9de1cbb5dd4c300d5c23bcc533a21bea8e871b6',
     '0x80192975119b97cab128cbbe474e09667ab8e027b651dc51282c3da8a5449f73',
   ],
-  transactionsRoot: '0x5f4773690718a2e37f45aa56458c6779a61b830fcf89485af5f32447c11f9b6c',
+  transactionsRoot:
+    '0x5f4773690718a2e37f45aa56458c6779a61b830fcf89485af5f32447c11f9b6c',
   uncles: [],
 }

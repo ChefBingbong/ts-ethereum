@@ -88,7 +88,7 @@ describe('[Block]: block functions', () => {
   })
 
   it('should initialize with undefined parameters without throwing', () => {
-    assert.doesNotThrow(function () {
+    assert.doesNotThrow(() => {
       createBlock()
     })
   })
@@ -96,7 +96,7 @@ describe('[Block]: block functions', () => {
   it('should initialize with null parameters without throwing', () => {
     const common = new Common({ chain: Mainnet, params: paramsBlock[1] })
     const opts = { common }
-    assert.doesNotThrow(function () {
+    assert.doesNotThrow(() => {
       createBlock({}, opts)
     })
   })

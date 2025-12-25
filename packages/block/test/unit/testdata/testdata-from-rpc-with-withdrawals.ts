@@ -13,11 +13,15 @@ export const testdataFromRPCWithWithdrawalsData: JSONRPCBlock = {
   mixHash: '0x8ad8211cb54508538509243eef6e3e824bc09ad8696cd113ee12ca3008810793',
   nonce: '0x0000000000000000',
   number: '0x84d405',
-  parentHash: '0xbb13e88e3198ac1c170de83a04ba90a9455692f47dc96bb91add7ab86b3085f5',
-  receiptsRoot: '0x7ed4bb2645654344c5beb2109f36f2c71db272d4d6f5c0f42b4d6ebcbdc18383',
-  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  parentHash:
+    '0xbb13e88e3198ac1c170de83a04ba90a9455692f47dc96bb91add7ab86b3085f5',
+  receiptsRoot:
+    '0x7ed4bb2645654344c5beb2109f36f2c71db272d4d6f5c0f42b4d6ebcbdc18383',
+  sha3Uncles:
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
   size: '0x25990',
-  stateRoot: '0xe93cafa1025033b2824e61381eafb8f769d7965bf1787349afbecde0c722fe98',
+  stateRoot:
+    '0xe93cafa1025033b2824e61381eafb8f769d7965bf1787349afbecde0c722fe98',
   timestamp: '0x641c71ec',
   totalDifficulty: '0xa4a470',
   transactions: [
@@ -135,7 +139,8 @@ export const testdataFromRPCWithWithdrawalsData: JSONRPCBlock = {
     '0x07f42035f549c88f09e1022776e8ff28da07f93a37f60d809d6324fc5a2f6aec',
     '0xe713698a82ec68ddb838257584cd8c7062dbf476e2036ccefa35daa49ba7e361',
   ],
-  transactionsRoot: '0x5345cf8b3d49524ed4c69a816cbc99a507a29b93a655689c23dac5c36749c8cf',
+  transactionsRoot:
+    '0x5345cf8b3d49524ed4c69a816cbc99a507a29b93a655689c23dac5c36749c8cf',
   uncles: [],
   withdrawals: [
     {
@@ -235,5 +240,6 @@ export const testdataFromRPCWithWithdrawalsData: JSONRPCBlock = {
       validatorIndex: '0x6de69',
     },
   ],
-  withdrawalsRoot: '0xb3dfca16034b4c90b8d83359b4549a46dd931bce765dd204eb230c5339a933e4',
+  withdrawalsRoot:
+    '0xb3dfca16034b4c90b8d83359b4549a46dd931bce765dd204eb230c5339a933e4',
 }

@@ -12,16 +12,21 @@ export const testdataFromRPCData: JSONRPCBlock = {
   mixHash: '0xcb3723ab82e84594d0ec9ed5a45fd976d5aba09903826e5ed5e06ae893011eaa',
   nonce: '0xa76a9a500301e044',
   number: '0x2ca14a',
-  parentHash: '0x24f155bdf17217767531f464636fe4b84b87a38c53127541f952b3052adbac95',
-  receiptsRoot: '0x0eb6a50257911130ea2fa2e500e71e55e2dfc38eb97f64ca9cfca6faeabd693e',
-  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  parentHash:
+    '0x24f155bdf17217767531f464636fe4b84b87a38c53127541f952b3052adbac95',
+  receiptsRoot:
+    '0x0eb6a50257911130ea2fa2e500e71e55e2dfc38eb97f64ca9cfca6faeabd693e',
+  sha3Uncles:
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
   size: '0x3d7',
-  stateRoot: '0xdf97474b1b492cb6491cff267ca53c33aa42b611ba15239b4027a77275afeffc',
+  stateRoot:
+    '0xdf97474b1b492cb6491cff267ca53c33aa42b611ba15239b4027a77275afeffc',
   timestamp: '0x586afa54',
   totalDifficulty: '0x61decf2ca7d9bbbf8',
   transactions: [
     {
-      blockHash: '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
+      blockHash:
+        '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
       blockNumber: '0x2ca14a',
       from: '0x41959417325160f8952bc933ae8317b4e5140dda',
       gas: '0x5e1b',
@@ -38,7 +43,8 @@ export const testdataFromRPCData: JSONRPCBlock = {
       value: '0x44004c09e76a0000',
     },
     {
-      blockHash: '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
+      blockHash:
+        '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
       blockNumber: '0x2ca14a',
       from: '0x56ce1399be2831f8a3f918a0408c05bbad658ef3',
       gas: '0x5208',
@@ -55,7 +61,8 @@ export const testdataFromRPCData: JSONRPCBlock = {
       value: '0x120a871cc0020000',
     },
     {
-      blockHash: '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
+      blockHash:
+        '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
       blockNumber: '0x2ca14a',
       from: '0x1e9939daaad6924ad004c2560e90804164900341',
       gas: '0x9858',
@@ -72,7 +79,8 @@ export const testdataFromRPCData: JSONRPCBlock = {
       value: '0xde4ea09ac8f1e88',
     },
     {
-      blockHash: '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
+      blockHash:
+        '0xc596cb892b649b4917da8c6b78611346d55daf7bcf4375da86a2d98810888e84',
       blockNumber: '0x2ca14a',
       from: '0xea674fdde714fd979de3edf0f56aa9716b898ec8',
       gas: '0x15f90',
@@ -89,6 +97,7 @@ export const testdataFromRPCData: JSONRPCBlock = {
       value: '0xe139507cd50c018',
     },
   ],
-  transactionsRoot: '0xe307e6d0e13f41ed336e09d71deb59a354eee4121449f0286cfb076e767fd45b',
+  transactionsRoot:
+    '0xe307e6d0e13f41ed336e09d71deb59a354eee4121449f0286cfb076e767fd45b',
   uncles: [],
 }

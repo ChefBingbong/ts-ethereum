@@ -12,16 +12,21 @@ export const infura2000004withTransactionsData: JSONRPCBlock = {
   mixHash: '0x99cc6f1d730bd508cc4b5223fee5ed3bf8a51b0e08b9456917afd417545dbf4a',
   nonce: '0x21d2fb0ab259c2f7',
   number: '0x1e8484',
-  parentHash: '0xa398e9e41cdff20f528e01866a155c8d2da7e4cb4084ef3ae5e3a2cf54bd5aa8',
-  receiptsRoot: '0x89e5d41a044b7af45f10a66ed6f179e5a7bc9f385806b77acf1deb6c74797ee4',
-  sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+  parentHash:
+    '0xa398e9e41cdff20f528e01866a155c8d2da7e4cb4084ef3ae5e3a2cf54bd5aa8',
+  receiptsRoot:
+    '0x89e5d41a044b7af45f10a66ed6f179e5a7bc9f385806b77acf1deb6c74797ee4',
+  sha3Uncles:
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
   size: '0x3d7',
-  stateRoot: '0x9ac456ca20a38a824eb9f46f7a7ddd7c87d97b20443e32f57e371bf4804b1eed',
+  stateRoot:
+    '0x9ac456ca20a38a824eb9f46f7a7ddd7c87d97b20443e32f57e371bf4804b1eed',
   timestamp: '0x57a111b0',
   totalDifficulty: '0x262c3ffd4b6372e07',
   transactions: [
     {
-      blockHash: '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
+      blockHash:
+        '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
       blockNumber: '0x1e8484',
       from: '0xbef52af092fa2349279f7a2b10779fe810785688',
       gas: '0x5208',
@@ -38,7 +43,8 @@ export const infura2000004withTransactionsData: JSONRPCBlock = {
       value: '0x26cbbe0dc146800',
     },
     {
-      blockHash: '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
+      blockHash:
+        '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
       blockNumber: '0x1e8484',
       from: '0xf05c1b271d12b7ecb3b37122730c085ec2c0b552',
       gas: '0x5208',
@@ -55,7 +61,8 @@ export const infura2000004withTransactionsData: JSONRPCBlock = {
       value: '0x2b4540c497979c078',
     },
     {
-      blockHash: '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
+      blockHash:
+        '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
       blockNumber: '0x1e8484',
       from: '0xed059bc543141c8c93031d545079b3da0233b27f',
       gas: '0x3d090',
@@ -72,7 +79,8 @@ export const infura2000004withTransactionsData: JSONRPCBlock = {
       value: '0x0',
     },
     {
-      blockHash: '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
+      blockHash:
+        '0x7250d1dc6c4b7c1a51f13fb02a92cc60ab1b9592e457ad60813356c656593cc2',
       blockNumber: '0x1e8484',
       from: '0x8975dbc1b8f25ec994815626d070899dda896511',
       gas: '0x1d8a8',
@@ -89,6 +97,7 @@ export const infura2000004withTransactionsData: JSONRPCBlock = {
       value: '0xba2382ff1fb9a3000',
     },
   ],
-  transactionsRoot: '0x681d66117e6161c01614b0c3f85b4433e5efc7672ca3b0e6ba982aee41a31e8d',
+  transactionsRoot:
+    '0x681d66117e6161c01614b0c3f85b4433e5efc7672ca3b0e6ba982aee41a31e8d',
   uncles: [],
 }
