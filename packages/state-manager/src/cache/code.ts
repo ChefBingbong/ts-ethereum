@@ -1,26 +1,22 @@
 import { OrderedMap } from '@js-sdsl/ordered-map'
-import { bytesToUnprefixedHex } from '@ts-ethereum/utils'
+import { bytesToUnprefixedHex, type Address } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import { LRUCache } from 'lru-cache'
 
 import { Cache } from './cache'
+import type { CacheOpts } from './types'
 import { CacheType } from './types'
 
-import type { Account, Address } from '@ts-ethereum/utils'
-import type { CacheOpts } from './types'
-
 /**
- * account: undefined
- *
- * Account is known to not exist in the trie
+ * Represents a cached code element.
  */
-type AccountCacheElement = {
-  accountRLP: Uint8Array | undefined
+type CodeCacheElement = {
+  code: Uint8Array | undefined
 }
 
-export class AccountCache extends Cache {
-  _lruCache: LRUCache<string, AccountCacheElement> | undefined
-  _orderedMapCache: OrderedMap<string, AccountCacheElement> | undefined
+export class CodeCache extends Cache {
+  _lruCache: LRUCache<string, CodeCacheElement> | undefined
+  _orderedMapCache: OrderedMap<string, CodeCacheElement> | undefined
 
   /**
    * Diff cache collecting the state of the cache
@@ -28,10 +24,11 @@ export class AccountCache extends Cache {
    * (respectively: before a first modification)
    *
    * If the whole cache element is undefined (in contrast
-   * to the account), the element didn't exist in the cache
+   * to the code), the element didn't exist in the cache
    * before.
    */
-  _diffCache: Map<string, AccountCacheElement | undefined>[] = []
+  _diffCache: Map<string, CodeCacheElement | undefined>[] = []
+
   constructor(opts: CacheOpts) {
     super()
     if (opts.type === CacheType.LRU) {
@@ -43,16 +40,21 @@ export class AccountCache extends Cache {
       this._orderedMapCache = new OrderedMap()
     }
 
-    this._diffCache.push(new Map<string, AccountCacheElement | undefined>())
-    this._debug = debugDefault('statemanager:cache:account')
+    this._diffCache.push(new Map<string, CodeCacheElement | undefined>())
+    this._debug = debugDefault('statemanager:cache:code')
   }
 
+  /**
+   * Saves the state of the code cache before making changes to it.
+   *
+   * @param cacheKeyHex Account key for which code is being modified.
+   */
   _saveCachePreState(cacheKeyHex: string) {
     const diffMap = this._diffCache[this._checkpoints]
     if (!diffMap.has(cacheKeyHex)) {
-      let oldElem: AccountCacheElement | undefined
+      let oldElem: CodeCacheElement | undefined
       if (this._lruCache) {
-        oldElem = this._lruCache!.get(cacheKeyHex)
+        oldElem = this._lruCache.get(cacheKeyHex)
       } else {
         oldElem = this._orderedMapCache!.getElementByKey(cacheKeyHex)
       }
@@ -61,31 +63,23 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Puts account to cache under its address.
-   * @param address - Address of account
-   * @param account - Account or undefined if account doesn't exist in the trie
+   * Puts code into the cache under its hash.
+   *
+   * @param address - Address of account code is being modified for.
+   * @param code - Bytecode or undefined if code doesn't exist.
    */
-  put(
-    address: Address,
-    account: Account | undefined,
-    couldBePartialAccount: boolean = false,
-  ): void {
+  put(address: Address, code: Uint8Array | undefined): void {
     const addressHex = bytesToUnprefixedHex(address.bytes)
     this._saveCachePreState(addressHex)
     const elem = {
-      accountRLP:
-        account !== undefined
-          ? couldBePartialAccount
-            ? account.serializeWithPartialInfo()
-            : account.serialize()
-          : undefined,
+      code,
     }
 
     if (this.DEBUG) {
-      this._debug(`Put account ${addressHex}`)
+      this._debug(`Put code ${addressHex}`)
     }
     if (this._lruCache) {
-      this._lruCache!.set(addressHex, elem)
+      this._lruCache.set(addressHex, elem)
     } else {
       this._orderedMapCache!.setElement(addressHex, elem)
     }
@@ -93,18 +87,19 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Returns the queried account or undefined if account doesn't exist
-   * @param address - Address of account
+   * Returns the queried code or undefined if it doesn't exist.
+   *
+   * @param address - Account address for which code is being fetched.
    */
-  get(address: Address): AccountCacheElement | undefined {
+  get(address: Address): CodeCacheElement | undefined {
     const addressHex = bytesToUnprefixedHex(address.bytes)
     if (this.DEBUG) {
-      this._debug(`Get account ${addressHex}`)
+      this._debug(`Get code ${addressHex}`)
     }
 
-    let elem: AccountCacheElement | undefined
+    let elem: CodeCacheElement | undefined
     if (this._lruCache) {
-      elem = this._lruCache!.get(addressHex)
+      elem = this._lruCache.get(addressHex)
     } else {
       elem = this._orderedMapCache!.getElementByKey(addressHex)
     }
@@ -116,22 +111,23 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Marks address as deleted in cache.
-   * @param address - Address
+   * Marks code as deleted in the cache.
+   *
+   * @param address - Account address for which code is being fetched.
    */
   del(address: Address): void {
     const addressHex = bytesToUnprefixedHex(address.bytes)
     this._saveCachePreState(addressHex)
     if (this.DEBUG) {
-      this._debug(`Delete account ${addressHex}`)
+      this._debug(`Delete code ${addressHex}`)
     }
     if (this._lruCache) {
-      this._lruCache!.set(addressHex, {
-        accountRLP: undefined,
+      this._lruCache.set(addressHex, {
+        code: undefined,
       })
     } else {
       this._orderedMapCache!.setElement(addressHex, {
-        accountRLP: undefined,
+        code: undefined,
       })
     }
 
@@ -139,23 +135,23 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Flushes cache by returning accounts that have been modified
+   * Flushes the cache by returning codes that have been modified
    * or deleted and resetting the diff cache (at checkpoint height).
    */
-  flush(): [string, AccountCacheElement][] {
+  flush(): [string, CodeCacheElement][] {
     if (this.DEBUG) {
       this._debug(`Flushing cache on checkpoint ${this._checkpoints}`)
     }
 
-    const diffMap = this._diffCache[this._checkpoints]!
+    const diffMap = this._diffCache[this._checkpoints]
 
-    const items: [string, AccountCacheElement][] = []
+    const items: [string, CodeCacheElement][] = []
 
     for (const entry of diffMap.entries()) {
       const cacheKeyHex = entry[0]
-      let elem: AccountCacheElement | undefined
+      let elem: CodeCacheElement | undefined
       if (this._lruCache) {
-        elem = this._lruCache!.get(cacheKeyHex)
+        elem = this._lruCache.get(cacheKeyHex)
       } else {
         elem = this._orderedMapCache!.getElementByKey(cacheKeyHex)
       }
@@ -164,12 +160,12 @@ export class AccountCache extends Cache {
         items.push([cacheKeyHex, elem])
       }
     }
-    this._diffCache[this._checkpoints] = new Map<string, AccountCacheElement | undefined>()
+    this._diffCache[this._checkpoints] = new Map<string, CodeCacheElement | undefined>()
     return items
   }
 
   /**
-   * Revert changes to cache last checkpoint (no effect on trie).
+   * Revert changes to the cache to the last checkpoint (no effect on trie).
    */
   revert(): void {
     this._checkpoints -= 1
@@ -182,13 +178,13 @@ export class AccountCache extends Cache {
       const elem = entry[1]
       if (elem === undefined) {
         if (this._lruCache) {
-          this._lruCache!.delete(addressHex)
+          this._lruCache.delete(addressHex)
         } else {
           this._orderedMapCache!.eraseElementByKey(addressHex)
         }
       } else {
         if (this._lruCache) {
-          this._lruCache!.set(addressHex, elem)
+          this._lruCache.set(addressHex, elem)
         } else {
           this._orderedMapCache!.setElement(addressHex, elem)
         }
@@ -197,7 +193,7 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Commits to current state of cache (no effect on trie).
+   * Commits the current state of the cache (no effect on trie).
    */
   commit(): void {
     this._checkpoints -= 1
@@ -216,15 +212,15 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Marks current state of cache as checkpoint, which can
-   * later on be reverted or committed.
+   * Marks the current state of the cache as a checkpoint, which can
+   * later be reverted or committed.
    */
   checkpoint(): void {
     this._checkpoints += 1
     if (this.DEBUG) {
       this._debug(`New checkpoint ${this._checkpoints}`)
     }
-    this._diffCache.push(new Map<string, AccountCacheElement | undefined>())
+    this._diffCache.push(new Map<string, CodeCacheElement | undefined>())
   }
 
   /**
@@ -240,10 +236,12 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Returns a dict with cache stats
-   * @param reset
+   * Returns a dictionary with cache statistics.
+   *
+   * @param reset - Whether to reset statistics after retrieval.
+   * @returns A dictionary with cache statistics.
    */
-  stats(reset = true) {
+  stats(reset = true): any {
     const stats = { ...this._stats }
     stats.size = this.size()
     if (reset) {
@@ -259,14 +257,14 @@ export class AccountCache extends Cache {
   }
 
   /**
-   * Clears cache.
+   * Clears the cache.
    */
   clear(): void {
     if (this.DEBUG) {
       this._debug(`Clear cache`)
     }
     if (this._lruCache) {
-      this._lruCache!.clear()
+      this._lruCache.clear()
     } else {
       this._orderedMapCache!.clear()
     }

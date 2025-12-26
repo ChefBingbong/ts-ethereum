@@ -35,10 +35,12 @@
     "test:unit": "vitest run --project unit --project unit"
   },
   "dependencies": {
+    "@noble/hashes": "2.0.1",
     "@ts-ethereum/chain-config": "workspace:*",
     "@ts-ethereum/mpt": "workspace:*",
     "@ts-ethereum/rlp": "workspace:*",
-    "@ts-ethereum/utils": "workspace:*"
+    "@ts-ethereum/utils": "workspace:*",
+    "lru-cache": "^11.2.4"
   },
   "devDependencies": {
     "@types/bun": "latest"

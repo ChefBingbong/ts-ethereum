@@ -16,7 +16,7 @@
         "@multiformats/multiaddr": "^13.0.1",
         "@multiformats/multiaddr-matcher": "^3.0.1",
         "@noble/curves": "2.0.1",
-        "@noble/hashes": "^2.0.1",
+        "@noble/hashes": "2.0.1",
         "@peculiar/webcrypto": "^1.5.0",
         "@peculiar/x509": "^1.14.0",
         "@polkadot/wasm-crypto": "^7.5.3",
@@ -325,10 +325,12 @@
       "name": "@ts-ethereum/state-manager",
       "version": "0.0.0",
       "dependencies": {
+        "@noble/hashes": "2.0.1",
         "@ts-ethereum/chain-config": "workspace:*",
         "@ts-ethereum/mpt": "workspace:*",
         "@ts-ethereum/rlp": "workspace:*",
         "@ts-ethereum/utils": "workspace:*",
+        "lru-cache": "^11.2.4",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -1374,6 +1376,8 @@
     "@ts-ethereum/rlp/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
     "@ts-ethereum/state-manager/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
+
+    "@ts-ethereum/state-manager/lru-cache": ["lru-cache@11.2.4", "", {}, "sha512-B5Y16Jr9LB9dHVkh6ZevG+vAbOsNOYCX+sXvFWFu7B3Iz5mijW3zdbMyhsh8ANd2mSWBYdJgnqi+mL7/LrOPYg=="],
 
     "@ts-ethereum/tx/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 

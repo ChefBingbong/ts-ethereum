@@ -1,69 +1,125 @@
-import { AccountCache } from "./account";
-import {
-	type CacheOpts,
-	CacheType,
-	type CachesStateManagerOpts,
-} from "./types";
+import { AccountCache } from './account'
+import { CodeCache } from './code'
+import { StorageCache } from './storage'
+import { type CacheOpts, CacheType, type CachesStateManagerOpts } from './types'
 
-import type { Address } from "@ts-ethereum/utils";
+import type { Address } from '@ts-ethereum/utils'
 
 export class Caches {
-	account?: AccountCache;
+  account?: AccountCache
+  code?: CodeCache
+  storage?: StorageCache
 
-	settings: Record<"account", CacheOpts>;
+  settings: Record<'account' | 'code' | 'storage', CacheOpts>
 
-	constructor(opts: CachesStateManagerOpts = {}) {
-		const accountSettings = {
-			type: opts.account?.type ?? CacheType.ORDERED_MAP,
-			size: opts.account?.size ?? 100000,
-		};
+  constructor(opts: CachesStateManagerOpts = {}) {
+    const accountSettings = {
+      type: opts.account?.type ?? CacheType.ORDERED_MAP,
+      size: opts.account?.size ?? 100000,
+    }
 
-		this.settings = {
-			account: accountSettings,
-		};
+    const codeSettings = {
+      type: opts.code?.type ?? CacheType.ORDERED_MAP,
+      size: opts.code?.size ?? 20000,
+    }
 
-		if (this.settings.account.size !== 0) {
-			this.account = new AccountCache({
-				size: this.settings.account.size,
-				type: this.settings.account.type,
-			});
-		}
-	}
+    const storageSettings = {
+      type: opts.storage?.type ?? CacheType.ORDERED_MAP,
+      size: opts.storage?.size ?? 20000,
+    }
 
-	checkpoint() {
-		this.account?.checkpoint();
-	}
+    this.settings = {
+      account: accountSettings,
+      code: codeSettings,
+      storage: storageSettings,
+    }
 
-	clear() {
-		this.account?.clear();
-	}
+    if (this.settings.account.size !== 0) {
+      this.account = new AccountCache({
+        size: this.settings.account.size,
+        type: this.settings.account.type,
+      })
+    }
 
-	commit() {
-		this.account?.commit();
-	}
+    if (this.settings.code.size !== 0) {
+      this.code = new CodeCache({
+        size: this.settings.code.size,
+        type: this.settings.code.type,
+      })
+    }
 
-	deleteAccount(address: Address) {
-		this.account?.del(address);
-	}
+    if (this.settings.storage.size !== 0) {
+      this.storage = new StorageCache({
+        size: this.settings.storage.size,
+        type: this.settings.storage.type,
+      })
+    }
+  }
 
-	shallowCopy(downlevelCaches: boolean) {
-		let cacheOptions: CachesStateManagerOpts | undefined;
+  checkpoint() {
+    this.account?.checkpoint()
+    this.storage?.checkpoint()
+    this.code?.checkpoint()
+  }
 
-		// Account cache options
-		if (this.settings.account.size !== 0) {
-			cacheOptions = {
-				account: downlevelCaches
-					? { size: this.settings.account.size, type: CacheType.ORDERED_MAP }
-					: this.settings.account,
-			};
-		}
+  clear() {
+    this.account?.clear()
+    this.storage?.clear()
+    this.code?.clear()
+  }
 
-		if (cacheOptions !== undefined) {
-			return new Caches(cacheOptions);
-		} else return undefined;
-	}
+  commit() {
+    this.account?.commit()
+    this.storage?.commit()
+    this.code?.commit()
+  }
 
-	revert() {
-		this.account?.revert();
-	}
+  deleteAccount(address: Address) {
+    this.code?.del(address)
+    this.account?.del(address)
+    this.storage?.clearStorage(address)
+  }
+
+  shallowCopy(downlevelCaches: boolean) {
+    let cacheOptions: CachesStateManagerOpts | undefined
+
+    // Account cache options
+    if (this.settings.account.size !== 0) {
+      cacheOptions = {
+        account: downlevelCaches
+          ? { size: this.settings.account.size, type: CacheType.ORDERED_MAP }
+          : this.settings.account,
+      }
+    }
+
+    // Storage cache options
+    if (this.settings.storage.size !== 0) {
+      cacheOptions = {
+        ...cacheOptions,
+        storage: downlevelCaches
+          ? { size: this.settings.storage.size, type: CacheType.ORDERED_MAP }
+          : this.settings.storage,
+      }
+    }
+
+    // Code cache options
+    if (this.settings.code.size !== 0) {
+      cacheOptions = {
+        ...cacheOptions,
+        code: downlevelCaches
+          ? { size: this.settings.code.size, type: CacheType.ORDERED_MAP }
+          : this.settings.code,
+      }
+    }
+
+    if (cacheOptions !== undefined) {
+      return new Caches(cacheOptions)
+    } else return undefined
+  }
+
+  revert() {
+    this.account?.revert()
+    this.storage?.revert()
+    this.code?.revert()
+  }
 }
