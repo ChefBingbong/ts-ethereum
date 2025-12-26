@@ -11,8 +11,8 @@ import {
 import {
   BIGINT_0,
   bytesToHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   type Withdrawal,

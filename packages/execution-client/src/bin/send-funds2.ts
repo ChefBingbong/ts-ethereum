@@ -18,13 +18,13 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
-    createWalletClient,
-    defineChain,
-    formatEther,
-    type Hex,
-    http,
-    parseEther,
-    publicActions,
+  createWalletClient,
+  defineChain,
+  formatEther,
+  type Hex,
+  http,
+  parseEther,
+  publicActions,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
