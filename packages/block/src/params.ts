@@ -19,12 +19,4 @@ export const paramsBlock: ParamsDict = {
     difficultyBoundDivisor: 2048, // The bound divisor of the difficulty, used in the update calculations
     durationLimit: 5, // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not
   },
-  12345: {
-    minGasLimit: 5000,
-    gasLimitBoundDivisor: 1024,
-    maxExtraDataSize: 32,
-    minimumDifficulty: 5,
-    difficultyBoundDivisor: 2048,
-    durationLimit: 4,
-  },
 }
