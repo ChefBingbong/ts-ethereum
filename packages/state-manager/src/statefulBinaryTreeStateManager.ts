@@ -19,11 +19,11 @@ import type {
 } from '@ts-ethereum/utils'
 import {
   Account,
-  bigIntToBytes,
   BINARY_TREE_CODE_CHUNK_SIZE,
   BINARY_TREE_CODE_OFFSET,
   BINARY_TREE_NODE_WIDTH,
   BinaryTreeLeafType,
+  bigIntToBytes,
   bytesToBigInt,
   bytesToHex,
   chunkifyBinaryTreeCode,
@@ -31,9 +31,9 @@ import {
   createPartialAccount,
   createPartialAccountFromRLP,
   decodeBinaryTreeLeafBasicData,
+  EthereumJSErrorWithoutCode,
   encodeBinaryTreeLeafBasicData,
   equalsBytes,
-  EthereumJSErrorWithoutCode,
   generateBinaryTreeChunkSuffixes,
   generateBinaryTreeCodeStems,
   getBinaryTreeKeyForStorageSlot,

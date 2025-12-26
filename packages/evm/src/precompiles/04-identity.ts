@@ -4,7 +4,6 @@ import { getPrecompileName } from './index'
 import type { PrecompileInput } from './types'
 import { gasLimitCheck, OOGResult } from './util'
 
-
 export function precompile04(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('04')
   const data = opts.data
