@@ -1,4 +1,4 @@
-import type { AffinePoint } from '@noble/curves/abstract/weierstrass'
+import type { AffinePoint } from '@noble/curves/abstract/weierstrass.js'
 import { bn254 } from '@noble/curves/bn254.js'
 import {
   BIGINT_0,

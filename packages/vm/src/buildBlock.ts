@@ -1,23 +1,46 @@
+import { sha256 } from '@noble/hashes/sha2.js'
 import type { Block, HeaderData } from '@ts-ethereum/block'
-import { createBlock, genTransactionsTrieRoot } from '@ts-ethereum/block'
-import { ConsensusType } from '@ts-ethereum/chain-config'
+import {
+  createBlock,
+  createSealedCliqueBlock,
+  genRequestsRoot,
+  genTransactionsTrieRoot,
+  genWithdrawalsTrieRoot,
+} from '@ts-ethereum/block'
+import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
+  Blob4844Tx,
+  createMinimal4844TxFromNetworkWrapper,
+  NetworkWrapperType,
+} from '@ts-ethereum/tx'
+import type { Withdrawal } from '@ts-ethereum/utils'
+import {
   Address,
   BIGINT_0,
   BIGINT_1,
+  BIGINT_2,
+  createWithdrawal,
   createZeroAddress,
   EthereumJSErrorWithoutCode,
+  GWEI_TO_WEI,
   KECCAK256_RLP,
   TypeOutput,
   toBytes,
   toType,
 } from '@ts-ethereum/utils'
-import { runTx } from '.'
-import { Bloom } from './bloom'
-import { calculateMinerReward, encodeReceipt, rewardAccount } from './runBlock'
+import { Bloom } from './bloom/index'
+import { runTx } from './index'
+import { accumulateRequests } from './requests'
+import {
+  accumulateParentBeaconBlockRoot,
+  accumulateParentBlockHash,
+  calculateMinerReward,
+  encodeReceipt,
+  rewardAccount,
+} from './runBlock'
 import type {
   BuildBlockOpts,
   BuilderOpts,
@@ -43,6 +66,10 @@ export class BlockBuilder {
    */
   gasUsed = BIGINT_0
   /**
+   *  The cumulative blob gas used by the blobs in a block
+   */
+  blobGasUsed = BIGINT_0
+  /**
    * Value of the block, represented by the final transaction fees
    * accruing to the miner.
    */
@@ -53,6 +80,7 @@ export class BlockBuilder {
   private headerData: HeaderData
   private transactions: TypedTransaction[] = []
   private transactionResults: RunTxResult[] = []
+  private withdrawals?: Withdrawal[]
   private checkpointed = false
   private blockStatus: BlockStatus = { status: BuildStatus.Pending }
 
@@ -68,8 +96,8 @@ export class BlockBuilder {
     this.vm = vm
     this.blockOpts = {
       putBlockIntoBlockchain: true,
-      common: this.vm.common,
       ...opts.blockOpts,
+      common: this.vm.common,
     }
 
     this.headerData = {
@@ -80,8 +108,35 @@ export class BlockBuilder {
       gasLimit: opts.headerData?.gasLimit ?? opts.parentBlock.header.gasLimit,
       timestamp: opts.headerData?.timestamp ?? Math.round(Date.now() / 1000),
     }
+    this.withdrawals = opts.withdrawals?.map(createWithdrawal)
 
-    // Frontier/Chainstart - no EIP-1559 base fee, no EIP-4844 blob gas
+    if (
+      this.vm.common.isActivatedEIP(1559) &&
+      typeof this.headerData.baseFeePerGas === 'undefined'
+    ) {
+      if (this.headerData.number === vm.common.hardforkBlock(Hardfork.London)) {
+        this.headerData.baseFeePerGas = vm.common.param('initialBaseFee')
+      } else {
+        this.headerData.baseFeePerGas =
+          opts.parentBlock.header.calcNextBaseFee()
+      }
+    }
+
+    if (typeof this.headerData.gasLimit === 'undefined') {
+      if (this.headerData.number === vm.common.hardforkBlock(Hardfork.London)) {
+        this.headerData.gasLimit = opts.parentBlock.header.gasLimit * BIGINT_2
+      } else {
+        this.headerData.gasLimit = opts.parentBlock.header.gasLimit
+      }
+    }
+
+    if (
+      this.vm.common.isActivatedEIP(4844) &&
+      typeof this.headerData.excessBlobGas === 'undefined'
+    ) {
+      this.headerData.excessBlobGas =
+        opts.parentBlock.header.calcNextExcessBlobGas(this.vm.common)
+    }
   }
 
   /**
@@ -152,6 +207,28 @@ export class BlockBuilder {
   }
 
   /**
+   * Adds the withdrawal amount to the withdrawal address
+   */
+  private async processWithdrawals() {
+    for (const withdrawal of this.withdrawals ?? []) {
+      const { address, amount } = withdrawal
+      // If there is no amount to add, skip touching the account
+      // as per the implementation of other clients geth/nethermind
+      // although this should never happen as no withdrawals with 0
+      // amount should ever land up here.
+      if (amount === BIGINT_0) continue
+      // Withdrawal amount is represented in Gwei so needs to be
+      // converted to wei
+      await rewardAccount(
+        this.vm.evm,
+        address,
+        amount * GWEI_TO_WEI,
+        this.vm.common,
+      )
+    }
+  }
+
+  /**
    * Run and add a transaction to the block being built.
    * Please note that this modifies the state of the VM.
    * Throws if the transaction's gasLimit is greater than
@@ -159,7 +236,10 @@ export class BlockBuilder {
    */
   async addTransaction(
     tx: TypedTransaction,
-    { skipHardForkValidation }: { skipHardForkValidation?: boolean } = {},
+    {
+      skipHardForkValidation,
+      allowNoBlobs,
+    }: { skipHardForkValidation?: boolean; allowNoBlobs?: boolean } = {},
   ) {
     this.checkStatus()
 
@@ -172,16 +252,58 @@ export class BlockBuilder {
     // cannot be greater than the remaining gas in the block
     const blockGasLimit = toType(this.headerData.gasLimit, TypeOutput.BigInt)
 
+    const blobGasPerBlob = this.vm.common.param('blobGasPerBlob')
+
     const blockGasRemaining = blockGasLimit - this.gasUsed
     if (tx.gasLimit > blockGasRemaining) {
       throw EthereumJSErrorWithoutCode(
         'tx has a higher gas limit than the remaining gas in the block',
       )
     }
+    let blobGasUsed
+    if (tx instanceof Blob4844Tx) {
+      const { maxBlobGasPerBlock: blobGasLimit } =
+        this.vm.common.getBlobGasSchedule()
+      if (
+        tx.networkWrapperVersion === NetworkWrapperType.EIP4844 &&
+        this.vm.common.isActivatedEIP(7594)
+      ) {
+        throw Error('eip4844 blob transaction for eip7594 activated fork')
+      } else if (
+        tx.networkWrapperVersion === NetworkWrapperType.EIP7594 &&
+        !this.vm.common.isActivatedEIP(7594)
+      ) {
+        throw Error('eip7594 blob transaction but eip not yet activated')
+      }
 
+      if (this.blockOpts.common?.isActivatedEIP(4844) === false) {
+        throw Error('eip4844 not activated yet for adding a blob transaction')
+      }
+      const blobTx = tx as Blob4844Tx
+
+      // Guard against the case if a tx came into the pool without blobs i.e. network wrapper payload
+      if (blobTx.blobs === undefined) {
+        // TODO: verify if we want this, do we want to allow the block builder to accept blob txs without the actual blobs?
+        // (these must have at least one `blobVersionedHashes`, this is verified at tx-level)
+        if (allowNoBlobs !== true) {
+          throw EthereumJSErrorWithoutCode('blobs missing for 4844 transaction')
+        }
+      }
+
+      if (
+        this.blobGasUsed + BigInt(blobTx.numBlobs()) * blobGasPerBlob >
+        blobGasLimit
+      ) {
+        throw EthereumJSErrorWithoutCode('block blob gas limit reached')
+      }
+
+      blobGasUsed = this.blobGasUsed
+    }
     const header = {
       ...this.headerData,
       gasUsed: this.gasUsed,
+      // correct excessBlobGas should already part of headerData used above
+      blobGasUsed,
     }
 
     const blockData = { header, transactions: this.transactions }
@@ -189,6 +311,15 @@ export class BlockBuilder {
 
     const result = await runTx(this.vm, { tx, block, skipHardForkValidation })
 
+    // If tx is a blob transaction, remove blobs/kzg commitments before adding to block per EIP-4844
+    if (tx instanceof Blob4844Tx) {
+      const txData = tx as Blob4844Tx
+      this.blobGasUsed +=
+        BigInt(txData.blobVersionedHashes.length) * blobGasPerBlob
+      tx = createMinimal4844TxFromNetworkWrapper(txData, {
+        common: this.blockOpts.common,
+      })
+    }
     this.transactions.push(tx)
     this.transactionResults.push(result)
     this.gasUsed += result.totalGasSpent
@@ -209,13 +340,18 @@ export class BlockBuilder {
   }
 
   /**
-   * This method constructs the finalized block.
+   * This method constructs the finalized block, including withdrawals and any CLRequests.
    * It also:
    *  - Assigns the reward for miner (PoW)
    *  - Commits the checkpoint on the StateManager
    *  - Sets the tip of the VM's blockchain to this block
    * For PoW, optionally seals the block with params `nonce` and `mixHash`,
    * which is validated along with the block number and difficulty by ethash.
+   * For PoA, please pass `blockOption.cliqueSigner` into the buildBlock constructor,
+   * as the signer will be awarded the txs amount spent on gas as they are added.
+   *
+   * Note: we add CLRequests here because they can be generated at any time during the
+   * lifecycle of a pending block so need to be provided only when the block is finalized.
    */
   async build(sealOpts?: SealBlockOpts) {
     this.checkStatus()
@@ -225,27 +361,50 @@ export class BlockBuilder {
     if (consensusType === ConsensusType.ProofOfWork) {
       await this.rewardMiner()
     }
+    await this.processWithdrawals()
 
     const transactionsTrie = await this.transactionsTrie()
+    const withdrawalsRoot = this.withdrawals
+      ? await genWithdrawalsTrieRoot(
+          this.withdrawals,
+          new MerklePatriciaTrie({ common: this.vm.common }),
+        )
+      : undefined
     const receiptTrie = await this.receiptTrie()
     const logsBloom = this.logsBloom()
     const gasUsed = this.gasUsed
     // timestamp should already be set in constructor
     const timestamp = this.headerData.timestamp ?? BIGINT_0
 
-    // get stateRoot after all the processing
+    let blobGasUsed
+    if (this.vm.common.isActivatedEIP(4844)) {
+      blobGasUsed = this.blobGasUsed
+    }
+
+    let requests
+    let requestsHash
+    if (this.vm.common.isActivatedEIP(7685)) {
+      const sha256Function = this.vm.common.customCrypto.sha256 ?? sha256
+      requests = await accumulateRequests(this.vm, this.transactionResults)
+      requestsHash = genRequestsRoot(requests, sha256Function)
+    }
+
+    // get stateRoot after all the accumulateRequests etc have been done
     const stateRoot = await this.vm.stateManager.getStateRoot()
     const headerData = {
       ...this.headerData,
       stateRoot,
       transactionsTrie,
+      withdrawalsRoot,
       receiptTrie,
       logsBloom,
       gasUsed,
       timestamp,
+      // correct excessBlobGas should already be part of headerData used above
+      blobGasUsed,
+      requestsHash,
     }
 
-    // PoW - allow setting nonce and mixHash for sealing
     if (consensusType === ConsensusType.ProofOfWork) {
       headerData.nonce = sealOpts?.nonce ?? headerData.nonce
       headerData.mixHash = sealOpts?.mixHash ?? headerData.mixHash
@@ -254,9 +413,16 @@ export class BlockBuilder {
     const blockData = {
       header: headerData,
       transactions: this.transactions,
+      withdrawals: this.withdrawals,
     }
 
-    const block = createBlock(blockData, blockOpts)
+    let block
+    const cs = this.blockOpts.cliqueSigner
+    if (cs !== undefined) {
+      block = createSealedCliqueBlock(cs, blockData, this.blockOpts)
+    } else {
+      block = createBlock(blockData, blockOpts)
+    }
 
     if (this.blockOpts.putBlockIntoBlockchain === true) {
       await this.vm.blockchain.putBlock(block)
@@ -268,11 +434,47 @@ export class BlockBuilder {
       this.checkpointed = false
     }
 
-    return { block }
+    return { block, requests }
   }
 
   async initState() {
-    // Frontier/Chainstart - no special state initialization needed
+    if (this.vm.common.isActivatedEIP(4788)) {
+      if (!this.checkpointed) {
+        await this.vm.evm.journal.checkpoint()
+        this.checkpointed = true
+      }
+
+      const { parentBeaconBlockRoot, timestamp } = this.headerData
+      // timestamp should already be set in constructor
+      const timestampBigInt = toType(timestamp ?? 0, TypeOutput.BigInt)
+      const parentBeaconBlockRootBuf =
+        toType(parentBeaconBlockRoot!, TypeOutput.Uint8Array) ??
+        new Uint8Array(32)
+
+      await accumulateParentBeaconBlockRoot(
+        this.vm,
+        parentBeaconBlockRootBuf,
+        timestampBigInt,
+      )
+    }
+    if (this.vm.common.isActivatedEIP(2935)) {
+      if (!this.checkpointed) {
+        await this.vm.evm.journal.checkpoint()
+        this.checkpointed = true
+      }
+
+      const { parentHash, number } = this.headerData
+      // timestamp should already be set in constructor
+      const numberBigInt = toType(number ?? 0, TypeOutput.BigInt)
+      const parentHashSanitized =
+        toType(parentHash, TypeOutput.Uint8Array) ?? new Uint8Array(32)
+
+      await accumulateParentBlockHash(
+        this.vm,
+        numberBigInt,
+        parentHashSanitized,
+      )
+    }
   }
 }
 

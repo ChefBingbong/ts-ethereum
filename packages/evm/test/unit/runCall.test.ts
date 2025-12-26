@@ -1,5 +1,5 @@
 // TODO: @ethereumjs/testdata is not available - need to find alternative or define locally
-// import { SIGNER_G, eip4844GethGenesis } from '@ethereumjs/testdata'
+// import { SIGNER_G, eip4844GethGenesis } from '@ts-ethereum/testdata'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import {

@@ -1,7 +1,6 @@
 import type { Common } from '@ts-ethereum/chain-config'
 import { BIGINT_0 } from '@ts-ethereum/utils'
-
-type RunState = any
+import type { RunState } from '../interpreter'
 
 /**
  * Adds address to accessedAddresses set if not already included.

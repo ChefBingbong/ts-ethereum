@@ -1,4 +1,4 @@
-export { Bloom } from './bloom'
+export { Bloom } from './bloom/index'
 export { BlockBuilder, BuildStatus, buildBlock } from './buildBlock'
 export * from './constructors'
 export * from './params'

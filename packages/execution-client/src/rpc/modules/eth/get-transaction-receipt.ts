@@ -6,7 +6,7 @@ import {
   safeError,
   safeResult,
 } from '@ts-ethereum/utils'
-import type { VM } from '@ts-ethereum/vm'
+import type { EIP4844BlobTxReceipt, VM } from '@ts-ethereum/vm'
 import { runBlock } from '@ts-ethereum/vm'
 import type { ReceiptsManager } from '../../../execution/receipt'
 import type { TxIndex } from '../../../execution/txIndex'
@@ -57,7 +57,10 @@ export const getTransactionReceipt = (node: ExecutionNode) => {
           skipBlockValidation: true,
         })
 
-        const { totalGasSpent } = runBlockResult.results[txIdx]
+        const { createdAddress, totalGasSpent } = runBlockResult.results[txIdx]
+        const { blobGasPrice, blobGasUsed } = runBlockResult.receipts[
+          txIdx
+        ] as EIP4844BlobTxReceipt
         const jsonRpcReceipt = await toJSONRPCReceipt(
           receipt,
           totalGasSpent,
@@ -66,7 +69,9 @@ export const getTransactionReceipt = (node: ExecutionNode) => {
           tx,
           txIdx,
           logIndex,
-          undefined,
+          createdAddress as any,
+          blobGasPrice,
+          blobGasUsed,
         )
         return safeResult(jsonRpcReceipt)
       } catch (error) {

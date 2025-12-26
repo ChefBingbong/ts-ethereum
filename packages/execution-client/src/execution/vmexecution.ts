@@ -5,6 +5,7 @@ import {
   DBSetHashToNumber,
   DBSetTD,
 } from '@ts-ethereum/blockchain'
+import { RustBN254 } from '@ts-ethereum/evm'
 import { createMPT } from '@ts-ethereum/mpt'
 import {
   Caches,
@@ -31,6 +32,7 @@ import {
   type VM,
 } from '@ts-ethereum/vm'
 import * as mcl from 'mcl-wasm'
+import { initRustBN } from 'rustbn-wasm'
 import {
   classifyError,
   createErrorContext,
@@ -190,31 +192,35 @@ export class VMExecution extends Execution {
 
     const stateManager = new MerkleStateManager({
       trie,
-      // prefixStorageTrieKeys: this.config.options.prefixStorageTrieKeys,
+      prefixStorageTrieKeys: this.config.options.prefixStorageTrieKeys,
       caches: new Caches({
         account: {
           type: CacheType.LRU,
           size: this.config.options.accountCache,
         },
-        // storage: {
-        //   type: CacheType.LRU,
-        //   size: this.config.options.storageCache,
-        // },
-        // code: {
-        //   type: CacheType.LRU,
-        //   size: this.config.options.codeCache,
-        // },
+        storage: {
+          type: CacheType.LRU,
+          size: this.config.options.storageCache,
+        },
+        code: {
+          type: CacheType.LRU,
+          size: this.config.options.codeCache,
+        },
       }),
       common: this.config.chainCommon,
     })
 
     await mcl.init(mcl.BLS12_381)
-    // const rustBN = await initRustBN()
+    const rustBN = await initRustBN()
     this.merkleVM = await createVM({
       common: this.config.execCommon,
       blockchain: this.chain.blockchain,
       stateManager,
       profilerOpts: this.config.options.vmProfilerOpts,
+      activatePrecompiles: true,
+      evmOpts: {
+        bn254: new RustBN254(rustBN),
+      },
     })
     this.vm = this.merkleVM
   }

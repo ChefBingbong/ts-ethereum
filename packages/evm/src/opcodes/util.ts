@@ -1,8 +1,8 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import type { Common } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
+import type { Address } from '@ts-ethereum/utils'
 import {
-  type Address,
   BIGINT_0,
   BIGINT_1,
   BIGINT_2,
@@ -71,7 +71,7 @@ export function createAddressFromStackBigInt(value: bigint): Address {
 }
 
 /**
- * Proxy function for @ts-ethereum/utils's setLengthLeft, except it returns a zero
+ * Proxy function for @ethereumjs/util's setLengthLeft, except it returns a zero
  * length Uint8Array in case the Uint8Array is full of zeros.
  * @param value Uint8Array which we want to pad
  */

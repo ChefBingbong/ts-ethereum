@@ -1,10 +1,6 @@
 export * from './block/index'
-export * from './consensus/index'
+export * from './consensus'
 export * from './header/index'
-export {
-  genTransactionsTrieRoot,
-  getDifficulty,
-  valuesArrayToHeaderData,
-} from './helpers'
+export * from './helpers'
 export * from './params'
 export * from './types'

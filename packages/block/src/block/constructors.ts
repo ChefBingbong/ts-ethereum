@@ -21,6 +21,7 @@ import {
   intToHex,
   isHexString,
 } from '@ts-ethereum/utils'
+import { generateCliqueBlockExtraData } from '../consensus/clique'
 import { genWithdrawalsTrieRoot } from '../helpers'
 import {
   Block,
@@ -380,4 +381,35 @@ export async function createBlockFromExecutionPayload(
   }
 
   return block
+}
+
+/**
+ * Creates a block for Clique networks with the seal applied during instantiation.
+ * @param blockData Block fields used to build the block
+ * @param cliqueSigner Private key bytes used to sign the header
+ * @param opts {@link BlockOptions}
+ * @returns A sealed Clique {@link Block} object
+ */
+export function createSealedCliqueBlock(
+  cliqueSigner: Uint8Array,
+  blockData: BlockData = {},
+  opts: BlockOptions = {},
+): Block {
+  const sealedCliqueBlock = createBlock(blockData, {
+    ...opts,
+    ...{ freeze: false, skipConsensusFormatValidation: true },
+  })
+  ;(sealedCliqueBlock.header.extraData as any) = generateCliqueBlockExtraData(
+    sealedCliqueBlock.header,
+    cliqueSigner,
+  )
+  if (opts?.freeze === true) {
+    // We have to freeze here since we can't freeze the block when constructing it since we are overwriting `extraData`
+    Object.freeze(sealedCliqueBlock)
+  }
+  if (opts?.skipConsensusFormatValidation === false) {
+    // We need to validate the consensus format here since we skipped it when constructing the block
+    sealedCliqueBlock.header['_consensusFormatValidation']()
+  }
+  return sealedCliqueBlock
 }

@@ -1,10 +1,11 @@
 import { ripemd160 } from '@noble/hashes/legacy.js'
 import { bytesToHex, setLengthLeft } from '@ts-ethereum/utils'
 
+import { OOGResult } from '../evm'
 import type { ExecResult } from '../types'
 import { getPrecompileName } from './index'
 import type { PrecompileInput } from './types'
-import { gasLimitCheck, OOGResult } from './util'
+import { gasLimitCheck } from './util'
 
 export function precompile03(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('03')

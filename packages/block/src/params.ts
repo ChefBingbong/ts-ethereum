@@ -12,9 +12,9 @@ export const paramsBlock: ParamsDict = {
     // gasConfig
     minGasLimit: 3000, // Minimum the gas limit may ever be
     gasLimitBoundDivisor: 1024, // The bound divisor of the gas limit, used in update calculations
-    // targetBlobGasPerBlock: 0, // Base value needed here since called pre-4844 in BlockHeader.calcNextExcessBlobGas()
-    // blobGasPerBlob: 0,
-    // maxBlobGasPerBlock: 0,
+    targetBlobGasPerBlock: 0, // Base value needed here since called pre-4844 in BlockHeader.calcNextExcessBlobGas()
+    blobGasPerBlob: 0,
+    maxBlobGasPerBlock: 0,
     // format
     maxExtraDataSize: 32, // Maximum size extra data may be after Genesis
     // pow

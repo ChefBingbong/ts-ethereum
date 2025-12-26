@@ -1,11 +1,20 @@
-import {
-  type Chain,
-  ChainGenesis,
-  type Common,
-  type GenesisState,
-} from '@ts-ethereum/chain-config'
+import type { Chain, Common, GenesisState } from '@ts-ethereum/chain-config'
+import { ChainGenesis } from '@ts-ethereum/chain-config'
 import { genesisMPTStateRoot } from '@ts-ethereum/mpt'
 
+/**
+ * Safe creation of a new Blockchain object awaiting the initialization function,
+ * encouraged method to use when creating a blockchain object.
+ *
+ * @param opts Constructor options, see {@link BlockchainOptions}
+ */
+
+/**
+ * Merkle genesis root
+ * @param genesisState
+ * @param common
+ * @returns
+ */
 export async function genGenesisStateRoot(
   genesisState: GenesisState,
   common: Common,
@@ -24,10 +33,9 @@ export async function genGenesisStateRoot(
 export async function getGenesisStateRoot(
   chainId: Chain,
   common: Common,
-  genesisState: GenesisState,
 ): Promise<Uint8Array> {
   const chainGenesis = ChainGenesis[chainId]
   return chainGenesis !== undefined
     ? chainGenesis.stateRoot
-    : genGenesisStateRoot(genesisState, common)
+    : genGenesisStateRoot({}, common)
 }

@@ -1,3 +1,4 @@
+import type { RunState } from '../interpreter'
 import { EOFContainer, EOFContainerMode } from './container'
 
 /**
@@ -6,7 +7,7 @@ import { EOFContainer, EOFContainerMode } from './container'
  * @param eofMode EOF mode to run in (only changes in case of EOFCREATE)
  */
 export function setupEOF(
-  runState: any,
+  runState: RunState,
   eofMode: EOFContainerMode = EOFContainerMode.Default,
 ) {
   runState.env.eof = {

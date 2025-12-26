@@ -1,11 +1,26 @@
 import type { Common } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { type Address, bytesToUnprefixedHex } from '@ts-ethereum/utils'
+import { precompile0a } from './0a-kzg-point-evaluation'
+import { precompile0b } from './0b-bls12-g1add'
+import { precompile0c } from './0c-bls12-g1msm'
+import { precompile0d } from './0d-bls12-g2add'
+import { precompile0e } from './0e-bls12-g2msm'
+import { precompile0f } from './0f-bls12-pairing'
 import { precompile01 } from './01-ecrecover'
 import { precompile02 } from './02-sha256'
 import { precompile03 } from './03-ripemd160'
 import { precompile04 } from './04-identity'
-import { NobleBN254 } from './bn254'
+import { precompile05 } from './05-modexp'
+import { precompile06 } from './06-bn254-add'
+import { precompile07 } from './07-bn254-mul'
+import { precompile08 } from './08-bn254-pairing'
+import { precompile09 } from './09-blake2f'
+import { precompile10 } from './10-bls12-map-fp-to-g1'
+import { precompile11 } from './11-bls12-map-fp2-to-g2'
+import { precompile100 } from './100-p256verify'
+import { MCLBLS, NobleBLS } from './bls12_381/index'
+import { NobleBN254, RustBN254 } from './bn254/index'
 import type { PrecompileFunc, PrecompileInput } from './types'
 
 interface PrecompileEntry {
@@ -80,6 +95,132 @@ const precompileEntries: PrecompileEntry[] = [
     precompile: precompile04,
     name: 'IDENTITY (0x04)',
   },
+  {
+    address: BYTES_19 + '05',
+    check: {
+      type: PrecompileAvailabilityCheck.Hardfork,
+      param: Hardfork.Byzantium,
+    },
+    precompile: precompile05,
+    name: 'MODEXP (0x05)',
+  },
+  {
+    address: BYTES_19 + '06',
+    check: {
+      type: PrecompileAvailabilityCheck.Hardfork,
+      param: Hardfork.Byzantium,
+    },
+    precompile: precompile06,
+    name: 'BN254_ADD (0x06)',
+  },
+  {
+    address: BYTES_19 + '07',
+    check: {
+      type: PrecompileAvailabilityCheck.Hardfork,
+      param: Hardfork.Byzantium,
+    },
+    precompile: precompile07,
+    name: 'BN254_MUL (0x07)',
+  },
+  {
+    address: BYTES_19 + '08',
+    check: {
+      type: PrecompileAvailabilityCheck.Hardfork,
+      param: Hardfork.Byzantium,
+    },
+    precompile: precompile08,
+    name: 'BN254_PAIRING (0x08)',
+  },
+  {
+    address: BYTES_19 + '09',
+    check: {
+      type: PrecompileAvailabilityCheck.Hardfork,
+      param: Hardfork.Istanbul,
+    },
+    precompile: precompile09,
+    name: 'BLAKE2f (0x09)',
+  },
+  {
+    address: BYTES_19 + '0a',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 4844,
+    },
+    precompile: precompile0a,
+    name: 'KZG_POINT_EVALUATION (0x0a)',
+  },
+  {
+    address: BYTES_19 + '0b',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile0b,
+    name: 'BLS12_G1ADD (0x0b)',
+  },
+  {
+    address: BYTES_19 + '0c',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile0c,
+    name: 'BLS12_G1MSM (0x0c)',
+  },
+  {
+    address: BYTES_19 + '0d',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile0d,
+    name: 'BLS12_G2ADD (0x0d)',
+  },
+  {
+    address: BYTES_19 + '0e',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile0e,
+    name: 'BLS12_G2MSM (0x0e)',
+  },
+  {
+    address: BYTES_19 + '0f',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile0f,
+    name: 'BLS12_PAIRING (0x0f)',
+  },
+  {
+    address: BYTES_19 + '10',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile10,
+    name: 'BLS12_MAP_FP_TO_G1 (0x10)',
+  },
+  {
+    address: BYTES_19 + '11',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 2537,
+    },
+    precompile: precompile11,
+    name: 'BLS12_MAP_FP_TO_G2 (0x11)',
+  },
+  {
+    address: '0000000000000000000000000000000000000100',
+    check: {
+      type: PrecompileAvailabilityCheck.EIP,
+      param: 7951,
+    },
+    precompile: precompile100,
+    name: 'P256VERIFY (0x100)',
+  },
 ]
 
 const precompiles: Precompiles = {
@@ -87,6 +228,20 @@ const precompiles: Precompiles = {
   [BYTES_19 + '02']: precompile02,
   [ripemdPrecompileAddress]: precompile03,
   [BYTES_19 + '04']: precompile04,
+  [BYTES_19 + '05']: precompile05,
+  [BYTES_19 + '06']: precompile06,
+  [BYTES_19 + '07']: precompile07,
+  [BYTES_19 + '08']: precompile08,
+  [BYTES_19 + '09']: precompile09,
+  [BYTES_19 + '0a']: precompile0a,
+  [BYTES_19 + '0b']: precompile0b,
+  [BYTES_19 + '0c']: precompile0c,
+  [BYTES_19 + '0d']: precompile0d,
+  [BYTES_19 + '0e']: precompile0e,
+  [BYTES_19 + '0f']: precompile0f,
+  [BYTES_19 + '10']: precompile10,
+  [BYTES_19 + '11']: precompile11,
+  '0000000000000000000000000000000000000100': precompile100,
 }
 
 type DeletePrecompile = {
@@ -146,10 +301,13 @@ function getPrecompileName(addressUnprefixedStr: string) {
 export {
   getActivePrecompiles,
   getPrecompileName,
+  MCLBLS,
+  NobleBLS,
   NobleBN254,
   precompileEntries,
   precompiles,
   ripemdPrecompileAddress,
+  RustBN254,
 }
 
 export type {

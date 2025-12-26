@@ -1,7 +1,17 @@
-import type { Common } from '@ts-ethereum/chain-config'
-import { createEVM, EVMMockBlockchain } from '@ts-ethereum/evm'
+import { Common, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  createEVM,
+  EVMMockBlockchain,
+  getActivePrecompiles,
+} from '@ts-ethereum/evm'
 import { MerkleStateManager } from '@ts-ethereum/state-manager'
-import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
+import {
+  Account,
+  Address,
+  createAccount,
+  EthereumJSErrorWithoutCode,
+  unprefixedHexToBytes,
+} from '@ts-ethereum/utils'
 import type { VMOpts } from './types'
 import { VM } from './vm'
 
@@ -11,14 +21,17 @@ import { VM } from './vm'
  * @param opts VM engine constructor options
  */
 export async function createVM(opts: VMOpts = {}): Promise<VM> {
+  // Save if a `StateManager` was passed (for activatePrecompiles)
+  const didPassStateManager = opts.stateManager !== undefined
+
   // Add common, SM, blockchain, EVM here
-  // if (opts.common === undefined) {
-  //   opts.common = new Common({ chain: Mainnet })
-  // }
+  if (opts.common === undefined) {
+    opts.common = new Common({ chain: Mainnet })
+  }
 
   if (opts.stateManager === undefined) {
     opts.stateManager = new MerkleStateManager({
-      common: opts.common as Common,
+      common: opts.common,
     })
   }
 
@@ -45,16 +58,44 @@ export async function createVM(opts: VMOpts = {}): Promise<VM> {
   }
 
   if (opts.evm === undefined) {
+    let enableProfiler = false
+    if (
+      opts.profilerOpts?.reportAfterBlock === true ||
+      opts.profilerOpts?.reportAfterTx === true
+    ) {
+      enableProfiler = true
+    }
     const evmOpts = opts.evmOpts ?? {}
     opts.evm = await createEVM({
       common: opts.common,
       stateManager: opts.stateManager,
       blockchain: opts.blockchain,
+      profiler: {
+        enabled: enableProfiler,
+      },
       ...evmOpts,
     })
   }
 
-  // Note: activatePrecompiles is ignored - precompiles not supported in value-transfer-only mode
+  if (opts.activatePrecompiles === true && !didPassStateManager) {
+    await opts.evm.journal.checkpoint()
+    // put 1 wei in each of the precompiles in order to make the accounts non-empty and thus not have them deduct `callNewAccount` gas.
+    for (const [addressStr] of getActivePrecompiles(opts.common)) {
+      const address = new Address(unprefixedHexToBytes(addressStr))
+      let account = await opts.evm.stateManager.getAccount(address)
+      // Only do this if it is not overridden in genesis
+      // Note: in the case that custom genesis has storage fields, this is preserved
+      if (account === undefined) {
+        account = new Account()
+        const newAccount = createAccount({
+          balance: 1,
+          storageRoot: account.storageRoot,
+        })
+        await opts.evm.stateManager.putAccount(address, newAccount)
+      }
+    }
+    await opts.evm.journal.commit()
+  }
 
   return new VM(opts)
 }

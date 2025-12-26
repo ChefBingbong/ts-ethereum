@@ -21,11 +21,12 @@
   "devDependencies": {
     "@paulmillr/trusted-setups": "0.2.0",
     "@types/bun": "latest",
+    "@vitest/coverage-v8": "^4.0.16",
     "lefthook": "^1.11.1",
     "micro-eth-signer": "0.15.0",
+    "solc": "^0.8.33",
     "tsx": "^4.20.6",
     "turbo": "^2.7.1",
-    "@vitest/coverage-v8": "^4.0.16",
     "vitest": "^4.0.13",
     "vitest-when": "^0.10.0"
   },

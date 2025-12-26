@@ -8,6 +8,7 @@ export enum AdminRpcMethods {
 
 export enum EthRpcMethods {
   eth_blockNumber = 'eth_blockNumber',
+  eth_call = 'eth_call',
   eth_chainId = 'eth_chainId',
   eth_coinbase = 'eth_coinbase',
   eth_estimateGas = 'eth_estimateGas',
@@ -15,6 +16,9 @@ export enum EthRpcMethods {
   eth_getBalance = 'eth_getBalance',
   eth_getBlockByHash = 'eth_getBlockByHash',
   eth_getBlockByNumber = 'eth_getBlockByNumber',
+  eth_getCode = 'eth_getCode',
+  eth_getLogs = 'eth_getLogs',
+  eth_getStorageAt = 'eth_getStorageAt',
   eth_getBlockReceipts = 'eth_getBlockReceipts',
   eth_getBlockTransactionCountByHash = 'eth_getBlockTransactionCountByHash',
   eth_getBlockTransactionCountByNumber = 'eth_getBlockTransactionCountByNumber',

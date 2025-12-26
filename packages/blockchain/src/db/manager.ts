@@ -20,6 +20,7 @@ import type {
 import {
   bytesToBigInt,
   bytesToHex,
+  EthereumJSErrorWithoutCode,
   equalsBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
@@ -69,8 +70,8 @@ export class DBManager {
    * Fetches iterator heads from the db.
    */
   async getHeads(): Promise<{ [key: string]: Uint8Array }> {
-    const heads = await this.get(DBTarget.Heads)
-    if (heads === undefined) return {} as { [key: string]: Uint8Array }
+    const heads = (await this.get(DBTarget.Heads)) as DBObject
+    if (heads === undefined) return heads
     const decodedHeads: { [key: string]: Uint8Array } = {}
     for (const key of Object.keys(heads)) {
       // Heads are stored in DB as hex strings since Level converts Uint8Arrays
@@ -116,7 +117,7 @@ export class DBManager {
       number = blockId
       hash = await this.numberToHash(blockId)
     } else {
-      throw new Error('Unknown blockId type')
+      throw EthereumJSErrorWithoutCode('Unknown blockId type')
     }
 
     if (hash === undefined || number === undefined) return undefined
@@ -129,18 +130,32 @@ export class DBManager {
       body = [[], []] as BlockBodyBytes
       // Do extra validations on the header since we are assuming empty transactions and uncles
       if (!equalsBytes(header.transactionsTrie, KECCAK256_RLP)) {
-        throw new Error('transactionsTrie root should be equal to hash of null')
+        throw EthereumJSErrorWithoutCode(
+          'transactionsTrie root should be equal to hash of null',
+        )
       }
 
       if (!equalsBytes(header.uncleHash, KECCAK256_RLP_ARRAY)) {
-        throw new Error('uncle hash should be equal to hash of empty array')
+        throw EthereumJSErrorWithoutCode(
+          'uncle hash should be equal to hash of empty array',
+        )
       }
 
-      // Frontier/Chainstart - no withdrawals
+      // If this block had empty withdrawals push an empty array in body
+      if (header.withdrawalsRoot !== undefined) {
+        // Do extra validations for withdrawal before assuming empty withdrawals
+        if (!equalsBytes(header.withdrawalsRoot, KECCAK256_RLP)) {
+          throw EthereumJSErrorWithoutCode(
+            'withdrawals root shoot be equal to hash of null when no withdrawals',
+          )
+        } else {
+          body.push([])
+        }
+      }
     }
 
     const blockData = [header.raw(), ...body] as BlockBytes
-    const opts: BlockOptions = { common: this.common }
+    const opts: BlockOptions = { common: this.common, setHardfork: true }
     return createBlockFromBytesArray(blockData, opts)
   }
 
@@ -165,7 +180,7 @@ export class DBManager {
     })
     const headerValues = RLP.decode(encodedHeader)
 
-    const opts: BlockOptions = { common: this.common }
+    const opts: BlockOptions = { common: this.common, setHardfork: true }
     return createBlockHeaderFromBytesArray(headerValues as Uint8Array[], opts)
   }
 
@@ -189,7 +204,9 @@ export class DBManager {
   async hashToNumber(blockHash: Uint8Array): Promise<bigint | undefined> {
     const value = await this.get(DBTarget.HashToNumber, { blockHash })
     if (value === undefined) {
-      throw new Error(`value for ${bytesToHex(blockHash)} not found in DB`)
+      throw EthereumJSErrorWithoutCode(
+        `value for ${bytesToHex(blockHash)} not found in DB`,
+      )
     }
     return value !== undefined ? bytesToBigInt(value) : undefined
   }
@@ -215,7 +232,7 @@ export class DBManager {
 
     if (cacheString !== undefined) {
       if (this._cache[cacheString] === undefined) {
-        throw new Error(`Invalid cache: ${cacheString}`)
+        throw EthereumJSErrorWithoutCode(`Invalid cache: ${cacheString}`)
       }
       let value = this._cache[cacheString].get(dbKey)
       if (value === undefined) {

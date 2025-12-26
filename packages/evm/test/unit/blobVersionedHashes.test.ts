@@ -16,7 +16,7 @@ describe('BLOBHASH / access blobVersionedHashes in calldata', () => {
   it('should work', async () => {
     // setup the evm
     // TODO: eip4844GethGenesis from @ethereumjs/testdata is not available
-    // const { eip4844GethGenesis } = await import('@ethereumjs/testdata')
+    // const { eip4844GethGenesis } = await import('@ts-ethereum/testdata')
     // const common = createCommonFromGethGenesis(eip4844GethGenesis, {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
@@ -48,7 +48,7 @@ describe(`BLOBHASH: access blobVersionedHashes within contract calls`, () => {
   it('should work', async () => {
     // setup the evm
     // TODO: eip4844GethGenesis from @ethereumjs/testdata is not available
-    // const { eip4844GethGenesis } = await import('@ethereumjs/testdata')
+    // const { eip4844GethGenesis } = await import('@ts-ethereum/testdata')
     // const common = createCommonFromGethGenesis(eip4844GethGenesis, {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
@@ -110,7 +110,7 @@ describe(`BLOBHASH: access blobVersionedHashes in a CREATE/CREATE2 frame`, () =>
   it('should work', async () => {
     // setup the evm
     // TODO: eip4844GethGenesis from @ethereumjs/testdata is not available
-    // const { eip4844GethGenesis } = await import('@ethereumjs/testdata')
+    // const { eip4844GethGenesis } = await import('@ts-ethereum/testdata')
     // const common = createCommonFromGethGenesis(eip4844GethGenesis, {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,

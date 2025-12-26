@@ -54,7 +54,7 @@ export class VM {
    * performance reasons to avoid string literal evaluation
    * @hidden
    */
-  DEBUG = false
+  readonly DEBUG: boolean = false
 
   /**
    * Instantiates a new {@link VM} Object.
@@ -92,7 +92,7 @@ export class VM {
     // Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
     // Additional window check is to prevent vite browser bundling (and potentially other) to break
     this.DEBUG =
-      typeof globalThis.window === 'undefined'
+      typeof window === 'undefined'
         ? (process?.env?.DEBUG?.includes('ethjs') ?? false)
         : false
   }
@@ -112,6 +112,7 @@ export class VM {
    */
   async shallowCopy(downlevelCaches = true): Promise<VM> {
     const common = this.common.copy()
+    common.setHardfork(this.common.hardfork())
     const blockchain = this.blockchain.shallowCopy()
     const stateManager = this.stateManager.shallowCopy(downlevelCaches)
     const evmOpts = {

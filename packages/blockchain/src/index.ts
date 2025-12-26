@@ -1,5 +1,9 @@
 export { Blockchain } from './blockchain'
-export { EthashConsensus } from './consensus/index'
+export {
+  CasperConsensus,
+  CliqueConsensus,
+  EthashConsensus,
+} from './consensus/index'
 export * from './constructors'
 export {
   DBOp,
