@@ -248,11 +248,13 @@
         "typescript": "^5",
       },
     },
-    "packages/metrics": {
-      "name": "@ts-ethereum/metrics",
+    "packages/merkel-trie": {
+      "name": "@ts-ethereum/mpt",
       "version": "0.0.0",
       "dependencies": {
-        "prom-client": "^15.1.3",
+        "@ts-ethereum/chain-config": "workspace:*",
+        "@ts-ethereum/rlp": "workspace:*",
+        "@ts-ethereum/utils": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -261,13 +263,11 @@
         "typescript": "^5",
       },
     },
-    "packages/mpt": {
-      "name": "@ts-ethereum/mpt",
+    "packages/metrics": {
+      "name": "@ts-ethereum/metrics",
       "version": "0.0.0",
       "dependencies": {
-        "@ts-ethereum/chain-config": "workspace:*",
-        "@ts-ethereum/rlp": "workspace:*",
-        "@ts-ethereum/utils": "workspace:*",
+        "prom-client": "^15.1.3",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -681,7 +681,7 @@
 
     "@ts-ethereum/metrics": ["@ts-ethereum/metrics@workspace:packages/metrics"],
 
-    "@ts-ethereum/mpt": ["@ts-ethereum/mpt@workspace:packages/mpt"],
+    "@ts-ethereum/mpt": ["@ts-ethereum/mpt@workspace:packages/merkel-trie"],
 
     "@ts-ethereum/p2p": ["@ts-ethereum/p2p@workspace:packages/p2p"],
 

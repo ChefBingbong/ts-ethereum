@@ -1,4 +1,5 @@
-import type { GenesisState } from '@ts-ethereum/chain-config'
+import { keccak_256 } from '@noble/hashes/sha3.js'
+import type { AccountState, GenesisState } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   Account,
@@ -7,7 +8,6 @@ import {
   unpadBytes,
   unprefixedHexToBytes,
 } from '@ts-ethereum/utils'
-import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { MerklePatriciaTrie } from '../mpt'
 
 /**
@@ -23,7 +23,7 @@ export async function genesisMPTStateRoot(genesisState: GenesisState) {
     if (typeof value === 'string') {
       account.balance = BigInt(value)
     } else {
-      const [balance, code, storage, nonce] = value as any
+      const [balance, code, storage, nonce] = value as Partial<AccountState>
       if (balance !== undefined) {
         account.balance = BigInt(balance)
       }
@@ -31,7 +31,7 @@ export async function genesisMPTStateRoot(genesisState: GenesisState) {
         const codeBytes = isHexString(code)
           ? hexToBytes(code)
           : unprefixedHexToBytes(code)
-        account.codeHash = keccak256(codeBytes)
+        account.codeHash = keccak_256(codeBytes)
       }
       if (storage !== undefined) {
         const storageTrie = new MerklePatriciaTrie({ useKeyHashing: true })

@@ -1,11 +1,16 @@
 import type { PutBatch } from '@ts-ethereum/utils'
-import { bytesToHex, concatBytes, equalsBytes } from '@ts-ethereum/utils'
+import {
+  bytesToHex,
+  concatBytes,
+  EthereumJSErrorWithoutCode,
+  equalsBytes,
+} from '@ts-ethereum/utils'
 import {
   createMPTFromProof,
   MerklePatriciaTrie,
   type MPTOpts,
   type Proof,
-} from '..'
+} from '../index'
 
 /**
  * An (EIP-1186)[https://eips.ethereum.org/EIPS/eip-1186] proof contains the encoded trie nodes
@@ -27,7 +32,7 @@ export async function verifyMerkleProof(
     const value = await proofTrie.get(key, true)
     return value
   } catch {
-    throw new Error('Invalid proof provided')
+    throw EthereumJSErrorWithoutCode('Invalid proof provided')
   }
 }
 
@@ -87,7 +92,7 @@ export async function updateMPTFromMerkleProof(
   if (shouldVerifyRoot) {
     if (opStack[0] !== undefined && opStack[0] !== null) {
       if (!equalsBytes(trie.root(), opStack[0].key)) {
-        throw new Error(
+        throw EthereumJSErrorWithoutCode(
           'The provided proof does not have the expected trie root',
         )
       }
@@ -132,7 +137,7 @@ export async function verifyMPTWithMerkleProof(
   try {
     await updateMPTFromMerkleProof(proofTrie, proof, true)
   } catch {
-    throw new Error('Invalid proof nodes given')
+    throw EthereumJSErrorWithoutCode('Invalid proof nodes given')
   }
   try {
     trie['DEBUG'] &&
@@ -145,7 +150,7 @@ export async function verifyMPTWithMerkleProof(
     return value
   } catch (err: any) {
     if (err.message === 'Missing node in DB') {
-      throw new Error('Invalid proof provided')
+      throw EthereumJSErrorWithoutCode('Invalid proof provided')
     } else {
       throw err
     }

@@ -121,7 +121,7 @@ describe('[Transaction]', () => {
 
   it('getIntrinsicGas() -> should return base fee', () => {
     const tx = createLegacyTx({})
-    assert.strictEqual(tx.getIntrinsicGas(), BigInt(53000))
+    assert.strictEqual(tx.getIntrinsicGas(), BigInt(21000))
   })
 
   it('getDataGas() -> should return data fee', () => {

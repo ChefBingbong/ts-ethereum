@@ -1,9 +1,11 @@
 import { RLP } from '@ts-ethereum/rlp'
-import type { NestedUint8Array } from '@ts-ethereum/utils'
+import {
+  EthereumJSErrorWithoutCode,
+  type NestedUint8Array,
+} from '@ts-ethereum/utils'
 
 import { isTerminator } from '../util/hex'
 import { bytesToNibbles } from '../util/nibbles'
-
 import { BranchMPTNode } from './branch'
 import { ExtensionMPTNode } from './extension'
 import { LeafMPTNode } from './leaf'
@@ -18,7 +20,7 @@ export function decodeRawMPTNode(raw: Uint8Array[]) {
     }
     return new ExtensionMPTNode(ExtensionMPTNode.decodeKey(nibbles), raw[1])
   } else {
-    throw new Error('Invalid node')
+    throw EthereumJSErrorWithoutCode('Invalid node')
   }
 }
 
@@ -31,7 +33,7 @@ export function isRawMPTNode(
 export function decodeMPTNode(node: Uint8Array) {
   const decodedNode = RLP.decode(Uint8Array.from(node))
   if (!isRawMPTNode(decodedNode)) {
-    throw new Error('Invalid node')
+    throw EthereumJSErrorWithoutCode('Invalid node')
   }
   return decodeRawMPTNode(decodedNode)
 }

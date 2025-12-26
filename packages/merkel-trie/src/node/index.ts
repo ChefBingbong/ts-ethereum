@@ -1,4 +1,5 @@
 export * from './branch'
 export * from './extension'
+export * from './extensionOrLeafNodeBase'
 export * from './leaf'
 export * from './util'

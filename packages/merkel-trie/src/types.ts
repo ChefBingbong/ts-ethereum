@@ -1,6 +1,6 @@
 import type { DB, ValueEncoding } from '@ts-ethereum/utils'
 import { utf8ToBytes } from '@ts-ethereum/utils'
-import type { BranchMPTNode, ExtensionMPTNode, LeafMPTNode } from './node'
+import type { BranchMPTNode, ExtensionMPTNode, LeafMPTNode } from './node/index'
 import type { WalkController } from './util/walkController'
 
 export type MPTNode = BranchMPTNode | ExtensionMPTNode | LeafMPTNode
@@ -26,7 +26,7 @@ export type BranchMPTNodeBranchValue = NodeReferenceOrRawMPTNode | null
 export type Proof = Uint8Array[]
 
 export interface CommonInterface {
-  customCrypto?: {
+  customCrypto: {
     keccak256?: (msg: Uint8Array) => Uint8Array
   }
 }
@@ -59,7 +59,7 @@ export interface MPTOpts {
 
   /**
    * Create as a secure MerklePatriciaTrie where the keys are automatically hashed using the
-   * **keccak256** hash function or alternatively the custom hash function provided.
+   * **keccak_256** hash function or alternatively the custom hash function provided.
    * Default: `false`
    *
    * This is the flavor of the MerklePatriciaTrie which is used in production Ethereum networks
@@ -108,7 +108,7 @@ export interface MPTOpts {
   cacheSize?: number
 
   /**
-   * ../../common `Common` instance (an alternative to passing in a `customHashingFunction`)
+   * @ethereumjs/common `Common` instance (an alternative to passing in a `customHashingFunction`)
    */
   common?: CommonInterface
 }

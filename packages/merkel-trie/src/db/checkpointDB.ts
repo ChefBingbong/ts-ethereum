@@ -6,7 +6,7 @@ import {
   ValueEncoding,
 } from '@ts-ethereum/utils'
 import { LRUCache } from 'lru-cache'
-import type { Checkpoint, CheckpointDBOpts } from '../types'
+import type { Checkpoint, CheckpointDBOpts } from '../types.js'
 
 /**
  * DB is a thin wrapper around the underlying levelup db,

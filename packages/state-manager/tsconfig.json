@@ -22,7 +22,7 @@
       "@ts-ethereum/evm": ["../evm/src/index.ts"],
       "@ts-ethereum/kademlia": ["../kademlia/src/index.ts"],
       "@ts-ethereum/metrics": ["../metrics/src/index.ts"],
-      "@ts-ethereum/mpt": ["../mpt/src/index.ts"],
+      "@ts-ethereum/mpt": ["../merkel-trie/src/index.ts"],
       "@ts-ethereum/p2p": ["../p2p/src/index.ts"],
       "@ts-ethereum/rlp": ["../rlp/src/index.ts"],
       "@ts-ethereum/tx": ["../tx/src/index.ts"],
