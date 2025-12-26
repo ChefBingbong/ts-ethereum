@@ -15,8 +15,8 @@ import {
   BIGINT_0,
   BIGINT_1,
   bytesToHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   hexToBytes,
   Lock,
   type PrefixedHexString,
@@ -24,8 +24,8 @@ import {
 } from '@ts-ethereum/utils'
 import {
   createVM,
-  runBlock,
   type RunBlockOpts,
+  runBlock,
   runTx,
   type TxReceipt,
   type VM,
