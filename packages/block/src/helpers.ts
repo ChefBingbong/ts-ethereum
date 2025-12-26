@@ -2,7 +2,7 @@ import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
-import { isHexString, TypeOutput, toType } from '@ts-ethereum/utils'
+import { isHexString, toType, TypeOutput } from '@ts-ethereum/utils'
 import type { BlockHeaderBytes, HeaderData } from './types'
 
 /**

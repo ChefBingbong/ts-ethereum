@@ -1,6 +1,9 @@
-import { PrioritizedTaskExecutor } from '@ts-ethereum/utils'
+import {
+  EthereumJSErrorWithoutCode,
+  PrioritizedTaskExecutor,
+} from '@ts-ethereum/utils'
 import type { MerklePatriciaTrie } from '../mpt'
-import { BranchMPTNode, ExtensionMPTNode, LeafMPTNode } from '../node'
+import { BranchMPTNode, ExtensionMPTNode, LeafMPTNode } from '../node/index'
 import type { FoundNodeFunction, MPTNode, Nibbles } from '../types'
 
 /**
@@ -126,11 +129,11 @@ export class WalkController {
     priority?: number,
   ) {
     if (!(node instanceof BranchMPTNode)) {
-      throw new Error('Expected branch node')
+      throw EthereumJSErrorWithoutCode('Expected branch node')
     }
     const childRef = node.getBranch(childIndex)
     if (!childRef) {
-      throw new Error('Could not get branch of childIndex')
+      throw EthereumJSErrorWithoutCode('Could not get branch of childIndex')
     }
     const childKey = key.slice() // This copies the key to a new array.
     childKey.push(childIndex)

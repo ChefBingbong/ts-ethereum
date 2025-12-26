@@ -1,12 +1,12 @@
 import type { BatchDBOp, DB, EncodingOpts } from '@ts-ethereum/utils'
 import {
-  bytesToUnprefixedHex,
-  KeyEncoding,
-  unprefixedHexToBytes,
-  ValueEncoding,
+    bytesToUnprefixedHex,
+    KeyEncoding,
+    unprefixedHexToBytes,
+    ValueEncoding,
 } from '@ts-ethereum/utils'
 import { LRUCache } from 'lru-cache'
-import type { Checkpoint, CheckpointDBOpts } from '../types'
+import type { Checkpoint, CheckpointDBOpts } from '../types.js'
 
 /**
  * DB is a thin wrapper around the underlying levelup db,
@@ -26,7 +26,7 @@ export class CheckpointDB implements DB {
   // Solution here seems therefore adequate, other solutions would rather
   // be some not so clean workaround.
   //
-  // (note that @ts-expect-error doesn't work since stripped on declaration (.d.ts) files)
+  // (note that @ts-ignore doesn't work since stripped on declaration (.d.ts) files)
   protected _cache?: LRUCache<string, Uint8Array>
   // protected _cache?: LRUCache<string, Uint8Array | undefined>
 

@@ -4,8 +4,8 @@ import { RLP } from '@ts-ethereum/rlp'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
 } from '@ts-ethereum/utils'

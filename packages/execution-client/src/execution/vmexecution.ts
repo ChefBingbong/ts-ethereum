@@ -15,8 +15,8 @@ import {
   BIGINT_0,
   BIGINT_1,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   Lock,
   type PrefixedHexString,
@@ -24,8 +24,8 @@ import {
 } from '@ts-ethereum/utils'
 import {
   createVM,
-  type RunBlockOpts,
   runBlock,
+  type RunBlockOpts,
   runTx,
   type TxReceipt,
   type VM,
@@ -971,7 +971,7 @@ export class VMExecution extends Execution {
         // Special verbose tx execution mode triggered by BLOCK_NUMBER[*]
         // Useful e.g. to trace slow txs
         const allTxs =
-          txHashes.length === 1 && txHashes[0] === '*' ? true : false
+          txHashes.length === 1 && txHashes[0] === '*' 
         for (const tx of block.transactions) {
           const txHash = bytesToHex(tx.hash())
           if (allTxs || txHashes.includes(txHash)) {

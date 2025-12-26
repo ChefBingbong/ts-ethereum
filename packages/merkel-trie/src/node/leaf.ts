@@ -6,7 +6,7 @@ export class LeafMPTNode extends ExtensionOrLeafMPTNodeBase {
     super(nibbles, value, true)
   }
 
-  override raw(): RawLeafMPTNode {
+  raw(): RawLeafMPTNode {
     return super.raw()
   }
 }
