@@ -1,3 +1,5 @@
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
@@ -25,8 +27,6 @@ import {
   genPrivateKey,
   hexToBytes,
 } from '@ts-ethereum/utils'
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import type { GlobalArgs } from '../../options/globalOptions.js'
 import type { NodeArgs } from './options.js'
 

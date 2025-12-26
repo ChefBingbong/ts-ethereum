@@ -75,7 +75,7 @@ function parseGethParams(gethGenesis: GethGenesis) {
     )
   }
 
-  let customHardforks: HardforksDict | undefined = undefined
+  let customHardforks: HardforksDict | undefined
   if (config.blobSchedule !== undefined) {
     customHardforks = {}
     const blobGasPerBlob = 131072

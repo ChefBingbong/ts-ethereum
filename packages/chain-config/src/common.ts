@@ -1,14 +1,14 @@
 import { hexToBytes } from '@ts-ethereum/rlp'
 import {
   BIGINT_0,
-  BigIntLike,
+  type BigIntLike,
   bytesToHex,
   concatBytes,
   EthereumJSErrorWithoutCode,
   intToBytes,
-  PrefixedHexString,
-  toType,
+  type PrefixedHexString,
   TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { crc32 } from './crc'

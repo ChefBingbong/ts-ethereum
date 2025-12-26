@@ -1,6 +1,6 @@
 import type { BigIntLike, KZG, PrefixedHexString } from '@ts-ethereum/utils'
 import type { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
-import { ConsensusAlgorithm, ConsensusType, Hardfork } from './enums'
+import type { ConsensusAlgorithm, ConsensusType, Hardfork } from './enums'
 
 export interface ChainName {
   [chainId: string]: string

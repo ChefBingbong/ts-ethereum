@@ -1,6 +1,6 @@
 import type { BlockData } from '@ts-ethereum/block'
 import { createBlock } from '@ts-ethereum/block'
-import { Chain } from '@ts-ethereum/chain-config'
+import type { Chain } from '@ts-ethereum/chain-config'
 import { BIGINT_0, bytesToHex, equalsBytes } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import type { BlockchainOptions, DBOp } from '.'
