@@ -7,11 +7,14 @@ import {
   ValueEncoding,
 } from '@ts-ethereum/utils'
 import {
-  MerklePatriciaTrie, MPTOpts, Proof, ROOT_DB_KEY,
-  updateMPTFromMerkleProof
+  MerklePatriciaTrie,
+  type MPTOpts,
+  type Proof,
+  ROOT_DB_KEY,
+  updateMPTFromMerkleProof,
 } from './index'
 
-export async function createMPT(opts?: MPTOpts){
+export async function createMPT(opts?: MPTOpts) {
   const keccakFunction =
     opts?.common?.customCrypto.keccak256 ??
     opts?.useKeyHashingFunction ??

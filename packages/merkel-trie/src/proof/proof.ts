@@ -2,8 +2,8 @@ import type { PutBatch } from '@ts-ethereum/utils'
 import {
   bytesToHex,
   concatBytes,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
 } from '@ts-ethereum/utils'
 import {
   createMPTFromProof,
@@ -73,7 +73,7 @@ export async function createMerkleProof(
 export async function updateMPTFromMerkleProof(
   trie: MerklePatriciaTrie,
   proof: Proof,
-  shouldVerifyRoot: boolean = false,
+  shouldVerifyRoot = false,
 ) {
   trie['DEBUG'] &&
     trie['debug'](`Saving (${proof.length}) proof nodes in DB`, ['from_proof'])
