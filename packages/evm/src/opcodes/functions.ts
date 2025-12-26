@@ -4,19 +4,19 @@ import {
   Address,
   BIGINT_0,
   BIGINT_1,
-  BIGINT_160,
   BIGINT_2,
+  BIGINT_2EXP96,
+  BIGINT_2EXP160,
+  BIGINT_2EXP224,
+  BIGINT_7,
+  BIGINT_8,
+  BIGINT_31,
+  BIGINT_32,
+  BIGINT_96,
+  BIGINT_160,
   BIGINT_224,
   BIGINT_255,
   BIGINT_256,
-  BIGINT_2EXP160,
-  BIGINT_2EXP224,
-  BIGINT_2EXP96,
-  BIGINT_31,
-  BIGINT_32,
-  BIGINT_7,
-  BIGINT_8,
-  BIGINT_96,
   bigIntToAddressBytes,
   bigIntToBytes,
   bytesToBigInt,
@@ -67,7 +67,12 @@ export const handlers = new Map([
   // 0x01: ADD
   [
     0x01,
-    (runState: { stack: { popN: (arg0: number) => [any, any]; push: (arg0: bigint) => void } }) => {
+    (runState: {
+      stack: {
+        popN: (arg0: number) => [any, any]
+        push: (arg0: bigint) => void
+      }
+    }) => {
       const [a, b] = runState.stack.popN(2)
       const r = mod(a + b, TWO_POW256)
       runState.stack.push(r)
@@ -379,10 +384,12 @@ export const handlers = new Map([
       const c = b >> a
       if (isSigned) {
         const shiftedOutWidth = BIGINT_255 - a
-        const mask = (MAX_INTEGER_BIGINT >> BigInt(shiftedOutWidth)) << BigInt(shiftedOutWidth)
-        r = BigInt(c) | mask as bigint
+        const mask =
+          (MAX_INTEGER_BIGINT >> BigInt(shiftedOutWidth)) <<
+          BigInt(shiftedOutWidth)
+        r = BigInt(c) | (mask as bigint)
       } else {
-        r = c 
+        r = c
       }
       runState.stack.push(r as bigint)
     },
