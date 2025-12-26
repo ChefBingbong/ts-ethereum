@@ -1,17 +1,29 @@
 import { concatBytes } from '@noble/hashes/utils.js'
-import { Common } from '@ts-ethereum/chain-config'
+import type { Common } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import { Blob4844Tx, type TypedTransaction } from '@ts-ethereum/tx'
-import type { CLRequest, CLRequestType, PrefixedHexString, Withdrawal } from '@ts-ethereum/utils'
-import { BIGINT_0, BIGINT_1, EthereumJSErrorWithoutCode, isHexString, toType, TypeOutput } from '@ts-ethereum/utils'
+import type {
+  CLRequest,
+  CLRequestType,
+  PrefixedHexString,
+  Withdrawal,
+} from '@ts-ethereum/utils'
+import {
+  BIGINT_0,
+  BIGINT_1,
+  EthereumJSErrorWithoutCode,
+  isHexString,
+  TypeOutput,
+  toType,
+} from '@ts-ethereum/utils'
 import type { BlockHeaderBytes, HeaderData } from './types'
 
 /**
  * Returns a 0x-prefixed hex number string from a hex string or string integer.
  * @param {string} input string to check, convert, and return
  */
-export const numberToHex = function (input?: string): PrefixedHexString | undefined {
+export const numberToHex = (input?: string): PrefixedHexString | undefined => {
   if (input === undefined) return undefined
   if (!isHexString(input)) {
     const regex = new RegExp(/^\d+$/) // test to make sure input contains only digits
@@ -19,7 +31,7 @@ export const numberToHex = function (input?: string): PrefixedHexString | undefi
       const msg = `Cannot convert string to hex string. numberToHex only supports 0x-prefixed hex or integer strings but the given string was: ${input}`
       throw EthereumJSErrorWithoutCode(msg)
     }
-    return `0x${parseInt(input, 10).toString(16)}`
+    return `0x${Number.parseInt(input, 10).toString(16)}`
   }
   return input
 }
@@ -121,13 +133,18 @@ export const getNumBlobs = (transactions: TypedTransaction[]) => {
 /**
  * Approximates `factor * e ** (numerator / denominator)` using Taylor expansion
  */
-export const fakeExponential = (factor: bigint, numerator: bigint, denominator: bigint) => {
+export const fakeExponential = (
+  factor: bigint,
+  numerator: bigint,
+  denominator: bigint,
+) => {
   let i = BIGINT_1
   let output = BIGINT_0
   let numerator_accumulator = factor * denominator
   while (numerator_accumulator > BIGINT_0) {
     output += numerator_accumulator
-    numerator_accumulator = (numerator_accumulator * numerator) / (denominator * i)
+    numerator_accumulator =
+      (numerator_accumulator * numerator) / (denominator * i)
     i++
   }
 
@@ -152,7 +169,10 @@ export const computeBlobGasPrice = (excessBlobGas: bigint, common: Common) => {
  * @param wts array of Withdrawal to compute the root of
  * @param emptyTrie Optional trie used to generate the root
  */
-export async function genWithdrawalsTrieRoot(wts: Withdrawal[], emptyTrie?: MerklePatriciaTrie) {
+export async function genWithdrawalsTrieRoot(
+  wts: Withdrawal[],
+  emptyTrie?: MerklePatriciaTrie,
+) {
   const trie = emptyTrie ?? new MerklePatriciaTrie()
   for (const [i, wt] of wts.entries()) {
     await trie.put(RLP.encode(i), RLP.encode(wt.raw()))
@@ -192,7 +212,9 @@ export function genRequestsRoot(
   if (requests.length > 1) {
     for (let x = 1; x < requests.length; x++) {
       if (requests[x].type < requests[x - 1].type)
-        throw EthereumJSErrorWithoutCode('requests are not sorted in ascending order')
+        throw EthereumJSErrorWithoutCode(
+          'requests are not sorted in ascending order',
+        )
     }
   }
 
@@ -203,7 +225,10 @@ export function genRequestsRoot(
   for (const req of requests) {
     if (req.bytes.length > 1) {
       // Only append requests if they have content
-      flatRequests = concatBytes(flatRequests, sha256Function(req.bytes)) as Uint8Array<ArrayBuffer>
+      flatRequests = concatBytes(
+        flatRequests,
+        sha256Function(req.bytes),
+      ) as Uint8Array<ArrayBuffer>
     }
   }
 

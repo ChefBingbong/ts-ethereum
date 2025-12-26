@@ -1,5 +1,9 @@
-import { EthereumJSErrorWithoutCode, fetchFromProvider, getProvider } from '@ts-ethereum/utils'
-
+import type { EthersProvider } from '@ts-ethereum/utils'
+import {
+  EthereumJSErrorWithoutCode,
+  fetchFromProvider,
+  getProvider,
+} from '@ts-ethereum/utils'
 import { createFeeMarket1559TxFromRLP } from './1559/constructors'
 import { createAccessList2930TxFromRLP } from './2930/constructors'
 import { createBlob4844TxFromRLP } from './4844/constructors'
@@ -9,13 +13,9 @@ import {
   createLegacyTxFromBytesArray,
   createLegacyTxFromRLP,
 } from './legacy/constructors'
-import {
-  TransactionType
-} from './types'
-import { normalizeTxParams } from './util/general'
-
-import type { EthersProvider } from '@ts-ethereum/utils'
 import type { Transaction, TxData, TxOptions, TypedTxData } from './types'
+import { TransactionType } from './types'
+import { normalizeTxParams } from './util/general'
 /**
  * Create a transaction from a `txData` object
  *
@@ -71,7 +71,9 @@ export function createTxFromRLP<T extends TransactionType>(
       case TransactionType.EOACodeEIP7702:
         return createEOACode7702TxFromRLP(data, txOptions) as Transaction[T]
       default:
-        throw EthereumJSErrorWithoutCode(`TypedTransaction with ID ${data[0]} unknown`)
+        throw EthereumJSErrorWithoutCode(
+          `TypedTransaction with ID ${data[0]} unknown`,
+        )
     }
   } else {
     return createLegacyTxFromRLP(data, txOptions) as Transaction[T]
@@ -97,7 +99,9 @@ export function createTxFromBlockBodyData(
     // It is a legacy transaction
     return createLegacyTxFromBytesArray(data, txOptions)
   } else {
-    throw EthereumJSErrorWithoutCode('Cannot decode transaction: unknown type input')
+    throw EthereumJSErrorWithoutCode(
+      'Cannot decode transaction: unknown type input',
+    )
   }
 }
 

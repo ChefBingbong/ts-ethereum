@@ -1,22 +1,16 @@
+import type { Common } from '@ts-ethereum/chain-config'
+import type { Address } from '@ts-ethereum/utils'
 import {
-  EthereumJSErrorWithoutCode,
-  MAX_INTEGER,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
+  EthereumJSErrorWithoutCode,
+  MAX_INTEGER,
   toBytes,
 } from '@ts-ethereum/utils'
-
 import * as EIP2718 from '../capabilities/eip2718'
 import * as EIP2930 from '../capabilities/eip2930'
 import * as Legacy from '../capabilities/legacy'
-import { TransactionType, isAccessList } from '../types'
-import { getBaseJSON, sharedConstructor, valueOverflowCheck } from '../util/internal'
-
-import { createAccessList2930Tx } from './constructors'
-
-import type { Common } from '@ts-ethereum/chain-config'
-import type { Address } from '@ts-ethereum/utils'
 import type {
   AccessListBytes,
   TxData as AllTypesTxData,
@@ -27,10 +21,18 @@ import type {
   TransactionInterface,
   TxOptions,
 } from '../types'
+import { isAccessList, TransactionType } from '../types'
 import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
+import {
+  getBaseJSON,
+  sharedConstructor,
+  valueOverflowCheck,
+} from '../util/internal'
+import { createAccessList2930Tx } from './constructors'
 
 export type TxData = AllTypesTxData[typeof TransactionType.AccessListEIP2930]
-export type TxValuesArray = AllTypesTxValuesArray[typeof TransactionType.AccessListEIP2930]
+export type TxValuesArray =
+  AllTypesTxValuesArray[typeof TransactionType.AccessListEIP2930]
 
 /**
  * Typed transaction with optional access lists
@@ -81,11 +83,18 @@ export class AccessList2930Tx
    * varying data types.
    */
   public constructor(txData: TxData, opts: TxOptions = {}) {
-    sharedConstructor(this, { ...txData, type: TransactionType.AccessListEIP2930 }, opts)
+    sharedConstructor(
+      this,
+      { ...txData, type: TransactionType.AccessListEIP2930 },
+      opts,
+    )
     const { chainId, accessList: rawAccessList, gasPrice } = txData
     const accessList = rawAccessList ?? []
 
-    if (chainId !== undefined && bytesToBigInt(toBytes(chainId)) !== this.common.chainId()) {
+    if (
+      chainId !== undefined &&
+      bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
+    ) {
       throw EthereumJSErrorWithoutCode(
         `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
@@ -99,7 +108,9 @@ export class AccessList2930Tx
     this.activeCapabilities = this.activeCapabilities.concat([2718, 2930])
 
     // Populate the access list fields
-    this.accessList = isAccessList(accessList) ? accessListJSONToBytes(accessList) : accessList
+    this.accessList = isAccessList(accessList)
+      ? accessListJSONToBytes(accessList)
+      : accessList
     // Verify the access list format.
     EIP2930.verifyAccessList(this)
 
@@ -108,7 +119,10 @@ export class AccessList2930Tx
     valueOverflowCheck({ gasPrice: this.gasPrice })
 
     if (this.gasPrice * this.gasLimit > MAX_INTEGER) {
-      const msg = Legacy.errorMsg(this, 'gasLimit * gasPrice cannot exceed MAX_INTEGER')
+      const msg = Legacy.errorMsg(
+        this,
+        'gasLimit * gasPrice cannot exceed MAX_INTEGER',
+      )
       throw EthereumJSErrorWithoutCode(msg)
     }
 
@@ -282,7 +296,11 @@ export class AccessList2930Tx
    * @param s - `s` component of the signature
    * @returns New `AccessList2930Tx` with the supplied signature
    */
-  addSignature(v: bigint, r: Uint8Array | bigint, s: Uint8Array | bigint): AccessList2930Tx {
+  addSignature(
+    v: bigint,
+    r: Uint8Array | bigint,
+    s: Uint8Array | bigint,
+  ): AccessList2930Tx {
     r = toBytes(r)
     s = toBytes(s)
     const opts = { ...this.txOptions, common: this.common }
@@ -358,7 +376,10 @@ export class AccessList2930Tx
    * @param extraEntropy - Optional entropy fed into the signing algorithm
    * @returns Newly signed transaction
    */
-  sign(privateKey: Uint8Array, extraEntropy: Uint8Array | boolean = false): AccessList2930Tx {
+  sign(
+    privateKey: Uint8Array,
+    extraEntropy: Uint8Array | boolean = false,
+  ): AccessList2930Tx {
     return Legacy.sign(this, privateKey, extraEntropy) as AccessList2930Tx
   }
 

@@ -1,26 +1,20 @@
+import type { Common } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
+import type { Address } from '@ts-ethereum/utils'
 import {
   BIGINT_2,
-  EthereumJSErrorWithoutCode,
-  MAX_INTEGER,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
+  EthereumJSErrorWithoutCode,
   intToBytes,
+  MAX_INTEGER,
   toBytes,
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-
 import * as Legacy from '../capabilities/legacy'
 import { paramsTx } from '../index'
-import { Capability, TransactionType } from '../types'
-import { getBaseJSON, sharedConstructor, valueOverflowCheck } from '../util/internal'
-
-import { createLegacyTx } from './constructors'
-
-import type { Common } from '@ts-ethereum/chain-config'
-import type { Address } from '@ts-ethereum/utils'
 import type {
   TxData as AllTypesTxData,
   TxValuesArray as AllTypesTxValuesArray,
@@ -29,6 +23,13 @@ import type {
   TransactionInterface,
   TxOptions,
 } from '../types'
+import { Capability, TransactionType } from '../types'
+import {
+  getBaseJSON,
+  sharedConstructor,
+  valueOverflowCheck,
+} from '../util/internal'
+import { createLegacyTx } from './constructors'
 
 export type TxData = AllTypesTxData[typeof TransactionType.Legacy]
 export type TxValuesArray = AllTypesTxValuesArray[typeof TransactionType.Legacy]
@@ -42,7 +43,10 @@ function meetsEIP155(_v: bigint, chainId: bigint) {
 /**
  * Validates tx's `v` value and extracts the chain id
  */
-function validateVAndExtractChainID(common: Common, _v?: bigint): bigint | undefined {
+function validateVAndExtractChainID(
+  common: Common,
+  _v?: bigint,
+): bigint | undefined {
   let chainIdBigInt
   const v = _v !== undefined ? Number(_v) : undefined
   // Check for valid v values in the scope of a signed legacy tx
@@ -57,7 +61,13 @@ function validateVAndExtractChainID(common: Common, _v?: bigint): bigint | undef
   }
 
   // No unsigned tx and EIP-155 activated and chain ID included
-  if (v !== undefined && v !== 0 && common.gteHardfork('spuriousDragon') && v !== 27 && v !== 28) {
+  if (
+    v !== undefined &&
+    v !== 0 &&
+    common.gteHardfork('spuriousDragon') &&
+    v !== 27 &&
+    v !== 28
+  ) {
     if (!meetsEIP155(BigInt(v), common.chainId())) {
       throw EthereumJSErrorWithoutCode(
         `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the Common parameter of the Transaction constructor to set the chain id.`,
@@ -79,7 +89,9 @@ function validateVAndExtractChainID(common: Common, _v?: bigint): bigint | undef
 /**
  * An Ethereum non-typed (legacy) transaction
  */
-export class LegacyTx implements TransactionInterface<typeof TransactionType.Legacy> {
+export class LegacyTx
+  implements TransactionInterface<typeof TransactionType.Legacy>
+{
   /* Tx public data fields */
   public type = TransactionType.Legacy // Legacy tx type
 
@@ -136,10 +148,12 @@ export class LegacyTx implements TransactionInterface<typeof TransactionType.Leg
       )
     }
 
-    this.keccakFunction =  keccak256
+    this.keccakFunction = keccak256
 
     if (this.gasPrice * this.gasLimit > MAX_INTEGER) {
-      throw EthereumJSErrorWithoutCode('gas limit * gasPrice cannot exceed MAX_INTEGER (2^256-1)')
+      throw EthereumJSErrorWithoutCode(
+        'gas limit * gasPrice cannot exceed MAX_INTEGER (2^256-1)',
+      )
     }
 
     if (this.common.gteHardfork('spuriousDragon')) {
@@ -379,7 +393,7 @@ export class LegacyTx implements TransactionInterface<typeof TransactionType.Leg
     // 27 or 28 for non-EIP-155 protected txs
     // 35 or 36 + chainId * 2 for EIP-155 protected txs
     // See: https://eips.ethereum.org/EIPS/eip-155
-    convertV: boolean = false,
+    convertV = false,
   ): LegacyTx {
     r = toBytes(r)
     s = toBytes(s)
@@ -458,7 +472,10 @@ export class LegacyTx implements TransactionInterface<typeof TransactionType.Leg
    * @param extraEntropy - Optional entropy passed to the signing routine
    * @returns A new signed `LegacyTx`
    */
-  sign(privateKey: Uint8Array, extraEntropy: Uint8Array | boolean = false): LegacyTx {
+  sign(
+    privateKey: Uint8Array,
+    extraEntropy: Uint8Array | boolean = false,
+  ): LegacyTx {
     return Legacy.sign(this, privateKey, extraEntropy) as LegacyTx
   }
 

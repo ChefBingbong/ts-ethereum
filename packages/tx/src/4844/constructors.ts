@@ -1,7 +1,6 @@
 import { RLP } from '@ts-ethereum/rlp'
+import type { KZG, PrefixedHexString } from '@ts-ethereum/utils'
 import {
-  CELLS_PER_EXT_BLOB,
-  EthereumJSErrorWithoutCode,
   bigIntToHex,
   blobsToCellProofs,
   blobsToCells,
@@ -10,29 +9,27 @@ import {
   bytesToBigInt,
   bytesToHex,
   bytesToInt,
+  CELLS_PER_EXT_BLOB,
   commitmentsToVersionedHashes,
   computeVersionedHash,
+  EthereumJSErrorWithoutCode,
   equalsBytes,
   getBlobs,
   intToHex,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
-
 import { paramsTx } from '../params'
-import { TransactionType } from '../types'
-import { accessListBytesToJSON } from '../util/access'
-
-import { Blob4844Tx, NetworkWrapperType } from './tx'
-
-import type { KZG, PrefixedHexString } from '@ts-ethereum/utils'
 import type {
   BlobEIP4844NetworkValuesArray,
   BlobEIP7594NetworkValuesArray,
   JSONBlobTxNetworkWrapper,
   TxOptions,
 } from '../types'
+import { TransactionType } from '../types'
+import { accessListBytesToJSON } from '../util/access'
 import { txTypeBytes, validateNotArray } from '../util/internal'
 import type { TxData, TxValuesArray } from './tx'
+import { Blob4844Tx, NetworkWrapperType } from './tx'
 
 const validateBlobTransactionNetworkWrapper = (
   networkWrapperVersion: NetworkWrapperType,
@@ -43,7 +40,12 @@ const validateBlobTransactionNetworkWrapper = (
   version: number,
   kzg: KZG,
 ) => {
-  if (!(blobVersionedHashes.length === blobs.length && blobs.length === commitments.length)) {
+  if (
+    !(
+      blobVersionedHashes.length === blobs.length &&
+      blobs.length === commitments.length
+    )
+  ) {
     throw EthereumJSErrorWithoutCode(
       'Number of blobVersionedHashes, blobs, and commitments not all equal',
     )
@@ -67,13 +69,22 @@ const validateBlobTransactionNetworkWrapper = (
           dupIndices.push(indices[j])
         }
       }
-      isValid = kzg.verifyCellKzgProofBatch(dupCommitments, dupIndices, cells, kzgProofs)
+      isValid = kzg.verifyCellKzgProofBatch(
+        dupCommitments,
+        dupIndices,
+        cells,
+        kzgProofs,
+      )
     }
   } catch (error) {
-    throw EthereumJSErrorWithoutCode(`KZG verification of blobs fail with error=${error}`)
+    throw EthereumJSErrorWithoutCode(
+      `KZG verification of blobs fail with error=${error}`,
+    )
   }
   if (!isValid) {
-    throw EthereumJSErrorWithoutCode('KZG proof cannot be verified from blobs/commitments')
+    throw EthereumJSErrorWithoutCode(
+      'KZG proof cannot be verified from blobs/commitments',
+    )
   }
 
   for (let x = 0; x < blobVersionedHashes.length; x++) {
@@ -139,12 +150,18 @@ export function createBlob4844Tx(txData: TxData, opts?: TxOptions) {
     txData.blobs ??= getBlobs(
       txData.blobsData!.reduce((acc, cur) => acc + cur),
     ) as PrefixedHexString[]
-    txData.kzgCommitments ??= blobsToCommitments(kzg, txData.blobs as PrefixedHexString[])
+    txData.kzgCommitments ??= blobsToCommitments(
+      kzg,
+      txData.blobs as PrefixedHexString[],
+    )
     txData.blobVersionedHashes ??= commitmentsToVersionedHashes(
       txData.kzgCommitments as PrefixedHexString[],
     )
     if (opts!.common!.isActivatedEIP(7594)) {
-      txData.kzgProofs ??= blobsToCellProofs(kzg, txData.blobs as PrefixedHexString[])
+      txData.kzgProofs ??= blobsToCellProofs(
+        kzg,
+        txData.blobs as PrefixedHexString[],
+      )
     } else {
       txData.kzgProofs ??= blobsToProofs(
         kzg,
@@ -190,7 +207,10 @@ export function createBlob4844Tx(txData: TxData, opts?: TxOptions) {
  * - Supports both unsigned (11 values) and signed (14 values) transaction formats
  * - All numeric values must be provided as Uint8Array byte representations
  */
-export function createBlob4844TxFromBytesArray(values: TxValuesArray, opts: TxOptions = {}) {
+export function createBlob4844TxFromBytesArray(
+  values: TxValuesArray,
+  opts: TxOptions = {},
+) {
   if (opts.common?.customCrypto?.kzg === undefined) {
     throw EthereumJSErrorWithoutCode(
       'A common object with customCrypto.kzg initialized required to instantiate a 4844 blob tx',
@@ -275,14 +295,22 @@ export function createBlob4844TxFromBytesArray(values: TxValuesArray, opts: TxOp
  * - RLP payload must decode to an array of transaction fields
  * - Delegates to `createBlob4844TxFromBytesArray` for actual construction
  */
-export function createBlob4844TxFromRLP(serialized: Uint8Array, opts: TxOptions = {}) {
+export function createBlob4844TxFromRLP(
+  serialized: Uint8Array,
+  opts: TxOptions = {},
+) {
   if (opts.common?.customCrypto?.kzg === undefined) {
     throw EthereumJSErrorWithoutCode(
       'A common object with customCrypto.kzg initialized required to instantiate a 4844 blob tx',
     )
   }
 
-  if (equalsBytes(serialized.subarray(0, 1), txTypeBytes(TransactionType.BlobEIP4844)) === false) {
+  if (
+    equalsBytes(
+      serialized.subarray(0, 1),
+      txTypeBytes(TransactionType.BlobEIP4844),
+    ) === false
+  ) {
     throw EthereumJSErrorWithoutCode(
       `Invalid serialized tx input: not an EIP-4844 transaction (wrong tx type, expected: ${
         TransactionType.BlobEIP4844
@@ -293,7 +321,9 @@ export function createBlob4844TxFromRLP(serialized: Uint8Array, opts: TxOptions 
   const values = RLP.decode(serialized.subarray(1))
 
   if (!Array.isArray(values)) {
-    throw EthereumJSErrorWithoutCode('Invalid serialized tx input: must be array')
+    throw EthereumJSErrorWithoutCode(
+      'Invalid serialized tx input: must be array',
+    )
   }
 
   return createBlob4844TxFromBytesArray(values as TxValuesArray, opts)
@@ -332,7 +362,9 @@ export function createBlob4844TxFromSerializedNetworkWrapper(
   opts?: TxOptions,
 ): Blob4844Tx {
   if (!opts || !opts.common) {
-    throw EthereumJSErrorWithoutCode('common instance required to validate versioned hashes')
+    throw EthereumJSErrorWithoutCode(
+      'common instance required to validate versioned hashes',
+    )
   }
 
   if (opts.common?.customCrypto?.kzg === undefined) {
@@ -341,7 +373,12 @@ export function createBlob4844TxFromSerializedNetworkWrapper(
     )
   }
 
-  if (equalsBytes(serialized.subarray(0, 1), txTypeBytes(TransactionType.BlobEIP4844)) === false) {
+  if (
+    equalsBytes(
+      serialized.subarray(0, 1),
+      txTypeBytes(TransactionType.BlobEIP4844),
+    ) === false
+  ) {
     throw EthereumJSErrorWithoutCode(
       `Invalid serialized tx input: not an EIP-4844 transaction (wrong tx type, expected: ${
         TransactionType.BlobEIP4844
@@ -353,17 +390,23 @@ export function createBlob4844TxFromSerializedNetworkWrapper(
   const networkTxValues = RLP.decode(serialized.subarray(1))
   let txValues, blobs, kzgCommitments, kzgProofs, networkWrapperVersion
   if (networkTxValues.length === 4) {
-    ;[txValues, blobs, kzgCommitments, kzgProofs] = networkTxValues as BlobEIP4844NetworkValuesArray
+    ;[txValues, blobs, kzgCommitments, kzgProofs] =
+      networkTxValues as BlobEIP4844NetworkValuesArray
     networkWrapperVersion = Uint8Array.from([NetworkWrapperType.EIP4844])
   } else if (networkTxValues.length === 5) {
     ;[txValues, networkWrapperVersion, blobs, kzgCommitments, kzgProofs] =
       networkTxValues as BlobEIP7594NetworkValuesArray
   } else {
-    throw Error(`Expected 4 or 5 values in the deserialized network transaction`)
+    throw Error(
+      `Expected 4 or 5 values in the deserialized network transaction`,
+    )
   }
 
   // Construct the tx but don't freeze yet, we will assign blobs etc once validated
-  const decodedTx = createBlob4844TxFromBytesArray(txValues, { ...opts, freeze: false })
+  const decodedTx = createBlob4844TxFromBytesArray(txValues, {
+    ...opts,
+    freeze: false,
+  })
   if (decodedTx.to === undefined) {
     throw Error('Blob4844Tx can not be send without a valid `to`')
   }
@@ -375,7 +418,9 @@ export function createBlob4844TxFromSerializedNetworkWrapper(
   const blobsHex = blobs.map((blob) => bytesToHex(blob))
   const commsHex = kzgCommitments.map((com) => bytesToHex(com))
   const proofsHex = kzgProofs.map((proof) => bytesToHex(proof))
-  const networkWrapperVersionInt = bytesToInt(networkWrapperVersion) as NetworkWrapperType
+  const networkWrapperVersionInt = bytesToInt(
+    networkWrapperVersion,
+  ) as NetworkWrapperType
   if (
     networkWrapperVersionInt !== NetworkWrapperType.EIP4844 &&
     networkWrapperVersionInt !== NetworkWrapperType.EIP7594

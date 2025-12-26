@@ -1,17 +1,26 @@
-import { ConsensusType, type Common } from '@ts-ethereum/chain-config'
+import { type Common, ConsensusType } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
-import { Blob4844Tx, Capability, FeeMarket1559Tx, LegacyTx, type TypedTransaction } from '@ts-ethereum/tx'
+import {
+  Blob4844Tx,
+  Capability,
+  type FeeMarket1559Tx,
+  type LegacyTx,
+  type TypedTransaction,
+} from '@ts-ethereum/tx'
 import {
   BIGINT_0,
   bytesToHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
-  Withdrawal,
+  type Withdrawal,
 } from '@ts-ethereum/utils'
+/* eslint-enable */
+import { keccak256 } from 'ethereum-cryptography/keccak'
 import { sha256 } from 'ethereum-cryptography/sha256.js'
+import { genWithdrawalsTrieRoot } from 'src/helpers'
 /* eslint-disable */
 // This is to allow for a proper and linked collection of constructors for the class header.
 // For tree shaking/code size this should be no problem since types go away on transpilation.
@@ -20,17 +29,18 @@ import { sha256 } from 'ethereum-cryptography/sha256.js'
 // (situation will eventually improve on Typescript and/or Eslint update)
 import {
   BlockHeader,
-  genTransactionsTrieRoot,
   type createBlock,
   type createBlockFromBytesArray,
   type createBlockFromRLP,
   type createBlockFromRPC,
+  genTransactionsTrieRoot,
 } from '../index'
-/* eslint-enable */
-import { keccak256 } from 'ethereum-cryptography/keccak'
-import { genWithdrawalsTrieRoot } from 'src/helpers'
-import type { BlockBytes, BlockOptions, ExecutionPayload, JSONBlock } from '../types'
-
+import type {
+  BlockBytes,
+  BlockOptions,
+  ExecutionPayload,
+  JSONBlock,
+} from '../types'
 
 /**
  * Class representing a block in the Ethereum network. The {@link BlockHeader} has its own
@@ -81,7 +91,8 @@ export class Block {
     this.sha256Function = this.common.customCrypto.sha256 ?? sha256
 
     this.transactions = transactions
-    this.withdrawals = withdrawals ?? (this.common.isActivatedEIP(4895) ? [] : undefined)
+    this.withdrawals =
+      withdrawals ?? (this.common.isActivatedEIP(4895) ? [] : undefined)
 
     this.uncleHeaders = uncleHeaders
     if (uncleHeaders.length > 0) {
@@ -101,7 +112,9 @@ export class Block {
     }
 
     if (!this.common.isActivatedEIP(4895) && withdrawals !== undefined) {
-      throw EthereumJSErrorWithoutCode('Cannot have a withdrawals field if EIP 4895 is not active')
+      throw EthereumJSErrorWithoutCode(
+        'Cannot have a withdrawals field if EIP 4895 is not active',
+      )
     }
 
     const freeze = opts?.freeze ?? true
@@ -117,7 +130,9 @@ export class Block {
     const bytesArray: BlockBytes = [
       this.header.raw(),
       this.transactions.map((tx) =>
-        tx.supports(Capability.EIP2718TypedTransaction) ? tx.serialize() : tx.raw(),
+        tx.supports(Capability.EIP2718TypedTransaction)
+          ? tx.serialize()
+          : tx.raw(),
       ) as Uint8Array[],
       this.uncleHeaders.map((uh) => uh.raw()),
     ]
@@ -197,7 +212,7 @@ export class Block {
             errs.push('tx unable to pay base fee (EIP-1559 tx)')
           }
         } else {
-        tx = tx as LegacyTx
+          tx = tx as LegacyTx
           if (tx.gasPrice < this.header.baseFeePerGas!) {
             errs.push('tx unable to pay base fee (non EIP-1559 tx)')
           }
@@ -222,7 +237,9 @@ export class Block {
 
     if (this.common.isActivatedEIP(4844)) {
       if (blobGasUsed !== this.header.blobGasUsed) {
-        errors.push(`invalid blobGasUsed expected=${this.header.blobGasUsed} actual=${blobGasUsed}`)
+        errors.push(
+          `invalid blobGasUsed expected=${this.header.blobGasUsed} actual=${blobGasUsed}`,
+        )
       }
     }
 
@@ -252,9 +269,9 @@ export class Block {
    * @param validateBlockSize if set to `true`, will check for block size limit (EIP-7934) (default: false)
    */
   async validateData(
-    onlyHeader: boolean = false,
-    verifyTxs: boolean = true,
-    validateBlockSize: boolean = false,
+    onlyHeader = false,
+    verifyTxs = true,
+    validateBlockSize = false,
   ): Promise<void> {
     // EIP-7934: RLP Execution Block Size Limit validation
     if (validateBlockSize && this.common.isActivatedEIP(7934)) {
@@ -271,7 +288,9 @@ export class Block {
     if (verifyTxs) {
       const txErrors = this.getTransactionsValidationErrors()
       if (txErrors.length > 0) {
-        const msg = this._errorMsg(`invalid transactions: ${txErrors.join(' ')}`)
+        const msg = this._errorMsg(
+          `invalid transactions: ${txErrors.join(' ')}`,
+        )
         throw EthereumJSErrorWithoutCode(msg)
       }
     }
@@ -301,7 +320,10 @@ export class Block {
       throw EthereumJSErrorWithoutCode(msg)
     }
 
-    if (this.common.isActivatedEIP(4895) && !(await this.withdrawalsTrieIsValid())) {
+    if (
+      this.common.isActivatedEIP(4895) &&
+      !(await this.withdrawalsTrieIsValid())
+    ) {
       const msg = this._errorMsg('invalid withdrawals trie')
       throw EthereumJSErrorWithoutCode(msg)
     }
@@ -319,7 +341,9 @@ export class Block {
       const blobGasPerBlob = this.common.param('blobGasPerBlob')
       let blobGasUsed = BIGINT_0
 
-      const expectedExcessBlobGas = parentHeader.calcNextExcessBlobGas(this.common)
+      const expectedExcessBlobGas = parentHeader.calcNextExcessBlobGas(
+        this.common,
+      )
       if (this.header.excessBlobGas !== expectedExcessBlobGas) {
         throw EthereumJSErrorWithoutCode(
           `block excessBlobGas mismatch: have ${this.header.excessBlobGas}, want ${expectedExcessBlobGas}`,
@@ -391,7 +415,10 @@ export class Block {
         new MerklePatriciaTrie({ common: this.common }),
       )
     }
-    result = equalsBytes(this.cache.withdrawalsTrieRoot, this.header.withdrawalsRoot!)
+    result = equalsBytes(
+      this.cache.withdrawalsTrieRoot,
+      this.header.withdrawalsRoot!,
+    )
     return result
   }
 
@@ -416,7 +443,9 @@ export class Block {
     }
 
     // Header does not count an uncle twice.
-    const uncleHashes = this.uncleHeaders.map((header) => bytesToHex(header.hash()))
+    const uncleHashes = this.uncleHeaders.map((header) =>
+      bytesToHex(header.hash()),
+    )
     if (!(new Set(uncleHashes).size === uncleHashes.length)) {
       const msg = this._errorMsg('duplicate uncles')
       throw EthereumJSErrorWithoutCode(msg)
@@ -459,8 +488,11 @@ export class Block {
   toExecutionPayload(): ExecutionPayload {
     const blockJSON = this.toJSON()
     const header = blockJSON.header!
-    const transactions = this.transactions.map((tx) => bytesToHex(tx.serialize())) ?? []
-    const withdrawalsArr = blockJSON.withdrawals ? { withdrawals: blockJSON.withdrawals } : {}
+    const transactions =
+      this.transactions.map((tx) => bytesToHex(tx.serialize())) ?? []
+    const withdrawalsArr = blockJSON.withdrawals
+      ? { withdrawals: blockJSON.withdrawals }
+      : {}
 
     const executionPayload: ExecutionPayload = {
       blockNumber: header.number!,

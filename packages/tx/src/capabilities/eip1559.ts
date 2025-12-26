@@ -8,7 +8,10 @@ import type { EIP1559CompatibleTx } from '../types'
  * @param baseFee - Base fee from the parent block used to determine inclusion cost
  * @returns Total wei that must be available to cover gas and value
  */
-export function getUpfrontCost(tx: EIP1559CompatibleTx, baseFee: bigint): bigint {
+export function getUpfrontCost(
+  tx: EIP1559CompatibleTx,
+  baseFee: bigint,
+): bigint {
   const prio = tx.maxPriorityFeePerGas
   const maxBase = tx.maxFeePerGas - baseFee
   const inclusionFeePerGas = prio < maxBase ? prio : maxBase
@@ -34,5 +37,7 @@ export function getEffectivePriorityFee(
   // The remaining fee for the coinbase, which can take up to this value, capped at `maxPriorityFeePerGas`
   const remainingFee = tx.maxFeePerGas - baseFee
 
-  return tx.maxPriorityFeePerGas < remainingFee ? tx.maxPriorityFeePerGas : remainingFee
+  return tx.maxPriorityFeePerGas < remainingFee
+    ? tx.maxPriorityFeePerGas
+    : remainingFee
 }

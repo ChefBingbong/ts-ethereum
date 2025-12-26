@@ -1,7 +1,6 @@
-import * as Legacy from './legacy'
-
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 import type { EIP2930CompatibleTx } from '../types'
+import * as Legacy from './legacy'
 
 /**
  * The amount of gas paid for the data in this tx
@@ -22,7 +21,10 @@ function getAccessListDataGas(tx: EIP2930CompatibleTx): number {
   const totalSlots = accessList.reduce((sum, item) => sum + item[1].length, 0)
   const addresses = accessList.length
 
-  return addresses * Number(accessListAddressCost) + totalSlots * Number(accessListStorageKeyCost)
+  return (
+    addresses * Number(accessListAddressCost) +
+    totalSlots * Number(accessListStorageKeyCost)
+  )
 }
 
 /**

@@ -1,9 +1,8 @@
 import { Address } from './address'
 import { bigIntToHex, bytesToHex, toBytes } from './bytes'
 import { BIGINT_0 } from './constants'
-import { TypeOutput, toType } from './types'
-
 import type { AddressLike, BigIntLike, PrefixedHexString } from './types'
+import { TypeOutput, toType } from './types'
 
 /**
  * Flexible input data type for EIP-4895 withdrawal data with amount in Gwei to
@@ -33,7 +32,9 @@ export type WithdrawalBytes = [Uint8Array, Uint8Array, Uint8Array, Uint8Array]
  * @param withdrawal the withdrawal to convert
  * @returns byte array of the withdrawal
  */
-export function withdrawalToBytesArray(withdrawal: Withdrawal | WithdrawalData): WithdrawalBytes {
+export function withdrawalToBytesArray(
+  withdrawal: Withdrawal | WithdrawalData,
+): WithdrawalBytes {
   const { index, validatorIndex, address, amount } = withdrawal
   const indexBytes =
     toType(index, TypeOutput.BigInt) === BIGINT_0
@@ -44,7 +45,9 @@ export function withdrawalToBytesArray(withdrawal: Withdrawal | WithdrawalData):
       ? new Uint8Array()
       : toType(validatorIndex, TypeOutput.Uint8Array)
   const addressBytes =
-    address instanceof Address ? address.bytes : toType(address, TypeOutput.Uint8Array)
+    address instanceof Address
+      ? address.bytes
+      : toType(address, TypeOutput.Uint8Array)
 
   const amountBytes =
     toType(amount, TypeOutput.BigInt) === BIGINT_0
@@ -67,7 +70,12 @@ export class Withdrawal {
    * Use the static factory methods to assist in creating a Withdrawal object from varying data types.
    * Its amount is in Gwei to match CL representation and for eventual ssz withdrawalsRoot
    */
-  constructor(index: bigint, validatorIndex: bigint, address: Address, amount: bigint) {
+  constructor(
+    index: bigint,
+    validatorIndex: bigint,
+    address: Address,
+    amount: bigint,
+  ) {
     this.index = index
     this.validatorIndex = validatorIndex
     this.address = address
@@ -112,7 +120,10 @@ export function createWithdrawal(withdrawalData: WithdrawalData) {
   } = withdrawalData
   const index = toType(indexData, TypeOutput.BigInt)
   const validatorIndex = toType(validatorIndexData, TypeOutput.BigInt)
-  const address = addressData instanceof Address ? addressData : new Address(toBytes(addressData))
+  const address =
+    addressData instanceof Address
+      ? addressData
+      : new Address(toBytes(addressData))
   const amount = toType(amountData, TypeOutput.BigInt)
 
   return new Withdrawal(index, validatorIndex, address, amount)
@@ -124,9 +135,13 @@ export function createWithdrawal(withdrawalData: WithdrawalData) {
  * @param withdrawalArray decoded RLP list of withdrawal data elements
  * @returns a {@link Withdrawal} object
  */
-export function createWithdrawalFromBytesArray(withdrawalArray: WithdrawalBytes) {
+export function createWithdrawalFromBytesArray(
+  withdrawalArray: WithdrawalBytes,
+) {
   if (withdrawalArray.length !== 4) {
-    throw Error(`Invalid withdrawalArray length expected=4 actual=${withdrawalArray.length}`)
+    throw Error(
+      `Invalid withdrawalArray length expected=4 actual=${withdrawalArray.length}`,
+    )
   }
   const [index, validatorIndex, address, amount] = withdrawalArray
   return createWithdrawal({ index, validatorIndex, address, amount })

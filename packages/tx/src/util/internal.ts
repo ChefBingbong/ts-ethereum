@@ -1,19 +1,24 @@
 import { Common, Mainnet } from '@ts-ethereum/chain-config'
 import {
   Address,
-  EthereumJSErrorWithoutCode,
-  MAX_INTEGER,
-  MAX_UINT64,
   bigIntToHex,
   bytesToBigInt,
   bytesToHex,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
+  MAX_INTEGER,
+  MAX_UINT64,
   toBytes,
 } from '@ts-ethereum/utils'
 
 import { paramsTx } from '../params'
 
-import type { TransactionInterface, TransactionType, TxData, TxOptions } from '../types'
+import type {
+  TransactionInterface,
+  TransactionType,
+  TxData,
+  TxOptions,
+} from '../types'
 
 /**
  * Gets a Common instance, creating a new one if none provided
@@ -194,7 +199,11 @@ export function sharedConstructor(
   const createContract = tx.to === undefined || tx.to === null
   const allowUnlimitedInitCodeSize = opts.allowUnlimitedInitCodeSize ?? false
 
-  if (createContract && tx.common.isActivatedEIP(3860) && allowUnlimitedInitCodeSize === false) {
+  if (
+    createContract &&
+    tx.common.isActivatedEIP(3860) &&
+    allowUnlimitedInitCodeSize === false
+  ) {
     checkMaxInitCodeSize(tx.common, tx.data.length)
   }
 }

@@ -1,10 +1,11 @@
 import { RLP } from '@ts-ethereum/rlp'
-import { EthereumJSErrorWithoutCode, validateNoLeadingZeroes } from '@ts-ethereum/utils'
-
-import { LegacyTx } from './tx'
-
+import {
+  EthereumJSErrorWithoutCode,
+  validateNoLeadingZeroes,
+} from '@ts-ethereum/utils'
 import type { TxOptions } from '../types'
 import type { TxData, TxValuesArray } from './tx'
+import { LegacyTx } from './tx'
 
 /**
  * Instantiate a transaction from a data dictionary.
@@ -23,7 +24,10 @@ export function createLegacyTx(txData: TxData, opts: TxOptions = {}) {
  *
  * Format: `[nonce, gasPrice, gasLimit, to, value, data, v, r, s]`
  */
-export function createLegacyTxFromBytesArray(values: TxValuesArray, opts: TxOptions = {}) {
+export function createLegacyTxFromBytesArray(
+  values: TxValuesArray,
+  opts: TxOptions = {},
+) {
   // If length is not 6, it has length 9. If v/r/s are empty Uint8Arrays, it is still an unsigned transaction
   // This happens if you get the RLP data from `raw()`
   if (values.length !== 6 && values.length !== 9) {
@@ -58,11 +62,16 @@ export function createLegacyTxFromBytesArray(values: TxValuesArray, opts: TxOpti
  * Format: `rlp([nonce, gasPrice, gasLimit, to, value, data,
  * signatureV, signatureR, signatureS])`
  */
-export function createLegacyTxFromRLP(serialized: Uint8Array, opts: TxOptions = {}) {
+export function createLegacyTxFromRLP(
+  serialized: Uint8Array,
+  opts: TxOptions = {},
+) {
   const values = RLP.decode(serialized)
 
   if (!Array.isArray(values)) {
-    throw EthereumJSErrorWithoutCode('Invalid serialized tx input. Must be array')
+    throw EthereumJSErrorWithoutCode(
+      'Invalid serialized tx input. Must be array',
+    )
   }
 
   return createLegacyTxFromBytesArray(values as TxValuesArray, opts)

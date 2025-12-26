@@ -1,4 +1,4 @@
-import { TypeOutput, setLengthLeft, toBytes, toType } from '@ts-ethereum/utils'
+import { setLengthLeft, TypeOutput, toBytes, toType } from '@ts-ethereum/utils'
 
 import type { TypedTxData } from '../types'
 
@@ -11,12 +11,17 @@ import type { TypedTxData } from '../types'
 export const normalizeTxParams = (txParamsFromRPC: any): TypedTxData => {
   const txParams = Object.assign({}, txParamsFromRPC)
 
-  txParams.gasLimit = toType(txParams.gasLimit ?? txParams.gas, TypeOutput.BigInt)
+  txParams.gasLimit = toType(
+    txParams.gasLimit ?? txParams.gas,
+    TypeOutput.BigInt,
+  )
   txParams.data = txParams.data === undefined ? txParams.input : txParams.data
 
   // check and convert gasPrice and value params
-  txParams.gasPrice = txParams.gasPrice !== undefined ? BigInt(txParams.gasPrice) : undefined
-  txParams.value = txParams.value !== undefined ? BigInt(txParams.value) : undefined
+  txParams.gasPrice =
+    txParams.gasPrice !== undefined ? BigInt(txParams.gasPrice) : undefined
+  txParams.value =
+    txParams.value !== undefined ? BigInt(txParams.value) : undefined
 
   // strict byte length checking
   txParams.to =

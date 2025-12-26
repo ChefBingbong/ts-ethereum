@@ -1,13 +1,15 @@
-import { RLP } from '@ts-ethereum/rlp'
-import { BIGINT_0, BIGINT_1, EthereumJSErrorWithoutCode, concatBytes } from '@ts-ethereum/utils'
-import { keccak256 } from 'ethereum-cryptography/keccak'
-
-import { txTypeBytes } from '../util/internal'
-
-import { errorMsg } from './legacy'
-
 import type { Input } from '@ts-ethereum/rlp'
+import { RLP } from '@ts-ethereum/rlp'
+import {
+  BIGINT_0,
+  BIGINT_1,
+  concatBytes,
+  EthereumJSErrorWithoutCode,
+} from '@ts-ethereum/utils'
+import { keccak256 } from 'ethereum-cryptography/keccak'
 import type { EIP2718CompatibleTx } from '../types'
+import { txTypeBytes } from '../util/internal'
+import { errorMsg } from './legacy'
 
 /**
  * Gets the hashed message to sign for EIP-2718 transactions
@@ -37,7 +39,10 @@ export function serialize(tx: EIP2718CompatibleTx, base?: Input): Uint8Array {
 export function validateYParity(tx: EIP2718CompatibleTx) {
   const { v } = tx
   if (v !== undefined && v !== BIGINT_0 && v !== BIGINT_1) {
-    const msg = errorMsg(tx, 'The y-parity of the transaction should either be 0 or 1')
+    const msg = errorMsg(
+      tx,
+      'The y-parity of the transaction should either be 0 or 1',
+    )
     throw EthereumJSErrorWithoutCode(msg)
   }
 }

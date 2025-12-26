@@ -97,4 +97,3 @@ export const paramsBlock: ParamsDict = {
     blobGasPriceUpdateFraction: 5007716, // The denominator used in the exponential when calculating a blob gas price
   },
 }
-

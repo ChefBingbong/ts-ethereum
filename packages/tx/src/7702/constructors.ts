@@ -1,19 +1,16 @@
 import { RLP } from '@ts-ethereum/rlp'
 import {
-  EthereumJSErrorWithoutCode,
   bytesToBigInt,
   bytesToHex,
+  EthereumJSErrorWithoutCode,
   equalsBytes,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
-
+import type { TxOptions } from '../types'
 import { TransactionType } from '../types'
 import { txTypeBytes, validateNotArray } from '../util/internal'
-
-import { EOACode7702Tx } from './tx'
-
-import type { TxOptions } from '../types'
 import type { TxData, TxValuesArray } from './tx'
+import { EOACode7702Tx } from './tx'
 
 /**
  * Instantiate a transaction from a data dictionary.
@@ -35,7 +32,10 @@ export function createEOACode7702Tx(txData: TxData, opts: TxOptions = {}) {
  * Format: `[chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
  * accessList, authorityList, signatureYParity, signatureR, signatureS]`
  */
-export function createEOACode7702TxFromBytesArray(values: TxValuesArray, opts: TxOptions = {}) {
+export function createEOACode7702TxFromBytesArray(
+  values: TxValuesArray,
+  opts: TxOptions = {},
+) {
   if (values.length !== 10 && values.length !== 13) {
     throw EthereumJSErrorWithoutCode(
       'Invalid EIP-7702 transaction. Only expecting 10 values (for unsigned tx) or 13 values (for signed tx).',
@@ -59,7 +59,16 @@ export function createEOACode7702TxFromBytesArray(values: TxValuesArray, opts: T
   ] = values
 
   validateNotArray({ chainId, v })
-  validateNoLeadingZeroes({ nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, value, v, r, s })
+  validateNoLeadingZeroes({
+    nonce,
+    maxPriorityFeePerGas,
+    maxFeePerGas,
+    gasLimit,
+    value,
+    v,
+    r,
+    s,
+  })
 
   return new EOACode7702Tx(
     {
@@ -87,9 +96,15 @@ export function createEOACode7702TxFromBytesArray(values: TxValuesArray, opts: T
  * Format: `0x04 || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
  * accessList, signatureYParity, signatureR, signatureS])`
  */
-export function createEOACode7702TxFromRLP(serialized: Uint8Array, opts: TxOptions = {}) {
+export function createEOACode7702TxFromRLP(
+  serialized: Uint8Array,
+  opts: TxOptions = {},
+) {
   if (
-    equalsBytes(serialized.subarray(0, 1), txTypeBytes(TransactionType.EOACodeEIP7702)) === false
+    equalsBytes(
+      serialized.subarray(0, 1),
+      txTypeBytes(TransactionType.EOACodeEIP7702),
+    ) === false
   ) {
     throw EthereumJSErrorWithoutCode(
       `Invalid serialized tx input: not an EIP-7702 transaction (wrong tx type, expected: ${
@@ -101,7 +116,9 @@ export function createEOACode7702TxFromRLP(serialized: Uint8Array, opts: TxOptio
   const values = RLP.decode(serialized.subarray(1))
 
   if (!Array.isArray(values)) {
-    throw EthereumJSErrorWithoutCode('Invalid serialized tx input: must be array')
+    throw EthereumJSErrorWithoutCode(
+      'Invalid serialized tx input: must be array',
+    )
   }
 
   return createEOACode7702TxFromBytesArray(values as TxValuesArray, opts)

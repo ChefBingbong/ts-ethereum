@@ -133,7 +133,11 @@ export type BlockBytes =
   | [BlockHeaderBytes, TransactionsBytes, UncleHeadersBytes, WithdrawalsBytes]
 
 export type BlockHeaderBytes = Uint8Array[]
-export type BlockBodyBytes = [TransactionsBytes, UncleHeadersBytes, WithdrawalsBytes?]
+export type BlockBodyBytes = [
+  TransactionsBytes,
+  UncleHeadersBytes,
+  WithdrawalsBytes?,
+]
 /**
  * TransactionsBytes can be an array of serialized txs for Typed Transactions or an array of Uint8Array Arrays for legacy transactions.
  */

@@ -1,22 +1,20 @@
 import {
   Address,
   BIGINT_0,
-  EthereumJSErrorWithoutCode,
-  SECP256K1_ORDER_DIV_2,
   bigIntMax,
   bigIntToUnpaddedBytes,
   bytesToHex,
+  EthereumJSErrorWithoutCode,
   ecrecover,
   publicToAddress,
+  SECP256K1_ORDER_DIV_2,
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1'
-
-import { Capability, TransactionType } from '../types'
-
 import type { LegacyTx } from '../legacy/tx'
 import type { LegacyTxInterface, Transaction } from '../types'
+import { Capability, TransactionType } from '../types'
 
 /**
  * Creates an error message with transaction context
@@ -58,7 +56,10 @@ export function getDataGas(tx: LegacyTxInterface): bigint {
     tx.data[i] === 0 ? (cost += txDataZero) : (cost += txDataNonZero)
   }
 
-  if ((tx.to === undefined || tx.to === null) && tx.common.isActivatedEIP(3860)) {
+  if (
+    (tx.to === undefined || tx.to === null) &&
+    tx.common.isActivatedEIP(3860)
+  ) {
     const dataLength = BigInt(Math.ceil(tx.data.length / 32))
     const initCodeCost = tx.common.param('initCodeWordGas') * dataLength
     cost += initCodeCost
@@ -114,7 +115,10 @@ export function toCreationAddress(tx: LegacyTxInterface): boolean {
  */
 export function hash(tx: LegacyTxInterface): Uint8Array {
   if (!tx.isSigned()) {
-    const msg = errorMsg(tx, 'Cannot call hash method if transaction is not signed')
+    const msg = errorMsg(
+      tx,
+      'Cannot call hash method if transaction is not signed',
+    )
     throw EthereumJSErrorWithoutCode(msg)
   }
 
@@ -134,7 +138,11 @@ export function hash(tx: LegacyTxInterface): Uint8Array {
  */
 export function validateHighS(tx: LegacyTxInterface): void {
   const { s } = tx
-  if (tx.common.gteHardfork('homestead') && s !== undefined && s > SECP256K1_ORDER_DIV_2) {
+  if (
+    tx.common.gteHardfork('homestead') &&
+    s !== undefined &&
+    s > SECP256K1_ORDER_DIV_2
+  ) {
     const msg = errorMsg(
       tx,
       'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid',
@@ -159,7 +167,7 @@ export function getSenderPublicKey(tx: LegacyTxInterface): Uint8Array {
   const { v, r, s } = tx
 
   validateHighS(tx)
-// Detect if this is an EIP-155 signature by checking v value
+  // Detect if this is an EIP-155 signature by checking v value
   // Pre-EIP-155: v = 27 or 28
   // EIP-155: v = chainId * 2 + 35 or chainId * 2 + 36
   const vNum = Number(v!)
@@ -192,7 +200,10 @@ export function getSenderPublicKey(tx: LegacyTxInterface): Uint8Array {
  * @returns The priority fee portion that can be paid to the block producer
  * @throws EthereumJSErrorWithoutCode if the base fee exceeds the gas price
  */
-export function getEffectivePriorityFee(gasPrice: bigint, baseFee: bigint | undefined): bigint {
+export function getEffectivePriorityFee(
+  gasPrice: bigint,
+  baseFee: bigint | undefined,
+): bigint {
   if (baseFee !== undefined && baseFee > gasPrice) {
     throw EthereumJSErrorWithoutCode('Tx cannot pay baseFee')
   }
@@ -222,7 +233,8 @@ export function getValidationErrors(tx: LegacyTxInterface): string[] {
       tokens += tx.data[i] === 0 ? 1 : 4
     }
     const floorCost =
-      tx.common.param('txGas') + tx.common.param('totalCostFloorPerToken') * BigInt(tokens)
+      tx.common.param('txGas') +
+      tx.common.param('totalCostFloorPerToken') * BigInt(tokens)
     intrinsicGas = bigIntMax(intrinsicGas, floorCost)
   }
   if (intrinsicGas > tx.gasLimit) {
@@ -296,7 +308,9 @@ export function sign(
     tx.common.gteHardfork('spuriousDragon') &&
     !tx.supports(Capability.EIP155ReplayProtection)
   ) {
-    ;(tx as LegacyTx)['activeCapabilities'].push(Capability.EIP155ReplayProtection)
+    ;(tx as LegacyTx)['activeCapabilities'].push(
+      Capability.EIP155ReplayProtection,
+    )
     hackApplied = true
   }
 
@@ -312,7 +326,9 @@ export function sign(
 
   // Hack part 2
   if (hackApplied) {
-    const index = (tx as LegacyTx)['activeCapabilities'].indexOf(Capability.EIP155ReplayProtection)
+    const index = (tx as LegacyTx)['activeCapabilities'].indexOf(
+      Capability.EIP155ReplayProtection,
+    )
     if (index > -1) {
       ;(tx as LegacyTx)['activeCapabilities'].splice(index, 1)
     }

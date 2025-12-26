@@ -1,13 +1,12 @@
-import * as EIP2930 from './eip2930'
-
 import {
-    EthereumJSErrorWithoutCode,
-    MAX_INTEGER,
-    MAX_UINT64,
-    bytesToBigInt,
-    validateNoLeadingZeroes,
+  bytesToBigInt,
+  EthereumJSErrorWithoutCode,
+  MAX_INTEGER,
+  MAX_UINT64,
+  validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
 import type { EIP7702CompatibleTx } from '../types'
+import * as EIP2930 from './eip2930'
 
 /**
  * The amount of gas paid for the data in this tx
@@ -15,7 +14,8 @@ import type { EIP7702CompatibleTx } from '../types'
 export function getDataGas(tx: EIP7702CompatibleTx): bigint {
   const eip2930Cost = EIP2930.getDataGas(tx)
   const eip7702Cost = BigInt(
-    tx.authorizationList.length * Number(tx.common.param('perEmptyAccountCost')),
+    tx.authorizationList.length *
+      Number(tx.common.param('perEmptyAccountCost')),
   )
   return eip2930Cost + eip7702Cost
 }
@@ -27,7 +27,9 @@ export function getDataGas(tx: EIP7702CompatibleTx): bigint {
 export function verifyAuthorizationList(tx: EIP7702CompatibleTx) {
   const authorizationList = tx.authorizationList
   if (authorizationList.length === 0) {
-    throw EthereumJSErrorWithoutCode('Invalid EIP-7702 transaction: authorization list is empty')
+    throw EthereumJSErrorWithoutCode(
+      'Invalid EIP-7702 transaction: authorization list is empty',
+    )
   }
 
   for (const item of authorizationList) {
@@ -58,11 +60,15 @@ export function verifyAuthorizationList(tx: EIP7702CompatibleTx) {
     }
 
     if (bytesToBigInt(chainId) > MAX_INTEGER) {
-      throw EthereumJSErrorWithoutCode('Invalid EIP-7702 transaction: chainId exceeds 2^256 - 1')
+      throw EthereumJSErrorWithoutCode(
+        'Invalid EIP-7702 transaction: chainId exceeds 2^256 - 1',
+      )
     }
 
     if (bytesToBigInt(nonce) > MAX_UINT64) {
-      throw EthereumJSErrorWithoutCode('Invalid EIP-7702 transaction: nonce exceeds 2^64 - 1')
+      throw EthereumJSErrorWithoutCode(
+        'Invalid EIP-7702 transaction: nonce exceeds 2^64 - 1',
+      )
     }
 
     const yParityBigInt = bytesToBigInt(yParity)
@@ -73,11 +79,15 @@ export function verifyAuthorizationList(tx: EIP7702CompatibleTx) {
     }
 
     if (bytesToBigInt(r) > MAX_INTEGER) {
-      throw EthereumJSErrorWithoutCode('Invalid EIP-7702 transaction: r exceeds 2^256 - 1')
+      throw EthereumJSErrorWithoutCode(
+        'Invalid EIP-7702 transaction: r exceeds 2^256 - 1',
+      )
     }
 
     if (bytesToBigInt(s) > MAX_INTEGER) {
-      throw EthereumJSErrorWithoutCode('Invalid EIP-7702 transaction: s exceeds 2^256 - 1')
+      throw EthereumJSErrorWithoutCode(
+        'Invalid EIP-7702 transaction: s exceeds 2^256 - 1',
+      )
     }
   }
 }

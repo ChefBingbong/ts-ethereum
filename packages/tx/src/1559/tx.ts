@@ -1,24 +1,18 @@
+import type { Common } from '@ts-ethereum/chain-config'
+import type { Address } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
-  EthereumJSErrorWithoutCode,
-  MAX_INTEGER,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
+  EthereumJSErrorWithoutCode,
+  MAX_INTEGER,
   toBytes,
 } from '@ts-ethereum/utils'
-
 import * as EIP1559 from '../capabilities/eip1559'
 import * as EIP2718 from '../capabilities/eip2718'
 import * as EIP2930 from '../capabilities/eip2930'
 import * as Legacy from '../capabilities/legacy'
-import { TransactionType, isAccessList } from '../types'
-import { getBaseJSON, sharedConstructor, valueOverflowCheck } from '../util/internal'
-
-import { createFeeMarket1559Tx } from './constructors'
-
-import type { Common } from '@ts-ethereum/chain-config'
-import type { Address } from '@ts-ethereum/utils'
 import type {
   AccessListBytes,
   TxData as AllTypesTxData,
@@ -29,10 +23,18 @@ import type {
   TransactionInterface,
   TxOptions,
 } from '../types'
+import { isAccessList, TransactionType } from '../types'
 import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
+import {
+  getBaseJSON,
+  sharedConstructor,
+  valueOverflowCheck,
+} from '../util/internal'
+import { createFeeMarket1559Tx } from './constructors'
 
 export type TxData = AllTypesTxData[typeof TransactionType.FeeMarketEIP1559]
-export type TxValuesArray = AllTypesTxValuesArray[typeof TransactionType.FeeMarketEIP1559]
+export type TxValuesArray =
+  AllTypesTxValuesArray[typeof TransactionType.FeeMarketEIP1559]
 
 /**
  * Typed transaction with a new gas fee market mechanism
@@ -85,11 +87,23 @@ export class FeeMarket1559Tx
    * varying data types.
    */
   public constructor(txData: TxData, opts: TxOptions = {}) {
-    sharedConstructor(this, { ...txData, type: TransactionType.FeeMarketEIP1559 }, opts)
-    const { chainId, accessList: rawAccessList, maxFeePerGas, maxPriorityFeePerGas } = txData
+    sharedConstructor(
+      this,
+      { ...txData, type: TransactionType.FeeMarketEIP1559 },
+      opts,
+    )
+    const {
+      chainId,
+      accessList: rawAccessList,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+    } = txData
     const accessList = rawAccessList ?? []
 
-    if (chainId !== undefined && bytesToBigInt(toBytes(chainId)) !== this.common.chainId()) {
+    if (
+      chainId !== undefined &&
+      bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
+    ) {
       throw EthereumJSErrorWithoutCode(
         `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
@@ -102,7 +116,9 @@ export class FeeMarket1559Tx
     this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930])
 
     // Populate the access list fields
-    this.accessList = isAccessList(accessList) ? accessListJSONToBytes(accessList) : accessList
+    this.accessList = isAccessList(accessList)
+      ? accessListJSONToBytes(accessList)
+      : accessList
 
     // Verify the access list format.
     EIP2930.verifyAccessList(this)
@@ -306,7 +322,11 @@ export class FeeMarket1559Tx
    * @param s - Signature `s` value
    * @returns Newly created transaction that includes the signature
    */
-  addSignature(v: bigint, r: Uint8Array | bigint, s: Uint8Array | bigint): FeeMarket1559Tx {
+  addSignature(
+    v: bigint,
+    r: Uint8Array | bigint,
+    s: Uint8Array | bigint,
+  ): FeeMarket1559Tx {
     r = toBytes(r)
     s = toBytes(s)
     const opts = { ...this.txOptions, common: this.common }
@@ -384,7 +404,10 @@ export class FeeMarket1559Tx
    * @param extraEntropy - Optional entropy passed to the signing routine
    * @returns Newly signed transaction
    */
-  sign(privateKey: Uint8Array, extraEntropy: Uint8Array | boolean = false): FeeMarket1559Tx {
+  sign(
+    privateKey: Uint8Array,
+    extraEntropy: Uint8Array | boolean = false,
+  ): FeeMarket1559Tx {
     return Legacy.sign(this, privateKey, extraEntropy) as FeeMarket1559Tx
   }
 

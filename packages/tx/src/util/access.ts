@@ -11,7 +11,9 @@ import type { AccessList, AccessListBytes } from '../types'
 export function accessListBytesToJSON(accessList: AccessListBytes): AccessList {
   return accessList.map(([address, storageSlots]) => ({
     address: bytesToHex(setLengthLeft(address, 20)),
-    storageKeys: storageSlots.map((slot) => bytesToHex(setLengthLeft(slot, 32))),
+    storageKeys: storageSlots.map((slot) =>
+      bytesToHex(setLengthLeft(slot, 32)),
+    ),
   }))
 }
 

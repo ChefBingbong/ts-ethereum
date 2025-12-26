@@ -13,8 +13,8 @@ import {
   bigIntToHex,
   bytesToHex,
   createWithdrawal,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   fetchFromProvider,
   getProvider,
   hexToBytes,
@@ -46,7 +46,10 @@ import type {
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createBlock(blockData: BlockData = {}, opts?: BlockOptions): Block {
+export function createBlock(
+  blockData: BlockData = {},
+  opts?: BlockOptions,
+): Block {
   const {
     header: headerData,
     transactions: txsData,
@@ -98,7 +101,10 @@ export function createBlock(blockData: BlockData = {}, opts?: BlockOptions): Blo
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createEmptyBlock(headerData: HeaderData, opts?: BlockOptions): Block {
+export function createEmptyBlock(
+  headerData: HeaderData,
+  opts?: BlockOptions,
+): Block {
   const header = createBlockHeader(headerData, opts)
   return new Block(header)
 }
@@ -110,7 +116,10 @@ export function createEmptyBlock(headerData: HeaderData, opts?: BlockOptions): B
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createBlockFromBytesArray(values: BlockBytes, opts?: BlockOptions): Block {
+export function createBlockFromBytesArray(
+  values: BlockBytes,
+  opts?: BlockOptions,
+): Block {
   if (values.length > 5) {
     throw EthereumJSErrorWithoutCode(
       `invalid  More values=${values.length} than expected were received (at most 5)`,
@@ -162,7 +171,9 @@ export function createBlockFromBytesArray(values: BlockBytes, opts?: BlockOption
     uncleOpts.setHardfork = true
   }
   for (const uncleHeaderData of uhsData ?? []) {
-    uncleHeaders.push(createBlockHeaderFromBytesArray(uncleHeaderData, uncleOpts))
+    uncleHeaders.push(
+      createBlockHeaderFromBytesArray(uncleHeaderData, uncleOpts),
+    )
   }
 
   const withdrawals = (withdrawalBytes as WithdrawalBytes[])
@@ -184,7 +195,10 @@ export function createBlockFromBytesArray(values: BlockBytes, opts?: BlockOption
  * @param opts
  * @returns a new {@link Block} object
  */
-export function createBlockFromRLP(serialized: Uint8Array, opts?: BlockOptions): Block {
+export function createBlockFromRLP(
+  serialized: Uint8Array,
+  opts?: BlockOptions,
+): Block {
   if (opts?.common?.isActivatedEIP(7934) === true) {
     const maxRlpBlockSize = opts.common.param('maxRlpBlockSize')
     if (serialized.length > maxRlpBlockSize) {
@@ -196,7 +210,9 @@ export function createBlockFromRLP(serialized: Uint8Array, opts?: BlockOptions):
   const values = RLP.decode(Uint8Array.from(serialized)) as BlockBytes
 
   if (!Array.isArray(values)) {
-    throw EthereumJSErrorWithoutCode('Invalid serialized block input. Must be array')
+    throw EthereumJSErrorWithoutCode(
+      'Invalid serialized block input. Must be array',
+    )
   }
 
   return createBlockFromBytesArray(values, opts)
@@ -228,7 +244,12 @@ export function createBlockFromRPC(
   const uncleHeaders = uncles.map((uh) => createBlockHeaderFromRPC(uh, options))
 
   return createBlock(
-    { header, transactions, uncleHeaders, withdrawals: blockParams.withdrawals },
+    {
+      header,
+      transactions,
+      uncleHeaders,
+      withdrawals: blockParams.withdrawals,
+    },
     options,
   )
 }
@@ -332,7 +353,10 @@ export async function createBlockFromExecutionPayload(
   )
   const withdrawals = withdrawalsData?.map((wData) => createWithdrawal(wData))
   const withdrawalsRoot = withdrawals
-    ? await genWithdrawalsTrieRoot(withdrawals, new MerklePatriciaTrie({ common: opts?.common }))
+    ? await genWithdrawalsTrieRoot(
+        withdrawals,
+        new MerklePatriciaTrie({ common: opts?.common }),
+      )
     : undefined
 
   const header: HeaderData = {

@@ -10,7 +10,6 @@ export * from './account'
  * Address type
  */
 export * from './address'
-export * from './withdrawal'
 /**
  * Export ethjs-util methods
  */
@@ -39,7 +38,7 @@ export {
   isHexString,
   padToEven,
   stripHexPrefix,
-  toAscii
+  toAscii,
 } from './internal'
 export * from './kzg'
 export * from './lock'
@@ -67,4 +66,4 @@ export * from './types'
  */
 export * from './units'
 export * from './utils'
-
+export * from './withdrawal'

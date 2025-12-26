@@ -1,36 +1,23 @@
+import type { Common } from '@ts-ethereum/chain-config'
+import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
-  EthereumJSErrorWithoutCode,
-  MAX_INTEGER,
-  TypeOutput,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
   bytesToInt,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   intToUnpaddedBytes,
+  MAX_INTEGER,
+  TypeOutput,
   toBytes,
   toType,
 } from '@ts-ethereum/utils'
-
 import * as EIP1559 from '../capabilities/eip1559'
 import * as EIP2718 from '../capabilities/eip2718'
 import * as EIP2930 from '../capabilities/eip2930'
 import * as Legacy from '../capabilities/legacy'
-import { TransactionType, isAccessList } from '../types'
-import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
-import {
-  getBaseJSON,
-  getCommon,
-  sharedConstructor,
-  validateNotArray,
-  valueOverflowCheck,
-} from '../util/internal'
-
-import { createBlob4844Tx } from './constructors'
-
-import type { Common } from '@ts-ethereum/chain-config'
-import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import type {
   AccessListBytes,
   TxData as AllTypesTxData,
@@ -41,15 +28,27 @@ import type {
   TransactionInterface,
   TxOptions,
 } from '../types'
+import { isAccessList, TransactionType } from '../types'
+import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
+import {
+  getBaseJSON,
+  getCommon,
+  sharedConstructor,
+  validateNotArray,
+  valueOverflowCheck,
+} from '../util/internal'
+import { createBlob4844Tx } from './constructors'
 
 export type TxData = AllTypesTxData[typeof TransactionType.BlobEIP4844]
-export type TxValuesArray = AllTypesTxValuesArray[typeof TransactionType.BlobEIP4844]
+export type TxValuesArray =
+  AllTypesTxValuesArray[typeof TransactionType.BlobEIP4844]
 
 export const NetworkWrapperType = {
   EIP4844: 0,
   EIP7594: 1,
 } as const
-export type NetworkWrapperType = (typeof NetworkWrapperType)[keyof typeof NetworkWrapperType]
+export type NetworkWrapperType =
+  (typeof NetworkWrapperType)[keyof typeof NetworkWrapperType]
 
 /**
  * Typed transaction with a new gas fee market mechanism for transactions that include "blobs" of data
@@ -61,7 +60,9 @@ export type NetworkWrapperType = (typeof NetworkWrapperType)[keyof typeof Networ
  * If blobs are passed in the tx automatically switches to "Network Wrapper" format and the
  * `networkWrapperVersion` will be set or validated.
  */
-export class Blob4844Tx implements TransactionInterface<typeof TransactionType.BlobEIP4844> {
+export class Blob4844Tx
+  implements TransactionInterface<typeof TransactionType.BlobEIP4844>
+{
   public type = TransactionType.BlobEIP4844 // 4844 tx type
 
   // Tx data part (part of the RLP)
@@ -123,7 +124,9 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
     const common = getCommon(opts.common)
     const networkWrapperVersion =
       txData.networkWrapperVersion !== undefined
-        ? (bytesToInt(toBytes(txData.networkWrapperVersion)) as NetworkWrapperType)
+        ? (bytesToInt(
+            toBytes(txData.networkWrapperVersion),
+          ) as NetworkWrapperType)
         : undefined
 
     if (networkWrapperVersion !== undefined) {
@@ -145,11 +148,17 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
           break
 
         default:
-          throw EthereumJSErrorWithoutCode(`Invalid networkWrapperVersion=${networkWrapperVersion}`)
+          throw EthereumJSErrorWithoutCode(
+            `Invalid networkWrapperVersion=${networkWrapperVersion}`,
+          )
       }
     }
 
-    sharedConstructor(this, { ...txData, type: TransactionType.BlobEIP4844 }, opts)
+    sharedConstructor(
+      this,
+      { ...txData, type: TransactionType.BlobEIP4844 },
+      opts,
+    )
     const {
       chainId,
       accessList: rawAccessList,
@@ -159,7 +168,10 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
     } = txData
     const accessList = rawAccessList ?? []
 
-    if (chainId !== undefined && bytesToBigInt(toBytes(chainId)) !== this.common.chainId()) {
+    if (
+      chainId !== undefined &&
+      bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
+    ) {
       throw EthereumJSErrorWithoutCode(
         `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
@@ -176,7 +188,9 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
     this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930])
 
     // Populate the access list fields
-    this.accessList = isAccessList(accessList) ? accessListJSONToBytes(accessList) : accessList
+    this.accessList = isAccessList(accessList)
+      ? accessListJSONToBytes(accessList)
+      : accessList
     // Verify the access list format.
     EIP2930.verifyAccessList(this)
 
@@ -222,7 +236,10 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
         const msg = Legacy.errorMsg(this, 'versioned hash is invalid length')
         throw EthereumJSErrorWithoutCode(msg)
       }
-      if (BigInt(parseInt(hash.slice(2, 4))) !== this.common.param('blobCommitmentVersionKzg')) {
+      if (
+        BigInt(Number.parseInt(hash.slice(2, 4))) !==
+        this.common.param('blobCommitmentVersionKzg')
+      ) {
         // We check the first "byte" of the hash (starts at position 2 since hash is a PrefixedHexString)
         const msg = Legacy.errorMsg(
           this,
@@ -246,7 +263,8 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
 
     // "Old" limit (superseded by EIP-7594 starting with Osaka)
     const limitBlobsPerTx =
-      this.common.param('maxBlobGasPerBlock') / this.common.param('blobGasPerBlob')
+      this.common.param('maxBlobGasPerBlock') /
+      this.common.param('blobGasPerBlob')
     if (this.blobVersionedHashes.length > limitBlobsPerTx) {
       const msg = Legacy.errorMsg(
         this,
@@ -269,10 +287,14 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
     // networkWrapperVersion was already validated earlier in the constructor
     this.networkWrapperVersion =
       txData.networkWrapperVersion !== undefined
-        ? (bytesToInt(toBytes(txData.networkWrapperVersion)) as NetworkWrapperType)
+        ? (bytesToInt(
+            toBytes(txData.networkWrapperVersion),
+          ) as NetworkWrapperType)
         : undefined
 
-    this.blobs = txData.blobs?.map((blob) => toType(blob, TypeOutput.PrefixedHexString))
+    this.blobs = txData.blobs?.map((blob) =>
+      toType(blob, TypeOutput.PrefixedHexString),
+    )
 
     if (this.networkWrapperVersion === undefined && this.blobs !== undefined) {
       if (this.common.isActivatedEIP(7594)) {
@@ -292,15 +314,23 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
     this.kzgCommitments = txData.kzgCommitments?.map((commitment) =>
       toType(commitment, TypeOutput.PrefixedHexString),
     )
-    this.kzgProofs = txData.kzgProofs?.map((proof) => toType(proof, TypeOutput.PrefixedHexString))
+    this.kzgProofs = txData.kzgProofs?.map((proof) =>
+      toType(proof, TypeOutput.PrefixedHexString),
+    )
 
     if (this.blobs !== undefined) {
       if (this.kzgCommitments === undefined) {
-        const msg = Legacy.errorMsg(this, 'kzgCommitments are mandatory if blobs are provided')
+        const msg = Legacy.errorMsg(
+          this,
+          'kzgCommitments are mandatory if blobs are provided',
+        )
         throw EthereumJSErrorWithoutCode(msg)
       }
       if (this.kzgProofs === undefined) {
-        const msg = Legacy.errorMsg(this, 'kzgProofs are mandatory if blobs are provided')
+        const msg = Legacy.errorMsg(
+          this,
+          'kzgProofs are mandatory if blobs are provided',
+        )
         throw EthereumJSErrorWithoutCode(msg)
       }
     }
@@ -435,7 +465,12 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
 
     const networkSerialized =
       this.networkWrapperVersion === NetworkWrapperType.EIP4844
-        ? EIP2718.serialize(this, [this.raw(), this.blobs, this.kzgCommitments, this.kzgProofs])
+        ? EIP2718.serialize(this, [
+            this.raw(),
+            this.blobs,
+            this.kzgCommitments,
+            this.kzgProofs,
+          ])
         : EIP2718.serialize(this, [
             this.raw(),
             intToUnpaddedBytes(this.networkWrapperVersion),
@@ -528,7 +563,11 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
    * @param s - Signature `s` value
    * @returns New `Blob4844Tx` instance containing the signature
    */
-  addSignature(v: bigint, r: Uint8Array | bigint, s: Uint8Array | bigint): Blob4844Tx {
+  addSignature(
+    v: bigint,
+    r: Uint8Array | bigint,
+    s: Uint8Array | bigint,
+  ): Blob4844Tx {
     r = toBytes(r)
     s = toBytes(s)
     const opts = { ...this.txOptions, common: this.common }
@@ -595,7 +634,10 @@ export class Blob4844Tx implements TransactionInterface<typeof TransactionType.B
    * @param extraEntropy - Optional entropy passed to the signing routine
    * @returns Newly signed transaction
    */
-  sign(privateKey: Uint8Array, extraEntropy: Uint8Array | boolean = false): Blob4844Tx {
+  sign(
+    privateKey: Uint8Array,
+    extraEntropy: Uint8Array | boolean = false,
+  ): Blob4844Tx {
     return Legacy.sign(this, privateKey, extraEntropy) as Blob4844Tx
   }
 
