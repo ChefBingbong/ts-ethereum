@@ -1,5 +1,5 @@
-import { equalsBytes } from '@ts-ethereum/utils'
 import { keccak_256 } from '@noble/hashes/sha3.js'
+import { equalsBytes } from '@ts-ethereum/utils'
 
 import { FORMAT, MAGIC } from './constants'
 

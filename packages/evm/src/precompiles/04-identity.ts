@@ -1,19 +1,18 @@
 import { short } from '@ts-ethereum/utils'
 
 import { OOGResult } from '../evm'
-
-import { getPrecompileName } from './index'
-import { gasLimitCheck } from './util'
-
 import type { ExecResult } from '../types'
+import { getPrecompileName } from './index'
 import type { PrecompileInput } from './types'
+import { gasLimitCheck } from './util'
 
 export function precompile04(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('04')
   const data = opts.data
 
   let gasUsed = opts.common.param('identityGas')
-  gasUsed += opts.common.param('identityWordGas') * BigInt(Math.ceil(data.length / 32))
+  gasUsed +=
+    opts.common.param('identityWordGas') * BigInt(Math.ceil(data.length / 32))
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }

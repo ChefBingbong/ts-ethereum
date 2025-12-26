@@ -10,7 +10,11 @@ import type { PrecompileInput } from './index'
  * @param pName - Human readable precompile name for logging
  * @returns `true` if the gas usage is within the provided limit
  */
-export const gasLimitCheck = (opts: PrecompileInput, gasUsed: bigint, pName: string) => {
+export const gasLimitCheck = (
+  opts: PrecompileInput,
+  gasUsed: bigint,
+  pName: string,
+) => {
   if (opts._debug !== undefined) {
     opts._debug(
       `Run ${pName} precompile data=${short(opts.data)} length=${
@@ -36,7 +40,11 @@ export const gasLimitCheck = (opts: PrecompileInput, gasUsed: bigint, pName: str
  * @param pName - Human readable precompile name for logging
  * @returns `true` if the provided data matches the required length
  */
-export const equalityLengthCheck = (opts: PrecompileInput, length: number, pName: string) => {
+export const equalityLengthCheck = (
+  opts: PrecompileInput,
+  length: number,
+  pName: string,
+) => {
   if (opts.data.length !== length) {
     if (opts._debug !== undefined) {
       opts._debug(
@@ -57,7 +65,11 @@ export const equalityLengthCheck = (opts: PrecompileInput, length: number, pName
  * @param pName - Human readable precompile name for logging
  * @returns `true` if the length is divisible by the chunk size
  */
-export const moduloLengthCheck = (opts: PrecompileInput, length: number, pName: string) => {
+export const moduloLengthCheck = (
+  opts: PrecompileInput,
+  length: number,
+  pName: string,
+) => {
   if (opts.data.length % length !== 0) {
     if (opts._debug !== undefined) {
       opts._debug(

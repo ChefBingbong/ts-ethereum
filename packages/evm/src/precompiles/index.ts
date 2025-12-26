@@ -1,12 +1,10 @@
+import type { Common } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { type Address, bytesToUnprefixedHex } from '@ts-ethereum/utils'
-
 import { precompile01 } from './01-ecrecover'
 import { precompile02 } from './02-sha256'
 import { precompile03 } from './03-ripemd160'
 import { precompile04 } from './04-identity'
-
-import type { Common } from '@ts-ethereum/chain-config'
 import type { PrecompileFunc, PrecompileInput } from './types'
 
 interface PrecompileEntry {
@@ -80,7 +78,7 @@ const precompileEntries: PrecompileEntry[] = [
     },
     precompile: precompile04,
     name: 'IDENTITY (0x04)',
-  }
+  },
 ]
 
 const precompiles: Precompiles = {
@@ -121,7 +119,8 @@ function getActivePrecompiles(
     const type = entry.check.type
 
     if (
-      (type === PrecompileAvailabilityCheck.Hardfork && common.gteHardfork(entry.check.param)) ||
+      (type === PrecompileAvailabilityCheck.Hardfork &&
+        common.gteHardfork(entry.check.param)) ||
       (entry.check.type === PrecompileAvailabilityCheck.EIP &&
         common.isActivatedEIP(entry.check.param))
     ) {
@@ -148,7 +147,13 @@ export {
   getPrecompileName,
   precompileEntries,
   precompiles,
-  ripemdPrecompileAddress
+  ripemdPrecompileAddress,
 }
 
-export type { AddPrecompile, CustomPrecompile, DeletePrecompile, PrecompileFunc, PrecompileInput }
+export type {
+  AddPrecompile,
+  CustomPrecompile,
+  DeletePrecompile,
+  PrecompileFunc,
+  PrecompileInput,
+}

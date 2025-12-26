@@ -1,5 +1,8 @@
+import { keccak_256 } from '@noble/hashes/sha3.js'
+import type { Common } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import {
+  type Address,
   BIGINT_0,
   BIGINT_1,
   BIGINT_2,
@@ -12,14 +15,9 @@ import {
   equalsBytes,
   setLengthLeft,
   setLengthRight,
-  type Address,
 } from '@ts-ethereum/utils'
-import { keccak_256 } from '@noble/hashes/sha3.js'
-
-import { EVMError } from '../errors'
-
-import type { Common } from '@ts-ethereum/chain-config'
 import type { EVMErrorType } from '../errors'
+import { EVMError } from '../errors'
 import type { RunState } from '../interpreter'
 
 const MASK_160 = (BIGINT_1 << BIGINT_160) - BIGINT_1
@@ -47,7 +45,9 @@ export function abs(a: bigint) {
   return a * BIGINT_NEG1
 }
 
-const N = BigInt(115792089237316195423570985008687907853269984665640564039457584007913129639936)
+const N = BigInt(
+  '115792089237316195423570985008687907853269984665640564039457584007913129639936',
+)
 export function exponentiation(bas: bigint, exp: bigint) {
   let t = BIGINT_1
   while (exp > BIGINT_0) {
@@ -96,7 +96,8 @@ export function trap(err: string) {
  * Error message helper - generates location string
  */
 export function describeLocation(runState: RunState): string {
-  const keccakFunction = runState.interpreter._evm.common.customCrypto.keccak256 ?? keccak_256
+  const keccakFunction =
+    runState.interpreter._evm.common.customCrypto.keccak256 ?? keccak_256
   const hash = bytesToHex(keccakFunction(runState.interpreter.getCode()))
   const address = runState.interpreter.getAddress().toString()
   const pc = runState.programCounter - 1
@@ -125,7 +126,11 @@ export function divCeil(a: bigint, b: bigint): bigint {
  * Returns an overflow-safe slice of an array. It right-pads
  * the data with zeros to `length`.
  */
-export function getDataSlice(data: Uint8Array, offset: bigint, length: bigint): Uint8Array {
+export function getDataSlice(
+  data: Uint8Array,
+  offset: bigint,
+  length: bigint,
+): Uint8Array {
   const len = BigInt(data.length)
   if (offset > len) {
     offset = len
@@ -200,7 +205,12 @@ export function maxCallGas(
 /**
  * Subtracts the amount needed for memory usage from `runState.gasLeft`
  */
-export function subMemUsage(runState: RunState, offset: bigint, length: bigint, common: Common) {
+export function subMemUsage(
+  runState: RunState,
+  offset: bigint,
+  length: bigint,
+  common: Common,
+) {
   // YP (225): access with zero length will not extend the memory
   if (length === BIGINT_0) return BIGINT_0
 
@@ -227,7 +237,11 @@ export function subMemUsage(runState: RunState, offset: bigint, length: bigint, 
 /**
  * Writes data returned by evm.call* methods to memory
  */
-export function writeCallOutput(runState: RunState, outOffset: bigint, outLength: bigint) {
+export function writeCallOutput(
+  runState: RunState,
+  outOffset: bigint,
+  outLength: bigint,
+) {
   const returnData = runState.interpreter.getReturnData()
   if (returnData.length > 0) {
     const memOffset = Number(outOffset)
@@ -258,7 +272,10 @@ export function updateSstoreGas(
     return gas
   } else if (value.length === 0 && currentStorage.length > 0) {
     const gas = common.param('sstoreResetGas')
-    runState.interpreter.refundGas(common.param('sstoreRefundGas'), 'updateSstoreGas')
+    runState.interpreter.refundGas(
+      common.param('sstoreRefundGas'),
+      'updateSstoreGas',
+    )
     return gas
   } else {
     /*

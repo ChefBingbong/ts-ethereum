@@ -1,14 +1,12 @@
+import type { Common } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
-
-import { handlers } from './functions'
-import { dynamicGasHandlers } from './gas'
-import { getFullname } from './util'
-
-import type { Common } from '@ts-ethereum/chain-config'
 import { type CustomOpcode, isAddOpcode } from '../types'
 import type { OpHandler } from './functions'
+import { handlers } from './functions'
 import type { AsyncDynamicGasHandler, SyncDynamicGasHandler } from './gas'
+import { dynamicGasHandlers } from './gas'
+import { getFullname } from './util'
 
 export class Opcode {
   readonly code: number
@@ -392,7 +390,7 @@ const eipOpcodes: { eip: number; opcodes: OpcodeEntry }[] = [
 function createOpcodes(opcodes: OpcodeEntryFee): OpcodeList {
   const result: OpcodeList = new Map()
   for (const [key, value] of Object.entries(opcodes)) {
-    const code = parseInt(key, 10)
+    const code = Number.parseInt(key, 10)
     if (isNaN(value.fee)) value.fee = 0
     result.set(
       code,
@@ -407,7 +405,10 @@ function createOpcodes(opcodes: OpcodeEntryFee): OpcodeList {
 }
 
 type OpcodeContext = {
-  dynamicGasHandlers: Map<number, AsyncDynamicGasHandler | SyncDynamicGasHandler>
+  dynamicGasHandlers: Map<
+    number,
+    AsyncDynamicGasHandler | SyncDynamicGasHandler
+  >
   handlers: Map<number, OpHandler>
   opcodes: OpcodeList
   opcodeMap: OpcodeMap
@@ -427,7 +428,10 @@ export type OpcodeMap = OpcodeMapEntry[]
  * @param customOpcodes List with custom opcodes (see EVM `customOpcodes` option description).
  * @returns {OpcodeList} Opcodes dictionary object.
  */
-export function getOpcodesForHF(common: Common, customOpcodes?: CustomOpcode[]): OpcodeContext {
+export function getOpcodesForHF(
+  common: Common,
+  customOpcodes?: CustomOpcode[],
+): OpcodeContext {
   let opcodeBuilder: any = { ...opcodes }
 
   const handlersCopy = new Map(handlers)
@@ -445,10 +449,14 @@ export function getOpcodesForHF(common: Common, customOpcodes?: CustomOpcode[]):
   }
 
   for (const key in opcodeBuilder) {
-    const baseFee = Number(common.param(`${opcodeBuilder[key].name.toLowerCase()}Gas`))
+    const baseFee = Number(
+      common.param(`${opcodeBuilder[key].name.toLowerCase()}Gas`),
+    )
     // explicitly verify that we have defined a base fee
     if (baseFee === undefined) {
-      throw EthereumJSErrorWithoutCode(`base fee not defined for: ${opcodeBuilder[key].name}`)
+      throw EthereumJSErrorWithoutCode(
+        `base fee not defined for: ${opcodeBuilder[key].name}`,
+      )
     }
     opcodeBuilder[key].fee = baseFee
   }
