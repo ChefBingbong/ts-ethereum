@@ -9,7 +9,7 @@ import {
   createTxFromRLP,
   LegacyTx,
   TransactionType,
-} from '../../src/index.ts'
+} from '../../src/index'
 
 const common = new Common({
   chain: Mainnet,

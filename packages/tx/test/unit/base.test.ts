@@ -8,7 +8,7 @@ import {
   utf8ToBytes,
 } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
-import type { LegacyTxData } from '../../src/index.ts'
+import type { LegacyTxData } from '../../src/index'
 import {
   createLegacyTx,
   createLegacyTxFromBytesArray,
@@ -16,8 +16,8 @@ import {
   LegacyTx,
   paramsTx,
   TransactionType,
-} from '../../src/index.ts'
-import { txsData } from './testData/txs.ts'
+} from '../../src/index'
+import { txsData } from './testData/txs'
 
 describe('[BaseTransaction]', () => {
   const common = new Common({

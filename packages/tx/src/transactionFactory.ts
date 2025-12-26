@@ -4,53 +4,85 @@ import {
   fetchFromProvider,
   getProvider,
 } from '@ts-ethereum/utils'
+import { createFeeMarket1559TxFromRLP } from './1559/constructors'
+import { createAccessList2930TxFromRLP } from './2930/constructors'
+import { createBlob4844TxFromRLP } from './4844/constructors'
+import { createEOACode7702TxFromRLP } from './7702/constructors'
 import {
   createLegacyTx,
   createLegacyTxFromBytesArray,
   createLegacyTxFromRLP,
 } from './legacy/constructors'
-import type { LegacyTx } from './legacy/tx'
-import type { LegacyTxData, TxOptions } from './types'
+import type { Transaction, TxData, TxOptions, TypedTxData } from './types'
 import { TransactionType } from './types'
 import { normalizeTxParams } from './util/general'
-
 /**
  * Create a transaction from a `txData` object
- * Only legacy transactions are supported in this simplified version.
  *
- * @param txData - The transaction data
+ * @param txData - The transaction data. The `type` field will determine which transaction type is returned (if undefined, creates a legacy transaction)
  * @param txOptions - Options to pass on to the constructor of the transaction
  */
-export function createTx(
-  txData: LegacyTxData,
+export function createTx<T extends TransactionType>(
+  txData: TypedTxData,
   txOptions: TxOptions = {},
-): LegacyTx {
-  return createLegacyTx(txData, txOptions)
+): Transaction[T] {
+  // if (!('type' in txData) || txData.type === undefined) {
+  //   // Assume legacy transaction
+  //   return createLegacyTx(txData, txOptions) as Transaction[T]
+  // } else {
+  //   if (isLegacyTxData(txData)) {
+  //     return createLegacyTx(txData, txOptions) as Transaction[T]
+  //   } else if (isAccessList2930TxData(txData)) {
+  //     return createAccessList2930Tx(txData, txOptions) as Transaction[T]
+  //   } else if (isFeeMarket1559TxData(txData)) {
+  //     return createFeeMarket1559Tx(txData, txOptions) as Transaction[T]
+  //   } else if (isBlob4844TxData(txData)) {
+  //     return createBlob4844Tx(txData, txOptions) as Transaction[T]
+  //   } else if (isEOACode7702TxData(txData)) {
+  //     return createEOACode7702Tx(txData, txOptions) as Transaction[T]
+  //   } else {
+  //     throw EthereumJSErrorWithoutCode(
+  //       `Tx instantiation with type ${(txData as TypedTxData)?.type} not supported`,
+  //     )
+  //   }
+  // }
+  return createLegacyTx(txData, txOptions) as Transaction[T]
 }
 
 /**
  * This method tries to decode serialized data.
- * Only legacy transactions are supported.
  *
  * @param data - The data Uint8Array
  * @param txOptions - The transaction options
  */
-export function createTxFromRLP(
+export function createTxFromRLP<T extends TransactionType>(
   data: Uint8Array,
   txOptions: TxOptions = {},
-): LegacyTx {
+): Transaction[T] {
   if (data[0] <= 0x7f) {
-    // Typed transactions are not supported
-    throw EthereumJSErrorWithoutCode(
-      `Typed transactions are not supported. Only legacy transactions (type 0) are allowed.`,
-    )
+    // Determine the type.
+    switch (data[0]) {
+      case TransactionType.AccessListEIP2930:
+        return createAccessList2930TxFromRLP(data, txOptions) as Transaction[T]
+      case TransactionType.FeeMarketEIP1559:
+        return createFeeMarket1559TxFromRLP(data, txOptions) as Transaction[T]
+      case TransactionType.BlobEIP4844:
+        return createBlob4844TxFromRLP(data, txOptions) as Transaction[T]
+      case TransactionType.EOACodeEIP7702:
+        return createEOACode7702TxFromRLP(data, txOptions) as Transaction[T]
+      default:
+        throw EthereumJSErrorWithoutCode(
+          `TypedTransaction with ID ${data[0]} unknown`,
+        )
+    }
+  } else {
+    return createLegacyTxFromRLP(data, txOptions) as Transaction[T]
   }
-  return createLegacyTxFromRLP(data, txOptions)
 }
 
 /**
  * When decoding a BlockBody, in the transactions field, a field is either:
- * A Uint8Array (a TypedTransaction - not supported)
+ * A Uint8Array (a TypedTransaction - encoded as TransactionType || rlp(TransactionPayload))
  * A Uint8Array[] (Legacy Transaction)
  * This method returns the right transaction.
  *
@@ -60,14 +92,8 @@ export function createTxFromRLP(
 export function createTxFromBlockBodyData(
   data: Uint8Array | Uint8Array[],
   txOptions: TxOptions = {},
-): LegacyTx {
+) {
   if (data instanceof Uint8Array) {
-    // Check if it might be a typed transaction
-    if (data[0] <= 0x7f) {
-      throw EthereumJSErrorWithoutCode(
-        `Typed transactions are not supported. Only legacy transactions (type 0) are allowed.`,
-      )
-    }
     return createTxFromRLP(data, txOptions)
   } else if (Array.isArray(data)) {
     // It is a legacy transaction
@@ -86,21 +112,11 @@ export function createTxFromBlockBodyData(
  * @param txOptions The transaction options
  * @returns A promise that resolves with the instantiated transaction
  */
-export async function createTxFromRPC(
-  txData: LegacyTxData,
+export async function createTxFromRPC<T extends TransactionType>(
+  txData: TxData[T],
   txOptions: TxOptions = {},
-): Promise<LegacyTx> {
-  const normalizedData = normalizeTxParams(txData)
-  // Verify it's a legacy transaction
-  if (
-    normalizedData.type !== undefined &&
-    normalizedData.type !== TransactionType.Legacy
-  ) {
-    throw EthereumJSErrorWithoutCode(
-      `Only legacy transactions (type 0) are supported. Got type: ${normalizedData.type}`,
-    )
-  }
-  return createTx(normalizedData, txOptions)
+): Promise<Transaction[T]> {
+  return createTx(normalizeTxParams(txData), txOptions)
 }
 
 /**
@@ -114,7 +130,7 @@ export async function createTxFromJSONRPCProvider(
   provider: string | EthersProvider,
   txHash: string,
   txOptions?: TxOptions,
-): Promise<LegacyTx> {
+) {
   const prov = getProvider(provider)
   const txData = await fetchFromProvider(prov, {
     method: 'eth_getTransactionByHash',

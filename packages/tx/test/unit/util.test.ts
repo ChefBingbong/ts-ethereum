@@ -1,7 +1,7 @@
 import { MAX_INTEGER, MAX_UINT64 } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
 
-import { valueOverflowCheck } from '../../src/util/internal.ts'
+import { valueOverflowCheck } from '../../src/util/internal'
 
 describe('Helper methods should be correct', () => {
   it('valueBoundaryCheck()', () => {

@@ -1,5 +1,9 @@
 import { RLP } from '@ts-ethereum/rlp'
-import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
+import {
+  bigIntToBytes,
+  EthereumJSErrorWithoutCode,
+  equalsBytes,
+} from '@ts-ethereum/utils'
 
 import { numberToHex, valuesArrayToHeaderData } from '../helpers'
 import { BlockHeader } from '../index'
@@ -35,7 +39,52 @@ export function createBlockHeaderFromBytesArray(
   opts: BlockOptions = {},
 ) {
   const headerData = valuesArrayToHeaderData(values)
-  return createBlockHeader(headerData, opts)
+  const {
+    number,
+    baseFeePerGas,
+    excessBlobGas,
+    blobGasUsed,
+    parentBeaconBlockRoot,
+    requestsHash,
+  } = headerData
+  const header = createBlockHeader(headerData, opts)
+  if (header.common.isActivatedEIP(1559) && baseFeePerGas === undefined) {
+    const eip1559ActivationBlock = bigIntToBytes(header.common.eipBlock(1559)!)
+    if (
+      eip1559ActivationBlock !== undefined &&
+      equalsBytes(eip1559ActivationBlock, number as Uint8Array)
+    ) {
+      throw EthereumJSErrorWithoutCode(
+        'invalid header. baseFeePerGas should be provided',
+      )
+    }
+  }
+  if (header.common.isActivatedEIP(4844)) {
+    if (excessBlobGas === undefined) {
+      throw EthereumJSErrorWithoutCode(
+        'invalid header. excessBlobGas should be provided',
+      )
+    } else if (blobGasUsed === undefined) {
+      throw EthereumJSErrorWithoutCode(
+        'invalid header. blobGasUsed should be provided',
+      )
+    }
+  }
+  if (
+    header.common.isActivatedEIP(4788) &&
+    parentBeaconBlockRoot === undefined
+  ) {
+    throw EthereumJSErrorWithoutCode(
+      'invalid header. parentBeaconBlockRoot should be provided',
+    )
+  }
+
+  if (header.common.isActivatedEIP(7685) && requestsHash === undefined) {
+    throw EthereumJSErrorWithoutCode(
+      'invalid header. requestsHash should be provided',
+    )
+  }
+  return header
 }
 
 /**
@@ -83,6 +132,12 @@ export function createBlockHeaderFromRPC(
     extraData,
     mixHash,
     nonce,
+    baseFeePerGas,
+    withdrawalsRoot,
+    blobGasUsed,
+    excessBlobGas,
+    parentBeaconBlockRoot,
+    requestsHash,
   } = blockParams
 
   const blockHeader = new BlockHeader(
@@ -102,6 +157,12 @@ export function createBlockHeaderFromRPC(
       extraData,
       mixHash,
       nonce,
+      baseFeePerGas,
+      withdrawalsRoot,
+      blobGasUsed,
+      excessBlobGas,
+      parentBeaconBlockRoot,
+      requestsHash,
     },
     options,
   )

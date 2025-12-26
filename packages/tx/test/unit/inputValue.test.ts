@@ -7,13 +7,13 @@ import type {
 } from '@ts-ethereum/utils'
 import { Address, hexToBytes, toBytes } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
-import type { TxValuesArray } from '../../src/index.ts'
+import type { TxValuesArray } from '../../src/index'
 import {
   createLegacyTx,
   createLegacyTxFromBytesArray,
   createTx,
   TransactionType,
-} from '../../src/index.ts'
+} from '../../src/index'
 
 // @returns: Array with subtypes of the AddressLike type for a given address
 function generateAddressLikeValues(address: PrefixedHexString): AddressLike[] {

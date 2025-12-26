@@ -18,9 +18,9 @@ import {
   type TransactionType,
   type TxData,
   type TypedTransaction,
-} from '../../src/index.ts'
+} from '../../src/index'
 
-import { txsData } from './testData/txs.ts'
+import { txsData } from './testData/txs'
 
 describe('[Transaction]', () => {
   const transactions: TypedTransaction[] = []

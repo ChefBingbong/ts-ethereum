@@ -24,9 +24,10 @@ export async function genGenesisStateRoot(
 export async function getGenesisStateRoot(
   chainId: Chain,
   common: Common,
+  genesisState: GenesisState,
 ): Promise<Uint8Array> {
   const chainGenesis = ChainGenesis[chainId]
   return chainGenesis !== undefined
     ? chainGenesis.stateRoot
-    : genGenesisStateRoot({}, common)
+    : genGenesisStateRoot(genesisState, common)
 }

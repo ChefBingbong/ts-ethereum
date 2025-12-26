@@ -31,6 +31,7 @@ export async function createBlockchain(opts: BlockchainOptions = {}) {
       stateRoot = await getGenesisStateRoot(
         Number(blockchain.common.chainId()) as Chain,
         blockchain.common,
+        opts.genesisState ?? {},
       )
     }
   }

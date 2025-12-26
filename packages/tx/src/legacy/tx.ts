@@ -2,16 +2,19 @@ import type { Common } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
+  BIGINT_2,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
   EthereumJSErrorWithoutCode,
+  intToBytes,
   MAX_INTEGER,
   toBytes,
+  unpadBytes,
 } from '@ts-ethereum/utils'
-import { keccak256 } from 'ethereum-cryptography/keccak.js'
+import { keccak256 } from 'ethereum-cryptography/keccak'
 import * as Legacy from '../capabilities/legacy'
-import { paramsTx } from '../params'
+import { paramsTx } from '../index'
 import type {
   TxData as AllTypesTxData,
   TxValuesArray as AllTypesTxValuesArray,
@@ -20,7 +23,7 @@ import type {
   TransactionInterface,
   TxOptions,
 } from '../types'
-import { type Capability, TransactionType } from '../types'
+import { Capability, TransactionType } from '../types'
 import {
   getBaseJSON,
   sharedConstructor,
@@ -31,33 +34,60 @@ import { createLegacyTx } from './constructors'
 export type TxData = AllTypesTxData[typeof TransactionType.Legacy]
 export type TxValuesArray = AllTypesTxValuesArray[typeof TransactionType.Legacy]
 
+function meetsEIP155(_v: bigint, chainId: bigint) {
+  const v = Number(_v)
+  const chainIdDoubled = Number(chainId) * 2
+  return v === chainIdDoubled + 35 || v === chainIdDoubled + 36
+}
+
 /**
- * Validates tx's `v` value
- * Accepts both pre-EIP-155 (v = 27 or 28) and EIP-155 (v = chainId * 2 + 35 or 36)
+ * Validates tx's `v` value and extracts the chain id
  */
-function validateV(common: Common, _v?: bigint): void {
+function validateVAndExtractChainID(
+  common: Common,
+  _v?: bigint,
+): bigint | undefined {
+  let chainIdBigInt
   const v = _v !== undefined ? Number(_v) : undefined
+  // Check for valid v values in the scope of a signed legacy tx
   if (v !== undefined) {
-    // Pre-EIP-155: v = 27 or 28
-    if (v === 27 || v === 28) {
-      return
+    // v is 1. not matching the EIP-155 chainId included case and...
+    // v is 2. not matching the classic v=27 or v=28 case
+    if (v < 37 && v !== 27 && v !== 28) {
+      throw EthereumJSErrorWithoutCode(
+        `Legacy txs need either v = 27/28 or v >= 37 (EIP-155 replay protection), got v = ${v}`,
+      )
     }
-    // EIP-155: v = chainId * 2 + 35 + recovery_id (where recovery_id is 0 or 1)
-    const chainId = common.chainId()
-    const eip155V0 = Number(chainId) * 2 + 35
-    const eip155V1 = Number(chainId) * 2 + 36
-    if (v === eip155V0 || v === eip155V1) {
-      return
-    }
-    throw EthereumJSErrorWithoutCode(
-      `Invalid v value. Expected 27, 28, ${eip155V0}, or ${eip155V1}, got v = ${v}`,
-    )
   }
+
+  // No unsigned tx and EIP-155 activated and chain ID included
+  if (
+    v !== undefined &&
+    v !== 0 &&
+    common.gteHardfork('spuriousDragon') &&
+    v !== 27 &&
+    v !== 28
+  ) {
+    if (!meetsEIP155(BigInt(v), common.chainId())) {
+      throw EthereumJSErrorWithoutCode(
+        `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the Common parameter of the Transaction constructor to set the chain id.`,
+      )
+    }
+    // Derive the original chain ID
+    let numSub
+    if ((v - 35) % 2 === 0) {
+      numSub = 35
+    } else {
+      numSub = 36
+    }
+    // Use derived chain ID to create a proper Common
+    chainIdBigInt = BigInt(v - numSub) / BIGINT_2
+  }
+  return chainIdBigInt
 }
 
 /**
  * An Ethereum non-typed (legacy) transaction
- * Simplified for Frontier/Chainstart - no EIP-155 replay protection
  */
 export class LegacyTx
   implements TransactionInterface<typeof TransactionType.Legacy>
@@ -89,7 +119,9 @@ export class LegacyTx
   readonly cache: TransactionCache = {}
 
   /**
-   * List of tx type defining EIPs - empty for Frontier
+   * List of tx type defining EIPs,
+   * e.g. 1559 (fee market) and 2930 (access lists)
+   * for FeeMarket1559Tx objects
    */
   protected activeCapabilities: number[] = []
 
@@ -106,9 +138,15 @@ export class LegacyTx
     this.gasPrice = bytesToBigInt(toBytes(txData.gasPrice))
     valueOverflowCheck({ gasPrice: this.gasPrice })
 
-    this.common.updateParams(opts.params ?? paramsTx)
+    // Everything from BaseTransaction done here
+    this.common.updateParams(opts.params ?? paramsTx) // TODO should this move higher?
 
-    validateV(this.common, this.v)
+    const chainId = validateVAndExtractChainID(this.common, this.v)
+    if (chainId !== undefined && chainId !== this.common.chainId()) {
+      throw EthereumJSErrorWithoutCode(
+        `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+      )
+    }
 
     this.keccakFunction = keccak256
 
@@ -116,6 +154,22 @@ export class LegacyTx
       throw EthereumJSErrorWithoutCode(
         'gas limit * gasPrice cannot exceed MAX_INTEGER (2^256-1)',
       )
+    }
+
+    if (this.common.gteHardfork('spuriousDragon')) {
+      if (!this.isSigned()) {
+        this.activeCapabilities.push(Capability.EIP155ReplayProtection)
+      } else {
+        // EIP155 spec:
+        // If block.number >= 2,675,000 and v = CHAIN_ID * 2 + 35 or v = CHAIN_ID * 2 + 36
+        // then when computing the hash of a transaction for purposes of signing or recovering
+        // instead of hashing only the first six elements (i.e. nonce, gasprice, startgas, to, value, data)
+        // hash nine elements, with v replaced by CHAIN_ID, r = 0 and s = 0.
+        // v and chain ID meet EIP-155 conditions
+        if (meetsEIP155(this.v!, this.common.chainId())) {
+          this.activeCapabilities.push(Capability.EIP155ReplayProtection)
+        }
+      }
     }
 
     const freeze = opts?.freeze ?? true
@@ -129,7 +183,16 @@ export class LegacyTx
    * on a tx, for example the EIP-1559 fee market mechanism
    * or the EIP-2930 access list feature.
    *
-   * For Frontier, this always returns false as no EIPs are active.
+   * Note that this is different from the tx type itself,
+   * so EIP-2930 access lists can very well be active
+   * on an EIP-1559 tx for example.
+   *
+   * This method can be useful for feature checks if the
+   * tx type is unknown (e.g. when instantiated with
+   * the tx factory).
+   *
+   * See `Capabilities` in the `types` module for a reference
+   * on all supported capabilities.
    */
   supports(capability: Capability) {
     return this.activeCapabilities.includes(capability)
@@ -144,8 +207,8 @@ export class LegacyTx
   }
 
   /**
-   * Computes the effective priority fee for this legacy transaction.
-   * @param baseFee - Optional base fee (not used in Frontier)
+   * Computes the effective priority fee for this legacy transaction, optionally considering a base fee.
+   * @param baseFee - Optional base fee used on networks that emulate 1559-style pricing
    * @returns Priority fee portion denominated in wei
    */
   getEffectivePriorityFee(baseFee?: bigint): bigint {
@@ -156,6 +219,14 @@ export class LegacyTx
    * Returns a Uint8Array Array of the raw Bytes of the legacy transaction, in order.
    *
    * Format: `[nonce, gasPrice, gasLimit, to, value, data, v, r, s]`
+   *
+   * For legacy txs this is also the correct format to add transactions
+   * to a block with {@link createBlockFromBytesArray} (use the `serialize()` method
+   * for typed txs).
+   *
+   * For an unsigned tx this method returns the empty Bytes values
+   * for the signature parameters `v`, `r` and `s`. For an EIP-155 compliant
+   * representation have a look at {@link Transaction.getMessageToSign}.
    */
   raw(): TxValuesArray {
     return [
@@ -175,6 +246,10 @@ export class LegacyTx
    * Returns the serialized encoding of the legacy transaction.
    *
    * Format: `rlp([nonce, gasPrice, gasLimit, to, value, data, v, r, s])`
+   *
+   * For an unsigned tx this method uses the empty Uint8Array values for the
+   * signature parameters `v`, `r` and `s` for encoding. For an EIP-155 compliant
+   * representation for external signing use {@link Transaction.getMessageToSign}.
    */
   serialize(): Uint8Array {
     return RLP.encode(this.raw())
@@ -184,11 +259,18 @@ export class LegacyTx
    * Returns the raw unsigned tx, which can be used
    * to sign the transaction (e.g. for sending to a hardware wallet).
    *
-   * For Frontier, this is just the first 6 fields: [nonce, gasPrice, gasLimit, to, value, data]
+   * Note: the raw message message format for the legacy tx is not RLP encoded
+   * and you might need to do yourself with:
+   *
+   * ```javascript
+   * import { RLP } from '@ts-ethereum/rlp'
+   * const message = tx.getMessageToSign()
+   * const serializedMessage = RLP.encode(message)) // use this for the HW wallet input
+   * ```
    * @returns Array representing the unsigned transaction fields
    */
   getMessageToSign(): Uint8Array[] {
-    return [
+    const message = [
       bigIntToUnpaddedBytes(this.nonce),
       bigIntToUnpaddedBytes(this.gasPrice),
       bigIntToUnpaddedBytes(this.gasLimit),
@@ -196,6 +278,14 @@ export class LegacyTx
       bigIntToUnpaddedBytes(this.value),
       this.data,
     ]
+
+    if (this.supports(Capability.EIP155ReplayProtection)) {
+      message.push(bigIntToUnpaddedBytes(this.common.chainId()))
+      message.push(unpadBytes(intToBytes(0)))
+      message.push(unpadBytes(intToBytes(0)))
+    }
+
+    return message
   }
 
   /**
@@ -215,6 +305,7 @@ export class LegacyTx
     return Legacy.getDataGas(this)
   }
 
+  // TODO figure out if this is necessary
   /**
    * If the tx's `to` is to the creation address
    */
@@ -224,11 +315,13 @@ export class LegacyTx
 
   /**
    * The minimum gas limit which the tx to have to be valid.
+   * This covers costs as the standard fee (21000 gas), the data fee (paid for each calldata byte),
+   * the optional creation fee (if the transaction creates a contract), and if relevant the gas
+   * to be paid for access lists (EIP-2930) and authority lists (EIP-7702).
    */
   getIntrinsicGas(): bigint {
     return Legacy.getIntrinsicGas(this)
   }
-
   /**
    * The up front amount that an account must have for this transaction to be valid
    */
@@ -248,8 +341,7 @@ export class LegacyTx
   }
 
   /**
-   * Computes a sha3-256 hash which can be used to verify the signature.
-   * Handles both pre-EIP-155 and EIP-155 signatures.
+   * Computes a sha3-256 hash which can be used to verify the signature
    * @returns Hash used when verifying the signature
    */
   getMessageToVerifySignature() {
@@ -257,7 +349,6 @@ export class LegacyTx
       const msg = Legacy.errorMsg(this, 'This transaction is not signed')
       throw EthereumJSErrorWithoutCode(msg)
     }
-
     // Detect if this is an EIP-155 signature by checking v value
     // Pre-EIP-155: v = 27 or 28
     // EIP-155: v = chainId * 2 + 35 or chainId * 2 + 36
@@ -274,8 +365,6 @@ export class LegacyTx
       ]
       return this.keccakFunction(RLP.encode(message))
     }
-
-    // Pre-EIP-155: just use the 6-element message
     return this.getHashedMessageToSign()
   }
 
@@ -289,22 +378,28 @@ export class LegacyTx
 
   /**
    * Adds a signature (or replaces an existing one) and returns a new transaction instance.
-   * @param v - Recovery parameter (0 or 1)
+   * @param v - Recovery parameter, potentially unconverted when `convertV` is false
    * @param r - `r` value of the signature
    * @param s - `s` value of the signature
-   * @param convertV - When true, converts the recovery ID into v=27 or v=28
+   * @param convertV - When true, converts the recovery ID into the appropriate legacy `v`
    * @returns A new `LegacyTx` that includes the provided signature
    */
   addSignature(
     v: bigint,
     r: Uint8Array | bigint,
     s: Uint8Array | bigint,
+    // convertV is `true` when called from `sign`
+    // This is used to convert the `v` output from `ecsign` (0 or 1) to the values used for legacy txs:
+    // 27 or 28 for non-EIP-155 protected txs
+    // 35 or 36 + chainId * 2 for EIP-155 protected txs
+    // See: https://eips.ethereum.org/EIPS/eip-155
     convertV = false,
   ): LegacyTx {
     r = toBytes(r)
     s = toBytes(s)
-    // For Frontier, v is simply 27 or 28
-    if (convertV) {
+    if (convertV && this.supports(Capability.EIP155ReplayProtection)) {
+      v += BigInt(35) + this.common.chainId() * BIGINT_2
+    } else if (convertV) {
       v += BigInt(27)
     }
 
@@ -331,6 +426,8 @@ export class LegacyTx
    * @returns JSON encoding of the transaction
    */
   toJSON(): JSONTx {
+    // TODO this is just copied. Make this execution-api compliant
+
     const baseJSON = getBaseJSON(this) as JSONTx
     baseJSON.gasPrice = bigIntToHex(this.gasPrice)
 

@@ -142,16 +142,7 @@ async function bootNode(
   const common = new Common({
     chain: testChainConfig,
     hardfork: Hardfork.Chainstart,
-    params: {
-      [12345]: {
-        minGasLimit: 5000,
-        gasLimitBoundDivisor: 1024,
-        maxExtraDataSize: 32,
-        minimumDifficulty: 1,
-        difficultyBoundDivisor: 2048,
-        durationLimit: 2,
-      },
-    },
+    eips: [1],
   })
 
   // Setup bootnodes
@@ -186,7 +177,7 @@ async function bootNode(
   const _accounts = configOptions.accounts ? [...configOptions.accounts] : []
   const config = new Config({
     ...configOptions,
-    minerPriorityAddresses: configOptions?.minerPriorityAddresses as any,
+    // minerPriorityAddresses: configOptions?.minerPriorityAddresses as any,
     bootnodes: _bootnodes as any,
     accounts: _accounts as any,
   })
@@ -201,6 +192,7 @@ async function bootNode(
   const databases = await initDatabases(dbPaths, nodeLogger)
   const genesisState = createGenesisState(accounts)
 
+  console.log('genesisState', genesisState)
   // Create blockchain
   const blockchain = await createBlockchain({
     db: new LevelDB(databases.chainDB),
@@ -557,7 +549,7 @@ async function checkTransactionProcessing(): Promise<{
       nonce,
       gasPrice: BigInt(2750000000),
       gas: BigInt(21000),
-      type: 'legacy',
+      // type: 'legacy',
     } as any)
 
     details.push(`Tx sent: ${truncateHex(txHash)}`)
