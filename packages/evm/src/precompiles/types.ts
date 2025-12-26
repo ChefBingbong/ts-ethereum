@@ -1,5 +1,5 @@
 import type { Common } from '@ts-ethereum/chain-config'
-import type { EVMInterface, ExecResult } from '../types.ts'
+import type { EVMInterface, ExecResult } from '../types'
 
 export interface PrecompileFunc {
   (input: PrecompileInput): Promise<ExecResult> | ExecResult

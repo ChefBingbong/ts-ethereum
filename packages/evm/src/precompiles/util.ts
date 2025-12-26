@@ -1,6 +1,6 @@
-import { short } from '@ethereumjs/util'
+import { short } from '@ts-ethereum/utils'
 
-import type { PrecompileInput } from './index.ts'
+import type { PrecompileInput } from './index'
 
 /**
  * Checks that the gas used remain under the gas limit.

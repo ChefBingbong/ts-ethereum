@@ -1,12 +1,12 @@
-import { short } from '@ethereumjs/util'
+import { short } from '@ts-ethereum/utils'
 
-import { OOGResult } from '../evm.ts'
+import { OOGResult } from '../evm'
 
-import { getPrecompileName } from './index.ts'
-import { gasLimitCheck } from './util.ts'
+import { getPrecompileName } from './index'
+import { gasLimitCheck } from './util'
 
-import type { ExecResult } from '../types.ts'
-import type { PrecompileInput } from './types.ts'
+import type { ExecResult } from '../types'
+import type { PrecompileInput } from './types'
 
 export function precompile04(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('04')

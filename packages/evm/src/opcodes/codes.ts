@@ -1,14 +1,14 @@
-import { Hardfork } from '@ethereumjs/common'
-import { EthereumJSErrorWithoutCode } from '@ethereumjs/util'
+import { Hardfork } from '@ts-ethereum/chain-config'
+import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 
-import { handlers } from './functions.ts'
-import { dynamicGasHandlers } from './gas.ts'
-import { getFullname } from './util.ts'
+import { handlers } from './functions'
+import { dynamicGasHandlers } from './gas'
+import { getFullname } from './util'
 
-import type { Common } from '@ethereumjs/common'
-import { type CustomOpcode, isAddOpcode } from '../types.ts'
-import type { OpHandler } from './functions.ts'
-import type { AsyncDynamicGasHandler, SyncDynamicGasHandler } from './gas.ts'
+import type { Common } from '@ts-ethereum/chain-config'
+import { type CustomOpcode, isAddOpcode } from '../types'
+import type { OpHandler } from './functions'
+import type { AsyncDynamicGasHandler, SyncDynamicGasHandler } from './gas'
 
 export class Opcode {
   readonly code: number

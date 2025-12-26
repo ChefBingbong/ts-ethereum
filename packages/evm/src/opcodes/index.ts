@@ -1,3 +1,4 @@
-export * from './codes.ts'
-export * from './functions.ts'
-export * from './util.ts'
+export * from './codes'
+export * from './functions'
+export * from './util'
+

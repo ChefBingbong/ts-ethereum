@@ -1,5 +1,5 @@
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
-import type { EVM } from '../evm.ts'
+import type { EVM } from '../evm'
 import {
   CODE_MIN,
   CODE_SIZE_MIN,
@@ -21,9 +21,9 @@ import {
   TYPE_MAX,
   TYPE_MIN,
   VERSION,
-} from './constants.ts'
-import { EOFErrorMessage, validationError } from './errors.ts'
-import { ContainerSectionType, verifyCode } from './verify.ts'
+} from './constants'
+import { EOFErrorMessage, validationError } from './errors'
+import { ContainerSectionType, verifyCode } from './verify'
 
 /*
   This file creates EOF Containers

@@ -1,7 +1,7 @@
-import type { EVM } from '../evm.ts'
-import type { EOFContainer } from './container.ts'
-import { EOFErrorMessage, validationError } from './errors.ts'
-import { stackDelta } from './stackDelta.ts'
+import type { EVM } from '../evm'
+import type { EOFContainer } from './container'
+import { EOFErrorMessage, validationError } from './errors'
+import { stackDelta } from './stackDelta'
 
 /**
  * Note for reviewers regarding these flags: these only reside inside `verify.ts` (this file)

@@ -1,4 +1,4 @@
-import { Hardfork } from '@ethereumjs/common'
+import { Hardfork } from '@ts-ethereum/chain-config'
 import {
   BIGINT_0,
   BIGINT_1,
@@ -9,15 +9,16 @@ import {
   bigIntToBytes,
   equalsBytes,
   setLengthLeft,
-} from '@ethereumjs/util'
+  type Address,
+} from '@ts-ethereum/utils'
 
-import { EOFErrorMessage } from '../eof/errors.ts'
-import { EVMError } from '../errors.ts'
-import { DELEGATION_7702_FLAG } from '../types.ts'
+import { EOFErrorMessage } from '../eof/errors'
+import { EVMError } from '../errors'
+import { DELEGATION_7702_FLAG } from '../types'
 
-import { updateSstoreGasEIP1283 } from './EIP1283.ts'
-import { updateSstoreGasEIP2200 } from './EIP2200.ts'
-import { accessAddressEIP2929, accessStorageEIP2929 } from './EIP2929.ts'
+import { updateSstoreGasEIP1283 } from './EIP1283'
+import { updateSstoreGasEIP2200 } from './EIP2200'
+import { accessAddressEIP2929, accessStorageEIP2929 } from './EIP2929'
 import {
   createAddressFromStackBigInt,
   divCeil,
@@ -26,11 +27,10 @@ import {
   subMemUsage,
   trap,
   updateSstoreGas,
-} from './util.ts'
+} from './util'
 
-import type { Common } from '@ethereumjs/common'
-import type { Address } from '@ethereumjs/util'
-import type { RunState } from '../interpreter.ts'
+import type { Common } from '@ts-ethereum/chain-config'
+import type { RunState } from '../interpreter'
 
 const EXTCALL_TARGET_MAX = BigInt(2) ** BigInt(8 * 20) - BigInt(1)
 

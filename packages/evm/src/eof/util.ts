@@ -1,7 +1,7 @@
-import { equalsBytes } from '@ethereumjs/util'
+import { equalsBytes } from '@ts-ethereum/utils'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 
-import { FORMAT, MAGIC } from './constants.ts'
+import { FORMAT, MAGIC } from './constants'
 
 export const EOFBYTES = new Uint8Array([FORMAT, MAGIC])
 export const EOFHASH = keccak_256(EOFBYTES)

@@ -25,13 +25,13 @@ import {
   concatBytes,
   setLengthLeft,
   setLengthRight,
-} from '@ethereumjs/util'
+} from '@ts-ethereum/utils'
 import { keccak_256 } from '@noble/hashes/sha3.js'
 
-import { EOFContainer, EOFContainerMode } from '../eof/container.ts'
-import { EOFErrorMessage } from '../eof/errors.ts'
-import { EOFBYTES, EOFHASH, isEOF } from '../eof/util.ts'
-import { EVMError } from '../errors.ts'
+import { EOFContainer, EOFContainerMode } from '../eof/container'
+import { EOFErrorMessage } from '../eof/errors'
+import { EOFBYTES, EOFHASH, isEOF } from '../eof/util'
+import { EVMError } from '../errors'
 
 import {
   createAddressFromStackBigInt,
@@ -44,10 +44,10 @@ import {
   toTwos,
   trap,
   writeCallOutput,
-} from './util.ts'
+} from './util'
 
-import type { Common } from '@ethereumjs/common'
-import type { RunState } from '../interpreter.ts'
+import type { Common } from '@ts-ethereum/chain-config'
+import type { RunState } from '../interpreter'
 
 export interface SyncOpHandler {
   (runState: RunState, common: Common): void
