@@ -79,3 +79,4 @@ export const leading16ZeroBytesCheck = (
   }
   return true
 }
+

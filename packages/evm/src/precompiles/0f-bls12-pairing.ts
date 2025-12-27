@@ -83,3 +83,4 @@ export async function precompile0f(opts: PrecompileInput): Promise<ExecResult> {
     returnValue,
   }
 }
+

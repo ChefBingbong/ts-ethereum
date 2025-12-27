@@ -9,3 +9,4 @@ sed -i "s|#EXECUTION_CLIENT_URL|${EXECUTION_CLIENT_URL}|g" /etc/prometheus/prome
 # Execute prometheus with all arguments
 exec /bin/prometheus "$@"
 
+

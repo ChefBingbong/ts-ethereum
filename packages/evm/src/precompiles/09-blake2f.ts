@@ -244,3 +244,4 @@ export function precompile09(opts: PrecompileInput): ExecResult {
     returnValue: output,
   }
 }
+

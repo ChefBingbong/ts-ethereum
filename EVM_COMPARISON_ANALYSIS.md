@@ -344,3 +344,4 @@ The most critical issue is the **hardcoded `from` address** in `call.ts`. This i
 
 The return value handling logic itself appears identical between both implementations, so the issue is likely in the execution path before the return value is set.
 
+

@@ -48,3 +48,4 @@ echo ""
 echo "Make sure your execution client is running and exposing metrics on port 9400"
 echo "To stop: docker-compose down"
 
+

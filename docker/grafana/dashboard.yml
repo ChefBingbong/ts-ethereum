@@ -12,3 +12,4 @@ providers:
       path: ${DASHBOARDS_DIR}
       foldersFromFilesStructure: true
 
+

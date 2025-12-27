@@ -283,3 +283,4 @@ export const BLS_GAS_DISCOUNT_PAIRS_G2: [number, number][] = [
   [127, 524],
   [128, 524],
 ]
+

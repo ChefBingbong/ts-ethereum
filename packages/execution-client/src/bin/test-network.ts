@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { existsSync, rmSync } from 'node:fs'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import type { ChainConfig } from '@ts-ethereum/chain-config'
 import {
@@ -10,6 +9,7 @@ import {
 } from '@ts-ethereum/chain-config'
 import { getDbPaths, initDatabases } from '@ts-ethereum/db'
 import debug from 'debug'
+import { existsSync, rmSync } from 'node:fs'
 import { Config, createConfigOptions } from '../config/index'
 import { LevelDB } from '../execution/level'
 import { getLogger, type Logger } from '../logging'
@@ -49,8 +49,6 @@ export const customChainConfig: ChainConfig = {
     { name: 'homestead', block: 0 },
     { name: 'dao', block: 0 },
     { name: 'tangerineWhistle', block: 0 },
-    { name: 'spuriousDragon', block: 0 },
-    { name: 'byzantium', block: 0 },
   ],
   bootstrapNodes: [],
 }
