@@ -1,4 +1,4 @@
-import { Common, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
 import {
   Address,
   bigIntToHex,
@@ -21,12 +21,12 @@ import type {
 } from '../types'
 
 /**
- * Gets a Common instance, creating a new one if none provided
- * @param common - Optional Common instance
- * @returns Common instance (copied if provided, new Mainnet instance if not)
+ * Gets a GlobalConfig instance, creating a new one if none provided
+ * @param common - Optional GlobalConfig instance
+ * @returns GlobalConfig instance (copied if provided, new Mainnet instance if not)
  */
-export function getCommon(common?: Common): Common {
-  return common?.copy() ?? new Common({ chain: Mainnet })
+export function getCommon(common?: GlobalConfig): GlobalConfig {
+  return common?.copy() ?? new GlobalConfig({ chain: Mainnet })
 }
 
 /**
@@ -68,7 +68,7 @@ export function validateNotArray(values: { [key: string]: any }) {
   }
 }
 
-function checkMaxInitCodeSize(common: Common, length: number) {
+function checkMaxInitCodeSize(common: GlobalConfig, length: number) {
   const maxInitCodeSize = common.param('maxInitCodeSize')
   if (maxInitCodeSize && BigInt(length) > maxInitCodeSize) {
     throw EthereumJSErrorWithoutCode(

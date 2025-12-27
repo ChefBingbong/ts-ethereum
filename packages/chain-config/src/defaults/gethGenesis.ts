@@ -121,7 +121,7 @@ export type AccountState = [
 ]
 
 /**
- * If you are using a custom chain {@link Common}, pass the genesis state.
+ * If you are using a custom chain {@link GlobalConfig}, pass the genesis state.
  *
  * Pattern 1 (with genesis state see {@link GenesisState} for format):
  *

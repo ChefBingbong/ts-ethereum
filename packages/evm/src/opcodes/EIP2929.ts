@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { BIGINT_0 } from '@ts-ethereum/utils'
 import type { RunState } from '../interpreter'
 
@@ -8,14 +8,14 @@ import type { RunState } from '../interpreter'
  * is warm/cold. (EIP 2929)
  * @param {RunState} runState
  * @param {Address}  address
- * @param {Common}   common
+ * @param {GlobalConfig}   common
  * @param {Boolean}  chargeGas (default: true)
  * @param {Boolean}  isSelfdestruct (default: false)
  */
 export function accessAddressEIP2929(
   runState: RunState,
   address: Uint8Array,
-  common: Common,
+  common: GlobalConfig,
   chargeGas = true,
   isSelfdestruct = false,
 ): bigint {
@@ -48,13 +48,13 @@ export function accessAddressEIP2929(
  * is warm/cold. (EIP 2929)
  * @param {RunState} runState
  * @param {Uint8Array} key (to storage slot)
- * @param {Common} common
+ * @param {GlobalConfig} common
  */
 export function accessStorageEIP2929(
   runState: RunState,
   key: Uint8Array,
   isSstore: boolean,
-  common: Common,
+  common: GlobalConfig,
   chargeGas = true,
 ): bigint {
   if (!common.isActivatedEIP(2929)) return BIGINT_0
@@ -87,7 +87,7 @@ export function accessStorageEIP2929(
  * @param  {Uint8Array}   key          storage slot
  * @param  {BigInt}   defaultCost  SSTORE_RESET_GAS / SLOAD
  * @param  {string}   costName     parameter name ('noop')
- * @param  {Common}   common
+ * @param  {GlobalConfig}   common
  * @return {BigInt}                adjusted cost
  */
 export function adjustSstoreGasEIP2929(
@@ -95,7 +95,7 @@ export function adjustSstoreGasEIP2929(
   key: Uint8Array,
   defaultCost: bigint,
   costName: string,
-  common: Common,
+  common: GlobalConfig,
 ): bigint {
   if (!common.isActivatedEIP(2929)) return defaultCost
 

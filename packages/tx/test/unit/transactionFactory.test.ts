@@ -1,4 +1,4 @@
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import { hexToBytes } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
 
@@ -11,7 +11,7 @@ import {
   TransactionType,
 } from '../../src/index'
 
-const common = new Common({
+const common = new GlobalConfig({
   chain: Mainnet,
   hardfork: Hardfork.Chainstart,
 })

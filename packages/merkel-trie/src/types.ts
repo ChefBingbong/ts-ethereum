@@ -108,7 +108,7 @@ export interface MPTOpts {
   cacheSize?: number
 
   /**
-   * @ethereumjs/common `Common` instance (an alternative to passing in a `customHashingFunction`)
+   * @ethereumjs/common `GlobalConfig` instance (an alternative to passing in a `customHashingFunction`)
    */
   common?: CommonInterface
 }

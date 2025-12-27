@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js'
 import type { Block } from '@ts-ethereum/block'
 import { createBlock, genRequestsRoot } from '@ts-ethereum/block'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
 import type { EVM, EVMInterface } from '@ts-ethereum/evm'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
@@ -23,8 +23,8 @@ import {
   bytesToHex,
   concatBytes,
   createAddressFromString,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   GWEI_TO_WEI,
   hexToBytes,
   intToBytes,
@@ -792,7 +792,7 @@ export async function rewardAccount(
   evm: EVMInterface,
   address: Address,
   reward: bigint,
-  common: Common,
+  common: GlobalConfig,
 ): Promise<Account> {
   let account = await evm.stateManager.getAccount(address)
   if (account === undefined) {

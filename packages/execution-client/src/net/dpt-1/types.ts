@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { NestedUint8Array } from '@ts-ethereum/rlp'
 import type { Socket } from 'net'
 import type { EthMessageCodes } from '../protocol/eth/eth'
@@ -134,9 +134,9 @@ export interface DPTOptions {
   onlyConfirmed?: boolean
 
   /**
-   * Common instance to allow for crypto primitive (e.g. keccak) replacement
+   * GlobalConfig instance to allow for crypto primitive (e.g. keccak) replacement
    */
-  common?: Common
+  common?: GlobalConfig
 }
 
 export interface DPTServerOptions {
@@ -162,9 +162,9 @@ export interface DPTServerOptions {
   createSocket?: Function
 
   /**
-   * Common instance to allow for crypto primitive (e.g. keccak) replacement
+   * GlobalConfig instance to allow for crypto primitive (e.g. keccak) replacement
    */
-  common?: Common
+  common?: GlobalConfig
 }
 
 export type ProtocolType = (typeof ProtocolType)[keyof typeof ProtocolType]
@@ -225,7 +225,7 @@ export interface Contact extends PeerInfo {
 export interface PeerOptions {
   clientId: Uint8Array
   capabilities?: Capabilities[]
-  common: Common
+  common: GlobalConfig
   port: number
   id: Uint8Array
   remoteClientIdFilter?: string[]
@@ -245,7 +245,7 @@ export interface RLPxOptions {
   maxPeers?: number
   remoteClientIdFilter?: string[]
   capabilities: Capabilities[]
-  common: Common
+  common: GlobalConfig
   listenPort?: number | null
 }
 

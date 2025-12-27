@@ -1,4 +1,8 @@
-import type { Common, Hardfork, ParamsDict } from '@ts-ethereum/chain-config'
+import type {
+  GlobalConfig,
+  Hardfork,
+  ParamsDict,
+} from '@ts-ethereum/chain-config'
 import type {
   Address,
   AddressLike,
@@ -57,16 +61,16 @@ export const Capability = {
  */
 export interface TxOptions {
   /**
-   * A {@link Common} object defining the chain and hardfork for the transaction.
+   * A {@link GlobalConfig} object defining the chain and hardfork for the transaction.
    *
    * Object will be internally copied so that tx behavior don't incidentally
    * change on future HF changes.
    *
-   * Default: {@link Common} object set to `mainnet` and the default hardfork as defined in the {@link Common} class.
+   * Default: {@link GlobalConfig} object set to `mainnet` and the default hardfork as defined in the {@link GlobalConfig} class.
    *
    * Current default hardfork: `istanbul`
    */
-  common?: Common
+  common?: GlobalConfig
   /**
    * Tx parameters sorted by EIP can be found in the exported `paramsTx` dictionary,
    * which is internally passed to the associated `@ethereumjs/common` instance which
@@ -217,7 +221,7 @@ export function isEOACode7702Tx(tx: TypedTransaction): tx is EOACode7702Tx {
 export interface TransactionInterface<
   T extends TransactionType = TransactionType,
 > {
-  readonly common: Common
+  readonly common: GlobalConfig
   readonly nonce: bigint
   readonly gasLimit: bigint
   readonly to?: Address

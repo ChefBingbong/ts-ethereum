@@ -1,4 +1,4 @@
-import { type Common, ConsensusType } from '@ts-ethereum/chain-config'
+import { ConsensusType, type GlobalConfig } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -11,8 +11,8 @@ import {
 import {
   BIGINT_0,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   type Withdrawal,
@@ -63,7 +63,7 @@ export class Block {
   public readonly transactions: TypedTransaction[] = []
   public readonly uncleHeaders: BlockHeader[] = []
   public readonly withdrawals?: Withdrawal[]
-  public readonly common: Common
+  public readonly common: GlobalConfig
   protected keccakFunction: (msg: Uint8Array) => Uint8Array
   protected sha256Function: (msg: Uint8Array) => Uint8Array
 

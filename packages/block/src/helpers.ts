@@ -1,5 +1,5 @@
 import { concatBytes } from '@noble/hashes/utils.js'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import { Blob4844Tx, type TypedTransaction } from '@ts-ethereum/tx'
@@ -14,8 +14,8 @@ import {
   BIGINT_1,
   EthereumJSErrorWithoutCode,
   isHexString,
-  TypeOutput,
   toType,
+  TypeOutput,
 } from '@ts-ethereum/utils'
 import type { BlockHeaderBytes, HeaderData } from './types'
 
@@ -156,7 +156,10 @@ export const fakeExponential = (
  * @param excessBlobGas
  * @param common
  */
-export const computeBlobGasPrice = (excessBlobGas: bigint, common: Common) => {
+export const computeBlobGasPrice = (
+  excessBlobGas: bigint,
+  common: GlobalConfig,
+) => {
   return fakeExponential(
     common.param('minBlobGas'),
     excessBlobGas,

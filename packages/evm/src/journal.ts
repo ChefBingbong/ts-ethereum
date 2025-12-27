@@ -1,4 +1,7 @@
-import type { Common, StateManagerInterface } from '@ts-ethereum/chain-config'
+import type {
+  GlobalConfig,
+  StateManagerInterface,
+} from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { Account, PrefixedHexString } from '@ts-ethereum/utils'
 import {
@@ -37,7 +40,7 @@ type JournalHeight = number
 
 export class Journal {
   private stateManager: StateManagerInterface
-  private common: Common
+  private common: GlobalConfig
   private DEBUG: boolean
   private _debug: Debugger
 
@@ -51,7 +54,7 @@ export class Journal {
   public accessList?: Map<AddressString, Set<SlotString>>
   public preimages?: Map<PrefixedHexString, Uint8Array>
 
-  constructor(stateManager: StateManagerInterface, common: Common) {
+  constructor(stateManager: StateManagerInterface, common: GlobalConfig) {
     // Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
     // Additional window check is to prevent vite browser bundling (and potentially other) to break
     this.DEBUG =

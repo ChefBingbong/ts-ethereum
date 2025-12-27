@@ -1,12 +1,6 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { type Address, bytesToUnprefixedHex } from '@ts-ethereum/utils'
-import { precompile0a } from './0a-kzg-point-evaluation'
-import { precompile0b } from './0b-bls12-g1add'
-import { precompile0c } from './0c-bls12-g1msm'
-import { precompile0d } from './0d-bls12-g2add'
-import { precompile0e } from './0e-bls12-g2msm'
-import { precompile0f } from './0f-bls12-pairing'
 import { precompile01 } from './01-ecrecover'
 import { precompile02 } from './02-sha256'
 import { precompile03 } from './03-ripemd160'
@@ -16,9 +10,15 @@ import { precompile06 } from './06-bn254-add'
 import { precompile07 } from './07-bn254-mul'
 import { precompile08 } from './08-bn254-pairing'
 import { precompile09 } from './09-blake2f'
+import { precompile0a } from './0a-kzg-point-evaluation'
+import { precompile0b } from './0b-bls12-g1add'
+import { precompile0c } from './0c-bls12-g1msm'
+import { precompile0d } from './0d-bls12-g2add'
+import { precompile0e } from './0e-bls12-g2msm'
+import { precompile0f } from './0f-bls12-pairing'
 import { precompile10 } from './10-bls12-map-fp-to-g1'
-import { precompile11 } from './11-bls12-map-fp2-to-g2'
 import { precompile100 } from './100-p256verify'
+import { precompile11 } from './11-bls12-map-fp2-to-g2'
 import { MCLBLS, NobleBLS } from './bls12_381/index'
 import { NobleBN254, RustBN254 } from './bn254/index'
 import type { PrecompileFunc, PrecompileInput } from './types'
@@ -256,7 +256,7 @@ type AddPrecompile = {
 type CustomPrecompile = AddPrecompile | DeletePrecompile
 
 function getActivePrecompiles(
-  common: Common,
+  common: GlobalConfig,
   customPrecompiles?: CustomPrecompile[],
 ): Map<string, PrecompileFunc> {
   const precompileMap = new Map()

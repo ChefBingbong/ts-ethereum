@@ -5,7 +5,7 @@ import type {
   StorageDump,
   StorageRange,
 } from '@ts-ethereum/chain-config'
-import { Common, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address, DB } from '@ts-ethereum/utils'
@@ -16,8 +16,8 @@ import {
   createAccount,
   createAccountFromRLP,
   createAddressFromString,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   short,
   toBytes,
@@ -68,7 +68,7 @@ export class MerkleStateManager implements StateManagerInterface {
   protected readonly _prefixCodeHashes: boolean
   protected readonly _prefixStorageTrieKeys: boolean
 
-  public readonly common: Common
+  public readonly common: GlobalConfig
 
   protected _checkpointCount: number
 
@@ -97,7 +97,7 @@ export class MerkleStateManager implements StateManagerInterface {
 
     this._debug = debugDefault('statemanager:merkle')
 
-    this.common = opts.common ?? new Common({ chain: Mainnet })
+    this.common = opts.common ?? new GlobalConfig({ chain: Mainnet })
 
     this._checkpointCount = 0
 

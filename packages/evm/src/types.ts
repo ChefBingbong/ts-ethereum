@@ -1,6 +1,6 @@
 import type {
   BinaryTreeAccessWitnessInterface,
-  Common,
+  GlobalConfig,
   ParamsDict,
   StateManagerInterface,
 } from '@ts-ethereum/chain-config'
@@ -164,7 +164,7 @@ export type EVMEvent = {
 }
 
 export interface EVMInterface {
-  common: Common
+  common: GlobalConfig
   journal: {
     commit(): Promise<void>
     revert(): Promise<void>
@@ -203,7 +203,7 @@ export type EVMProfilerOpts = {
  */
 export interface EVMOpts {
   /**
-   * Use a {@link Common} instance for EVM instantiation.
+   * Use a {@link GlobalConfig} instance for EVM instantiation.
    *
    * ### Supported EIPs
    *
@@ -249,7 +249,7 @@ export interface EVMOpts {
    *
    * - `experimental`: behaviour can change on patch versions
    */
-  common?: Common
+  common?: GlobalConfig
 
   /**
    * Allows unlimited contract sizes while debugging. By setting this to `true`, the check for
@@ -297,7 +297,7 @@ export interface EVMOpts {
    *    // The base fee of the opcode
    *    baseFee: number
    *    // If the opcode charges dynamic gas, add this here. To charge the gas, use the `i` methods of the BN, to update the charged gas
-   *    gasFunction?: function(runState: RunState, gas: BN, common: Common)
+   *    gasFunction?: function(runState: RunState, gas: BN, common: GlobalConfig)
    *    // The logic of the opcode which holds the logic of changing the current state
    *    logicFunction: function(runState: RunState)
    * }

@@ -1,11 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
-  Common,
   enodeToDPTPeerInfo,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   initPrivateKey,
   readAccounts,
@@ -27,6 +25,8 @@ import {
   genPrivateKey,
   hexToBytes,
 } from '@ts-ethereum/utils'
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import type { GlobalArgs } from '../../options/globalOptions.js'
 import type { NodeArgs } from './options.js'
 
@@ -255,9 +255,9 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
 
   const account = accounts[0]
 
-  // Create Common
+  // Create GlobalConfig
   const testChainConfig = createTestChainConfig(chainId)
-  const common = new Common({
+  const common = new GlobalConfig({
     chain: testChainConfig,
     hardfork: Hardfork.Chainstart,
   })

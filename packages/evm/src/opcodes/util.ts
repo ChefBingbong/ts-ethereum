@@ -1,14 +1,14 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
   BIGINT_1,
+  BIGINT_160,
   BIGINT_2,
   BIGINT_32,
   BIGINT_64,
-  BIGINT_160,
   BIGINT_NEG1,
   bytesToHex,
   createAddressFromBigInt,
@@ -192,7 +192,7 @@ export function maxCallGas(
   gasLimit: bigint,
   gasLeft: bigint,
   runState: RunState,
-  common: Common,
+  common: GlobalConfig,
 ): bigint {
   if (common.gteHardfork(Hardfork.TangerineWhistle)) {
     const gasAllowed = gasLeft - gasLeft / BIGINT_64
@@ -209,7 +209,7 @@ export function subMemUsage(
   runState: RunState,
   offset: bigint,
   length: bigint,
-  common: Common,
+  common: GlobalConfig,
 ) {
   // YP (225): access with zero length will not extend the memory
   if (length === BIGINT_0) return BIGINT_0
@@ -262,7 +262,7 @@ export function updateSstoreGas(
   runState: RunState,
   currentStorage: Uint8Array,
   value: Uint8Array,
-  common: Common,
+  common: GlobalConfig,
 ): bigint {
   if (
     (value.length === 0 && currentStorage.length === 0) ||

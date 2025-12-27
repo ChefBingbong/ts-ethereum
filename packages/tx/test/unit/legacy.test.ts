@@ -1,4 +1,4 @@
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   bytesToBigInt,
@@ -58,7 +58,7 @@ describe('[Transaction]', () => {
   })
 
   it('Initialization', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -183,7 +183,7 @@ describe('[Transaction]', () => {
   })
 
   it('hash() / getHashedMessageToSign() / getMessageToSign()', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -295,13 +295,13 @@ describe('[Transaction]', () => {
   })
 
   it('common propagates from the common of tx, not the common in TxOptions', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
     const pkey = hexToBytes(`0x${txsData[0].privateKey}`)
     const txn = createLegacyTx({}, { common, freeze: false })
-    const newCommon = new Common({
+    const newCommon = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })

@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type {
   Address,
   EOACode7702AuthorizationListBytes,
@@ -8,9 +8,9 @@ import {
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
-  EthereumJSErrorWithoutCode,
   eoaCode7702AuthorizationListBytesItemToJSON,
   eoaCode7702AuthorizationListJSONItemToBytes,
+  EthereumJSErrorWithoutCode,
   isEOACode7702AuthorizationList,
   MAX_INTEGER,
   toBytes,
@@ -74,7 +74,7 @@ export class EOACode7702Tx
 
   // End of Tx data part
 
-  public readonly common!: Common
+  public readonly common!: GlobalConfig
 
   readonly txOptions!: TxOptions
 
@@ -115,13 +115,13 @@ export class EOACode7702Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
     if (!this.common.isActivatedEIP(7702)) {
-      throw EthereumJSErrorWithoutCode('EIP-7702 not enabled on Common')
+      throw EthereumJSErrorWithoutCode('EIP-7702 not enabled on GlobalConfig')
     }
     this.activeCapabilities = this.activeCapabilities.concat([
       1559, 2718, 2930, 7702,

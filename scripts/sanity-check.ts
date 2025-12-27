@@ -1,19 +1,19 @@
 #!/usr/bin/env bun
 
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
-  Common,
   enodeToDPTPeerInfo,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   readAccounts,
   readPrivateKey,
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import {
   createWalletClient,
   defineChain,
@@ -138,8 +138,8 @@ async function bootNode(
   const accountIndex = port === NODE1_PORT ? 0 : 1
   const account = accounts[accountIndex]
 
-  // Create Common
-  const common = new Common({
+  // Create GlobalConfig
+  const common = new GlobalConfig({
     chain: testChainConfig,
     hardfork: Hardfork.Chainstart,
     eips: [1],

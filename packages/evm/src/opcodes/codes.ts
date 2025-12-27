@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 import { type CustomOpcode, isAddOpcode } from '../types'
@@ -424,12 +424,12 @@ export type OpcodeMap = OpcodeMapEntry[]
 /**
  * Get suitable opcodes for the required hardfork.
  *
- * @param common {Common} Ethereumjs Common metadata object.
+ * @param common {GlobalConfig} Ethereumjs GlobalConfig metadata object.
  * @param customOpcodes List with custom opcodes (see EVM `customOpcodes` option description).
  * @returns {OpcodeList} Opcodes dictionary object.
  */
 export function getOpcodesForHF(
-  common: Common,
+  common: GlobalConfig,
   customOpcodes?: CustomOpcode[],
 ): OpcodeContext {
   let opcodeBuilder: any = { ...opcodes }

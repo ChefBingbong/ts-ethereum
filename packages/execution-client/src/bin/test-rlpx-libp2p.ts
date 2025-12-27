@@ -2,7 +2,7 @@
 
 import { generateKeyPair } from '@libp2p/crypto/keys'
 import { multiaddr } from '@multiformats/multiaddr'
-import { Common } from '@ts-ethereum/chain-config'
+import { GlobalConfig } from '@ts-ethereum/chain-config'
 import { RLPxConnectionAdapter, rlpxLibp2p } from '@ts-ethereum/p2p'
 import { bigIntToBytes } from '@ts-ethereum/utils'
 import debug from 'debug'
@@ -82,8 +82,8 @@ export async function runTwoNodeExample(): Promise<void> {
   const node2RlpxKey =
     node2Key.raw.length === 32 ? node2Key.raw : node2Key.raw.slice(-32)
 
-  // Setup Common
-  const common = new Common({
+  // Setup GlobalConfig
+  const common = new GlobalConfig({
     chain: {
       name: 'testnet',
       chainId: 1,

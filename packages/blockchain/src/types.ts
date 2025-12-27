@@ -1,8 +1,8 @@
 import type { Block, BlockHeader } from '@ts-ethereum/block'
 import type {
-  Common,
   ConsensusAlgorithm,
   GenesisState,
+  GlobalConfig,
 } from '@ts-ethereum/chain-config'
 import type { DB, DBObject } from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
@@ -109,7 +109,7 @@ export interface GenesisOptions {
   genesisBlock?: Block
 
   /**
-   * If you are using a custom chain {@link Common}, pass the genesis state.
+   * If you are using a custom chain {@link GlobalConfig}, pass the genesis state.
    *
    * Pattern 1 (with genesis state see {@link GenesisState} for format):
    *
@@ -149,12 +149,12 @@ export type ConsensusDict = {
  */
 export interface BlockchainOptions extends GenesisOptions {
   /**
-   * Specify the chain and hardfork by passing a {@link Common} instance.
+   * Specify the chain and hardfork by passing a {@link GlobalConfig} instance.
    *
    * If not provided this defaults to chain `mainnet` and hardfork `chainstart`
    *
    */
-  common?: Common
+  common?: GlobalConfig
 
   /**
    * Set the HF to the fork determined by the head block and update on head updates.
@@ -163,7 +163,7 @@ export interface BlockchainOptions extends GenesisOptions {
    * threshold (merge HF) the calculated TD is additionally taken into account
    * for HF determination.
    *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link Common} instance)
+   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
    */
   hardforkByHeadBlockNumber?: boolean
 
@@ -212,7 +212,7 @@ export interface BlockchainOptions extends GenesisOptions {
    * ```
    *
    * Additionally it is possible to provide a fully custom consensus implementation.
-   * Note that this needs a custom `Common` object passed to the blockchain where
+   * Note that this needs a custom `GlobalConfig` object passed to the blockchain where
    * the `ConsensusAlgorithm` string matches the string used here.
    */
   consensusDict?: ConsensusDict

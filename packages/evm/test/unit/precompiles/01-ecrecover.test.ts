@@ -1,5 +1,5 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import {
   bytesToHex,
   bytesToUnprefixedHex,
@@ -24,7 +24,10 @@ describe('Precompiles: ECRECOVER', () => {
   it('ECRECOVER', async () => {
     // Test reference: https://github.com/ethereum/go-ethereum/issues/3731#issuecomment-293866868
 
-    const common = new Common({ chain: Mainnet, hardfork: Hardfork.Petersburg })
+    const common = new GlobalConfig({
+      chain: Mainnet,
+      hardfork: Hardfork.Petersburg,
+    })
     const evm = await createEVM({
       common,
     })

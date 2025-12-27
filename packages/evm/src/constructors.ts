@@ -1,4 +1,4 @@
-import { Common, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import { SimpleStateManager } from '@ts-ethereum/state-manager'
 import type { EVMOpts } from './index'
 import { EVM } from './index'
@@ -18,7 +18,10 @@ export async function createEVM(createOpts?: EVMOpts) {
   opts.bn254 = new NobleBN254()
 
   if (opts.common === undefined) {
-    opts.common = new Common({ chain: Mainnet })
+    opts.common = new GlobalConfig({
+      chain: Mainnet,
+      hardfork: Hardfork.Prague,
+    })
   }
 
   if (opts.blockchain === undefined) {

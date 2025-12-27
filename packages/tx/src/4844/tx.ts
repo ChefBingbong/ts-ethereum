@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
@@ -10,9 +10,9 @@ import {
   hexToBytes,
   intToUnpaddedBytes,
   MAX_INTEGER,
-  TypeOutput,
   toBytes,
   toType,
+  TypeOutput,
 } from '@ts-ethereum/utils'
 import * as EIP1559 from '../capabilities/eip1559'
 import * as EIP2718 from '../capabilities/eip2718'
@@ -98,7 +98,7 @@ export class Blob4844Tx
   kzgCommitments?: PrefixedHexString[] // EIP-4844 + EIP-7594
   kzgProofs?: PrefixedHexString[] // EIP-4844: per-Blob proofs, EIP-7594: per-Cell proofs
 
-  public readonly common!: Common
+  public readonly common!: GlobalConfig
 
   readonly txOptions!: TxOptions
 
@@ -134,7 +134,7 @@ export class Blob4844Tx
         case NetworkWrapperType.EIP7594:
           if (!common.isActivatedEIP(7594)) {
             throw EthereumJSErrorWithoutCode(
-              'EIP-7594 not enabled on Common for EIP-7594 network wrapper version',
+              'EIP-7594 not enabled on GlobalConfig for EIP-7594 network wrapper version',
             )
           }
           break
@@ -142,7 +142,7 @@ export class Blob4844Tx
         case NetworkWrapperType.EIP4844:
           if (common.isActivatedEIP(7594)) {
             throw EthereumJSErrorWithoutCode(
-              'EIP-7594 is active on Common for EIP-4844 network wrapper version',
+              'EIP-7594 is active on GlobalConfig for EIP-4844 network wrapper version',
             )
           }
           break
@@ -173,17 +173,17 @@ export class Blob4844Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
     if (!this.common.isActivatedEIP(1559)) {
-      throw EthereumJSErrorWithoutCode('EIP-1559 not enabled on Common')
+      throw EthereumJSErrorWithoutCode('EIP-1559 not enabled on GlobalConfig')
     }
 
     if (!this.common.isActivatedEIP(4844)) {
-      throw EthereumJSErrorWithoutCode('EIP-4844 not enabled on Common')
+      throw EthereumJSErrorWithoutCode('EIP-4844 not enabled on GlobalConfig')
     }
     this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930])
 

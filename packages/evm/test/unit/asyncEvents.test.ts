@@ -1,4 +1,4 @@
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import {
   Address,
   createAddressFromBigInt,
@@ -13,7 +13,7 @@ describe('async events', () => {
     const caller = new Address(
       hexToBytes('0x00000000000000000000000000000000000000ee'),
     )
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Constantinople,
     })

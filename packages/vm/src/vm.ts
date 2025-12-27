@@ -1,4 +1,7 @@
-import type { Common, StateManagerInterface } from '@ts-ethereum/chain-config'
+import type {
+  GlobalConfig,
+  StateManagerInterface,
+} from '@ts-ethereum/chain-config'
 import type { EVMInterface, EVMMockBlockchainInterface } from '@ts-ethereum/evm'
 import { createEVM } from '@ts-ethereum/evm'
 import type { BigIntLike } from '@ts-ethereum/utils'
@@ -26,7 +29,7 @@ export class VM {
    */
   readonly blockchain: EVMMockBlockchainInterface
 
-  readonly common: Common
+  readonly common: GlobalConfig
 
   readonly events: EventEmitter<VMEvent>
   /**

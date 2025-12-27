@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
 import { type Multiaddr, multiaddr } from '@multiformats/multiaddr'
 import { bytesToUnprefixedHex, hexToBytes } from '@ts-ethereum/utils'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 // import type { PeerInfo } from '../kademlia/types'
-import { getNodeId } from './setup/keys'
+import { getNodeId } from '../setup/keys'
 
 type PeerInfo = {
   id?: Uint8Array

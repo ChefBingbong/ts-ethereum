@@ -309,7 +309,7 @@ function parseGethParams(gethGenesis: GethGenesis) {
 }
 
 /**
- * Parses a genesis object exported from Geth into parameters for Common instance
+ * Parses a genesis object exported from Geth into parameters for GlobalConfig instance
  * @param gethGenesis GethGenesis object
  * @param name optional chain name
  * @returns parsed params

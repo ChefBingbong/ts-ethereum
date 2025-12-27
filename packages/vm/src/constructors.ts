@@ -1,4 +1,4 @@
-import { Common, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
 import {
   createEVM,
   EVMMockBlockchain,
@@ -26,7 +26,7 @@ export async function createVM(opts: VMOpts = {}): Promise<VM> {
 
   // Add common, SM, blockchain, EVM here
   if (opts.common === undefined) {
-    opts.common = new Common({ chain: Mainnet })
+    opts.common = new GlobalConfig({ chain: Mainnet })
   }
 
   if (opts.stateManager === undefined) {

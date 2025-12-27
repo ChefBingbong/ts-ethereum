@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import {
   defaultMetricsOptions,
@@ -52,7 +52,7 @@ export interface ResolvedConfigOptions {
   readonly savePreimages: boolean
   readonly metrics?: MetricsOptions
   readonly rateLimit?: import('../rpc/rate-limit/types').RateLimitOptions
-  readonly common: Common
+  readonly common: GlobalConfig
   readonly logger?: Logger
 }
 
@@ -60,7 +60,7 @@ export interface ResolvedConfigOptions {
  * Create config options with all defaults applied
  */
 export function createConfigFromDefaults(
-  common: Common,
+  common: GlobalConfig,
 ): ResolvedConfigOptions {
   return {
     syncmode: constants.SYNCMODE_DEFAULT,

@@ -1,7 +1,7 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import type {
   AccountFields,
-  Common,
+  GlobalConfig,
   StateManagerInterface,
 } from '@ts-ethereum/chain-config'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
@@ -39,7 +39,7 @@ export class SimpleStateManager implements StateManagerInterface {
     clear(): void
   }
 
-  public readonly common?: Common
+  public readonly common?: GlobalConfig
 
   constructor(opts: SimpleStateManagerOpts = {}) {
     this.checkpointSync()

@@ -8,7 +8,7 @@ import type { FullSynchronizer } from '../sync/index'
 import type { TxPool } from './txpool'
 
 /**
- * Common interface for execution node
+ * GlobalConfig interface for execution node
  * @deprecated Use ExecutionNode directly
  */
 export interface IFullEthereumService {

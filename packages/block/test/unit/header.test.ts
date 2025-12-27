@@ -1,4 +1,4 @@
-import { Common, Hardfork } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   bytesToHex,
@@ -49,7 +49,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> fromHeaderData()', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -83,7 +83,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> fromRLPSerializedHeader()', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -118,7 +118,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> createWithdrawalFromBytesArray()', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -181,7 +181,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> Clique Blocks', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: goerliChainConfig,
       hardfork: Hardfork.Chainstart,
     })
@@ -197,7 +197,7 @@ describe('[Block]: Header functions', () => {
 
   it('should validate extraData', () => {
     // PoW
-    let common = new Common({
+    let common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -235,7 +235,7 @@ describe('[Block]: Header functions', () => {
     )
 
     // PoA
-    common = new Common({
+    common = new GlobalConfig({
       chain: goerliChainConfig,
       hardfork: Hardfork.Chainstart,
     })
@@ -274,7 +274,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('should skip consensusFormatValidation if flag is set to false', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: goerliChainConfig,
       hardfork: Hardfork.Chainstart,
     })
@@ -325,7 +325,7 @@ describe('[Block]: Header functions', () => {
   it('header validation -> poa checks',  () => {
     const headerData = testDataPreLondon.blocks[0].blockHeader
 
-    const common = new Common({ chain: goerliChainConfig, hardfork: Hardfork.Istanbul })
+    const common = new GlobalConfig({ chain: goerliChainConfig, hardfork: Hardfork.Istanbul })
     const blockchain = new Mockchain()
 
     const genesisRlp = hexToBytes(testDataPreLondon.genesisRLP)
@@ -442,7 +442,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('should test hash() function', () => {
-    let common = new Common({
+    let common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -453,7 +453,7 @@ describe('[Block]: Header functions', () => {
       'correct PoW hash (mainnet block 1)',
     )
 
-    common = new Common({
+    common = new GlobalConfig({
       chain: goerliChainConfig,
       hardfork: Hardfork.Chainstart,
     })

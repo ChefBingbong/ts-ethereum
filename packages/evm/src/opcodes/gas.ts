@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -33,7 +33,7 @@ const EXTCALL_TARGET_MAX = BigInt(2) ** BigInt(8 * 20) - BigInt(1)
 
 async function eip7702GasCost(
   runState: RunState,
-  common: Common,
+  common: GlobalConfig,
   address: Address,
   charge2929Gas: boolean,
 ) {
@@ -61,13 +61,13 @@ async function eip7702GasCost(
 export type AsyncDynamicGasHandler = (
   runState: RunState,
   gas: bigint,
-  common: Common,
+  common: GlobalConfig,
 ) => Promise<bigint>
 
 export type SyncDynamicGasHandler = (
   runState: RunState,
   gas: bigint,
-  common: Common,
+  common: GlobalConfig,
 ) => bigint
 
 export const dynamicGasHandlers: Map<

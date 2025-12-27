@@ -1,5 +1,5 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 
 const BYTE_SIZE = 256
@@ -11,7 +11,7 @@ export class Bloom {
   /**
    * Represents a Bloom filter.
    */
-  constructor(bitvector?: Uint8Array, common?: Common) {
+  constructor(bitvector?: Uint8Array, common?: GlobalConfig) {
     if (common?.customCrypto.keccak256 !== undefined) {
       this.keccakFunction = common.customCrypto.keccak256
     } else {

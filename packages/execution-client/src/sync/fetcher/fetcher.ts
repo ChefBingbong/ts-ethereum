@@ -12,7 +12,7 @@ import type { JobTask as BlockFetcherJobTask } from './blockfetcherbase'
 import type { Job } from './types'
 
 export interface FetcherOptions {
-  /* Common chain config*/
+  /* GlobalConfig chain config*/
   config: Config
 
   /* Peer pool */

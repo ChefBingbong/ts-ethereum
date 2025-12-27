@@ -4,7 +4,7 @@ import type {
   StateManagerInterface,
   StorageDump,
 } from '@ts-ethereum/chain-config'
-import { Common, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -13,8 +13,8 @@ import {
   bytesToHex,
   createAccount,
   createAccountFromRLP,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   fetchFromProvider,
   hexToBytes,
   intToHex,
@@ -38,7 +38,7 @@ export class RPCStateManager implements StateManagerInterface {
   protected _debug: Debugger
   protected DEBUG: boolean
   private keccakFunction: Function
-  public readonly common: Common
+  public readonly common: GlobalConfig
 
   constructor(opts: RPCStateManagerOpts) {
     // Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
@@ -68,7 +68,7 @@ export class RPCStateManager implements StateManagerInterface {
     this.originalStorageCache = new OriginalStorageCache(
       this.getStorage.bind(this),
     )
-    this.common = opts.common ?? new Common({ chain: Mainnet })
+    this.common = opts.common ?? new GlobalConfig({ chain: Mainnet })
     this.keccakFunction = opts.common?.customCrypto.keccak256 ?? keccak_256
   }
 

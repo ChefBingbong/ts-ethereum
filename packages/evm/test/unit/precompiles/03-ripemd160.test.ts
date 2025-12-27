@@ -1,4 +1,4 @@
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import { bytesToHex, hexToBytes } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
 
@@ -14,7 +14,10 @@ describe('Precompiles: RIPEMD160', () => {
   it('RIPEMD160', async () => {
     // Test reference: https://github.com/ethereum/go-ethereum/blob/e206d3f8975bd98cc86d14055dca40f996bacc60/core/vm/contracts_test.go#L217
 
-    const common = new Common({ chain: Mainnet, hardfork: Hardfork.Petersburg })
+    const common = new GlobalConfig({
+      chain: Mainnet,
+      hardfork: Hardfork.Petersburg,
+    })
     const evm = await createEVM({
       common,
     })

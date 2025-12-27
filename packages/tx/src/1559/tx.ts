@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
@@ -66,7 +66,7 @@ export class FeeMarket1559Tx
 
   // End of Tx data part
 
-  public readonly common!: Common
+  public readonly common!: GlobalConfig
 
   readonly txOptions!: TxOptions
 
@@ -105,13 +105,13 @@ export class FeeMarket1559Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
     if (!this.common.isActivatedEIP(1559)) {
-      throw EthereumJSErrorWithoutCode('EIP-1559 not enabled on Common')
+      throw EthereumJSErrorWithoutCode('EIP-1559 not enabled on GlobalConfig')
     }
     this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930])
 

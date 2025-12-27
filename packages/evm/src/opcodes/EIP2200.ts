@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { equalsBytes } from '@ts-ethereum/utils'
 import { EVMError } from '../errors'
 import type { RunState } from '../interpreter'
@@ -12,7 +12,7 @@ import { trap } from './util'
  * @param {Uint8Array}   currentStorage
  * @param {Uint8Array}   originalStorage
  * @param {Uint8Array}   value
- * @param {Common}   common
+ * @param {GlobalConfig}   common
  */
 export function updateSstoreGasEIP2200(
   runState: RunState,
@@ -20,7 +20,7 @@ export function updateSstoreGasEIP2200(
   originalStorage: Uint8Array,
   value: Uint8Array,
   key: Uint8Array,
-  common: Common,
+  common: GlobalConfig,
 ) {
   // Fail if not enough gas is left
   if (

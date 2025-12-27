@@ -1,6 +1,6 @@
 import type { Block, BlockOptions, HeaderData } from '@ts-ethereum/block'
 import type {
-  Common,
+  GlobalConfig,
   ParamsDict,
   StateManagerInterface,
 } from '@ts-ethereum/chain-config'
@@ -105,12 +105,12 @@ export type VMProfilerOpts = {
  */
 export interface VMOpts {
   /**
-   * Use a {@link Common} instance
+   * Use a {@link GlobalConfig} instance
    * if you want to change the chain setup.
    *
    * ### Possible Values
    *
-   * - `chain`: all chains supported by `Common` or a custom chain
+   * - `chain`: all chains supported by `GlobalConfig` or a custom chain
    * - `hardfork`: `mainnet` hardforks up to the `Paris` hardfork
    * - `eips`: `2537` (usage e.g. `eips: [ 2537, ]`)
    *
@@ -119,13 +119,13 @@ export interface VMOpts {
    *
    * ### Default Setup
    *
-   * Default setup if no `Common` instance is provided:
+   * Default setup if no `GlobalConfig` instance is provided:
    *
    * - `chain`: `mainnet`
    * - `hardfork`: `paris`
    * - `eips`: `[]`
    */
-  common?: Common
+  common?: GlobalConfig
   /**
    * A {@link StateManager} instance to use as the state store
    */
@@ -156,7 +156,7 @@ export interface VMOpts {
    * Additionally it is possible to pass in a specific TD value to support live-Merge-HF
    * transitions. Note that this should only be needed in very rare and specific scenarios.
    *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link Common} instance)
+   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
    */
   setHardfork?: boolean | BigIntLike
   /**
@@ -312,7 +312,7 @@ export interface RunBlockOpts {
    * Set the hardfork either by timestamp (for HFs from Shanghai onwards) or by block number
    * for older Hfs.
    *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link Common} instance)
+   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
    */
   setHardfork?: boolean
 

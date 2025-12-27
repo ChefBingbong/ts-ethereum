@@ -1,6 +1,6 @@
 import type {
   BinaryTreeAccessWitnessInterface,
-  Common,
+  GlobalConfig,
   StateManagerInterface,
 } from '@ts-ethereum/chain-config'
 import { ConsensusAlgorithm } from '@ts-ethereum/chain-config'
@@ -13,8 +13,8 @@ import {
   bigIntToHex,
   bytesToBigInt,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   MAX_UINT64,
   setLengthRight,
 } from '@ts-ethereum/utils'
@@ -146,7 +146,7 @@ export class Interpreter {
   protected _vm: any
   protected _runState: RunState
   protected _stateManager: StateManagerInterface
-  protected common: Common
+  protected common: GlobalConfig
   public _evm: EVM
   public journal: Journal
   _env: Env

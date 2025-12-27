@@ -1,4 +1,4 @@
-import type { Common, ParamsDict } from '@ts-ethereum/chain-config'
+import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
 import type {
   JSONRPCTx,
   JSONTx,
@@ -18,27 +18,27 @@ import type {
 import type { BlockHeader } from './index'
 /**
  * An object to set to which blockchain the blocks and their headers belong. This could be specified
- * using a {@link Common} object, or `chain` and `hardfork`. Defaults to mainnet without specifying a
+ * using a {@link GlobalConfig} object, or `chain` and `hardfork`. Defaults to mainnet without specifying a
  * hardfork.
  */
 export interface BlockOptions {
   /**
-   * A {@link Common} object defining the chain and the hardfork a block/block header belongs to.
+   * A {@link GlobalConfig} object defining the chain and the hardfork a block/block header belongs to.
    *
    * Object will be internally copied so that tx behavior don't incidentally
    * change on future HF changes.
    *
-   * Default: {@link Common} object set to `mainnet` and the HF currently defined as the default
-   * hardfork in the {@link Common} class.
+   * Default: {@link GlobalConfig} object set to `mainnet` and the HF currently defined as the default
+   * hardfork in the {@link GlobalConfig} class.
    *
    * Current default hardfork: `merge`
    */
-  common?: Common
+  common?: GlobalConfig
   /**
    * Set the hardfork either by timestamp (for HFs from Shanghai onwards) or by block number
    * for older Hfs.
    *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link Common} instance)
+   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
    */
   setHardfork?: boolean
   /**

@@ -1,4 +1,4 @@
-import { Common, Hardfork } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork } from '@ts-ethereum/chain-config'
 import { createLegacyTx } from '@ts-ethereum/tx'
 import { bytesToHex, equalsBytes, hexToBytes } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
@@ -19,7 +19,7 @@ import { testdataFromRPCGoerliData } from './testdata/testdata-from-rpc-goerli.t
 
 describe('[Block]: block functions', () => {
   it('should test block initialization', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })
@@ -93,7 +93,7 @@ describe('[Block]: block functions', () => {
   })
 
   it('should initialize with null parameters without throwing', () => {
-    const common = new Common({ chain: Mainnet })
+    const common = new GlobalConfig({ chain: Mainnet })
     const opts = { common }
     assert.doesNotThrow(() => {
       createBlock({}, opts)
@@ -101,7 +101,7 @@ describe('[Block]: block functions', () => {
   })
 
   it('should test block validation on poa chain', async () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: goerliChainConfig,
       hardfork: Hardfork.Chainstart,
     })
@@ -190,7 +190,7 @@ describe('[Block]: block functions', () => {
         },
       },
       {
-        common: new Common({
+        common: new GlobalConfig({
           chain: Mainnet,
           hardfork: Hardfork.Chainstart,
         }),
@@ -207,7 +207,7 @@ describe('[Block]: block functions', () => {
   })
 
   it('should test genesis hashes (mainnet default)', () => {
-    const common = new Common({
+    const common = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Chainstart,
     })

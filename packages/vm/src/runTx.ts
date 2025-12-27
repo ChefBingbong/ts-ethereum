@@ -1,6 +1,6 @@
 import type { Block } from '@ts-ethereum/block'
 import { cliqueSigner, createBlockHeader } from '@ts-ethereum/block'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
 import { BinaryTreeAccessWitness, type EVM } from '@ts-ethereum/evm'
 import type {
@@ -23,9 +23,9 @@ import {
   bytesToHex,
   bytesToUnprefixedHex,
   concatBytes,
-  EthereumJSErrorWithoutCode,
   eoaCode7702RecoverAuthority,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   KECCAK256_NULL,
   MAX_UINT64,
@@ -864,7 +864,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
  * @method txLogsBloom
  * @private
  */
-function txLogsBloom(logs?: any[], common?: Common): Bloom {
+function txLogsBloom(logs?: any[], common?: GlobalConfig): Bloom {
   const bloom = new Bloom(undefined, common)
   if (logs) {
     for (let i = 0; i < logs.length; i++) {

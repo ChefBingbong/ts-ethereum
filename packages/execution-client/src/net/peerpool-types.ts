@@ -3,7 +3,7 @@ import type { NetworkCore } from './core/network-core'
 import type { Peer } from './peer/peer'
 
 /**
- * Common interface for peer pools
+ * GlobalConfig interface for peer pools
  * Now only Network is supported (replaces P2PPeerPool)
  */
 export interface IPeerPool {

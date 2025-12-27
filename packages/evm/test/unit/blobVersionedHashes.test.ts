@@ -1,4 +1,4 @@
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
   Account,
@@ -21,7 +21,10 @@ describe('BLOBHASH / access blobVersionedHashes in calldata', () => {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = new Common({ chain: Mainnet, hardfork: Hardfork.Cancun })
+    const common = new GlobalConfig({
+      chain: Mainnet,
+      hardfork: Hardfork.Cancun,
+    })
     const evm = await createEVM({
       common,
     })
@@ -53,7 +56,10 @@ describe(`BLOBHASH: access blobVersionedHashes within contract calls`, () => {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = new Common({ chain: Mainnet, hardfork: Hardfork.Cancun })
+    const common = new GlobalConfig({
+      chain: Mainnet,
+      hardfork: Hardfork.Cancun,
+    })
     const evm = await createEVM({
       common,
     })
@@ -115,7 +121,10 @@ describe(`BLOBHASH: access blobVersionedHashes in a CREATE/CREATE2 frame`, () =>
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = new Common({ chain: Mainnet, hardfork: Hardfork.Cancun })
+    const common = new GlobalConfig({
+      chain: Mainnet,
+      hardfork: Hardfork.Cancun,
+    })
     const evm = await createEVM({
       common,
     })

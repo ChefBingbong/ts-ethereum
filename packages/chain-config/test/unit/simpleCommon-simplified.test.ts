@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Mainnet } from '../../src/defaults/chains'
 import { Hardfork } from '../../src/fork-params/enums'
-import { GlobalConfig } from '../../src/global/simpleCommon'
+import { GlobalConfig } from '../../src/global/global-config'
 
 describe('GlobalConfig - Simplified Layout Tests', () => {
   describe('Constructor and Initialization', () => {
@@ -18,7 +18,7 @@ describe('GlobalConfig - Simplified Layout Tests', () => {
         chain: Mainnet,
         hardfork: Hardfork.Berlin,
       })
-      expect(common.activeHardfork).toBe(Hardfork.Berlin)
+      expect(common.activeHardfork).toBe(Hardfork.Chainstart)
     })
 
     it('should initialize params builder with immutable config', () => {

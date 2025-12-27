@@ -1,5 +1,4 @@
-import * as crypto from 'node:crypto'
-import type { Common, CustomCrypto } from '@ts-ethereum/chain-config'
+import type { CustomCrypto, GlobalConfig } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   assertEq,
@@ -19,8 +18,9 @@ import {
 import debugDefault from 'debug'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { getRandomBytesSync } from 'ethereum-cryptography/random.js'
-import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { ecdh, ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
+import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
+import * as crypto from 'node:crypto'
 import { MAC } from './mac'
 
 type Decipher = crypto.Decipheriv
@@ -96,7 +96,7 @@ export class ECIES {
     privateKey: Uint8Array,
     id: Uint8Array,
     remoteId: Uint8Array,
-    _common?: Common,
+    _common?: GlobalConfig,
   ) {
     this._privateKey = privateKey
     this._publicKey = id2pk(id)

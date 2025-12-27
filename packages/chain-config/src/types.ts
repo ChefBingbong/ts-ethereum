@@ -133,7 +133,7 @@ export interface BaseOpts {
 }
 
 /**
- * Options for instantiating a {@link Common} instance.
+ * Options for instantiating a {@link GlobalConfig} instance.
  */
 export interface CommonOpts extends BaseOpts {
   /**

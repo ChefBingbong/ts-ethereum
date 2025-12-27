@@ -361,7 +361,7 @@ export class ETH extends Protocol {
         const latestBlock = bytesToBigInt(status.latestBlock)
         if (latestBlock < this._latestBlock) {
           throw new Error(
-            'latest block provided is not matching the HF setting of the Common instance (Rlpx)',
+            'latest block provided is not matching the HF setting of the GlobalConfig instance (Rlpx)',
           )
         }
         this._latestBlock = latestBlock

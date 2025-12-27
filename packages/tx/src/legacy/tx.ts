@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -44,7 +44,7 @@ function meetsEIP155(_v: bigint, chainId: bigint) {
  * Validates tx's `v` value and extracts the chain id
  */
 function validateVAndExtractChainID(
-  common: Common,
+  common: GlobalConfig,
   _v?: bigint,
 ): bigint | undefined {
   let chainIdBigInt
@@ -70,7 +70,7 @@ function validateVAndExtractChainID(
   ) {
     if (!meetsEIP155(BigInt(v), common.chainId())) {
       throw EthereumJSErrorWithoutCode(
-        `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the Common parameter of the Transaction constructor to set the chain id.`,
+        `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the GlobalConfig parameter of the Transaction constructor to set the chain id.`,
       )
     }
     // Derive the original chain ID
@@ -80,7 +80,7 @@ function validateVAndExtractChainID(
     } else {
       numSub = 36
     }
-    // Use derived chain ID to create a proper Common
+    // Use derived chain ID to create a proper GlobalConfig
     chainIdBigInt = BigInt(v - numSub) / BIGINT_2
   }
   return chainIdBigInt
@@ -111,7 +111,7 @@ export class LegacyTx
   // End of Tx data part
 
   /* Other handy tx props */
-  public readonly common!: Common
+  public readonly common!: GlobalConfig
   private keccakFunction: (msg: Uint8Array) => Uint8Array
 
   readonly txOptions!: TxOptions
@@ -144,7 +144,7 @@ export class LegacyTx
     const chainId = validateVAndExtractChainID(this.common, this.v)
     if (chainId !== undefined && chainId !== this.common.chainId()) {
       throw EthereumJSErrorWithoutCode(
-        `Common chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
 

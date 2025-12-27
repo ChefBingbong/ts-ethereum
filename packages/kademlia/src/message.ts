@@ -1,7 +1,7 @@
 // src/kademlia/message.ts
 // RLP-encoded, secp256k1-signed message encoding for Ethereum-compatible discovery protocol
 
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   bigIntToBytes,
@@ -355,7 +355,7 @@ export function encode<T>(
   typename: MessageTypeName,
   data: T,
   privateKey: Uint8Array,
-  common?: Common,
+  common?: GlobalConfig,
 ): Uint8Array {
   const type = MessageTypes.byName[typename]
   if (type === undefined) throw new Error(`Invalid typename: ${typename}`)
@@ -385,7 +385,10 @@ export interface DecodedMessage {
   hash: Uint8Array
 }
 
-export function decode(bytes: Uint8Array, common?: Common): DecodedMessage {
+export function decode(
+  bytes: Uint8Array,
+  common?: GlobalConfig,
+): DecodedMessage {
   const keccakFn = common?.customCrypto?.keccak256 ?? keccak256
   const recoverFn = common?.customCrypto?.ecdsaRecover ?? ecdsaRecover
 

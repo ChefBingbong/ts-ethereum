@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { MetricsOptions } from '@ts-ethereum/metrics'
 import type { P2PNode } from '@ts-ethereum/p2p'
 import type { Address } from '@ts-ethereum/utils'
@@ -24,10 +24,10 @@ export const SyncMode = {
 
 export interface ConfigOptions {
   /**
-   * Specify the chain by providing a {@link Common} instance,
+   * Specify the chain by providing a {@link GlobalConfig} instance,
    * the common instance will not be modified by client
    */
-  common: Common
+  common: GlobalConfig
 
   /**
    * Synchronization mode ('full', 'none')

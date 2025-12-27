@@ -1,7 +1,7 @@
 import {
-  Common,
   ConsensusAlgorithm,
   ConsensusType,
+  GlobalConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -16,14 +16,14 @@ import {
   bytesToHex,
   bytesToUtf8,
   createZeroAddress,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   SHA256_NULL,
-  TypeOutput,
   toType,
+  TypeOutput,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import { computeBlobGasPrice } from '../helpers'
@@ -70,7 +70,7 @@ export class BlockHeader {
   public readonly parentBeaconBlockRoot?: Uint8Array
   public readonly requestsHash?: Uint8Array
 
-  public readonly common: Common
+  public readonly common: GlobalConfig
 
   protected keccakFunction: (msg: Uint8Array) => Uint8Array
 
@@ -102,7 +102,7 @@ export class BlockHeader {
     if (opts.common) {
       this.common = opts.common.copy()
     } else {
-      this.common = new Common({
+      this.common = new GlobalConfig({
         chain: Mainnet, // default
       })
     }
@@ -598,7 +598,7 @@ export class BlockHeader {
   /**
    * Calculates the excess blob gas for next (hopefully) post EIP 4844 block.
    */
-  public calcNextExcessBlobGas(childCommon: Common): bigint {
+  public calcNextExcessBlobGas(childCommon: GlobalConfig): bigint {
     const excessBlobGas = this.excessBlobGas ?? BIGINT_0
     const blobGasUsed = this.blobGasUsed ?? BIGINT_0
 
@@ -634,7 +634,7 @@ export class BlockHeader {
    * Calculate the blob gas price of the block built on top of this one
    * @returns The blob gas price
    */
-  public calcNextBlobGasPrice(childCommon: Common): bigint {
+  public calcNextBlobGasPrice(childCommon: GlobalConfig): bigint {
     return computeBlobGasPrice(
       this.calcNextExcessBlobGas(childCommon),
       childCommon,

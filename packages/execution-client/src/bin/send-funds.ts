@@ -60,7 +60,7 @@ function findAccountsFile(customPath?: string): string {
     throw new Error(`Accounts file not found at: ${customPath}`)
   }
 
-  // Common locations to check (relative to workspace root)
+  // GlobalConfig locations to check (relative to workspace root)
   const possiblePaths = [
     // Docker genesis accounts (primary for Docker setup)
     path.resolve(process.cwd(), 'docker/genesis/accounts.json'),

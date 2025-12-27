@@ -1,11 +1,11 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { createMetrics, type Metrics } from '@ts-ethereum/metrics'
 import { BIGINT_0, genPrivateKey, safeTry } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { Level } from 'level'
 import { Logger } from 'winston'
 import type { Chain } from '../blockchain/chain'
-import { type ClientError, classifyError } from '../errors/index'
+import { classifyError, type ClientError } from '../errors/index'
 import type { NetworkService } from '../net/network-service'
 import { Event, type EventParams } from '../types'
 import type { ConfigOptions } from './types'
@@ -24,8 +24,8 @@ export interface SynchronizedState {
 export class Config {
   public readonly events: EventEmitter<EventParams>
   public readonly options: ResolvedConfigOptions
-  public readonly chainCommon: Common
-  public readonly execCommon: Common
+  public readonly chainCommon: GlobalConfig
+  public readonly execCommon: GlobalConfig
 
   public synchronized: boolean
   public lastSynchronized: boolean
@@ -176,7 +176,7 @@ export class Config {
     return new Level<string | Uint8Array, Uint8Array>(`${networkDir}/config`)
   }
 
-  static async getClientKey(datadir: string, common: Common) {
+  static async getClientKey(datadir: string, common: GlobalConfig) {
     const db = Config.getConfigDB(`${datadir}/${common.chainName()}`)
     const dbKey = 'config:client_key'
 

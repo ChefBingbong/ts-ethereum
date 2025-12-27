@@ -27,7 +27,7 @@ export async function debugCodeReplayBlock(
  */
 
 import { Level } from 'level';
-import { Common } from '../../chain-config'
+import { GlobalConfig } from '../../chain-config'
 import { Block } from '../../block'
 import { VM, runBlock, createVM }  from './src'
 import { MerklePatriciaTrie } from '../../mpt'
@@ -35,7 +35,7 @@ import { MerkleStateManager } from './src/state'
 import { Blockchain } from '../../blockchain'
 
 const main = async () => {
-  const common = new Common({ chain: '${execution.config.execCommon.chainName()}', hardfork: '${
+  const common = new GlobalConfig({ chain: '${execution.config.execCommon.chainName()}', hardfork: '${
     execution.hardfork
   }' })
   const block = createBlockFromRLP(hexToBytes('${bytesToHex(block.serialize())}'), { common })

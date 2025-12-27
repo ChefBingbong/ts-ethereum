@@ -1,22 +1,22 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import {
   Address,
   BIGINT_0,
   BIGINT_1,
-  BIGINT_2,
-  BIGINT_2EXP96,
-  BIGINT_2EXP160,
-  BIGINT_2EXP224,
-  BIGINT_7,
-  BIGINT_8,
-  BIGINT_31,
-  BIGINT_32,
-  BIGINT_96,
   BIGINT_160,
+  BIGINT_2,
   BIGINT_224,
   BIGINT_255,
   BIGINT_256,
+  BIGINT_2EXP160,
+  BIGINT_2EXP224,
+  BIGINT_2EXP96,
+  BIGINT_31,
+  BIGINT_32,
+  BIGINT_7,
+  BIGINT_8,
+  BIGINT_96,
   bigIntToAddressBytes,
   bigIntToBytes,
   bytesToBigInt,
@@ -46,11 +46,11 @@ import {
   writeCallOutput,
 } from './util'
 
-export type SyncOpHandler = (runState: RunState, common: Common) => void
+export type SyncOpHandler = (runState: RunState, common: GlobalConfig) => void
 
 export type AsyncOpHandler = (
   runState: RunState,
-  common: Common,
+  common: GlobalConfig,
 ) => Promise<void>
 
 export type OpHandler = SyncOpHandler | AsyncOpHandler
@@ -1525,7 +1525,7 @@ export const handlers: Map<number, OpHandler> = new Map([
   // 0xf1: CALL
   [
     0xf1,
-    async (runState: RunState, common: Common) => {
+    async (runState: RunState, common: GlobalConfig) => {
       const [
         _currentGasLimit,
         toAddr,
@@ -1565,7 +1565,7 @@ export const handlers: Map<number, OpHandler> = new Map([
   // 0xf2: CALLCODE
   [
     0xf2,
-    async (runState: RunState, common: Common) => {
+    async (runState: RunState, common: GlobalConfig) => {
       const [
         _currentGasLimit,
         toAddr,

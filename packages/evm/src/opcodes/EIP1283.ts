@@ -1,4 +1,4 @@
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { equalsBytes } from '@ts-ethereum/utils'
 import type { RunState } from '../interpreter'
 
@@ -9,14 +9,14 @@ import type { RunState } from '../interpreter'
  * @param {Uint8Array}   currentStorage
  * @param {Uint8Array}   originalStorage
  * @param {Uint8Array}   value
- * @param {Common}   common
+ * @param {GlobalConfig}   common
  */
 export function updateSstoreGasEIP1283(
   runState: RunState,
   currentStorage: Uint8Array,
   originalStorage: Uint8Array,
   value: Uint8Array,
-  common: Common,
+  common: GlobalConfig,
 ) {
   if (equalsBytes(currentStorage, value)) {
     // If current value equals new value (this is a no-op), 200 gas is deducted.

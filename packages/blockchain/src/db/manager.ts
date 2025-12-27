@@ -8,7 +8,7 @@ import {
   createBlockFromBytesArray,
   createBlockHeaderFromBytesArray,
 } from '@ts-ethereum/block'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type {
   BatchDBOp,
@@ -20,8 +20,8 @@ import type {
 import {
   bytesToBigInt,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   unprefixedHexToBytes,
@@ -48,12 +48,12 @@ export type CacheMap = { [key: string]: Cache<Uint8Array> }
  */
 export class DBManager {
   private _cache: CacheMap
-  public readonly common: Common
+  public readonly common: GlobalConfig
   private _db: DB<Uint8Array | string, Uint8Array | string | DBObject>
 
   constructor(
     db: DB<Uint8Array | string, Uint8Array | string | DBObject>,
-    common: Common,
+    common: GlobalConfig,
   ) {
     this._db = db
     this.common = common

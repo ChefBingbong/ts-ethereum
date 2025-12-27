@@ -1,4 +1,4 @@
-import { Common, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
 import { Address, createZeroAddress, hexToBytes } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
 
@@ -11,7 +11,7 @@ describe('Precompiles: hardfork availability', () => {
     const ECPAIR_Address = new Address(hexToBytes(`0x${ECPAIR_AddressStr}`))
 
     // ECPAIR was introduced in Byzantium; check if available from Byzantium.
-    const commonByzantium = new Common({
+    const commonByzantium = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Byzantium,
     })
@@ -40,7 +40,7 @@ describe('Precompiles: hardfork availability', () => {
     assert.strictEqual(result.execResult.executionGasUsed, BigInt(100000)) // check that we are using gas (if address would contain no code we use 0 gas)
 
     // Check if ECPAIR is available in future hard forks.
-    const commonPetersburg = new Common({
+    const commonPetersburg = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Petersburg,
     })
@@ -67,7 +67,7 @@ describe('Precompiles: hardfork availability', () => {
     assert.strictEqual(result.execResult.executionGasUsed, BigInt(100000))
 
     // Check if ECPAIR is not available in Homestead.
-    const commonHomestead = new Common({
+    const commonHomestead = new GlobalConfig({
       chain: Mainnet,
       hardfork: Hardfork.Homestead,
     })

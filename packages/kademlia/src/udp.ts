@@ -1,7 +1,7 @@
 // src/kademlia/udp.ts
 // UDP transport for Ethereum-compatible Kademlia discovery protocol
 
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { bytesToHex, bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import * as dgram from 'dgram'
@@ -9,8 +9,8 @@ import { EventEmitter } from 'eventemitter3'
 import { LRUCache } from 'lru-cache'
 
 import {
-  type DecodedMessage,
   decode,
+  type DecodedMessage,
   encode,
   type MessageTypeName,
 } from './message'
@@ -51,7 +51,7 @@ export class UdpTransport implements KademliaTransport {
   private _requests: Map<string, PendingRequest> = new Map()
   private _requestsCache: LRUCache<string, Promise<PeerInfo>>
   private _socket: dgram.Socket | null = null
-  private _common?: Common
+  private _common?: GlobalConfig
   private _onPeers?: (peers: PeerInfo[]) => void
   private _getPeer?: (id: Uint8Array) => PeerInfo | null
 

@@ -2,9 +2,9 @@ import type { HeaderData } from '@ts-ethereum/block'
 import { Block, BlockHeader, createBlock } from '@ts-ethereum/block'
 import type { CliqueConfig, GenesisState } from '@ts-ethereum/chain-config'
 import {
-  Common,
   ConsensusAlgorithm,
   ConsensusType,
+  GlobalConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -18,8 +18,8 @@ import {
   bytesToHex,
   bytesToUnprefixedHex,
   concatBytes,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   KECCAK256_RLP,
   Lock,
   MapDB,
@@ -89,7 +89,7 @@ export class Blockchain implements BlockchainInterface {
 
   private _lock: Lock
 
-  public readonly common: Common
+  public readonly common: GlobalConfig
   private _hardforkByHeadBlockNumber: boolean
   private readonly _validateBlocks: boolean
   private readonly _validateConsensus: boolean
@@ -127,7 +127,7 @@ export class Blockchain implements BlockchainInterface {
     } else {
       const DEFAULT_CHAIN = Mainnet
       const DEFAULT_HARDFORK = Hardfork.Chainstart
-      this.common = new Common({
+      this.common = new GlobalConfig({
         chain: DEFAULT_CHAIN,
         hardfork: DEFAULT_HARDFORK,
       })
@@ -169,7 +169,7 @@ export class Blockchain implements BlockchainInterface {
   }
 
   /**
-   * Returns an eventual consensus object matching the current consensus algorithm from Common
+   * Returns an eventual consensus object matching the current consensus algorithm from GlobalConfig
    * or undefined if non available
    */
   get consensus(): Consensus | undefined {
@@ -1409,7 +1409,7 @@ export class Blockchain implements BlockchainInterface {
   }
 
   /**
-   * Creates a genesis {@link Block} for the blockchain with params from {@link Common.genesis}
+   * Creates a genesis {@link Block} for the blockchain with params from {@link GlobalConfig.genesis}
    * @param stateRoot The genesis stateRoot
    */
   createGenesisBlock(stateRoot: Uint8Array): Block {

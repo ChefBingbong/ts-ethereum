@@ -9,7 +9,7 @@ import type {
   Metrics,
   OutboundConnectionUpgradeEvents,
 } from '@libp2p/interface'
-import type { Common } from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { Socket } from 'net'
 import type { ProgressEvent } from 'progress-events'
 // import type { Capabilities } from '../../../client/net/dpt-1/types'
@@ -88,7 +88,7 @@ export interface RLPxTransportOptions extends RLPxSocketOptions {
   /**
    * Chain configuration for protocol compatibility
    */
-  common: Common
+  common: GlobalConfig
 
   /**
    * Connection timeout in milliseconds
@@ -218,7 +218,7 @@ export interface RLPxCreateListenerOptions extends RLPxSocketOptions {
   /**
    * Chain configuration
    */
-  common: Common
+  common: GlobalConfig
 
   /**
    * Connection timeout in milliseconds
@@ -334,7 +334,7 @@ export interface RLPxConnectionOptions {
   /**
    * Chain configuration
    */
-  common: Common
+  common: GlobalConfig
 
   /**
    * Connection timeout

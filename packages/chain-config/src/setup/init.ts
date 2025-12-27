@@ -1,23 +1,23 @@
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
+import type { GenesisState } from 'src/defaults'
+import {
+  enodeToDPTPeerInfo,
+  readBootnodeInfo,
+  writeBootnodeInfo,
+} from '../defaults/bootnodes'
+import { Hardfork } from '../fork-params/enums'
+import { GlobalConfig } from '../global'
+import { initPrivateKey } from '../setup/keys'
+import { getClientPaths } from '../setup/paths'
+import type { ChainConfig } from '../types'
 import {
   generateAccounts,
   getNodeAccount,
   readAccounts,
   writeAccounts,
 } from './accounts'
-import {
-  enodeToDPTPeerInfo,
-  readBootnodeInfo,
-  writeBootnodeInfo,
-} from './bootnodes'
-import { Common } from './common.js'
-import { Hardfork } from './enums'
-import type { GenesisState } from './gethGenesis'
-import { initPrivateKey } from './keys'
-import { getClientPaths } from './paths'
-import type { ChainConfig } from './types'
 
 export interface ClientInitArgs extends Partial<any> {
   /** Root data directory */
@@ -43,7 +43,7 @@ export interface ClientInitArgs extends Partial<any> {
 }
 
 export interface ClientConfig {
-  common: Common
+  common: GlobalConfig
   datadir: string
   key: Uint8Array
   accounts: [address: UtilsAddress, privKey: Uint8Array][]
@@ -121,13 +121,13 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     }
   }
 
-  // Create Common instance
+  // Create GlobalConfig instance
   const chainConfig = args.chainConfig
   if (!chainConfig) {
     throw new Error('chainConfig is required')
   }
 
-  const common = new Common({
+  const common = new GlobalConfig({
     chain: chainConfig,
     hardfork: Hardfork.TangerineWhistle,
   })
