@@ -1,4 +1,4 @@
-import { type EIP, HARDFORK_ORDER, Hardfork } from './enums'
+import { type EIP, HARDFORK_ORDER, type Hardfork } from './enums'
 import { hardforksDict } from './hardforks'
 import { EIPParams, HardforkParams } from './mappings'
 import type { ChainParams, MergedParamsAtHardfork } from './types'
