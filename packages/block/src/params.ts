@@ -20,7 +20,7 @@ export const paramsBlock: ParamsDict = {
     // pow
     minimumDifficulty: 10, // The minimum that the difficulty may ever be
     difficultyBoundDivisor: 2048, // The bound divisor of the difficulty, used in the update calculations
-    durationLimit: 4, // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not
+    durationLimit: 3, // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not
     difficultyBombDelay: 0, // the amount of blocks to delay the difficulty bomb with
   },
   /**
@@ -35,7 +35,20 @@ export const paramsBlock: ParamsDict = {
    */
   1013: {
     // pow
-    difficultyBombDelay: 5000000, // the amount of blocks to delay the difficulty bomb with
+    difficultyBombDelay: 5000000n, // the amount of blocks to delay the difficulty bomb with,
+    // gasPrices
+    netSstoreNoopGas: 200n, // Once per SSTORE operation if the value doesn't change
+    netSstoreInitGas: 20000n, // Once per SSTORE operation from clean zero
+    netSstoreCleanGas: 5000n, // Once per SSTORE operation from clean non-zero
+    netSstoreDirtyGas: 200n, // Once per SSTORE operation from dirty
+    netSstoreClearRefundGas: 15000n, // Once per SSTORE operation for clearing an originally existing storage slot
+    netSstoreResetRefundGas: 4800n, // Once per SSTORE operation for resetting to the original non-zero value
+    netSstoreResetClearRefundGas: 19800n, // Once per SSTORE operation for resetting to the original zero value
+    shlGas: 3n, // Base fee of the SHL opcode
+    shrGas: 3n, // Base fee of the SHR opcode
+    sarGas: 3n, // Base fee of the SAR opcode
+    extcodehashGas: 400n, // Base fee of the EXTCODEHASH opcode
+    create2Gas: 32000n, // Base fee of the CREATE2 opcode
   },
   /**
    * MuirGlacier HF Meta EIP

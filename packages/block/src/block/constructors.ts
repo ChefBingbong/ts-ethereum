@@ -201,7 +201,7 @@ export function createBlockFromRLP(
   opts?: BlockOptions,
 ): Block {
   if (opts?.common?.isActivatedEIP(7934) === true) {
-    const maxRlpBlockSize = opts.common.param('maxRlpBlockSize')
+    const maxRlpBlockSize = opts.common.getParamByEIP(7934, 'maxRlpBlockSize')
     if (serialized.length > maxRlpBlockSize) {
       throw EthereumJSErrorWithoutCode(
         `Block size exceeds limit: ${serialized.length} > ${maxRlpBlockSize}`,

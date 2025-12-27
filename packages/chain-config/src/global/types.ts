@@ -3,6 +3,7 @@ import type {
   BerlinAndLater,
   ByzantiumAndLater,
   CancunAndLater,
+  ChainstartAndLater,
   ConstantinopleAndLater,
   EIP1Params,
   EIP606Params,
@@ -34,7 +35,9 @@ import type {
   EIP5133Params,
   EIP5656Params,
   EIP6206Params,
+  EIP7002Params,
   EIP7069Params,
+  EIP7251Params,
   EIP7480Params,
   EIP7516Params,
   EIP7594Params,
@@ -43,6 +46,7 @@ import type {
   EIP7691Params,
   EIP7702Params,
   EIP7825Params,
+  EIP7934Params,
   EIP7939Params,
   HomesteadAndLater,
   IstanbulAndLater,
@@ -57,7 +61,9 @@ import type {
 
 export interface MinHardforkFor {
   // Chainstart (always available)
-  [EIP.EIP_1]: HomesteadAndLater
+
+  [EIP.EIP_1]: ChainstartAndLater
+  [EIP.EIP_7934]: ChainstartAndLater
 
   // Homestead
   [EIP.EIP_606]: HomesteadAndLater
@@ -93,6 +99,8 @@ export interface MinHardforkFor {
 
   // Paris (The Merge)
   [EIP.EIP_4399]: ParisAndLater
+  [EIP.EIP_7002]: ParisAndLater
+  [EIP.EIP_7251]: ParisAndLater
 
   // Shanghai
   [EIP.EIP_3651]: ShanghaiAndLater
@@ -169,6 +177,9 @@ export interface EIPParamsMap {
   [EIP.EIP_7702]: EIP7702Params
   [EIP.EIP_7825]: EIP7825Params
   [EIP.EIP_7939]: EIP7939Params
+  [EIP.EIP_7934]: EIP7934Params
+  [EIP.EIP_7002]: EIP7002Params
+  [EIP.EIP_7251]: EIP7251Params
 }
 
 export type EIPWithParams = keyof EIPParamsMap

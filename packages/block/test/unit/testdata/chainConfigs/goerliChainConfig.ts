@@ -2,7 +2,7 @@ import type { ChainConfig } from '@ts-ethereum/chain-config'
 
 export const goerliChainConfig: ChainConfig = {
   name: 'goerli',
-  chainId: 5,
+  chainId: 5n,
   defaultHardfork: 'cancun',
   consensus: {
     type: 'poa',
@@ -23,60 +23,60 @@ export const goerliChainConfig: ChainConfig = {
   hardforks: [
     {
       name: 'chainstart',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'homestead',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'tangerineWhistle',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'spuriousDragon',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'byzantium',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'constantinople',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'petersburg',
-      block: 0,
+      block: 0n,
       forkHash: '0xa3f5ab08',
     },
     {
       name: 'istanbul',
-      block: 1561651,
+      block: 1561651n,
       forkHash: '0xc25efa5c',
     },
     {
       name: 'berlin',
-      block: 4460644,
+      block: 4460644n,
       forkHash: '0x757a1c47',
     },
     {
       name: 'london',
-      block: 5062605,
+      block: 5062605n,
       forkHash: '0xb8c6299d',
     },
     {
       // The forkHash will remain same as mergeNetsplitBlock is post merge,
       // terminal block: https://goerli.etherscan.io/block/7382818
       name: 'paris',
-      block: 7382819,
-      forkHash: '0xb8c6299d',
+      block: 7382819n,
+      forkHash: '0xb8c6299d', // same as mergeNetsplitBlock hash
     },
     {
       name: 'mergeNetsplitBlock',

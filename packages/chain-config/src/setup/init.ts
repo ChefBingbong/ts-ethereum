@@ -1,7 +1,8 @@
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
-import type { GenesisState } from 'src/defaults'
+import { schemaFromChainConfig } from '../builder'
+import type { GenesisState } from '../defaults'
 import {
   enodeToDPTPeerInfo,
   readBootnodeInfo,
@@ -127,8 +128,9 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     throw new Error('chainConfig is required')
   }
 
-  const common = new GlobalConfig({
-    chain: chainConfig,
+  const schema = schemaFromChainConfig(chainConfig)
+  const common = GlobalConfig.fromSchema({
+    schema,
     hardfork: Hardfork.TangerineWhistle,
   })
 

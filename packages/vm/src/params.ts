@@ -6,12 +6,12 @@ export const paramsVM: ParamsDict = {
    */
   1: {
     // gasConfig
-    maxRefundQuotient: 2, // Maximum refund quotient; max tx refund is min(tx.gasUsed/maxRefundQuotient, tx.gasRefund)
-    blobGasPerBlob: 0,
-    maxBlobGasPerBlock: 0,
-    targetBlobGasPerBlock: 0,
+    maxRefundQuotient: 2n, // Maximum refund quotient; max tx refund is min(tx.gasUsed/maxRefundQuotient, tx.gasRefund)
+    blobGasPerBlob: 0n,
+    maxBlobGasPerBlock: 0n,
+    targetBlobGasPerBlock: 0n,
     // pow
-    minerReward: '5000000000000000000', // the amount a miner get rewarded for mining a block
+    minerReward: 5000000000000000000n, // the amount a miner get rewarded for mining a block
   },
   /**
 .  * Byzantium HF Meta EIP
@@ -25,7 +25,20 @@ export const paramsVM: ParamsDict = {
 .  */
   1013: {
     // pow
-    minerReward: '2000000000000000000', // The amount a miner gets rewarded for mining a block
+    minerReward: 2000000000000000000n, // The amount a miner gets rewarded for mining a block,
+    // gasPrices
+    netSstoreNoopGas: 200n, // Once per SSTORE operation if the value doesn't change
+    netSstoreInitGas: 20000n, // Once per SSTORE operation from clean zero
+    netSstoreCleanGas: 5000n, // Once per SSTORE operation from clean non-zero
+    netSstoreDirtyGas: 200n, // Once per SSTORE operation from dirty
+    netSstoreClearRefundGas: 15000n, // Once per SSTORE operation for clearing an originally existing storage slot
+    netSstoreResetRefundGas: 4800n, // Once per SSTORE operation for resetting to the original non-zero value
+    netSstoreResetClearRefundGas: 19800n, // Once per SSTORE operation for resetting to the original zero value
+    shlGas: 3n, // Base fee of the SHL opcode
+    shrGas: 3n, // Base fee of the SHR opcode
+    sarGas: 3n, // Base fee of the SAR opcode
+    extcodehashGas: 400n, // Base fee of the EXTCODEHASH opcode
+    create2Gas: 32000n, // Base fee of the CREATE2 opcode
   },
   /**
 .  * Fee market change for ETH 1.0 chain
@@ -40,9 +53,9 @@ export const paramsVM: ParamsDict = {
    */
   2935: {
     // config
-    historyStorageAddress: '0x0000F90827F1C53A10CB7A02335B175320002935', // The address where the historical blockhashes are stored
+    historyStorageAddress: 0x0000f90827f1c53a10cb7a02335b175320002935n, // The address where the historical blockhashes are stored
     historyServeWindow: 8191, // The amount of blocks to be served by the historical blockhash contract
-    systemAddress: '0xfffffffffffffffffffffffffffffffffffffffe', // The system address
+    systemAddress: 0xfffffffffffffffffffffffffffffffffffffffen, // The system address
   },
   /**
 .  * Reduction in refunds
@@ -75,10 +88,10 @@ export const paramsVM: ParamsDict = {
    */
   7002: {
     // config
-    systemAddress: '0xfffffffffffffffffffffffffffffffffffffffe', // The system address to perform operations on the withdrawal requests predeploy address
+    systemAddress: 0xfffffffffffffffffffffffffffffffffffffffen, // The system address to perform operations on the withdrawal requests predeploy address
     // See: https://github.com/ethereum/EIPs/pull/8934/files
     withdrawalRequestPredeployAddress:
-      '0x00000961EF480EB55E80D19AD83579A64C007002', // Address of the validator excess address
+      0x00000961ef480eb55e80d19ad83579a64c007002n, // Address of the validator excess address
   },
 
   /**

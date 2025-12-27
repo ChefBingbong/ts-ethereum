@@ -2,7 +2,7 @@ import type { ChainConfig } from '@ts-ethereum/chain-config'
 
 export const testnetMergeChainConfig: ChainConfig = {
   name: 'testnetMerge',
-  chainId: 55555,
+  chainId: 55555n,
   defaultHardfork: 'istanbul',
   consensus: {
     type: 'poa',
@@ -22,39 +22,39 @@ export const testnetMergeChainConfig: ChainConfig = {
   hardforks: [
     {
       name: 'chainstart',
-      block: 0,
+      block: 0n,
     },
     {
       name: 'homestead',
-      block: 1,
+      block: 1n,
     },
     {
       name: 'tangerineWhistle',
-      block: 2,
+      block: 2n,
     },
     {
       name: 'spuriousDragon',
-      block: 3,
+      block: 3n,
     },
     {
       name: 'istanbul',
-      block: 8,
+      block: 8n,
     },
     {
       name: 'muirGlacier',
-      block: 10,
+      block: 10n,
     },
     {
       name: 'berlin',
-      block: 12,
+      block: 12n,
     },
     {
       name: 'london',
-      block: 14,
+      block: 14n,
     },
     {
       name: 'paris',
-      block: 15,
+      block: 15n,
     },
     {
       name: 'shanghai',

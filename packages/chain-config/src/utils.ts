@@ -2,7 +2,6 @@ import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
   addHexPrefix,
   EthereumJSErrorWithoutCode,
-  intToHex,
   isHexString,
   stripHexPrefix,
 } from '@ts-ethereum/utils'
@@ -14,7 +13,7 @@ import type { HardforksDict } from './types.ts'
 
 type ConfigHardfork =
   | { name: string; block: null; timestamp: number }
-  | { name: string; block: number; timestamp?: number }
+  | { name: string; block: bigint; timestamp?: number }
 /**
  * Transforms Geth formatted nonce (i.e. hex string) to 8 byte 0x-prefixed string used internally
  * @param nonce string parsed from the Geth genesis file
@@ -57,9 +56,7 @@ function parseGethParams(gethGenesis: GethGenesis) {
   const extraData = addHexPrefix(unparsedExtraData ?? '')
 
   // geth may use number for timestamp
-  const timestamp: PrefixedHexString = isHexString(unparsedTimestamp)
-    ? unparsedTimestamp
-    : intToHex(Number.parseInt(unparsedTimestamp))
+  const timestamp = unparsedTimestamp as PrefixedHexString
 
   // geth may not give us a nonce strictly formatted to an 8 byte 0x-prefixed hex string
   const nonce =
@@ -250,7 +247,7 @@ function parseGethParams(gethGenesis: GethGenesis) {
     if (mergeNetsplitBlockIndex === -1) {
       params.hardforks.splice(firstPostMergeHFIndex, 0, {
         name: Hardfork.MergeNetsplitBlock,
-        block: 0,
+        block: 0n,
       })
       mergeNetsplitBlockIndex = firstPostMergeHFIndex
     }
@@ -267,14 +264,14 @@ function parseGethParams(gethGenesis: GethGenesis) {
       // If we don't have a Paris hardfork, add it at end of hardfork array
       params.hardforks.push({
         name: Hardfork.Paris,
-        block: 0,
+        block: 0n,
       })
     }
     // If we don't have a MergeNetsplitBlock hardfork, add it at end of hardfork array
     if (mergeNetsplitBlockIndex === -1) {
       params.hardforks.push({
         name: Hardfork.MergeNetsplitBlock,
-        block: 0,
+        block: 0n,
       })
       mergeNetsplitBlockIndex = firstPostMergeHFIndex
     }
@@ -283,8 +280,8 @@ function parseGethParams(gethGenesis: GethGenesis) {
   // TODO: Decide if we actually need to do this since `ForkMap` specifies the order we expect things in
   params.hardforks.sort(
     (a: ConfigHardfork, b: ConfigHardfork) =>
-      (a.block ?? Number.POSITIVE_INFINITY) -
-      (b.block ?? Number.POSITIVE_INFINITY),
+      Number(a.block ?? Number.POSITIVE_INFINITY) -
+      Number(b.block ?? Number.POSITIVE_INFINITY),
   )
 
   params.hardforks.sort((a: ConfigHardfork, b: ConfigHardfork) => {
@@ -303,7 +300,7 @@ function parseGethParams(gethGenesis: GethGenesis) {
   const latestHardfork =
     params.hardforks.length > 0 ? params.hardforks.slice(-1)[0] : undefined
   params.hardfork = latestHardfork?.name
-  params.hardforks.unshift({ name: Hardfork.Chainstart, block: 0 })
+  params.hardforks.unshift({ name: Hardfork.Chainstart, block: 0n })
 
   return params
 }

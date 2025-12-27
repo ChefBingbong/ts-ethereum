@@ -212,7 +212,7 @@ async function deployContract(
     account: walletClient.account,
     data: data as Hex,
     gas: 2_000_000n,
-    gasPrice: 1_000_000_000n, // 1 gwei
+    gasPrice: 10_000_000_000n, // 1 gwei
     nonce,
     type: 'legacy',
   })

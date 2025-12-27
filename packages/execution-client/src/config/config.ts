@@ -150,7 +150,7 @@ export class Config {
   }
 
   getNetworkDirectory(): string {
-    const networkDirName = this.chainCommon.chainName()
+    const networkDirName = this.chainCommon.chain?.name
     return `${this.options.datadir}/${networkDirName}`
   }
 

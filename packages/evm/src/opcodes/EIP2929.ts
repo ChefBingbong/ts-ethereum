@@ -29,15 +29,15 @@ export function accessAddressEIP2929(
     // selfdestruct beneficiary address reads are charged an *additional* cold access
     // if binary tree not activated
     if (chargeGas && !common.isActivatedEIP(7864)) {
-      return common.param('coldaccountaccessGas')
+      return common.getParamByEIP(2929, 'coldaccountaccessGas')
     } else if (chargeGas && common.isActivatedEIP(7864)) {
       // If binary tree is active, then the warmstoragereadGas should still be charged
       // This is because otherwise opcodes will have cost 0 (this is thus the base fee)
-      return common.param('warmstoragereadGas')
+      return common.getParamByEIP(2929, 'warmstoragereadGas')
     }
     // Warm: (selfdestruct beneficiary address reads are not charged when warm)
   } else if (chargeGas && !isSelfdestruct) {
-    return common.param('warmstoragereadGas')
+    return common.getParamByEIP(2929, 'warmstoragereadGas')
   }
   return BIGINT_0
 }
@@ -69,13 +69,13 @@ export function accessStorageEIP2929(
       chargeGas &&
       !(common.isActivatedEIP(6800) || common.isActivatedEIP(7864))
     ) {
-      return common.param('coldsloadGas')
+      return common.getParamByEIP(2929, 'coldsloadGas')
     }
   } else if (
     chargeGas &&
     (!isSstore || common.isActivatedEIP(6800) || common.isActivatedEIP(7864))
   ) {
-    return common.param('warmstoragereadGas')
+    return common.getParamByEIP(2929, 'warmstoragereadGas')
   }
   return BIGINT_0
 }
@@ -100,15 +100,15 @@ export function adjustSstoreGasEIP2929(
   if (!common.isActivatedEIP(2929)) return defaultCost
 
   const address = runState.interpreter.getAddress().bytes
-  const warmRead = common.param('warmstoragereadGas')
-  const coldSload = common.param('coldsloadGas')
+  const warmRead = common.getParamByEIP(2929, 'warmstoragereadGas')
+  const coldSload = common.getParamByEIP(2929, 'coldsloadGas')
 
   if (runState.interpreter.journal.isWarmedStorage(address, key)) {
     switch (costName) {
       case 'noop':
         return warmRead
       case 'initRefund':
-        return common.param('sstoreInitEIP2200Gas') - warmRead
+        return common.getParamByEIP(1679, 'sstoreInitEIP2200Gas') - warmRead
       case 'cleanRefund':
         return common.param('sstoreResetGas') - coldSload - warmRead
     }

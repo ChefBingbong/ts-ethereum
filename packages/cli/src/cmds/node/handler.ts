@@ -1,13 +1,12 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   initPrivateKey,
+  mainnetSchema,
   readAccounts,
   writeAccounts,
 } from '@ts-ethereum/chain-config'
@@ -27,6 +26,8 @@ import {
   genPrivateKey,
   hexToBytes,
 } from '@ts-ethereum/utils'
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import type { GlobalArgs } from '../../options/globalOptions.js'
 import type { NodeArgs } from './options.js'
 
@@ -35,7 +36,7 @@ const SHARED_ACCOUNTS_PATH = '/shared/accounts.json'
 
 export type NodeHandlerArgs = NodeArgs & GlobalArgs
 
-function createTestChainConfig(chainId: number): ChainConfig {
+function createTestChainConfig(chainId: bigint): ChainConfig {
   return {
     name: 'docker-testnet',
     chainId,
@@ -51,7 +52,7 @@ function createTestChainConfig(chainId: number): ChainConfig {
       extraData:
         '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     },
-    hardforks: [{ name: 'chainstart', block: 0 }],
+    hardforks: [{ name: 'chainstart', block: 0n }],
     bootstrapNodes: [],
   }
 }
@@ -256,10 +257,9 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
   const account = accounts[0]
 
   // Create GlobalConfig
-  const testChainConfig = createTestChainConfig(chainId)
-  const common = new GlobalConfig({
-    chain: testChainConfig,
-    hardfork: Hardfork.Chainstart,
+  const common = GlobalConfig.fromSchema({
+    schema: mainnetSchema,
+    hardfork: Hardfork.Prague,
   })
 
   // Setup bootnodes

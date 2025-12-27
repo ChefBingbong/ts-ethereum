@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { existsSync, rmSync } from 'node:fs'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import type { ChainConfig } from '@ts-ethereum/chain-config'
 import {
@@ -10,6 +9,7 @@ import {
 } from '@ts-ethereum/chain-config'
 import { getDbPaths, initDatabases } from '@ts-ethereum/db'
 import debug from 'debug'
+import { existsSync, rmSync } from 'node:fs'
 import { Config, createConfigOptions } from '../config/index'
 import { LevelDB } from '../execution/level'
 import { getLogger, type Logger } from '../logging'
@@ -31,7 +31,7 @@ const ACCOUNT_SEEDS = [
 // Simplified chain config - only Chainstart/Frontier hardfork with PoW
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
-  chainId: 12345,
+  chainId: 12345n,
   defaultHardfork: 'tangerineWhistle',
   consensus: {
     type: 'pow',
@@ -45,10 +45,10 @@ export const customChainConfig: ChainConfig = {
       '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   },
   hardforks: [
-    { name: 'chainstart', block: 0 },
-    { name: 'homestead', block: 0 },
-    { name: 'dao', block: 0 },
-    { name: 'tangerineWhistle', block: 0 },
+    { name: 'chainstart', block: 0n },
+    { name: 'homestead', block: 0n },
+    { name: 'dao', block: 0n },
+    { name: 'tangerineWhistle', block: 0n },
   ],
   bootstrapNodes: [],
 }

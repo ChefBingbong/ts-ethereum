@@ -185,7 +185,9 @@ export const dynamicGasHandlers: Map<
         (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
         runState.interpreter._evm.getPrecompile(address) === undefined &&
         !address.equals(
-          createAddressFromStackBigInt(common.param('systemAddress')),
+          createAddressFromStackBigInt(
+            common.getParamByEIP(7002, 'systemAddress'),
+          ),
         )
       ) {
         let coldAccessGas = BIGINT_0
@@ -224,7 +226,9 @@ export const dynamicGasHandlers: Map<
         (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
         runState.interpreter._evm.getPrecompile(address) === undefined &&
         !address.equals(
-          createAddressFromStackBigInt(common.param('systemAddress')),
+          createAddressFromStackBigInt(
+            common.getParamByEIP(7002, 'systemAddress'),
+          ),
         )
       ) {
         let coldAccessGas = BIGINT_0
@@ -303,7 +307,9 @@ export const dynamicGasHandlers: Map<
         (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
         runState.interpreter._evm.getPrecompile(address) === undefined &&
         !address.equals(
-          createAddressFromStackBigInt(common.param('systemAddress')),
+          createAddressFromStackBigInt(
+            common.getParamByEIP(7002, 'systemAddress'),
+          ),
         )
       ) {
         let coldAccessGas = BIGINT_0
@@ -600,7 +606,8 @@ export const dynamicGasHandlers: Map<
 
       if (common.isActivatedEIP(3860)) {
         gas +=
-          ((length + BIGINT_31) / BIGINT_32) * common.param('initCodeWordGas')
+          ((length + BIGINT_31) / BIGINT_32) *
+          common.getParamByEIP(3860, 'initCodeWordGas')
       }
 
       gas += subMemUsage(runState, offset, length, common)
@@ -866,7 +873,8 @@ export const dynamicGasHandlers: Map<
 
       if (common.isActivatedEIP(3860)) {
         gas +=
-          ((length + BIGINT_31) / BIGINT_32) * common.param('initCodeWordGas')
+          ((length + BIGINT_31) / BIGINT_32) *
+          common.getParamByEIP(3860, 'initCodeWordGas')
       }
 
       gas += common.param('keccak256WordGas') * divCeil(length, BIGINT_32)
@@ -922,8 +930,8 @@ export const dynamicGasHandlers: Map<
         }
       }
 
-      const minRetainedGas = common.param('minRetainedGas')
-      const minCalleeGas = common.param('minCalleeGas')
+      const minRetainedGas = common.getParamByEIP(7069, 'minRetainedGas')
+      const minCalleeGas = common.getParamByEIP(7069, 'minCalleeGas')
 
       const currentGasAvailable = runState.interpreter.getGasLeft() - gas
       const reducedGas = currentGasAvailable / BIGINT_64
@@ -979,8 +987,8 @@ export const dynamicGasHandlers: Map<
       // (in case if address is already warm, this charges the 100 gas)
       gas += accessAddressEIP2929(runState, toAddress.bytes, common)
 
-      const minRetainedGas = common.param('minRetainedGas')
-      const minCalleeGas = common.param('minCalleeGas')
+      const minRetainedGas = common.getParamByEIP(7069, 'minRetainedGas')
+      const minCalleeGas = common.getParamByEIP(7069, 'minCalleeGas')
 
       const currentGasAvailable = runState.interpreter.getGasLeft() - gas
       const reducedGas = currentGasAvailable / BIGINT_64
@@ -1093,8 +1101,8 @@ export const dynamicGasHandlers: Map<
       // (in case if address is already warm, this charges the 100 gas)
       gas += accessAddressEIP2929(runState, toAddress.bytes, common)
 
-      const minRetainedGas = common.param('minRetainedGas')
-      const minCalleeGas = common.param('minCalleeGas')
+      const minRetainedGas = common.getParamByEIP(7069, 'minRetainedGas')
+      const minCalleeGas = common.getParamByEIP(7069, 'minCalleeGas')
 
       const currentGasAvailable = runState.interpreter.getGasLeft() - gas
       const reducedGas = currentGasAvailable / BIGINT_64

@@ -69,7 +69,7 @@ export class VM {
    */
   constructor(opts: VMOpts = {}) {
     this.common = opts.common!
-    this.common.updateParams(opts.params ?? paramsVM)
+    this.common.updateBatchParams(opts.params ?? paramsVM)
     this.stateManager = opts.stateManager!
     this.blockchain = opts.blockchain!
     this.evm = opts.evm!
@@ -120,7 +120,7 @@ export class VM {
     const stateManager = this.stateManager.shallowCopy(downlevelCaches)
     const evmOpts = {
       ...(this.evm as any)._optsCached,
-      common: this._opts.evmOpts?.common?.copy() ?? common,
+      common: common,
       blockchain: this._opts.evmOpts?.blockchain?.shallowCopy() ?? blockchain,
       stateManager:
         this._opts.evmOpts?.stateManager?.shallowCopy(downlevelCaches) ??

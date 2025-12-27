@@ -1,19 +1,25 @@
 #!/usr/bin/env bun
 
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   readAccounts,
   readPrivateKey,
+  schemaFromChainConfig,
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
-import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
+import { BIGINT_0, bytesToHex, ecrecover } from '@ts-ethereum/utils'
+import debug from 'debug'
+import { keccak256 } from 'ethereum-cryptography/keccak.js'
+import { ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
+import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
+import { sha256 } from 'ethereum-cryptography/sha256.js'
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import {
   createWalletClient,
   defineChain,
@@ -42,16 +48,17 @@ import {
   waitForCondition,
 } from './lib/test-utils'
 
+debug.enable('p2p:*')
 const FIXTURES_DIR = path.join(import.meta.dir, 'fixtures')
 
 const NODE1_PORT = 9000
 const NODE2_PORT = 9001
-const CHAIN_ID = 12345
+const CHAIN_ID = 12345n
 const TIMEOUT_MS = 30000
 let txHash: Hex | null = null
 
 // Chain config for test network
-const testChainConfig: ChainConfig = {
+export const testChainConfig: ChainConfig = {
   name: 'sanity-test',
   chainId: CHAIN_ID,
   defaultHardfork: 'chainstart',
@@ -66,7 +73,7 @@ const testChainConfig: ChainConfig = {
     extraData:
       '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   },
-  hardforks: [{ name: 'chainstart', block: 0 }],
+  hardforks: [{ name: 'chainstart', block: 0n }],
   bootstrapNodes: [],
 }
 
@@ -139,10 +146,17 @@ async function bootNode(
   const account = accounts[accountIndex]
 
   // Create GlobalConfig
-  const common = new GlobalConfig({
-    chain: testChainConfig,
+  const common = GlobalConfig.fromSchema({
+    schema: schemaFromChainConfig(testChainConfig),
     hardfork: Hardfork.Chainstart,
-    eips: [1],
+    customCrypto: {
+      keccak256: keccak256,
+      ecrecover: ecrecover,
+      sha256: sha256,
+      ecsign: secp256k1.sign,
+      ecdsaRecover: ecdsaRecover,
+    },
+    // overrides: {...paramsBlock[EIP.EIP_1]}
   })
 
   // Setup bootnodes
@@ -154,6 +168,9 @@ async function bootNode(
     }
   }
 
+  console.log('common', common._hardforkParams.getHardforkForEIP(1))
+  console.log('common', common._hardforkParams.getParam('minimumDifficulty'))
+  console.log('common', common._hardforkParams.getParam('durationLimit'))
   // Create config
   const configOptions = await createConfigOptions({
     common,
@@ -296,6 +313,8 @@ async function checkPeerDiscovery(): Promise<{
 
     return { passed: true, details }
   } catch (error) {
+    console.log('error', error)
+    console.log('error', error.message)
     details.push(`Node 1 peers: ${node1.node.peerCount()}`)
     details.push(`Node 2 peers: ${node2.node.peerCount()}`)
     details.push(
@@ -333,6 +352,8 @@ async function checkEciesHandshake(): Promise<{
 
     return { passed: false, details: ['ETH protocol not negotiated'] }
   } catch (error) {
+    console.log('error', error)
+    console.log('error', error.message)
     details.push(
       `Error: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -389,6 +410,8 @@ async function checkStatusExchange(): Promise<{
 
     return { passed: false, details: ['Status not exchanged'] }
   } catch (error) {
+    console.log('error', error)
+    console.log('error', error.message)
     details.push(
       `Error: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -431,6 +454,8 @@ async function checkEthProtocol(): Promise<{
 
     return { passed: false, details: ['ETH protocol not active'] }
   } catch (error) {
+    console.log('error', error)
+    console.log('error', error.message)
     details.push(
       `Error: ${error instanceof Error ? error.message : String(error)}`,
     )
@@ -511,7 +536,7 @@ async function checkTransactionProcessing(): Promise<{
 
     // Define the test chain
     const testChain = defineChain({
-      id: CHAIN_ID,
+      id: Number(CHAIN_ID),
       name: 'sanity-test',
       network: 'sanity-test',
       nativeCurrency: {
@@ -547,9 +572,9 @@ async function checkTransactionProcessing(): Promise<{
       to: recipientAddress,
       value: parseEther('1'),
       nonce,
-      gasPrice: BigInt(2750000000),
-      gas: BigInt(21000),
-      // type: 'legacy',
+      gasPrice: BigInt(575000000000000),
+      gas: BigInt(500000),
+      type: 'legacy',
     } as any)
 
     details.push(`Tx sent: ${truncateHex(txHash)}`)
@@ -568,9 +593,9 @@ async function checkTransactionProcessing(): Promise<{
 
     return { passed: receipt.blockNumber !== null, details }
   } catch (error) {
-    details.push(
-      `Error: ${error instanceof Error ? error.message : String(error)}`,
-    )
+    console.log('error', error)
+    console.log('error', error.message)
+    details.push(`Error: ${error instanceof Error ? error : String(error)}`)
 
     // Transaction processing is hard without mining being fully active
     // Check if we can at least access txpool
@@ -642,6 +667,9 @@ async function checkChainConsistency(): Promise<{
 
     return { passed: node1Height === node2Height, details }
   } catch (error) {
+    console.log('error', error)
+    console.log('error', error.message)
+    console.log('error', error.stack)
     details.push(
       `Error: ${error instanceof Error ? error.message : String(error)}`,
     )

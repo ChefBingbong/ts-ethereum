@@ -5,7 +5,11 @@ import type {
   StorageDump,
   StorageRange,
 } from '@ts-ethereum/chain-config'
-import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  GlobalConfig,
+  Hardfork,
+  mainnetSchema,
+} from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address, DB } from '@ts-ethereum/utils'
@@ -97,7 +101,12 @@ export class MerkleStateManager implements StateManagerInterface {
 
     this._debug = debugDefault('statemanager:merkle')
 
-    this.common = opts.common ?? new GlobalConfig({ chain: Mainnet })
+    this.common =
+      opts.common ??
+      GlobalConfig.fromSchema({
+        schema: mainnetSchema,
+        hardfork: Hardfork.Prague,
+      })
 
     this._checkpointCount = 0
 
@@ -106,7 +115,7 @@ export class MerkleStateManager implements StateManagerInterface {
       new MerklePatriciaTrie({ useKeyHashing: true, common: this.common })
     this._storageTries = {}
 
-    this.keccakFunction = opts.common?.customCrypto.keccak256 ?? keccak_256
+    this.keccakFunction = keccak_256
 
     this.originalStorageCache = new OriginalStorageCache(
       this.getStorage.bind(this),

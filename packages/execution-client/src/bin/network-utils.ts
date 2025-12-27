@@ -1,13 +1,5 @@
 #!/usr/bin/env node
 
-import { createHash } from 'node:crypto'
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
 import { multiaddr } from '@multiformats/multiaddr'
 import type { ChainConfig, GenesisState } from '@ts-ethereum/chain-config'
 import {
@@ -17,6 +9,14 @@ import {
   createAddressFromPrivateKey,
 } from '@ts-ethereum/utils'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
+import { createHash } from 'node:crypto'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 
 export type Account = [address: Address, privateKey: Uint8Array]
 
@@ -46,7 +46,7 @@ export const ACCOUNTS_FILE = `${SHARED_DIR}/accounts.json`
 // Simplified chain config - only Chainstart/Frontier hardfork with PoW
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
-  chainId: 12345,
+  chainId: 12345n,
   defaultHardfork: 'chainstart',
   consensus: {
     type: 'pow',
@@ -59,7 +59,7 @@ export const customChainConfig: ChainConfig = {
     extraData:
       '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   },
-  hardforks: [{ name: 'chainstart', block: 0 }],
+  hardforks: [{ name: 'chainstart', block: 0n }],
   bootstrapNodes: [],
 }
 
