@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   readAccounts,
   readPrivateKey,
@@ -17,9 +15,11 @@ import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex, ecrecover } from '@ts-ethereum/utils'
 import debug from 'debug'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
-import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
+import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { sha256 } from 'ethereum-cryptography/sha256.js'
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import {
   createWalletClient,
   defineChain,
@@ -38,7 +38,15 @@ import { getLogger } from '../packages/execution-client/src/logging'
 import { ExecutionNode } from '../packages/execution-client/src/node/index'
 import { Event } from '../packages/execution-client/src/types'
 import { defaultMetricsOptions } from '../packages/metrics/src'
-import { sleep, truncateHex, waitForCondition } from './lib/test-utils'
+import {
+  type CheckResult,
+  formatCheckResult,
+  printSummary,
+  runCheck,
+  sleep,
+  truncateHex,
+  waitForCondition,
+} from './lib/test-utils'
 
 debug.enable('p2p:*')
 const FIXTURES_DIR = path.join(import.meta.dir, 'fixtures')
@@ -56,7 +64,7 @@ let txHash: Hex | null = null
 // Smart contract test constants
 const INITIAL_GREETING = 'Hello, World!'
 const SECOND_GREETING = 'Hola, Mundo!'
-const deployedContractAddress: Hex | null = null
+let deployedContractAddress: Hex | null = null
 
 // Chain config for test network
 export const testChainConfig: ChainConfig = {
@@ -89,8 +97,8 @@ interface NodeContext {
   metaDB: any
 }
 
-const node1: NodeContext | null = null
-const node2: NodeContext | null = null
+let node1: NodeContext | null = null
+let node2: NodeContext | null = null
 
 /**
  * Create genesis state with prefunded accounts
@@ -158,7 +166,7 @@ async function bootNode(
       ecdsaRecover: ecdsaRecover,
     },
     // overrides: {...paramsBlock[EIP.EIP_1]}
-  })
+  }) as GlobalConfig<Hardfork, Hardfork>
 
   // Setup bootnodes
   let bootnodes: any[] = []
@@ -677,3 +685,487 @@ async function checkChainConsistency(): Promise<{
     return { passed: false, details }
   }
 }
+
+// ============================================
+// SMART CONTRACT TESTS
+// ============================================
+
+/**
+ * Get solc input configuration
+ */
+function getSolcInput(source: string): any {
+  return {
+    language: 'Solidity',
+    sources: {
+      'Greeter.sol': {
+        content: source,
+      },
+    },
+    settings: {
+      outputSelection: {
+        '*': {
+          '*': ['abi', 'evm.bytecode'],
+        },
+      },
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  }
+}
+
+/**
+ * Compile the Greeter contract
+ */
+function compileGreeterContract(): { abi: any[]; bytecode: string } | null {
+  try {
+    const solc = require('solc')
+    const source = require('node:fs').readFileSync(GREETER_SOL_PATH, 'utf8')
+    const input = JSON.stringify(getSolcInput(source))
+    const output = JSON.parse(solc.compile(input))
+
+    if (output.errors) {
+      const errors = output.errors.filter((e: any) => e.severity === 'error')
+      if (errors.length > 0) {
+        console.error('Solidity compilation errors:', errors)
+        return null
+      }
+    }
+
+    const contract = output.contracts['Greeter.sol'].Greeter
+    return {
+      abi: contract.abi,
+      bytecode: contract.evm.bytecode.object,
+    }
+  } catch (error) {
+    console.error('Failed to compile contract:', error)
+    return null
+  }
+}
+
+const { encodeAbiParameters, encodeFunctionData, decodeFunctionResult } =
+  await import('viem')
+
+async function checkSmartContractDeploy(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
+  const details: string[] = []
+
+  if (!node1) {
+    return { passed: false, details: ['Node 1 not initialized'] }
+  }
+
+  try {
+    // Compile contract
+    details.push('Compiling Greeter.sol...')
+    const compiled = compileGreeterContract()
+    if (!compiled) {
+      return { passed: false, details: ['Contract compilation failed'] }
+    }
+    details.push('Contract compiled successfully')
+
+    const rpcUrl = `http://127.0.0.1:${node1.port + 300}`
+
+    const testChain = defineChain({
+      id: Number(CHAIN_ID),
+      name: 'sanity-test',
+      network: 'sanity-test',
+      nativeCurrency: {
+        name: 'TestETH',
+        symbol: 'TETH',
+        decimals: 18,
+      },
+      rpcUrls: {
+        default: { http: [rpcUrl] },
+        public: { http: [rpcUrl] },
+      },
+    })
+
+    const senderPrivKey = bytesToHex(node1.account[1]) as Hex
+    const senderAccount = privateKeyToAccount(senderPrivKey)
+
+    const client = createWalletClient({
+      account: senderAccount,
+      chain: testChain,
+      transport: http(rpcUrl),
+    }).extend(publicActions)
+
+    // Prepare deployment data
+    const deployData =
+      '0x' +
+      compiled.bytecode +
+      encodeAbiParameters([{ type: 'string' }], [INITIAL_GREETING]).slice(2)
+
+    const nonce = await client.getTransactionCount({
+      address: senderAccount.address,
+    })
+
+    // Send deploy transaction
+    const deployTxHash = await client.sendTransaction({
+      account: senderAccount,
+      data: deployData as Hex,
+      gas: 2_000_000n,
+      gasPrice: 10_000_000_000n,
+      nonce,
+      type: 'legacy',
+    } as any)
+
+    details.push(`Deploy tx sent: ${truncateHex(deployTxHash)}`)
+
+    // Mine a block to include the transaction
+    await node1.node.miner.assembleBlock()
+
+    // Wait for receipt
+    const receipt = await client.waitForTransactionReceipt({
+      hash: deployTxHash,
+      timeout: TIMEOUT_MS,
+      pollingInterval: 500,
+    })
+
+    if (!receipt.contractAddress) {
+      details.push('No contract address in receipt')
+      return { passed: false, details }
+    }
+
+    deployedContractAddress = receipt.contractAddress as Hex
+    details.push(
+      `Contract deployed at: ${truncateHex(deployedContractAddress)}`,
+    )
+    details.push(`Block #${receipt.blockNumber}, Gas: ${receipt.gasUsed}`)
+
+    return { passed: true, details }
+  } catch (error) {
+    console.log('Smart contract deploy error:', error)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return { passed: false, details }
+  }
+}
+
+async function checkSmartContractRead(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
+  const details: string[] = []
+
+  if (!node1) {
+    return { passed: false, details: ['Node 1 not initialized'] }
+  }
+
+  if (!deployedContractAddress) {
+    return { passed: false, details: ['Contract not deployed yet'] }
+  }
+
+  try {
+    const compiled = compileGreeterContract()
+    if (!compiled) {
+      return { passed: false, details: ['Contract compilation failed'] }
+    }
+
+    const rpcUrl = `http://127.0.0.1:${node1.port + 300}`
+
+    const testChain = defineChain({
+      id: Number(CHAIN_ID),
+      name: 'sanity-test',
+      network: 'sanity-test',
+      nativeCurrency: {
+        name: 'TestETH',
+        symbol: 'TETH',
+        decimals: 18,
+      },
+      rpcUrls: {
+        default: { http: [rpcUrl] },
+        public: { http: [rpcUrl] },
+      },
+    })
+
+    const senderPrivKey = bytesToHex(node1.account[1]) as Hex
+    const senderAccount = privateKeyToAccount(senderPrivKey)
+
+    const client = createWalletClient({
+      account: senderAccount,
+      chain: testChain,
+      transport: http(rpcUrl),
+    }).extend(publicActions)
+
+    // Call greet() function
+    const greetData = encodeFunctionData({
+      abi: compiled.abi,
+      functionName: 'greet',
+      args: [],
+    })
+
+    const result = await client.call({
+      to: deployedContractAddress,
+      data: greetData,
+    })
+
+    if (!result.data) {
+      details.push('No data returned from greet()')
+      return { passed: false, details }
+    }
+
+    const greeting = decodeFunctionResult({
+      abi: compiled.abi,
+      functionName: 'greet',
+      data: result.data,
+    }) as unknown as string
+
+    details.push(`greet() returned: "${greeting}"`)
+
+    const passed = greeting === INITIAL_GREETING
+    if (!passed) {
+      details.push(`Expected: "${INITIAL_GREETING}"`)
+    }
+
+    return { passed, details }
+  } catch (error) {
+    console.log('Smart contract read error:', error)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return { passed: false, details }
+  }
+}
+
+async function checkSmartContractWrite(): Promise<{
+  passed: boolean
+  details: string[]
+}> {
+  const details: string[] = []
+
+  if (!node1) {
+    return { passed: false, details: ['Node 1 not initialized'] }
+  }
+
+  if (!deployedContractAddress) {
+    return { passed: false, details: ['Contract not deployed yet'] }
+  }
+
+  try {
+    const compiled = compileGreeterContract()
+    if (!compiled) {
+      return { passed: false, details: ['Contract compilation failed'] }
+    }
+
+    const rpcUrl = `http://127.0.0.1:${node1.port + 300}`
+
+    const testChain = defineChain({
+      id: Number(CHAIN_ID),
+      name: 'sanity-test',
+      network: 'sanity-test',
+      nativeCurrency: {
+        name: 'TestETH',
+        symbol: 'TETH',
+        decimals: 18,
+      },
+      rpcUrls: {
+        default: { http: [rpcUrl] },
+        public: { http: [rpcUrl] },
+      },
+    })
+
+    const senderPrivKey = bytesToHex(node1.account[1]) as Hex
+    const senderAccount = privateKeyToAccount(senderPrivKey)
+
+    const client = createWalletClient({
+      account: senderAccount,
+      chain: testChain,
+      transport: http(rpcUrl),
+    }).extend(publicActions)
+
+    // Encode setGreeting call
+    const setGreetingData = encodeFunctionData({
+      abi: compiled.abi,
+      functionName: 'setGreeting',
+      args: [SECOND_GREETING],
+    })
+
+    const nonce = await client.getTransactionCount({
+      address: senderAccount.address,
+    })
+
+    // Send setGreeting transaction
+    const txHash = await client.sendTransaction({
+      account: senderAccount,
+      to: deployedContractAddress,
+      data: setGreetingData,
+      gas: 100_000n,
+      gasPrice: 10_000_000_000n,
+      nonce,
+      type: 'legacy',
+    } as any)
+
+    details.push(`setGreeting tx sent: ${truncateHex(txHash)}`)
+
+    // Mine a block
+    await node1.node.miner.assembleBlock()
+
+    // Wait for receipt
+    const receipt = await client.waitForTransactionReceipt({
+      hash: txHash,
+      timeout: TIMEOUT_MS,
+      pollingInterval: 500,
+    })
+
+    details.push(`Tx mined in block #${receipt.blockNumber}`)
+
+    // Read back the new greeting
+    const greetData = encodeFunctionData({
+      abi: compiled.abi,
+      functionName: 'greet',
+      args: [],
+    })
+
+    const result = await client.call({
+      to: deployedContractAddress,
+      data: greetData,
+    })
+
+    if (!result.data) {
+      details.push('No data returned from greet()')
+      return { passed: false, details }
+    }
+
+    const newGreeting = decodeFunctionResult({
+      abi: compiled.abi,
+      functionName: 'greet',
+      data: result.data,
+    }) as unknown as string
+
+    details.push(`New greeting: "${newGreeting}"`)
+
+    const passed = newGreeting === SECOND_GREETING
+    if (!passed) {
+      details.push(`Expected: "${SECOND_GREETING}"`)
+    }
+
+    return { passed, details }
+  } catch (error) {
+    console.log('Smart contract write error:', error)
+    details.push(
+      `Error: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return { passed: false, details }
+  }
+}
+
+// ============================================
+// MAIN EXECUTION
+// ============================================
+
+async function main(): Promise<void> {
+  console.log('\n🔬 P2P Blockchain Sanity Check\n')
+  console.log('='.repeat(60))
+
+  const results: CheckResult[] = []
+  const mainStartTime = Date.now()
+
+  try {
+    // Boot Node 1 (miner) - starts automatically during init
+    console.log('\n📦 Booting Node 1 (miner) on port', NODE1_PORT)
+    node1 = await bootNode(NODE1_PORT, true)
+    console.log('  [Node 1 started]')
+
+    // Get Node 1's enode for Node 2
+    const node1Enode = getEnodeUrl(node1)
+    console.log(`  [Enode: ${truncateHex(node1Enode)}]`)
+
+    // Boot Node 2 (non-miner, connects to Node 1) - starts automatically during init
+    console.log('\n📦 Booting Node 2 on port', NODE2_PORT)
+    node2 = await bootNode(NODE2_PORT, false, { enode: node1Enode })
+    console.log('  [Node 2 started]')
+
+    // Wait for initialization
+    console.log('\n⏳ Waiting for network initialization...')
+    await sleep(3000)
+
+    // Run checks
+    const checks: Array<{
+      name: string
+      fn: () => Promise<{ passed: boolean; details: string[] }>
+    }> = [
+      { name: 'Services Start', fn: checkServicesStart },
+      { name: 'Peer Discovery', fn: checkPeerDiscovery },
+      { name: 'ECIES Handshake', fn: checkEciesHandshake },
+      { name: 'Status Exchange', fn: checkStatusExchange },
+      { name: 'ETH Protocol', fn: checkEthProtocol },
+      { name: 'Sync & RPC', fn: checkSyncAndRpc },
+      { name: 'Transaction Processing', fn: checkTransactionProcessing },
+      { name: 'Chain Consistency', fn: checkChainConsistency },
+      { name: 'Smart Contract Deploy', fn: checkSmartContractDeploy },
+      { name: 'Smart Contract Read', fn: checkSmartContractRead },
+      { name: 'Smart Contract Write', fn: checkSmartContractWrite },
+    ]
+
+    console.log('\n' + '='.repeat(60))
+    console.log('Running checks...\n')
+
+    for (let i = 0; i < checks.length; i++) {
+      const check = checks[i]
+      const result = await runCheck(check.name, check.fn)
+      results.push(result)
+      console.log(formatCheckResult(result, i + 1, checks.length))
+    }
+
+    // Print summary
+    printSummary(results, Date.now() - mainStartTime)
+  } catch (error) {
+    console.error('\n❌ Fatal error:', error)
+    process.exitCode = 1
+  } finally {
+    // Cleanup
+    console.log('\n🧹 Cleaning up...')
+
+    if (node2) {
+      try {
+        await node2.node.stop()
+        console.log('  [Node 2 stopped]')
+      } catch (e) {
+        console.log('  [Error stopping Node 2]')
+      }
+    }
+
+    if (node1) {
+      try {
+        await node1.node.stop()
+        console.log('  [Node 1 stopped]')
+      } catch (e) {
+        console.log('  [Error stopping Node 1]')
+      }
+    }
+
+    // Clean up runtime directory
+    const runtimeDir = path.join(FIXTURES_DIR, 'runtime')
+    if (existsSync(runtimeDir)) {
+      rmSync(runtimeDir, { recursive: true, force: true })
+      console.log('  [Runtime data cleaned]')
+    }
+
+    console.log('\n✨ Done!\n')
+
+    // Exit with appropriate code
+    const allPassed = results.every((r) => r.passed)
+    process.exitCode = allPassed ? 0 : 1
+  }
+}
+
+// Handle signals
+process.on('SIGINT', async () => {
+  console.log('\n\n⚠️  Received SIGINT, cleaning up...')
+  process.exit(1)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('\n\n⚠️  Received SIGTERM, cleaning up...')
+  process.exit(1)
+})
+
+// Run main
+main().catch((error) => {
+  console.error('Unhandled error:', error)
+  process.exit(1)
+})

@@ -1,3 +1,12 @@
+/**
+ * Global Types for Chain Configuration
+ *
+ * This module provides type definitions for EIP-based parameter access
+ * and hardfork-based type guards.
+ *
+ * Re-exports schema types for convenience.
+ */
+
 import { EIP, type Hardfork } from '../fork-params/enums'
 import type {
   BerlinAndLater,
@@ -5,16 +14,11 @@ import type {
   CancunAndLater,
   ChainstartAndLater,
   ConstantinopleAndLater,
-  EIP1Params,
-  EIP606Params,
-  EIP607Params,
-  EIP608Params,
-  EIP609Params,
-  EIP663Params,
   EIP1013Params,
   EIP1153Params,
   EIP1559Params,
   EIP1679Params,
+  EIP1Params,
   EIP2384Params,
   EIP2537Params,
   EIP2565Params,
@@ -34,7 +38,12 @@ import type {
   EIP4844Params,
   EIP5133Params,
   EIP5656Params,
+  EIP606Params,
+  EIP607Params,
+  EIP608Params,
+  EIP609Params,
   EIP6206Params,
+  EIP663Params,
   EIP7002Params,
   EIP7069Params,
   EIP7251Params,
@@ -58,6 +67,26 @@ import type {
   SpuriousDragonAndLater,
   TangerineWhistleAndLater,
 } from '../types'
+
+// ============================================================================
+// Re-export Schema Types
+// ============================================================================
+
+export type {
+  ChainSchemaDef,
+  ConsensusSchemaConfig,
+  ExtractEIPsForHardfork,
+  ExtractEIPsFromHardforks,
+  ExtractSchemaHardforkNames,
+  GenesisSchemaConfig,
+  HardforkWithEIPs,
+  InferHardforkNames,
+  InferParamsFromEIPs,
+  InferParamsFromSchema,
+  UnionToIntersection,
+  ValidatedChainSchemaDef,
+  ValidatedHardforkWithEIPs,
+} from './schema.types'
 
 export interface MinHardforkFor {
   // Chainstart (always available)
