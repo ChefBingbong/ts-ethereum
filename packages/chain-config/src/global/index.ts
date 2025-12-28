@@ -55,9 +55,9 @@ export type {
 } from './param-manager'
 
 export {
+  createHardforkSchema,
   EIPAccessor,
   HardforkParamManager,
-  createHardforkSchema,
   hardforkEntry,
 } from './param-manager'
 // Schema builders
@@ -91,8 +91,8 @@ export type {
 // EIP types and mappings
 export type {
   EIPParamKeys,
-  EIPParamType,
   EIPParamsMap,
+  EIPParamType,
   EIPWithHardfork,
   EIPWithParams,
   IsEIPActiveAt,
