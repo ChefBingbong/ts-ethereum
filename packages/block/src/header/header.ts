@@ -17,14 +17,14 @@ import {
   bytesToHex,
   bytesToUtf8,
   createZeroAddress,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   hexToBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   SHA256_NULL,
-  toType,
   TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import { computeBlobGasPrice } from '../helpers'

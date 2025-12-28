@@ -5,8 +5,8 @@ import {
   hexToBytes,
   intToBytes,
   type PrefixedHexString,
-  toType,
   TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { crc32 } from '../crc'
@@ -14,8 +14,8 @@ import {
   ConsensusAlgorithm,
   ConsensusType,
   type EIP,
-  Hardfork,
   HARDFORK_ORDER,
+  Hardfork,
 } from '../fork-params/enums'
 import type {
   ChainConfig,

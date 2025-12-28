@@ -13,7 +13,8 @@ export function precompile02(opts: PrecompileInput): ExecResult {
   const sha256Function = opts.common.customCrypto.sha256 ?? sha256
   let gasUsed = opts.common.getParamByEIP(1, 'sha256Gas')
   gasUsed +=
-    opts.common.getParamByEIP(1, 'sha256WordGas') * BigInt(Math.ceil(data.length / 32))
+    opts.common.getParamByEIP(1, 'sha256WordGas') *
+    BigInt(Math.ceil(data.length / 32))
 
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)

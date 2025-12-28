@@ -38,24 +38,25 @@ import { getLogger } from '../packages/execution-client/src/logging'
 import { ExecutionNode } from '../packages/execution-client/src/node/index'
 import { Event } from '../packages/execution-client/src/types'
 import { defaultMetricsOptions } from '../packages/metrics/src'
-import {
-  type CheckResult,
-  formatCheckResult,
-  printSummary,
-  runCheck,
-  sleep,
-  truncateHex,
-  waitForCondition,
-} from './lib/test-utils'
+import { sleep, truncateHex, waitForCondition } from './lib/test-utils'
 
 debug.enable('p2p:*')
 const FIXTURES_DIR = path.join(import.meta.dir, 'fixtures')
+const GREETER_SOL_PATH = path.join(
+  import.meta.dir,
+  '../packages/execution-client/src/bin/helpers/Greeter.sol',
+)
 
 const NODE1_PORT = 9000
 const NODE2_PORT = 9001
 const CHAIN_ID = 12345n
 const TIMEOUT_MS = 30000
 let txHash: Hex | null = null
+
+// Smart contract test constants
+const INITIAL_GREETING = 'Hello, World!'
+const SECOND_GREETING = 'Hola, Mundo!'
+let deployedContractAddress: Hex | null = null
 
 // Chain config for test network
 export const testChainConfig: ChainConfig = {
@@ -197,7 +198,7 @@ async function bootNode(
     // minerPriorityAddresses: configOptions?.minerPriorityAddresses as any,
     bootnodes: _bootnodes as any,
     accounts: _accounts as any,
-  })
+  } as any)
 
   // Setup paths and databases (using runtime copy of snapshot)
   const dbPaths = {
@@ -676,102 +677,3 @@ async function checkChainConsistency(): Promise<{
     return { passed: false, details }
   }
 }
-
-// ============================================
-// MAIN
-// ============================================
-
-async function main() {
-  const startTime = Date.now()
-  const results: CheckResult[] = []
-
-  console.log('='.repeat(44))
-  console.log('  NODE SANITY CHECK')
-  console.log('='.repeat(44))
-  console.log()
-
-  // Check for snapshot
-  if (!existsSync(path.join(FIXTURES_DIR, 'accounts.json'))) {
-    console.log('ERROR: Snapshot not found. Run first:')
-    console.log('  bun scripts/generate-snapshot.ts')
-    process.exit(1)
-  }
-
-  try {
-    // Boot nodes
-    console.log('Booting Node 1 (miner)...')
-    node1 = await bootNode(NODE1_PORT, true)
-    console.log(`  Started on port ${NODE1_PORT}`)
-
-    const node1Enode = getEnodeUrl(node1)
-    console.log(`  Enode: ${truncateHex(node1Enode, 20)}...`)
-
-    console.log('Booting Node 2...')
-    node2 = await bootNode(NODE2_PORT, false, { enode: node1Enode })
-    console.log(`  Started on port ${NODE2_PORT}`)
-    console.log()
-
-    const blockNumber = await node1.node.chain.blocks.latest?.header
-    await node1.node.synchronizer?.updateSynchronizedState(blockNumber, true)
-    await node2.node.synchronizer?.updateSynchronizedState(blockNumber, true)
-
-    // Give nodes time to initialize
-
-    // Run checks
-    const checks = [
-      { name: 'Services Start', fn: checkServicesStart },
-      { name: 'Peer Discovery', fn: checkPeerDiscovery },
-      { name: 'ECIES Handshake', fn: checkEciesHandshake },
-      { name: 'Status Exchange', fn: checkStatusExchange },
-      { name: 'ETH Protocol Messages', fn: checkEthProtocol },
-      { name: 'Sync & RPC Ready', fn: checkSyncAndRpc },
-      { name: 'Transaction Processing', fn: checkTransactionProcessing },
-      { name: 'Chain Consistency', fn: checkChainConsistency },
-    ]
-
-    for (let i = 0; i < checks.length; i++) {
-      const check = checks[i]
-      const result = await runCheck(check.name, check.fn, TIMEOUT_MS)
-      results.push(result)
-      console.log(formatCheckResult(result, i + 1, checks.length))
-    }
-  } catch (error) {
-    console.error('Fatal error:', error)
-  } finally {
-    // Shutdown
-    console.log('Shutting down nodes...')
-    console.log(node1?.node.chain.config.chainCommon)
-    if (node1) {
-      node1.node.stop().catch(() => {})
-    }
-    if (node2) {
-      node2.node.stop().catch(() => {})
-    }
-
-    const totalTime = Date.now() - startTime
-    printSummary(results, totalTime)
-
-    // Exit with appropriate code
-    const allPassed = results.every((r) => r.passed)
-    process.exit(allPassed ? 0 : 1)
-  }
-}
-
-// Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\nInterrupted, shutting down...')
-  if (node1) await node1.node.stop().catch(() => {})
-  if (node2) await node2.node.stop().catch(() => {})
-  process.exit(1)
-})
-
-process.on('SIGTERM', async () => {
-  if (node1) await node1.node.stop().catch(() => {})
-  if (node2) await node2.node.stop().catch(() => {})
-  process.exit(1)
-})
-
-main().catch((error) => {
-  console.error('Unhandled error:', error)
-  process.exit(1)
-})

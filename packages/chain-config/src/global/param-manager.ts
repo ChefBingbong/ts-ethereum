@@ -2,8 +2,8 @@ import type { EIP, Hardfork } from '../fork-params/enums'
 import type { ChainConfig, ChainParams, ParamsConfig } from '../types'
 import {
   buildChainRules,
-  validateForkOrder,
   type ValidateForkOrderOpts,
+  validateForkOrder,
 } from './chain-rules'
 import {
   getCumulativeEIPs,

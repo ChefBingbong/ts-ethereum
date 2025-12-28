@@ -1,8 +1,8 @@
 import { Hardfork } from '../../fork-params/enums'
 import {
   createHardforkSchema,
-  hardforkEntry,
   HardforkParamManager,
+  hardforkEntry,
 } from '../../global/param-manager'
 import type { ChainConfig, ParamsConfig } from '../../types'
 
