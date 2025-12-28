@@ -1,4 +1,8 @@
-import { ConsensusType, type GlobalConfig } from '@ts-ethereum/chain-config'
+import {
+  ConsensusType,
+  EIP,
+  type GlobalConfig,
+} from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -219,8 +223,11 @@ export class Block {
         }
       }
       if (this.common.isActivatedEIP(4844)) {
-        const blobGasLimit = this.common.param('maxBlobGasPerBlock')
-        const blobGasPerBlob = this.common.param('blobGasPerBlob')
+        const blobGasLimit = this.common.getParamByEIP(
+          4844,
+          'maxBlobGasPerBlock',
+        )
+        const blobGasPerBlob = this.common.getParamByEIP(4844, 'blobGasPerBlob')
         if (tx instanceof Blob4844Tx) {
           blobGasUsed += BigInt(tx.numBlobs()) * blobGasPerBlob
           if (blobGasUsed > blobGasLimit) {
@@ -274,9 +281,9 @@ export class Block {
     validateBlockSize = false,
   ): Promise<void> {
     // EIP-7934: RLP Execution Block Size Limit validation
-    if (validateBlockSize && this.common.isActivatedEIP(7934)) {
+    if (validateBlockSize && this.common.isActivatedEIP(EIP.EIP_7934)) {
       const rlpEncoded = this.serialize()
-      const maxRlpBlockSize = this.common.param('maxRlpBlockSize')
+      const maxRlpBlockSize = this.common.getParamByEIP(7934, 'maxRlpBlockSize')
       if (rlpEncoded.length > maxRlpBlockSize) {
         const msg = this._errorMsg(
           `Block size exceeds maximum RLP block size limit: ${rlpEncoded.length} bytes > ${maxRlpBlockSize} bytes`,
@@ -337,8 +344,8 @@ export class Block {
    */
   validateBlobTransactions(parentHeader: BlockHeader) {
     if (this.common.isActivatedEIP(4844)) {
-      const blobGasLimit = this.common.param('maxBlobGasPerBlock')
-      const blobGasPerBlob = this.common.param('blobGasPerBlob')
+      const blobGasLimit = this.common.getParamByEIP(4844, 'maxBlobGasPerBlock')
+      const blobGasPerBlob = this.common.getParamByEIP(4844, 'blobGasPerBlob')
       let blobGasUsed = BIGINT_0
 
       const expectedExcessBlobGas = parentHeader.calcNextExcessBlobGas(

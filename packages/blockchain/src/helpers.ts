@@ -1,9 +1,9 @@
-import type {
-  Chain,
-  GenesisState,
-  GlobalConfig,
+import {
+  type Chain,
+  ChainGenesis,
+  type GenesisState,
+  type GlobalConfig,
 } from '@ts-ethereum/chain-config'
-import { ChainGenesis } from '@ts-ethereum/chain-config'
 import { genesisMPTStateRoot } from '@ts-ethereum/mpt'
 
 /**
@@ -26,7 +26,7 @@ export async function genGenesisStateRoot(
   const genCommon = common.copy()
   genCommon.setHardforkBy({
     blockNumber: 0,
-    timestamp: genCommon.genesis().timestamp,
+    timestamp: genCommon.genesis()?.timestamp ?? 0,
   })
   return genesisMPTStateRoot(genesisState)
 }

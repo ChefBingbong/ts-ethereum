@@ -2,7 +2,7 @@ import type { ChainConfig } from '@ts-ethereum/chain-config'
 
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
-  chainId: 12345,
+  chainId: 12345n,
   defaultHardfork: 'byzantium',
   consensus: {
     type: 'pow',
@@ -18,51 +18,51 @@ export const customChainConfig: ChainConfig = {
   hardforks: [
     {
       name: 'chainstart',
-      block: 0,
+      block: 0n,
     },
     {
       name: 'homestead',
-      block: 1,
+      block: 1n,
     },
     {
       name: 'tangerineWhistle',
-      block: 2,
+      block: 2n,
     },
     {
       name: 'spuriousDragon',
-      block: 3,
+      block: 3n,
     },
     {
       name: 'byzantium',
-      block: 4,
+      block: 4n,
     },
     {
       name: 'constantinople',
-      block: 5,
+      block: 5n,
     },
     {
       name: 'petersburg',
-      block: 6,
+      block: 6n,
     },
     {
       name: 'istanbul',
-      block: 7,
+      block: 7n,
     },
     {
       name: 'muirGlacier',
-      block: 8,
+      block: 8n,
     },
     {
       name: 'berlin',
-      block: 9,
+      block: 9n,
     },
     {
       name: 'london',
-      block: 10,
+      block: 10n,
     },
     {
       name: 'paris',
-      block: 11,
+      block: 11n,
     },
   ],
   bootstrapNodes: [

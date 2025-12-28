@@ -1,5 +1,9 @@
-import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
-import { SimpleStateManager } from '@ts-ethereum/state-manager'
+import {
+  GlobalConfig,
+  Hardfork,
+  mainnetSchema,
+} from '@ts-ethereum/chain-config'
+import { MerkleStateManager } from '@ts-ethereum/state-manager'
 import type { EVMOpts } from './index'
 import { EVM } from './index'
 import { NobleBN254 } from './precompiles/index'
@@ -18,8 +22,8 @@ export async function createEVM(createOpts?: EVMOpts) {
   opts.bn254 = new NobleBN254()
 
   if (opts.common === undefined) {
-    opts.common = new GlobalConfig({
-      chain: Mainnet,
+    opts.common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
       hardfork: Hardfork.Prague,
     })
   }
@@ -29,7 +33,7 @@ export async function createEVM(createOpts?: EVMOpts) {
   }
 
   if (opts.stateManager === undefined) {
-    opts.stateManager = new SimpleStateManager()
+    opts.stateManager = new MerkleStateManager(opts)
   }
 
   return new EVM(opts)

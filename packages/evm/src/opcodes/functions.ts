@@ -655,9 +655,14 @@ export const handlers: Map<number, OpHandler> = new Map([
         }
 
         const historyAddress = new Address(
-          bigIntToAddressBytes(common.param('historyStorageAddress')),
+          bigIntToAddressBytes(
+            common.getParamByEIP(2935, 'historyStorageAddress'),
+          ),
         )
-        const historyServeWindow = common.param('historyServeWindow')
+        const historyServeWindow = common.getParamByEIP(
+          2935,
+          'historyServeWindow',
+        )
         const key = setLengthLeft(
           bigIntToBytes(number % historyServeWindow),
           32,
@@ -1457,7 +1462,7 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       if (
         common.isActivatedEIP(3860) &&
-        length > Number(common.param('maxInitCodeSize')) &&
+        length > Number(common.getParamByEIP(3860, 'maxInitCodeSize')) &&
         !runState.interpreter._evm.allowUnlimitedInitCodeSize
       ) {
         trap(EVMError.errorMessages.INITCODE_SIZE_VIOLATION)
@@ -1493,7 +1498,7 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       if (
         common.isActivatedEIP(3860) &&
-        length > Number(common.param('maxInitCodeSize')) &&
+        length > Number(common.getParamByEIP(3860, 'maxInitCodeSize')) &&
         !runState.interpreter._evm.allowUnlimitedInitCodeSize
       ) {
         trap(EVMError.errorMessages.INITCODE_SIZE_VIOLATION)

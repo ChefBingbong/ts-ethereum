@@ -28,7 +28,7 @@ export type EthashConfig = any
 // Kept for compatibility but Casper is not used
 export type CasperConfig = any
 
-type ConsensusConfig = {
+export type ConsensusConfig = {
   type: ConsensusType | string
   algorithm: ConsensusAlgorithm | string
   clique?: CliqueConfig
@@ -38,7 +38,7 @@ type ConsensusConfig = {
 
 export interface ChainConfig {
   name: string
-  chainId: number | string
+  chainId: bigint
   defaultHardfork?: Hardfork
   comment?: string
   url?: string
@@ -64,9 +64,10 @@ export interface GenesisBlockConfig {
 
 export interface HardforkTransitionConfig {
   name: Hardfork | string
-  block: number | null
+  block: bigint | null
   timestamp?: number | string
   forkHash?: PrefixedHexString | null
+  optional?: boolean
 }
 
 export interface BootstrapNodeConfig {
@@ -308,6 +309,10 @@ export interface EIP1Params {
   difficultyBombDelay: bigint
 }
 
+export interface EIP7934Params {
+  maxRlpBlockSize: bigint
+}
+
 /** EIP-606: Homestead */
 export interface EIP606Params {
   delegatecallGas: bigint
@@ -349,13 +354,13 @@ export interface EIP609Params {
 /** EIP-1013: Constantinople */
 export interface EIP1013Params {
   // Net gas metering (can be nullified by EIP-1716)
-  netSstoreNoopGas: bigint | null
-  netSstoreInitGas: bigint | null
-  netSstoreCleanGas: bigint | null
-  netSstoreDirtyGas: bigint | null
-  netSstoreClearRefundGas: bigint | null
-  netSstoreResetRefundGas: bigint | null
-  netSstoreResetClearRefundGas: bigint | null
+  netSstoreNoopGas: bigint
+  netSstoreInitGas: bigint
+  netSstoreCleanGas: bigint
+  netSstoreDirtyGas: bigint
+  netSstoreClearRefundGas: bigint
+  netSstoreResetRefundGas: bigint
+  netSstoreResetClearRefundGas: bigint
   // Bitwise shift opcodes
   shlGas: bigint
   shrGas: bigint
@@ -509,6 +514,7 @@ export interface EIP2935Params {
 
 /** EIP-7002: Execution layer triggerable withdrawals */
 export interface EIP7002Params {
+  systemAddress: bigint // Used with bigIntToAddressBytes
   withdrawalRequestPredeployAddress: bigint // Used with bigIntToBytes
 }
 
@@ -532,12 +538,12 @@ export interface EIP7691Params {
 /** EIP-7702: Set EOA account code */
 export interface EIP7702Params {
   perAuthBaseGas: bigint
-  perEmptyAccountCost: number // Used with Number() cast
+  perEmptyAccountCost: bigint // Used with Number() cast
 }
 
 /** EIP-7594: PeerDAS */
 export interface EIP7594Params {
-  maxBlobsPerTx: number // Count - used as number
+  maxBlobsPerTx: bigint // Count - used as number
 }
 
 /** EIP-7825: Transaction Gas Limit Cap */
@@ -705,6 +711,7 @@ export interface HardforkMetadata {
 // berlin -> london -> arrowGlacier -> grayGlacier -> mergeNetsplitBlock ->
 // paris -> shanghai -> cancun -> prague -> osaka -> bpo1-5
 
+export type ChainstartAndLater = Hardfork
 /** Hardforks at or after Homestead (EIP-606) */
 export type HomesteadAndLater = Exclude<Hardfork, 'chainstart'>
 
@@ -838,7 +845,7 @@ export type OsakaAndLater = 'osaka' | 'bpo1' | 'bpo2' | 'bpo3' | 'bpo4' | 'bpo5'
 // Hardfork-Specific Param Groups (Composed from EIP interfaces)
 // These directly mirror the params in fork-params/*.ts
 // ============================================================================
-
+export type ChainstartParams = EIP1Params & EIP7934Params
 /** Params at Homestead+ (EIP-606) */
 export type HomesteadParams = EIP606Params
 
@@ -943,3 +950,14 @@ export type MergedParamsAtHardfork<H extends Hardfork> =
     (H extends PragueAndLater ? PragueParams : {}) &
     // Osaka (EIP-7594, EIP-7825, EIP-7939, EOF EIPs)
     (H extends OsakaAndLater ? OsakaParams : {})
+
+export const OPTIONAL_HARDFORKS: Set<Hardfork> = new Set([
+  'chainstart',
+  'homestead',
+  'london',
+  'paris',
+  'shanghai',
+  'cancun',
+  'prague',
+  'osaka',
+])

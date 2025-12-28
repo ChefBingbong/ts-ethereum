@@ -31,7 +31,7 @@ const ACCOUNT_SEEDS = [
 // Simplified chain config - only Chainstart/Frontier hardfork with PoW
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
-  chainId: 12345,
+  chainId: 12345n,
   defaultHardfork: 'tangerineWhistle',
   consensus: {
     type: 'pow',
@@ -45,10 +45,10 @@ export const customChainConfig: ChainConfig = {
       '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   },
   hardforks: [
-    { name: 'chainstart', block: 0 },
-    { name: 'homestead', block: 0 },
-    { name: 'dao', block: 0 },
-    { name: 'tangerineWhistle', block: 0 },
+    { name: 'chainstart', block: 0n },
+    { name: 'homestead', block: 0n },
+    { name: 'dao', block: 0n },
+    { name: 'tangerineWhistle', block: 0n },
   ],
   bootstrapNodes: [],
 }

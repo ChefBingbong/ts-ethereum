@@ -1,4 +1,8 @@
-import { GlobalConfig, Hardfork } from '@ts-ethereum/chain-config'
+import {
+  GlobalConfig,
+  Hardfork,
+  mainnetSchema,
+} from '@ts-ethereum/chain-config'
 import { createLegacyTx } from '@ts-ethereum/tx'
 import { bytesToHex, equalsBytes, hexToBytes } from '@ts-ethereum/utils'
 import { assert, describe, it } from 'vitest'
@@ -13,14 +17,13 @@ import {
   genTransactionsTrieRoot,
   paramsBlock,
 } from '../../src/index.ts'
-import { goerliChainConfig, Mainnet } from './testdata/chainConfigs/index.ts'
 import { genesisHashesTestData } from './testdata/genesisHashesTest.ts'
 import { testdataFromRPCGoerliData } from './testdata/testdata-from-rpc-goerli.ts'
 
 describe('[Block]: block functions', () => {
   it('should test block initialization', () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
       hardfork: Hardfork.Chainstart,
     })
     const genesis = createBlock({}, { common })
@@ -93,7 +96,7 @@ describe('[Block]: block functions', () => {
   })
 
   it('should initialize with null parameters without throwing', () => {
-    const common = new GlobalConfig({ chain: Mainnet })
+    const common = GlobalConfig.fromSchema({ schema: mainnetSchema })
     const opts = { common }
     assert.doesNotThrow(() => {
       createBlock({}, opts)
@@ -101,8 +104,8 @@ describe('[Block]: block functions', () => {
   })
 
   it('should test block validation on poa chain', async () => {
-    const common = new GlobalConfig({
-      chain: goerliChainConfig,
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
       hardfork: Hardfork.Chainstart,
     })
 
@@ -190,8 +193,8 @@ describe('[Block]: block functions', () => {
         },
       },
       {
-        common: new GlobalConfig({
-          chain: Mainnet,
+        common: GlobalConfig.fromSchema({
+          schema: mainnetSchema,
           hardfork: Hardfork.Chainstart,
         }),
       },
@@ -207,8 +210,8 @@ describe('[Block]: block functions', () => {
   })
 
   it('should test genesis hashes (mainnet default)', () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
       hardfork: Hardfork.Chainstart,
     })
     const rlp = hexToBytes(`0x${genesisHashesTestData.test.genesis_rlp_hex}`)

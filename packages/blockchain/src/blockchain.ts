@@ -6,7 +6,7 @@ import {
   ConsensusType,
   GlobalConfig,
   Hardfork,
-  Mainnet,
+  mainnetSchema,
 } from '@ts-ethereum/chain-config'
 import { Ethash } from '@ts-ethereum/consensus'
 import type { BigIntLike, DB, DBObject } from '@ts-ethereum/utils'
@@ -125,10 +125,9 @@ export class Blockchain implements BlockchainInterface {
     if (opts.common) {
       this.common = opts.common
     } else {
-      const DEFAULT_CHAIN = Mainnet
       const DEFAULT_HARDFORK = Hardfork.Chainstart
-      this.common = new GlobalConfig({
-        chain: DEFAULT_CHAIN,
+      this.common = GlobalConfig.fromSchema({
+        schema: mainnetSchema,
         hardfork: DEFAULT_HARDFORK,
       })
     }
@@ -600,7 +599,7 @@ export class Blockchain implements BlockchainInterface {
       const londonHfBlock = this.common.hardforkBlock(Hardfork.London)
       const isInitialEIP1559Block = number === londonHfBlock
       if (isInitialEIP1559Block) {
-        expectedBaseFee = header.common.param('initialBaseFee')
+        expectedBaseFee = header.common.getParamByEIP(1559, 'initialBaseFee')
       } else {
         expectedBaseFee = parentHeader.calcNextBaseFee()
       }
@@ -1416,7 +1415,7 @@ export class Blockchain implements BlockchainInterface {
     const common = this.common.copy()
     common.setHardforkBy({
       blockNumber: 0,
-      timestamp: common.genesis().timestamp,
+      timestamp: common.genesis()?.timestamp ?? BIGINT_0,
     })
 
     const header: HeaderData = {
@@ -1427,9 +1426,9 @@ export class Blockchain implements BlockchainInterface {
       requestsHash: common.isActivatedEIP(7685) ? SHA256_NULL : undefined,
     }
     if (common.consensusType() === 'poa') {
-      if (common.genesis().extraData) {
+      if (common.genesis()?.extraData) {
         // Ensure extra data is populated from genesis data if provided
-        header.extraData = common.genesis().extraData
+        header.extraData = common.genesis()?.extraData
       } else {
         // Add required extraData (32 bytes vanity + 65 bytes filled with zeroes
         header.extraData = concatBytes(new Uint8Array(32), new Uint8Array(65))

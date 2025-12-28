@@ -2,7 +2,7 @@ import type { ChainConfig } from '@ts-ethereum/chain-config'
 
 export const Mainnet: ChainConfig = {
   name: 'mainnet',
-  chainId: 1,
+  chainId: 1n,
   defaultHardfork: 'prague',
   consensus: {
     type: 'pow',
@@ -19,79 +19,79 @@ export const Mainnet: ChainConfig = {
   hardforks: [
     {
       name: 'chainstart',
-      block: 0,
+      block: 0n,
       forkHash: '0xfc64ec04',
     },
     {
       name: 'homestead',
-      block: 1150000,
+      block: 1150000n,
       forkHash: '0x97c2c34c',
     },
     {
       name: 'dao',
-      block: 1920000,
+      block: 1920000n,
       forkHash: '0x91d1f948',
     },
     {
       name: 'tangerineWhistle',
-      block: 2463000,
+      block: 2463000n,
       forkHash: '0x7a64da13',
     },
     {
       name: 'spuriousDragon',
-      block: 2675000,
+      block: 2675000n,
       forkHash: '0x3edd5b10',
     },
     {
       name: 'byzantium',
-      block: 4370000,
+      block: 4370000n,
       forkHash: '0xa00bc324',
     },
     {
       name: 'constantinople',
-      block: 7280000,
+      block: 7280000n,
       forkHash: '0x668db0af',
     },
     {
       name: 'petersburg',
-      block: 7280000,
+      block: 7280000n,
       forkHash: '0x668db0af',
     },
     {
       name: 'istanbul',
-      block: 9069000,
+      block: 9069000n,
       forkHash: '0x879d6e30',
     },
     {
       name: 'muirGlacier',
-      block: 9200000,
+      block: 9200000n,
       forkHash: '0xe029e991',
     },
     {
       name: 'berlin',
-      block: 12244000,
+      block: 12244000n,
       forkHash: '0x0eb440f6',
     },
     {
       name: 'london',
-      block: 12965000,
+      block: 12965000n,
       forkHash: '0xb715077d',
     },
     {
       name: 'arrowGlacier',
-      block: 13773000,
+      block: 13773000n,
       forkHash: '0x20c327fc',
     },
     {
       name: 'grayGlacier',
-      block: 15050000,
+      block: 15050000n,
       forkHash: '0xf0afd0e3',
     },
     {
       // The forkHash will remain same as mergeNetsplitBlock is post merge
       // terminal block: https://etherscan.io/block/15537393
       name: 'paris',
-      block: 15537394,
+      block: 15537394n,
       forkHash: '0xf0afd0e3',
     },
     {

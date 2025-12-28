@@ -14,7 +14,7 @@ import {
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import * as Legacy from '../capabilities/legacy'
-import { paramsTx } from '../index'
+import { paramsTx } from '../params'
 import type {
   TxData as AllTypesTxData,
   TxValuesArray as AllTypesTxValuesArray,
@@ -139,7 +139,7 @@ export class LegacyTx
     valueOverflowCheck({ gasPrice: this.gasPrice })
 
     // Everything from BaseTransaction done here
-    this.common.updateParams(opts.params ?? paramsTx) // TODO should this move higher?
+    this.common.updateBatchParams(opts.params ?? paramsTx) // TODO should this move higher?
 
     const chainId = validateVAndExtractChainID(this.common, this.v)
     if (chainId !== undefined && chainId !== this.common.chainId()) {

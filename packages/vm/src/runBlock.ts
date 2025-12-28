@@ -526,9 +526,11 @@ export async function accumulateParentBlockHash(
     )
   }
   const historyAddress = new Address(
-    bigIntToAddressBytes(vm.common.param('historyStorageAddress')),
+    bigIntToAddressBytes(
+      vm.common.getParamByEIP(2935, 'historyStorageAddress'),
+    ),
   )
-  const historyServeWindow = vm.common.param('historyServeWindow')
+  const historyServeWindow = vm.common.getParamByEIP(2935, 'historyServeWindow')
 
   // getAccount with historyAddress will throw error as witnesses are not bundled
   // but we need to put account so as to query later for slot
@@ -575,7 +577,10 @@ export async function accumulateParentBeaconBlockRoot(
     )
   }
   // Save the parentBeaconBlockRoot to the beaconroot stateful precompile ring buffers
-  const historicalRootsLength = BigInt(vm.common.param('historicalRootsLength'))
+  const historicalRootsLength = vm.common.getParamByEIP(
+    4788,
+    'historicalRootsLength',
+  )
   const timestampIndex = timestamp % historicalRootsLength
   const timestampExtended = timestampIndex + historicalRootsLength
 
@@ -641,7 +646,8 @@ async function applyTransactions(vm: VM, block: Block, opts: RunBlockOpts) {
     let maxGasLimit
     if (vm.common.isActivatedEIP(1559)) {
       maxGasLimit =
-        block.header.gasLimit * vm.common.param('elasticityMultiplier')
+        block.header.gasLimit *
+        vm.common.getParamByEIP(1559, 'elasticityMultiplier')
     } else {
       maxGasLimit = block.header.gasLimit
     }
@@ -782,7 +788,7 @@ export function calculateMinerReward(
   ommersNum: number,
 ): bigint {
   // calculate nibling reward
-  const niblingReward = minerReward / BigInt(32)
+  const niblingReward = BigInt(minerReward) / BigInt(32)
   const totalNiblingReward = niblingReward * BigInt(ommersNum)
   const reward = minerReward + totalNiblingReward
   return reward

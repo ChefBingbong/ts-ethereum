@@ -39,7 +39,6 @@ import type {
 } from './opcodes/gas'
 import type { OpcodeList, OpcodeMap, OpHandler } from './opcodes/index'
 import { getOpcodesForHF } from './opcodes/index'
-import { paramsEVM } from './params'
 import type { CustomPrecompile, PrecompileFunc } from './precompiles/index'
 import {
   getActivePrecompiles,
@@ -315,7 +314,7 @@ export class EVM implements EVMInterface {
       )
     }
 
-    this.common.updateParams(opts.params ?? paramsEVM)
+    this.common.updateBatchParams(opts.params ?? {})
 
     this.allowUnlimitedContractSize = opts.allowUnlimitedContractSize ?? false
     this.allowUnlimitedInitCodeSize = opts.allowUnlimitedInitCodeSize ?? false
@@ -599,7 +598,8 @@ export class EVM implements EVMInterface {
 
     if (this.common.isActivatedEIP(3860)) {
       if (
-        message.data.length > Number(this.common.param('maxInitCodeSize')) &&
+        message.data.length >
+          Number(this.common.getParamByEIP(3860, 'maxInitCodeSize')) &&
         !this.allowUnlimitedInitCodeSize
       ) {
         return {

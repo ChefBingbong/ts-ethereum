@@ -1169,7 +1169,7 @@ export class Interpreter {
 
     if (this.common.isActivatedEIP(3860)) {
       if (
-        codeToRun.length > Number(this.common.param('maxInitCodeSize')) &&
+        codeToRun.length > this.common.getParamByEIP(3860, 'maxInitCodeSize') &&
         this._evm.allowUnlimitedInitCodeSize === false
       ) {
         return BIGINT_0

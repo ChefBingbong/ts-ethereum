@@ -1,4 +1,8 @@
-import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  GlobalConfig,
+  Hardfork,
+  mainnetSchema,
+} from '@ts-ethereum/chain-config'
 import {
   Address,
   bigIntToHex,
@@ -10,8 +14,6 @@ import {
   MAX_UINT64,
   toBytes,
 } from '@ts-ethereum/utils'
-
-import { paramsTx } from '../params'
 
 import type {
   TransactionInterface,
@@ -26,7 +28,13 @@ import type {
  * @returns GlobalConfig instance (copied if provided, new Mainnet instance if not)
  */
 export function getCommon(common?: GlobalConfig): GlobalConfig {
-  return common?.copy() ?? new GlobalConfig({ chain: Mainnet })
+  return (
+    common?.copy() ??
+    GlobalConfig.fromSchema({
+      schema: mainnetSchema,
+      hardfork: Hardfork.Prague,
+    })
+  )
 }
 
 /**
@@ -148,7 +156,7 @@ export function sharedConstructor(
 ) {
   // LOAD base tx super({ ...txData, type: TransactionType.Legacy }, opts)
   tx.common = getCommon(opts.common)
-  tx.common.updateParams(opts.params ?? paramsTx)
+  tx.common.updateBatchParams(opts.params ?? {})
 
   validateNotArray(txData) // is this necessary?
 
@@ -188,7 +196,7 @@ export function sharedConstructor(
 
   // EIP-7825: Transaction Gas Limit Cap
   if (tx.common.isActivatedEIP(7825)) {
-    const maxGasLimit = tx.common.param('maxTransactionGasLimit')
+    const maxGasLimit = tx.common.getParamByEIP(7825, 'maxTransactionGasLimit')
     if (tx.gasLimit > maxGasLimit) {
       throw EthereumJSErrorWithoutCode(
         `Transaction gas limit ${tx.gasLimit} exceeds the maximum allowed by EIP-7825 (${maxGasLimit})`,

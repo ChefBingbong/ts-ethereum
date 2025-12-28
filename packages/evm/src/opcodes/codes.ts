@@ -450,7 +450,7 @@ export function getOpcodesForHF(
 
   for (const key in opcodeBuilder) {
     const baseFee = Number(
-      common.param(`${opcodeBuilder[key].name.toLowerCase()}Gas`),
+      common.param(`${opcodeBuilder[key].name.toLowerCase()}Gas` as any),
     )
     // explicitly verify that we have defined a base fee
     if (baseFee === undefined) {

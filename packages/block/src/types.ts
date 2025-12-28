@@ -197,6 +197,7 @@ export interface JSONRPCBlock {
   logsBloom: PrefixedHexString // the bloom filter for the logs of the block.
   transactionsRoot: PrefixedHexString // the root of the transaction trie of the block.
   stateRoot: PrefixedHexString // the root of the final state trie of the block.
+  // accessList: Array<AccessListEntry> // the access list for the block.
   receiptsRoot: PrefixedHexString // the root of the receipts trie of the block.
   miner: PrefixedHexString // the address of the beneficiary to whom the mining rewards were given.
   difficulty: PrefixedHexString | NumericString // integer of the difficulty for this block. Can be a 0x-prefixed hex string or a string integer

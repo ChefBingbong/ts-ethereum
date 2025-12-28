@@ -28,7 +28,7 @@ export async function precompile0e(opts: PrecompileInput): Promise<ExecResult> {
   }
 
   const numPairs = Math.floor(opts.data.length / 288)
-  const gasUsedPerPair = opts.common.param('bls12381G2MulGas')
+  const gasUsedPerPair = opts.common.getParamByEIP(2537, 'bls12381G2MulGas')
   const gasUsed = msmGasUsed(
     numPairs,
     gasUsedPerPair,

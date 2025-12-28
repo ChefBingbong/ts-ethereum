@@ -83,21 +83,22 @@ export async function runTwoNodeExample(): Promise<void> {
     node2Key.raw.length === 32 ? node2Key.raw : node2Key.raw.slice(-32)
 
   // Setup GlobalConfig
+  // @ts-expect-error - GlobalConfig is not a constructor
   const common = new GlobalConfig({
     chain: {
       name: 'testnet',
-      chainId: 1,
+      chainId: 1n,
       genesis: {
         gasLimit: 5000,
         difficulty: '0x10',
         nonce: '0x0000000000000000',
         extraData: '0x',
-      },
+      } as any,
       hardforks: [],
       bootstrapNodes: [],
       consensus: { type: 'pow', algorithm: 'ethash' },
-    },
-  } as any)
+    } as any,
+  } as any) as any
 
   const port1 = 30303
   const port2 = 30304

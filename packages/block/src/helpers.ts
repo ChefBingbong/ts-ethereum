@@ -161,9 +161,9 @@ export const computeBlobGasPrice = (
   common: GlobalConfig,
 ) => {
   return fakeExponential(
-    common.param('minBlobGas'),
+    common.getParamByEIP(4844, 'minBlobGas'),
     excessBlobGas,
-    common.param('blobGasPriceUpdateFraction'),
+    common.getParamByEIP(4844, 'blobGasPriceUpdateFraction'),
   )
 }
 

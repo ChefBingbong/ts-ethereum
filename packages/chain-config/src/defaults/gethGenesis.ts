@@ -1,9 +1,9 @@
 import {
   addHexPrefix,
   bigIntToHex,
-  isHexString,
   type PrefixedHexString,
 } from '@ts-ethereum/utils'
+import type { ConsensusConfig } from '../types'
 
 /**
  * Interface for Geth Genesis Config
@@ -85,20 +85,21 @@ export interface GethGenesisBlobSchedule {
  */
 export interface GethGenesis {
   config: GethGenesisConfig
-  name?: string
-  excessBlobGas?: string
-  requestsHash?: string
-  nonce: string
-  timestamp: string
-  extraData?: string
-  gasLimit: PrefixedHexString
+  name: string
+  excessBlobGas?: PrefixedHexString
+  requestsHash?: PrefixedHexString
+  nonce: PrefixedHexString
+  timestamp?: PrefixedHexString
+  extraData?: PrefixedHexString
+  gasLimit: PrefixedHexString | number
   difficulty?: PrefixedHexString
   mixHash?: PrefixedHexString
   coinbase?: PrefixedHexString
-  alloc: GethGenesisAlloc
+  alloc?: GethGenesisAlloc
   number?: PrefixedHexString
   gasUsed?: PrefixedHexString
   parentHash?: PrefixedHexString
+  consensus?: ConsensusConfig
   baseFeePerGas?: PrefixedHexString | number | null
 }
 
@@ -154,29 +155,21 @@ export interface GenesisState {
  * @returns Parsed {@link GenesisState}
  */
 export function parseGethGenesisState(gethGenesis: GethGenesis): GenesisState {
+  const genesisAllocation = Object.entries(gethGenesis?.alloc ?? {})
   const state: GenesisState = {}
 
-  for (const address of Object.keys(gethGenesis.alloc)) {
-    const {
-      balance: rawBalance,
-      code: rawCode,
-      nonce: rawNonce,
-      storage: rawStorage,
-    } = gethGenesis.alloc[address]
-    // create a map with lowercase for easy lookups
+  if (genesisAllocation.length === 0) return state
+
+  for (const [address, genState] of genesisAllocation) {
     const prefixedAddress = addHexPrefix(address.toLowerCase())
-    const balance = isHexString(rawBalance)
-      ? rawBalance
-      : bigIntToHex(BigInt(rawBalance))
-    const code = rawCode !== undefined ? addHexPrefix(rawCode) : undefined
-    const storage =
-      rawStorage !== undefined
-        ? (Object.entries(rawStorage).map((storagePair) =>
-            storagePair.map(addHexPrefix),
-          ) as StoragePair[])
-        : undefined
-    const nonce = rawNonce !== undefined ? addHexPrefix(rawNonce) : undefined
-    state[prefixedAddress] = [balance, code, storage, nonce]
+    const balance = bigIntToHex(BigInt(genState.balance))
+    const code = genState.code && addHexPrefix(genState.code)
+
+    const entries = Object.entries(genState.storage ?? {})
+    const storage = entries.map((s) => s.map(addHexPrefix)) as StoragePair[]
+
+    const nonce = genState.nonce && addHexPrefix(genState.nonce)
+    state[prefixedAddress] = [balance, code, storage, nonce] as AccountState
   }
   return state
 }

@@ -44,9 +44,7 @@ export const accumulateRequests = async (
   const common = vm.common
 
   if (common.isActivatedEIP(6110)) {
-    const depositContractAddress =
-      vm.common['_chainParams'].depositContractAddress ??
-      Mainnet.depositContractAddress
+    const depositContractAddress = Mainnet.depositContractAddress
     if (depositContractAddress === undefined)
       throw EthereumJSErrorWithoutCode(
         'deposit contract address required with EIP 6110',
@@ -77,13 +75,15 @@ const accumulateWithdrawalsRequest = async (
 ): Promise<CLRequest<typeof CLRequestType.Withdrawal>> => {
   // Partial withdrawals logic
   const addressBytes = setLengthLeft(
-    bigIntToBytes(vm.common.param('withdrawalRequestPredeployAddress')),
+    bigIntToBytes(
+      vm.common.getParamByEIP(7002, 'withdrawalRequestPredeployAddress'),
+    ),
     20,
   )
   const withdrawalsAddress = createAddressFromString(bytesToHex(addressBytes))
 
   const systemAddressBytes = bigIntToAddressBytes(
-    vm.common.param('systemAddress'),
+    vm.common.getParamByEIP(7002, 'systemAddress'),
   )
   const systemAddress = createAddressFromString(bytesToHex(systemAddressBytes))
   const systemAccount = await vm.stateManager.getAccount(systemAddress)
@@ -115,7 +115,9 @@ const accumulateConsolidationsRequest = async (
 ): Promise<CLRequest<typeof CLRequestType.Consolidation>> => {
   // Partial withdrawals logic
   const addressBytes = setLengthLeft(
-    bigIntToBytes(vm.common.param('consolidationRequestPredeployAddress')),
+    bigIntToBytes(
+      vm.common.getParamByEIP(7251, 'consolidationRequestPredeployAddress'),
+    ),
     20,
   )
   const consolidationsAddress = createAddressFromString(
@@ -123,7 +125,7 @@ const accumulateConsolidationsRequest = async (
   )
 
   const systemAddressBytes = bigIntToAddressBytes(
-    vm.common.param('systemAddress'),
+    vm.common.getParamByEIP(7002, 'systemAddress'),
   )
   const systemAddress = createAddressFromString(bytesToHex(systemAddressBytes))
   const systemAccount = await vm.stateManager.getAccount(systemAddress)

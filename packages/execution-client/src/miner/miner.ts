@@ -228,7 +228,7 @@ export class Miner {
     try {
       await vmCopy.stateManager.setStateRoot(parentBlock.header.stateRoot)
     } catch (error) {
-      this.config.options.logger?.error(
+      console.log(
         `Miner: Failed to set state root for block ${number}: ${error}`,
       )
       this.assembling = false
@@ -324,7 +324,10 @@ export class Miner {
       } catch (error) {
         const errorMsg = (error as Error).message
         const txHash = bytesToHex(tx.hash())
-
+        this.config.options.logger?.debug(
+          `Miner: Error adding tx ${txHash}: ${errorMsg}`,
+          error,
+        )
         // Classify error and handle accordingly
         if (
           errorMsg ===

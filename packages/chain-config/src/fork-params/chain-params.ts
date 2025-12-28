@@ -1,3 +1,4 @@
+import { MAX_RLP_BLOCK_SIZE } from '@ts-ethereum/utils'
 import type { ParamsDict } from '../types'
 import { EIP } from './enums'
 
@@ -19,9 +20,9 @@ export const paramsBlock: ParamsDict = {
     // format
     maxExtraDataSize: 32n, // Maximum size extra data may be after Genesis
     // pow
-    minimumDifficulty: 10n, // The minimum that the difficulty may ever be
+    minimumDifficulty: 1n, // The minimum that the difficulty may ever be
     difficultyBoundDivisor: 2048n, // The bound divisor of the difficulty, used in the update calculations
-    durationLimit: 4n, // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not
+    durationLimit: 1n, // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not
     difficultyBombDelay: 0n, // the amount of blocks to delay the difficulty bomb with
   },
   /**
@@ -96,5 +97,9 @@ export const paramsBlock: ParamsDict = {
     targetBlobGasPerBlock: 786432n, // The target blob gas consumed per block
     maxBlobGasPerBlock: 1179648n, // The max blob gas allowable per block
     blobGasPriceUpdateFraction: 5007716n, // The denominator used in the exponential when calculating a blob gas price
+  },
+  [EIP.EIP_7934]: {
+    // config
+    maxRlpBlockSize: BigInt(MAX_RLP_BLOCK_SIZE), // The maximum size of the RLP block in bytes
   },
 }

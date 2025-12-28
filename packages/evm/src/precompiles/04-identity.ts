@@ -10,9 +10,10 @@ export function precompile04(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('04')
   const data = opts.data
 
-  let gasUsed = opts.common.param('identityGas')
+  let gasUsed = opts.common.getParamByEIP(1, 'identityGas')
   gasUsed +=
-    opts.common.param('identityWordGas') * BigInt(Math.ceil(data.length / 32))
+    opts.common.getParamByEIP(1, 'identityWordGas') *
+    BigInt(Math.ceil(data.length / 32))
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }

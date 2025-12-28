@@ -206,7 +206,7 @@ export function precompile09(opts: PrecompileInput): ExecResult {
   // final
   const f = lastByte === 1
 
-  let gasUsed = opts.common.param('blake2RoundGas')
+  let gasUsed = opts.common.getParamByEIP(1679, 'blake2RoundGas')
   gasUsed *= BigInt(rounds)
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)

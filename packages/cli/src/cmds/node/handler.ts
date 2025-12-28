@@ -8,6 +8,7 @@ import {
   getNodeId,
   Hardfork,
   initPrivateKey,
+  mainnetSchema,
   readAccounts,
   writeAccounts,
 } from '@ts-ethereum/chain-config'
@@ -35,7 +36,7 @@ const SHARED_ACCOUNTS_PATH = '/shared/accounts.json'
 
 export type NodeHandlerArgs = NodeArgs & GlobalArgs
 
-function createTestChainConfig(chainId: number): ChainConfig {
+function createTestChainConfig(chainId: bigint): ChainConfig {
   return {
     name: 'docker-testnet',
     chainId,
@@ -51,7 +52,7 @@ function createTestChainConfig(chainId: number): ChainConfig {
       extraData:
         '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
     },
-    hardforks: [{ name: 'chainstart', block: 0 }],
+    hardforks: [{ name: 'chainstart', block: 0n }],
     bootstrapNodes: [],
   }
 }
@@ -256,10 +257,9 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
   const account = accounts[0]
 
   // Create GlobalConfig
-  const testChainConfig = createTestChainConfig(chainId)
-  const common = new GlobalConfig({
-    chain: testChainConfig,
-    hardfork: Hardfork.Chainstart,
+  const common = GlobalConfig.fromSchema({
+    schema: mainnetSchema,
+    hardfork: Hardfork.Prague,
   })
 
   // Setup bootnodes

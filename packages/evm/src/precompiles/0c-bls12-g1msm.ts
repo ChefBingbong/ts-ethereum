@@ -33,7 +33,7 @@ export async function precompile0c(opts: PrecompileInput): Promise<ExecResult> {
   // on this eventually to be "floored" pair number should happen before the input length modulo
   // validation (same for g2msm)
   const numPairs = Math.floor(inputData.length / 160)
-  const gasUsedPerPair = opts.common.param('bls12381G1MulGas')
+  const gasUsedPerPair = opts.common.getParamByEIP(2537, 'bls12381G1MulGas')
   const gasUsed = msmGasUsed(
     numPairs,
     gasUsedPerPair,

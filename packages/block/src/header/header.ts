@@ -1,9 +1,10 @@
 import {
   ConsensusAlgorithm,
   ConsensusType,
+  type EIPAccessor,
   GlobalConfig,
   Hardfork,
-  Mainnet,
+  mainnetSchema,
 } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -102,11 +103,12 @@ export class BlockHeader {
     if (opts.common) {
       this.common = opts.common.copy()
     } else {
-      this.common = new GlobalConfig({
-        chain: Mainnet, // default
+      this.common = GlobalConfig.fromSchema({
+        schema: mainnetSchema,
+        hardfork: Hardfork.Prague,
       })
     }
-    this.common.updateParams(opts.params ?? paramsBlock)
+    this.common.updateBatchParams(opts.params ?? paramsBlock)
 
     this.keccakFunction = this.common.customCrypto.keccak256 ?? keccak256
 
@@ -178,7 +180,7 @@ export class BlockHeader {
     const hardforkDefaults = {
       baseFeePerGas: this.common.isActivatedEIP(1559)
         ? number === this.common.hardforkBlock(Hardfork.London)
-          ? this.common.param('initialBaseFee')
+          ? this.common.getParamByEIP(1559, 'initialBaseFee')
           : BIGINT_2
         : undefined,
       withdrawalsRoot: this.common.isActivatedEIP(4895)
@@ -370,7 +372,7 @@ export class BlockHeader {
         londonHfBlock !== BIGINT_0 &&
         this.number === londonHfBlock
       ) {
-        const initialBaseFee = this.common.param('initialBaseFee')
+        const initialBaseFee = this.common.getParamByEIP(1559, 'initialBaseFee')
         if (this.baseFeePerGas !== initialBaseFee) {
           const msg = this._errorMsg(
             'Initial EIP1559 block does not have initial base fee',
@@ -424,7 +426,6 @@ export class BlockHeader {
    */
   protected _consensusFormatValidation() {
     const { nonce, uncleHash, difficulty, extraData, number } = this
-
     // Consensus type dependent checks
     if (this.common.consensusAlgorithm() === ConsensusAlgorithm.Ethash) {
       // PoW/Ethash
@@ -488,12 +489,11 @@ export class BlockHeader {
       londonHardforkBlock !== BIGINT_0 &&
       this.number === londonHardforkBlock
     ) {
-      const elasticity = this.common.param('elasticityMultiplier')
+      const elasticity = this.common.getParamByEIP(1559, 'elasticityMultiplier')
       parentGasLimit = parentGasLimit * elasticity
     }
     const gasLimit = this.gasLimit
-
-    const a = parentGasLimit / this.common.param('gasLimitBoundDivisor')
+    const a = parentGasLimit / BigInt(this.common.param('gasLimitBoundDivisor'))
     const maxGasLimit = parentGasLimit + a
     const minGasLimit = parentGasLimit - a
 
@@ -532,14 +532,15 @@ export class BlockHeader {
       throw EthereumJSErrorWithoutCode(msg)
     }
     let nextBaseFee: bigint
-    const elasticity = this.common.param('elasticityMultiplier')
+    const elasticity = this.common.getParamByEIP(1559, 'elasticityMultiplier')
     const parentGasTarget = this.gasLimit / elasticity
 
     if (parentGasTarget === this.gasUsed) {
       nextBaseFee = this.baseFeePerGas!
     } else if (this.gasUsed > parentGasTarget) {
       const gasUsedDelta = this.gasUsed - parentGasTarget
-      const baseFeeMaxChangeDenominator = this.common.param(
+      const baseFeeMaxChangeDenominator = this.common.getParamByEIP(
+        1559,
         'baseFeeMaxChangeDenominator',
       )
 
@@ -552,7 +553,8 @@ export class BlockHeader {
         this.baseFeePerGas!
     } else {
       const gasUsedDelta = parentGasTarget - this.gasUsed
-      const baseFeeMaxChangeDenominator = this.common.param(
+      const baseFeeMaxChangeDenominator = this.common.getParamByEIP(
+        1559,
         'baseFeeMaxChangeDenominator',
       )
 
@@ -588,7 +590,7 @@ export class BlockHeader {
    * @returns the total blob gas fee for numBlobs blobs
    */
   calcDataFee(numBlobs: number): bigint {
-    const blobGasPerBlob = this.common.param('blobGasPerBlob')
+    const blobGasPerBlob = this.common.getParamByEIP(4844, 'blobGasPerBlob')
     const blobGasUsed = blobGasPerBlob * BigInt(numBlobs)
 
     const blobGasPrice = this.getBlobGasPrice()
@@ -614,8 +616,8 @@ export class BlockHeader {
 
     // EIP-7918 reserve price check
     if (childCommon.isActivatedEIP(7918)) {
-      const blobBaseCost = childCommon.param('blobBaseCost')
-      const gasPerBlob = childCommon.param('blobGasPerBlob')
+      const blobBaseCost = childCommon.param('blobBaseCost')!
+      const gasPerBlob = childCommon.getParamByEIP(4844, 'blobGasPerBlob')
       const baseFee = this.baseFeePerGas ?? BIGINT_0
       const blobFee = this.getBlobGasPrice()
 
@@ -725,8 +727,11 @@ export class BlockHeader {
     }
     const blockTs = this.timestamp
     const { timestamp: parentTs, difficulty: parentDif } = parentBlockHeader
-    const minimumDifficulty = this.common.param('minimumDifficulty')
-    const offset = parentDif / this.common.param('difficultyBoundDivisor')
+
+    const manager = this.common._hardforkParams.forEIP(1) as EIPAccessor<1>
+    const minimumDifficulty = manager.get('minimumDifficulty')
+    const offset = parentDif / manager.get('difficultyBoundDivisor')
+
     let num = this.number
 
     // We use a ! here as TS cannot follow this hardfork-dependent logic, but it always gets assigned
@@ -751,7 +756,7 @@ export class BlockHeader {
 
     if (this.common.gteHardfork(Hardfork.Byzantium)) {
       // Get delay as parameter from common
-      num = num - this.common.param('difficultyBombDelay')
+      num = num - manager.get('difficultyBombDelay')
       if (num < BIGINT_0) {
         num = BIGINT_0
       }
@@ -766,7 +771,7 @@ export class BlockHeader {
       dif = parentDif + offset * a
     } else {
       // pre-homestead
-      if (parentTs + this.common.param('durationLimit') > blockTs) {
+      if (parentTs + manager.get('durationLimit') > blockTs) {
         dif = offset + parentDif
       } else {
         dif = parentDif - offset

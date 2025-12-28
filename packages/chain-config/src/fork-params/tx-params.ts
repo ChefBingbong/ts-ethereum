@@ -65,7 +65,7 @@ export const paramsTx: ParamsDict = {
     // TODO: Set correct minimum hardfork
     // gasPrices
     perAuthBaseGas: 12500n, // Gas cost of each authority item, provided the authority exists in the trie
-    perEmptyAccountCost: 25000, // Gas cost of each authority item, in case the authority does not exist in the trie (stays number - used with Number() cast)
+    perEmptyAccountCost: 25000n, // Gas cost of each authority item, in case the authority does not exist in the trie (stays number - used with Number() cast)
   },
   /**
   .  * Shard Blob Transactions

@@ -237,8 +237,8 @@ export class Blob4844Tx
         throw EthereumJSErrorWithoutCode(msg)
       }
       if (
-        BigInt(Number.parseInt(hash.slice(2, 4))) !==
-        this.common.param('blobCommitmentVersionKzg')
+        Number.parseInt(hash.slice(2, 4)) !==
+        this.common.getParamByEIP(4844, 'blobCommitmentVersionKzg')
       ) {
         // We check the first "byte" of the hash (starts at position 2 since hash is a PrefixedHexString)
         const msg = Legacy.errorMsg(
@@ -251,7 +251,7 @@ export class Blob4844Tx
 
     // EIP-7594 PeerDAS: Limit of 6 blobs per transaction
     if (this.common.isActivatedEIP(7594)) {
-      const maxBlobsPerTx = this.common.param('maxBlobsPerTx')
+      const maxBlobsPerTx = this.common.getParamByEIP(7594, 'maxBlobsPerTx')
       if (this.blobVersionedHashes.length > maxBlobsPerTx) {
         const msg = Legacy.errorMsg(
           this,
@@ -263,8 +263,8 @@ export class Blob4844Tx
 
     // "Old" limit (superseded by EIP-7594 starting with Osaka)
     const limitBlobsPerTx =
-      this.common.param('maxBlobGasPerBlock') /
-      this.common.param('blobGasPerBlob')
+      this.common.getParamByEIP(4844, 'maxBlobGasPerBlock') /
+      this.common.getParamByEIP(4844, 'blobGasPerBlob')
     if (this.blobVersionedHashes.length > limitBlobsPerTx) {
       const msg = Legacy.errorMsg(
         this,

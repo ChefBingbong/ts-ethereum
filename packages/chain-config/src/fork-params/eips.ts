@@ -1,6 +1,5 @@
+import type { EIPsDict } from '../types'
 import { Hardfork } from './enums'
-
-import type { EIPsDict } from './types'
 
 export const eipsDict: EIPsDict = {
   /**

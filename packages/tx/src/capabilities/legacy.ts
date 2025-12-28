@@ -61,7 +61,8 @@ export function getDataGas(tx: LegacyTxInterface): bigint {
     tx.common.isActivatedEIP(3860)
   ) {
     const dataLength = BigInt(Math.ceil(tx.data.length / 32))
-    const initCodeCost = tx.common.param('initCodeWordGas') * dataLength
+    const initCodeCost =
+      tx.common.getParamByEIP(3860, 'initCodeWordGas') * dataLength
     cost += initCodeCost
   }
 
@@ -233,8 +234,8 @@ export function getValidationErrors(tx: LegacyTxInterface): string[] {
       tokens += tx.data[i] === 0 ? 1 : 4
     }
     const floorCost =
-      tx.common.param('txGas') +
-      tx.common.param('totalCostFloorPerToken') * BigInt(tokens)
+      tx.common.param('txGas')! +
+      tx.common.getParamByEIP(7623, 'totalCostFloorPerToken') * BigInt(tokens)
     intrinsicGas = bigIntMax(intrinsicGas, floorCost)
   }
   if (intrinsicGas > tx.gasLimit) {

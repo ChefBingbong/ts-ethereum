@@ -4,7 +4,11 @@ import type {
   StateManagerInterface,
   StorageDump,
 } from '@ts-ethereum/chain-config'
-import { GlobalConfig, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  GlobalConfig,
+  Hardfork,
+  mainnetSchema,
+} from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -68,7 +72,12 @@ export class RPCStateManager implements StateManagerInterface {
     this.originalStorageCache = new OriginalStorageCache(
       this.getStorage.bind(this),
     )
-    this.common = opts.common ?? new GlobalConfig({ chain: Mainnet })
+    this.common =
+      opts.common?.copy() ??
+      GlobalConfig.fromSchema({
+        schema: mainnetSchema,
+        hardfork: Hardfork.Prague,
+      })
     this.keccakFunction = opts.common?.customCrypto.keccak256 ?? keccak_256
   }
 
@@ -81,6 +90,7 @@ export class RPCStateManager implements StateManagerInterface {
     const newState = new RPCStateManager({
       provider: this._provider,
       blockTag: BigInt(this._blockTag),
+      common: this.common,
     })
     newState._caches = new Caches({ storage: { size: 100000 } })
 

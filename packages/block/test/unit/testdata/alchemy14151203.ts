@@ -1,4 +1,4 @@
-import type { JSONRPCBlock } from '../../src/index.ts'
+import type { JSONRPCBlock } from '@ts-ethereum/block'
 
 export const alchemy14151203Data: JSONRPCBlock = {
   number: '0xd7ee23',

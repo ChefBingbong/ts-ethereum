@@ -287,11 +287,11 @@ export class FullSynchronizer extends Synchronizer {
     }
     if (block.header.number > this.chain.headers.height + BIGINT_1) {
       // Block is too far ahead - we need to fetch missing blocks first
-      this.config.options.logger?.info(
+      console.log(
         `📡 Block ${block.header.number} is ahead of chain height ${this.chain.headers.height}, fetching missing blocks`,
       )
       // Request the missing blocks via handleNewBlockHashes
-      this.handleNewBlockHashes([[block.hash(), block.header.number]])
+      this.handleNewBlockHashes([[block.hash(), BigInt(block.header.number)]])
       return
     }
     try {
@@ -332,7 +332,7 @@ export class FullSynchronizer extends Synchronizer {
       }
     } else {
       // Call handleNewBlockHashes to retrieve all blocks between chain tip and new block
-      this.handleNewBlockHashes([[block.hash(), block.header.number]])
+      this.handleNewBlockHashes([[block.hash(), BigInt(block.header.number)]])
     }
     for (const peer of this.pool
       .getConnectedPeers()

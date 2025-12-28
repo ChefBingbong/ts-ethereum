@@ -150,18 +150,18 @@ export const paramsEVM: ParamsDict = {
 .  */
   1013: {
     // gasPrices
-    netSstoreNoopGas: 200, // Once per SSTORE operation if the value doesn't change
-    netSstoreInitGas: 20000, // Once per SSTORE operation from clean zero
-    netSstoreCleanGas: 5000, // Once per SSTORE operation from clean non-zero
-    netSstoreDirtyGas: 200, // Once per SSTORE operation from dirty
-    netSstoreClearRefundGas: 15000, // Once per SSTORE operation for clearing an originally existing storage slot
-    netSstoreResetRefundGas: 4800, // Once per SSTORE operation for resetting to the original non-zero value
-    netSstoreResetClearRefundGas: 19800, // Once per SSTORE operation for resetting to the original zero value
+    netSstoreNoopGas: 200n, // Once per SSTORE operation if the value doesn't change
+    netSstoreInitGas: 20000n, // Once per SSTORE operation from clean zero
+    netSstoreCleanGas: 5000n, // Once per SSTORE operation from clean non-zero
+    netSstoreDirtyGas: 200n, // Once per SSTORE operation from dirty
+    netstoreClearRefundGas: 15000n, // Once per SSTORE operation for clearing an originally existing storage slot
+    netSstoreResetRefundGas: 4800n, // Once per SSTORE operation for resetting to the original non-zero value
+    netSstoreResetClearRefundGas: 19800n, // Once per SSTORE operation for resetting to the original zero value
     shlGas: 3, // Base fee of the SHL opcode
     shrGas: 3, // Base fee of the SHR opcode
     sarGas: 3, // Base fee of the SAR opcode
-    extcodehashGas: 400, // Base fee of the EXTCODEHASH opcode
-    create2Gas: 32000, // Base fee of the CREATE2 opcode
+    extcodehashGas: 400n, // Base fee of the EXTCODEHASH opcode
+    create2Gas: 32000n, // Base fee of the CREATE2 opcode
   },
   /**
 .  * Petersburg HF Meta EIP
@@ -271,9 +271,9 @@ export const paramsEVM: ParamsDict = {
    */
   2935: {
     // evm
-    historyStorageAddress: '0x0000F90827F1C53A10CB7A02335B175320002935', // The address where the historical blockhashes are stored
+    historyStorageAddress: 0x0000f90827f1c53a10cb7a02335b175320002935n, // The address where the historical blockhashes are stored
     historyServeWindow: 8192, // The amount of blocks to be served by the historical blockhash contract
-    systemAddress: '0xfffffffffffffffffffffffffffffffffffffffe', // The system address
+    systemAddress: 0xfffffffffffffffffffffffffffffffffffffffen, // The system address
   },
   /**
 .  * BASEFEE opcode

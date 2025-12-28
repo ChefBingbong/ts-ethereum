@@ -46,7 +46,7 @@ export const ACCOUNTS_FILE = `${SHARED_DIR}/accounts.json`
 // Simplified chain config - only Chainstart/Frontier hardfork with PoW
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
-  chainId: 12345,
+  chainId: 12345n,
   defaultHardfork: 'chainstart',
   consensus: {
     type: 'pow',
@@ -59,7 +59,7 @@ export const customChainConfig: ChainConfig = {
     extraData:
       '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   },
-  hardforks: [{ name: 'chainstart', block: 0 }],
+  hardforks: [{ name: 'chainstart', block: 0n }],
   bootstrapNodes: [],
 }
 

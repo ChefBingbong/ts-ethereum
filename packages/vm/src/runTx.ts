@@ -286,8 +286,8 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       tokens += tx.data[i] === 0 ? 1 : 4
     }
     floorCost =
-      tx.common.param('txGas') +
-      tx.common.param('totalCostFloorPerToken') * BigInt(tokens)
+      tx.common.param('txGas')! +
+      tx.common.getParamByEIP(7623, 'totalCostFloorPerToken') * BigInt(tokens)
   }
 
   let gasLimit = tx.gasLimit
@@ -414,7 +414,8 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     // EIP-4844 spec
     // the signer must be able to afford the transaction
     // assert signer(tx).balance >= tx.message.gas * tx.message.max_fee_per_gas + get_total_data_gas(tx) * tx.message.max_fee_per_data_gas
-    totalblobGas = vm.common.param('blobGasPerBlob') * BigInt(tx.numBlobs())
+    totalblobGas =
+      vm.common.getParamByEIP(4844, 'blobGasPerBlob') * BigInt(tx.numBlobs())
     maxCost += totalblobGas * tx.maxFeePerBlobGas
 
     // 4844 minimum blobGas price check
@@ -566,8 +567,8 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
 
       if (accountExists) {
         const refund =
-          tx.common.param('perEmptyAccountCost') -
-          tx.common.param('perAuthBaseGas')
+          tx.common.getParamByEIP(7702, 'perEmptyAccountCost') -
+          tx.common.getParamByEIP(7702, 'perAuthBaseGas')
         gasRefund += refund
       }
 

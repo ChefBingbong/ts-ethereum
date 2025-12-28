@@ -25,7 +25,10 @@ export async function precompile0a(opts: PrecompileInput): Promise<ExecResult> {
   if (opts.common.customCrypto?.kzg === undefined) {
     throw EthereumJSErrorWithoutCode('kzg not initialized')
   }
-  const gasUsed = opts.common.param('kzgPointEvaluationPrecompileGas')
+  const gasUsed = opts.common.getParamByEIP(
+    4844,
+    'kzgPointEvaluationPrecompileGas',
+  )
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }
@@ -37,8 +40,13 @@ export async function precompile0a(opts: PrecompileInput): Promise<ExecResult> {
     )
   }
 
-  const version = Number(opts.common.param('blobCommitmentVersionKzg'))
-  const fieldElementsPerBlob = opts.common.param('fieldElementsPerBlob')
+  const version = Number(
+    opts.common.getParamByEIP(4844, 'blobCommitmentVersionKzg'),
+  )
+  const fieldElementsPerBlob = opts.common.getParamByEIP(
+    4844,
+    'fieldElementsPerBlob',
+  )
   const versionedHash = bytesToHex(opts.data.subarray(0, 32))
   const z = bytesToHex(opts.data.subarray(32, 64))
   const y = bytesToHex(opts.data.subarray(64, 96))
@@ -96,7 +104,7 @@ export async function precompile0a(opts: PrecompileInput): Promise<ExecResult> {
 
   // Return value - FIELD_ELEMENTS_PER_BLOB and BLS_MODULUS as padded 32 byte big endian values
   const fieldElementsBuffer = setLengthLeft(
-    bigIntToBytes(fieldElementsPerBlob),
+    bigIntToBytes(BigInt(fieldElementsPerBlob)),
     32,
   )
 

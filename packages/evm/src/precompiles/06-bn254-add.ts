@@ -8,7 +8,7 @@ import { gasLimitCheck } from './util'
 
 export function precompile06(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('06')
-  const gasUsed = opts.common.param('bn254AddGas')
+  const gasUsed = opts.common.getParamByEIP(609, 'bn254AddGas')
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }
