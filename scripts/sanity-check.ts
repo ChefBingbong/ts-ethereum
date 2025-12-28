@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
 
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  getNodeId,
   GlobalConfig,
+  getNodeId,
   Hardfork,
   readAccounts,
   readPrivateKey,
@@ -15,11 +17,9 @@ import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex, ecrecover } from '@ts-ethereum/utils'
 import debug from 'debug'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
-import { ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
+import { ecdsaRecover } from 'ethereum-cryptography/secp256k1-compat.js'
 import { sha256 } from 'ethereum-cryptography/sha256.js'
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import {
   createWalletClient,
   defineChain,
@@ -56,7 +56,7 @@ let txHash: Hex | null = null
 // Smart contract test constants
 const INITIAL_GREETING = 'Hello, World!'
 const SECOND_GREETING = 'Hola, Mundo!'
-let deployedContractAddress: Hex | null = null
+const deployedContractAddress: Hex | null = null
 
 // Chain config for test network
 export const testChainConfig: ChainConfig = {
@@ -89,8 +89,8 @@ interface NodeContext {
   metaDB: any
 }
 
-let node1: NodeContext | null = null
-let node2: NodeContext | null = null
+const node1: NodeContext | null = null
+const node2: NodeContext | null = null
 
 /**
  * Create genesis state with prefunded accounts
