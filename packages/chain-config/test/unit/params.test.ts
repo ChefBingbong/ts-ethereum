@@ -1,3 +1,4 @@
+/** biome-ignore-all assist/source/organizeImports: <explanation> */
 import { describe, expect, it } from 'vitest'
 import { EIP } from '../../src/hardforks/eips'
 import {
