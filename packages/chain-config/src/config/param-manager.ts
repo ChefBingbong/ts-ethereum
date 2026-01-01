@@ -5,9 +5,9 @@ import {
   type Hardfork,
 } from '../hardforks/hardforks'
 import {
-  EIP1_PARAMS,
-  EIP_PARAMS,
   type AllParamNames,
+  EIP_PARAMS,
+  EIP1_PARAMS,
   type EIPParamsFor,
   type EIPWithParams,
   type ParamValue,

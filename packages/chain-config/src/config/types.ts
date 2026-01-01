@@ -6,7 +6,7 @@ import type {
   ParamValue,
 } from '../hardforks/params'
 import type { ChainConfig, CustomCrypto, ParamsConfig } from '../types'
-import { ParamsManager } from './param-manager'
+import type { ParamsManager } from './param-manager'
 
 export type { EIPWithParams } from '../hardforks/params'
 

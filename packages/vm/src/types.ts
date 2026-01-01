@@ -7,7 +7,7 @@ import type {
   EVMResult,
   Log,
 } from '@ts-ethereum/evm'
-import { StateManagerInterface } from '@ts-ethereum/state-manager'
+import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import type { AccessList, TypedTransaction } from '@ts-ethereum/tx'
 import type {
   BigIntLike,
