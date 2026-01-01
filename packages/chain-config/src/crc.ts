@@ -1,8 +1,3 @@
-/**
- * This code was duplicated from https://github.com/alexgorbatchev/crc/ under MIT license.
- * The code below is copied largely unmodified from the below file
- * https://github.com/alexgorbatchev/crc/blob/31fc3853e417b5fb5ec83335428805842575f699/src/calculators/crc32.ts
- */
 let TABLE: Array<number> | Int32Array = [
   0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
   0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -63,12 +58,6 @@ const crc = (current: Uint8Array, previous?: number) => {
   return crc ^ -1
 }
 
-/**
- * Calculates the CRC32 checksum of `current`.
- * @param current Input data
- * @param previous Optional previous CRC to continue a multi-part calculation
- * @returns Unsigned CRC32 checksum
- */
 export const crc32 = (current: Uint8Array, previous?: number) => {
   return crc(current, previous) >>> 0
 }

@@ -1,9 +1,7 @@
-import type {
-  GlobalConfig,
-  StateManagerInterface,
-} from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { EVMInterface, EVMMockBlockchainInterface } from '@ts-ethereum/evm'
 import { createEVM } from '@ts-ethereum/evm'
+import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import type { BigIntLike } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { createVM } from './constructors'

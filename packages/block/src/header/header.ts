@@ -1,7 +1,6 @@
 import {
   ConsensusAlgorithm,
   ConsensusType,
-  type EIPAccessor,
   GlobalConfig,
   Hardfork,
   mainnetSchema,
@@ -728,9 +727,9 @@ export class BlockHeader {
     const blockTs = this.timestamp
     const { timestamp: parentTs, difficulty: parentDif } = parentBlockHeader
 
-    const manager = this.common._hardforkParams.forEIP(1) as EIPAccessor<1>
-    const minimumDifficulty = manager.get('minimumDifficulty')
-    const offset = parentDif / manager.get('difficultyBoundDivisor')
+    const manager = this.common._hardforkParams.getEIPParams(1)
+    const minimumDifficulty = manager['minimumDifficulty']
+    const offset = parentDif / manager['difficultyBoundDivisor']
 
     let num = this.number
 
@@ -756,7 +755,7 @@ export class BlockHeader {
 
     if (this.common.gteHardfork(Hardfork.Byzantium)) {
       // Get delay as parameter from common
-      num = num - manager.get('difficultyBombDelay')
+      num = num - manager['difficultyBombDelay']
       if (num < BIGINT_0) {
         num = BIGINT_0
       }
@@ -771,7 +770,7 @@ export class BlockHeader {
       dif = parentDif + offset * a
     } else {
       // pre-homestead
-      if (parentTs + manager.get('durationLimit') > blockTs) {
+      if (parentTs + manager['durationLimit'] > blockTs) {
         dif = offset + parentDif
       } else {
         dif = parentDif - offset

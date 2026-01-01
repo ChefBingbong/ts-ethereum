@@ -46,9 +46,9 @@ export const customChainConfig: ChainConfig = {
   },
   hardforks: [
     { name: 'chainstart', block: 0n },
-    { name: 'homestead', block: 0n },
-    { name: 'dao', block: 0n },
-    { name: 'tangerineWhistle', block: 0n },
+    { name: 'homestead', block: 2n },
+    { name: 'dao', block: 3n },
+    { name: 'tangerineWhistle', block: 4n },
   ],
   bootstrapNodes: [],
 }

@@ -30,6 +30,6 @@
       "@ts-ethereum/vm": ["../vm/src/index.ts"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "../state-manager/src/interfaces.ts"],
   "exclude": ["node_modules", "dist", "_types", "_cjs", "_esm"]
 }

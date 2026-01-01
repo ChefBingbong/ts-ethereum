@@ -1,4 +1,4 @@
-import type { BinaryTreeAccessWitnessInterface } from '@ts-ethereum/chain-config'
+import type { BinaryTreeAccessWitnessInterface } from '@ts-ethereum/state-manager/src/interfaces'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   BIGINT_0,

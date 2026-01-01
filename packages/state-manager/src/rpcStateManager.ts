@@ -1,9 +1,4 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type {
-  AccountFields,
-  StateManagerInterface,
-  StorageDump,
-} from '@ts-ethereum/chain-config'
 import {
   GlobalConfig,
   Hardfork,
@@ -28,6 +23,11 @@ import type { Debugger } from 'debug'
 import debugDefault from 'debug'
 import { Caches, OriginalStorageCache } from './cache/index'
 import type { RPCStateManagerOpts } from './index'
+import type {
+  AccountFields,
+  StateManagerInterface,
+  StorageDump,
+} from './interfaces'
 import { modifyAccountFields } from './util'
 
 const KECCAK256_RLP_EMPTY_ACCOUNT = RLP.encode(new Account().serialize()).slice(

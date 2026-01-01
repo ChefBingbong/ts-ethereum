@@ -1,9 +1,5 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type {
-  AccountFields,
-  GlobalConfig,
-  StateManagerInterface,
-} from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   Account,
@@ -12,6 +8,7 @@ import {
 } from '@ts-ethereum/utils'
 import { OriginalStorageCache } from './cache/originalStorageCache'
 import type { SimpleStateManagerOpts } from './index'
+import type { AccountFields, StateManagerInterface } from './interfaces'
 import { modifyAccountFields } from './util'
 
 /**

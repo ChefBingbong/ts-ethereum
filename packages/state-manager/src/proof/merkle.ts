@@ -1,4 +1,3 @@
-import type { Proof, StorageProof } from '@ts-ethereum/chain-config'
 import {
   createMerkleProof,
   createMPTFromProof,
@@ -24,6 +23,7 @@ import {
 } from '@ts-ethereum/utils'
 import type { MerkleStateManagerOpts } from '../index'
 import { MerkleStateManager } from '../merkleStateManager'
+import type { Proof, StorageProof } from '../types'
 
 /**
  * Get an EIP-1186 proof

@@ -1,11 +1,7 @@
-import type { GethGenesis } from './defaults/gethGenesis.js'
-import { Hardfork } from './fork-params/enums'
-import {
-  createHardforkSchema,
-  GlobalConfig,
-  hardforkEntry,
-  parseGethGenesis,
-} from './index'
+import { parseGethGenesis } from './genesis/gethGenesis'
+import type { GethGenesis } from './genesis/types'
+import { Hardfork } from './hardforks/hardforks.js'
+import { createHardforkSchema, GlobalConfig, hardforkEntry } from './index'
 import type { BaseOpts, ChainConfig, GethConfigOpts } from './index.js'
 
 export function schemaFromChainConfig(chainConfig: ChainConfig) {

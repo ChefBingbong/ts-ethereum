@@ -1,15 +1,13 @@
 import type {
   AccessEventFlags,
+  BinaryTree,
   BinaryTreeAccessedState,
   BinaryTreeAccessedStateWithAddress,
   BinaryTreeAccessWitnessInterface,
   RawBinaryTreeAccessedState,
-} from '@ts-ethereum/chain-config'
-import { BinaryTreeAccessedStateType } from '@ts-ethereum/chain-config'
-import type {
-  BinaryTree,
   StatefulBinaryTreeStateManager,
 } from '@ts-ethereum/state-manager'
+import { BinaryTreeAccessedStateType } from '@ts-ethereum/state-manager'
 import type {
   Address,
   BinaryTreeExecutionWitness,

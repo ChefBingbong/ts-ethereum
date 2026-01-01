@@ -1,9 +1,5 @@
 import type { Block, BlockOptions, HeaderData } from '@ts-ethereum/block'
-import type {
-  GlobalConfig,
-  ParamsDict,
-  StateManagerInterface,
-} from '@ts-ethereum/chain-config'
+import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
 import type {
   EVMInterface,
   EVMMockBlockchainInterface,
@@ -11,6 +7,7 @@ import type {
   EVMResult,
   Log,
 } from '@ts-ethereum/evm'
+import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import type { AccessList, TypedTransaction } from '@ts-ethereum/tx'
 import type {
   BigIntLike,
