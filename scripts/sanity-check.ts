@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   readAccounts,
   readPrivateKey,
@@ -15,6 +13,8 @@ import {
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import {
   createPublicClient,
   createWalletClient,
@@ -703,62 +703,142 @@ async function checkChainConsistency(): Promise<{
 // SMART CONTRACT TESTS
 // ============================================
 
+import solc from 'solc'
+import {
+  decodeAbiParameters,
+  encodeAbiParameters,
+  encodeFunctionData,
+} from 'viem'
+
 /**
- * Get solc input configuration
+ * This function creates the input for the Solidity compiler.
  */
-function getSolcInput(source: string): any {
+function getSolcInput() {
+  if (!existsSync(GREETER_SOL_PATH)) {
+    throw new Error(`Greeter.sol not found at ${GREETER_SOL_PATH}`)
+  }
+
   return {
     language: 'Solidity',
     sources: {
       'Greeter.sol': {
-        content: source,
+        content: require('node:fs').readFileSync(GREETER_SOL_PATH, 'utf8'),
       },
     },
     settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+      evmVersion: 'homestead',
       outputSelection: {
         '*': {
           '*': ['abi', 'evm.bytecode'],
         },
       },
-      optimizer: {
-        enabled: true,
-        runs: 200,
-      },
     },
   }
 }
 
 /**
- * Compile the Greeter contract
+ * This function compiles all the contracts and returns the Solidity Standard JSON
+ * output. If the compilation fails, it returns `undefined`.
  */
-function compileGreeterContract(): { abi: any[]; bytecode: string } | null {
-  try {
-    const solc = require('solc')
-    const source = require('node:fs').readFileSync(GREETER_SOL_PATH, 'utf8')
-    const input = JSON.stringify(getSolcInput(source))
-    const output = JSON.parse(solc.compile(input))
+function compileContracts() {
+  const input = getSolcInput()
+  const output = JSON.parse(solc.compile(JSON.stringify(input)))
 
-    if (output.errors) {
-      const errors = output.errors.filter((e: any) => e.severity === 'error')
-      if (errors.length > 0) {
-        console.error('Solidity compilation errors:', errors)
-        return null
+  let compilationFailed = false
+
+  if (output.errors !== undefined) {
+    for (const error of output.errors) {
+      if (error.severity === 'error') {
+        console.error(error.formattedMessage)
+        compilationFailed = true
+      } else {
+        console.warn(error.formattedMessage)
       }
     }
-
-    const contract = output.contracts['Greeter.sol'].Greeter
-    return {
-      abi: contract.abi,
-      bytecode: contract.evm.bytecode.object,
-    }
-  } catch (error) {
-    console.error('Failed to compile contract:', error)
-    return null
   }
+
+  if (compilationFailed) {
+    return undefined
+  }
+
+  return output
 }
 
-const { encodeAbiParameters, encodeFunctionData, decodeFunctionResult } =
-  await import('viem')
+function getGreeterDeploymentBytecode(solcOutput: any): string {
+  return solcOutput.contracts['Greeter.sol'].Greeter.evm.bytecode.object
+}
+
+function getGreeterABI(solcOutput: any): any[] {
+  return solcOutput.contracts['Greeter.sol'].Greeter.abi
+}
+
+async function getGreeting(
+  publicClient: any,
+  contractAddress: string,
+  callerAddress: string,
+  abi: any[],
+): Promise<string> {
+  const sigHash = encodeFunctionData({
+    abi,
+    functionName: 'greet',
+    args: [],
+  })
+
+  // Use eth_call to read the contract
+  const result = await publicClient.call({
+    to: contractAddress as Hex,
+    from: callerAddress as Hex,
+    data: sigHash as Hex,
+    gas: 2_000_000n,
+    gasPrice: 1_000_000_000n,
+  })
+
+  if (!result.data || result.data === '0x') {
+    throw new Error('Contract call returned no data')
+  }
+
+  const decoded = decodeAbiParameters([{ type: 'string' }], result.data as Hex)
+
+  return decoded[0] as string
+}
+
+async function setGreeting(
+  walletClient: any,
+  publicClient: any,
+  senderAddress: string,
+  contractAddress: string,
+  greeting: string,
+  abi: any[],
+) {
+  const data = encodeFunctionData({
+    abi,
+    functionName: 'setGreeting',
+    args: [greeting],
+  })
+
+  const nonce = await publicClient.getTransactionCount({
+    address: senderAddress as Hex,
+  })
+
+  const hash = await walletClient.sendTransaction({
+    account: walletClient.account,
+    to: contractAddress as Hex,
+    data: data as Hex,
+    gas: 2_000_000n,
+    gasPrice: 1_000_000_000n,
+    nonce,
+    type: 'legacy',
+  })
+
+  return hash
+}
+
+// Store compiled contract for reuse
+let compiledContract: { abi: any[]; bytecode: string } | null = null
 
 async function checkSmartContractDeploy(): Promise<{
   passed: boolean
@@ -773,11 +853,15 @@ async function checkSmartContractDeploy(): Promise<{
   try {
     // Compile contract
     details.push('Compiling Greeter.sol...')
-    const compiled = compileGreeterContract()
-    if (!compiled) {
+    const solcOutput = compileContracts()
+    if (solcOutput === undefined) {
       return { passed: false, details: ['Contract compilation failed'] }
     }
     details.push('Contract compiled successfully')
+
+    const bytecode = getGreeterDeploymentBytecode(solcOutput)
+    const abi = getGreeterABI(solcOutput)
+    compiledContract = { abi, bytecode }
 
     const rpcUrl = `http://127.0.0.1:${node1.port + 300}`
 
@@ -805,10 +889,11 @@ async function checkSmartContractDeploy(): Promise<{
       transport: http(rpcUrl),
     }).extend(publicActions)
 
-    // Prepare deployment data
+    // Prepare deployment data - contracts are deployed by sending their deployment bytecode to the address 0
+    // The contract params should be abi-encoded and appended to the deployment bytecode.
     const deployData =
       '0x' +
-      compiled.bytecode +
+      bytecode +
       encodeAbiParameters([{ type: 'string' }], [INITIAL_GREETING]).slice(2)
 
     const nonce = await client.getTransactionCount({
@@ -878,16 +963,15 @@ async function checkSmartContractRead(): Promise<{
     return { passed: false, details: ['Contract not deployed yet'] }
   }
 
-  try {
-    const compiled = compileGreeterContract()
-    if (!compiled) {
-      return { passed: false, details: ['Contract compilation failed'] }
-    }
+  if (!compiledContract) {
+    return { passed: false, details: ['Contract not compiled yet'] }
+  }
 
+  try {
     const rpcUrl = `http://127.0.0.1:${node1.port + 300}`
 
     const testChain = defineChain({
-      id: Number(12345),
+      id: Number(CHAIN_ID),
       name: 'sanity-test',
       network: 'sanity-test',
       nativeCurrency: {
@@ -904,41 +988,18 @@ async function checkSmartContractRead(): Promise<{
     const senderPrivKey = bytesToHex(node1.account[1]) as Hex
     const senderAccount = privateKeyToAccount(senderPrivKey)
 
-    // Use public client for eth_call (like the working deploy-contract-rpc.ts)
+    // Use public client for eth_call
     const publicClient = createPublicClient({
       chain: testChain,
       transport: http(rpcUrl),
     })
 
-    // Call greet() function
-    const greetData = encodeFunctionData({
-      abi: compiled.abi,
-      functionName: 'greet',
-      args: [],
-    })
-
-    console.log('from', senderAccount.address)
-    console.log('to', deployedContractAddress)
-    console.log('data', greetData)
-
-    const result = await publicClient.call({
-      to: deployedContractAddress as Hex,
-      from: senderAccount.address as Hex,
-      data: greetData as Hex,
-      gas: 2_000_000n,
-      gasPrice: 1_000_000_000n,
-    } as any)
-
-    if (!result.data) {
-      details.push('No data returned from greet()')
-      return { passed: false, details }
-    }
-
-    const greeting = decodeFunctionResult({
-      abi: compiled.abi,
-      functionName: 'greet',
-      data: result.data,
-    }) as unknown as string
+    const greeting = await getGreeting(
+      publicClient,
+      deployedContractAddress,
+      senderAccount.address,
+      compiledContract.abi,
+    )
 
     details.push(`greet() returned: "${greeting}"`)
 
@@ -971,12 +1032,11 @@ async function checkSmartContractWrite(): Promise<{
     return { passed: false, details: ['Contract not deployed yet'] }
   }
 
-  try {
-    const compiled = compileGreeterContract()
-    if (!compiled) {
-      return { passed: false, details: ['Contract compilation failed'] }
-    }
+  if (!compiledContract) {
+    return { passed: false, details: ['Contract not compiled yet'] }
+  }
 
+  try {
     const rpcUrl = `http://127.0.0.1:${node1.port + 300}`
 
     const testChain = defineChain({
@@ -997,35 +1057,28 @@ async function checkSmartContractWrite(): Promise<{
     const senderPrivKey = bytesToHex(node1.account[1]) as Hex
     const senderAccount = privateKeyToAccount(senderPrivKey)
 
-    const client = createWalletClient({
+    const walletClient = createWalletClient({
       account: senderAccount,
       chain: testChain,
       transport: http(rpcUrl),
     }).extend(publicActions)
 
-    // Encode setGreeting call
-    const setGreetingData = encodeFunctionData({
-      abi: compiled.abi,
-      functionName: 'setGreeting',
-      args: [SECOND_GREETING],
+    const publicClient = createPublicClient({
+      chain: testChain,
+      transport: http(rpcUrl),
     })
 
-    const nonce = await client.getTransactionCount({
-      address: senderAccount.address,
-    })
+    // Send setGreeting transaction using helper
+    const setTxHash = await setGreeting(
+      walletClient,
+      publicClient,
+      senderAccount.address,
+      deployedContractAddress,
+      SECOND_GREETING,
+      compiledContract.abi,
+    )
 
-    // Send setGreeting transaction
-    const txHash = await client.sendTransaction({
-      account: senderAccount,
-      to: deployedContractAddress,
-      data: setGreetingData,
-      gas: 100_000n,
-      gasPrice: 10_000_000_000n,
-      nonce,
-      type: 'legacy',
-    } as any)
-
-    details.push(`setGreeting tx sent: ${truncateHex(txHash)}`)
+    details.push(`setGreeting tx sent: ${truncateHex(setTxHash)}`)
 
     // Mine blocks and allow state to flush
     await node1.node.miner.assembleBlock()
@@ -1034,8 +1087,8 @@ async function checkSmartContractWrite(): Promise<{
     await sleep(500)
 
     // Wait for receipt
-    const receipt = await client.waitForTransactionReceipt({
-      hash: txHash,
+    const receipt = await walletClient.waitForTransactionReceipt({
+      hash: setTxHash,
       timeout: TIMEOUT_MS,
       pollingInterval: 500,
       confirmations: 1,
@@ -1043,36 +1096,13 @@ async function checkSmartContractWrite(): Promise<{
 
     details.push(`Tx mined in block #${receipt.blockNumber}`)
 
-    // Read back the new greeting using public client
-    const publicClient = createPublicClient({
-      chain: testChain,
-      transport: http(rpcUrl),
-    })
-
-    const greetData = encodeFunctionData({
-      abi: compiled.abi,
-      functionName: 'greet',
-      args: [],
-    })
-
-    const result = await publicClient.call({
-      to: deployedContractAddress as Hex,
-      from: senderAccount.address as Hex,
-      data: greetData as Hex,
-      gas: 2_000_000n,
-      gasPrice: 1_000_000_000n,
-    } as any)
-
-    if (!result.data) {
-      details.push('No data returned from greet()')
-      return { passed: false, details }
-    }
-
-    const newGreeting = decodeFunctionResult({
-      abi: compiled.abi,
-      functionName: 'greet',
-      data: result.data,
-    }) as unknown as string
+    // Read back the new greeting using helper
+    const newGreeting = await getGreeting(
+      publicClient,
+      deployedContractAddress,
+      senderAccount.address,
+      compiledContract.abi,
+    )
 
     details.push(`New greeting: "${newGreeting}"`)
 
