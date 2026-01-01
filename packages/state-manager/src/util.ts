@@ -1,4 +1,3 @@
-import type {} from '@ts-ethereum/chain-config'
 import { Account, type Address, bytesToHex } from '@ts-ethereum/utils'
 import type { AccountFields, StateManagerInterface } from './interfaces'
 

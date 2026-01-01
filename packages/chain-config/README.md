@@ -15,53 +15,11 @@ This package provides the foundational configuration layer for the entire blockc
 
 The chain-config package sits at the base of the dependency tree. Nearly every other package depends on it:
 
-```
-                    chain-config
-                         |
-        +----------------+----------------+
-        |                |                |
-       evm              vm            blockchain
-        |                |                |
-        +-------+--------+                |
-                |                         |
-           state-manager                  |
-                |                         |
-                +-----------+-------------+
-                            |
-                    execution-client
-```
-
 - **evm** uses chain-config to look up opcode gas costs and check which EIPs are active
 - **vm** queries hardfork-specific block validation rules
 - **blockchain** uses it for fork hash calculations and hardfork transition logic
 - **state-manager** needs gas parameters for storage operations
 - **execution-client** creates the GlobalConfig instance and passes it to all subsystems
-
-## Package Structure
-
-```
-src/
-  config/
-    global-config.ts   # Main GlobalConfig class
-    param-manager.ts   # ParamsManager for EIP parameter resolution
-    types.ts           # Type definitions for config options
-  hardforks/
-    hardforks.ts       # Hardfork ordering and EIP mappings
-    eips.ts            # EIP number constants
-    params.ts          # Parameter values for each EIP
-  chains/
-    schema.ts          # Helper functions for schema creation
-    presets/           # Mainnet, Sepolia, Holesky, etc.
-  genesis/
-    gethGenesis.ts     # Parse geth-style genesis files
-    types.ts           # Genesis state types
-  network/
-    accounts.ts        # Account management utilities
-    bootnodes.ts       # Bootnode parsing
-    keys.ts            # Key file handling
-  builder.ts           # Factory functions for creating configs
-  types.ts             # Core type definitions
-```
 
 ## Key Concepts
 
