@@ -4,10 +4,10 @@ import {
   getActiveEIPsAtHardfork,
   getHardforkIndex,
   getHardforkSequence,
+  Hardfork,
   HARDFORK_EIPS,
   HARDFORK_ORDER,
-  Hardfork,
-} from '../../src/hardforks'
+} from '../src/hardforks'
 
 describe('hardforks', () => {
   describe('HARDFORK_ORDER', () => {
