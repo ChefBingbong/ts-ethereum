@@ -1,4 +1,8 @@
-import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  createCustomCommon,
+  Hardfork,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import {
   bytesToBigInt,
   equalsBytes,
@@ -20,8 +24,7 @@ import {
 import { txsData } from './testData/txs'
 
 describe('[BaseTransaction]', () => {
-  const common = new GlobalConfig({
-    chain: Mainnet,
+  const common = createCustomCommon({}, Mainnet, {
     hardfork: Hardfork.Chainstart,
   })
 
@@ -58,8 +61,7 @@ describe('[BaseTransaction]', () => {
       )
       assert.isFrozen(tx, `${txType.name}: tx should be frozen by default`)
 
-      const initCommon = new GlobalConfig({
-        chain: Mainnet,
+      const initCommon = createCustomCommon({}, Mainnet, {
         hardfork: Hardfork.Chainstart,
       })
       tx = txType.create.txData({}, { common: initCommon })
@@ -75,7 +77,7 @@ describe('[BaseTransaction]', () => {
         `${txType.name}: tx should not be frozen when freeze deactivated in options`,
       )
 
-      const params = JSON.parse(JSON.stringify(paramsTx))
+      const params = structuredClone(paramsTx)
       params['1']['txGas'] = 21000n // 21000
       tx = txType.create.txData({}, { common, params })
       assert.strictEqual(

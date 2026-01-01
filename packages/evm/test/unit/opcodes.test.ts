@@ -1,4 +1,8 @@
-import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  createCustomCommon,
+  Hardfork,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import { assert, describe, it } from 'vitest'
 
 import { createEVM } from '../../src'
@@ -8,8 +12,7 @@ describe('EVM -> getActiveOpcodes()', () => {
   const CHAINID = 0x46 //istanbul opcode
 
   it('should not expose opcodes from a follow-up HF (istanbul -> petersburg)', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Petersburg,
     })
     const evm = await createEVM({ common })
@@ -21,8 +24,7 @@ describe('EVM -> getActiveOpcodes()', () => {
   })
 
   it('should expose opcodes when HF is active (>= istanbul)', async () => {
-    let common = new GlobalConfig({
-      chain: Mainnet,
+    let common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Istanbul,
     })
     let evm = await createEVM({ common })
@@ -32,8 +34,7 @@ describe('EVM -> getActiveOpcodes()', () => {
       'istanbul opcode exposed (HF: istanbul)',
     )
 
-    common = new GlobalConfig({
-      chain: Mainnet,
+    common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.MuirGlacier,
     })
     evm = await createEVM({ common })
@@ -45,8 +46,7 @@ describe('EVM -> getActiveOpcodes()', () => {
   })
 
   it('should switch DIFFICULTY opcode name to PREVRANDAO when >= Merge HF', async () => {
-    let common = new GlobalConfig({
-      chain: Mainnet,
+    let common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Istanbul,
     })
     let evm = await createEVM({ common })
@@ -56,7 +56,7 @@ describe('EVM -> getActiveOpcodes()', () => {
       'Opcode x44 named DIFFICULTY pre-Merge',
     )
 
-    common = new GlobalConfig({ chain: Mainnet, hardfork: Hardfork.Paris })
+    common = createCustomCommon({}, Mainnet, { hardfork: Hardfork.Paris })
     evm = await createEVM({ common })
     assert.strictEqual(
       evm.getActiveOpcodes().get(DIFFICULTY_PREVRANDAO)!.name,
@@ -66,8 +66,7 @@ describe('EVM -> getActiveOpcodes()', () => {
   })
 
   it('should update opcodes on a hardfork change', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Chainstart,
     })
     const evm = await createEVM({ common })

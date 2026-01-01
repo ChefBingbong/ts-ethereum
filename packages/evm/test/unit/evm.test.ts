@@ -21,8 +21,8 @@ describe('initialization', () => {
       'should use default EVM parameters',
     )
 
-    const params = JSON.parse(JSON.stringify(paramsEVM))
-    params['1679']['bn254AddGas'] = 100 // 150
+    const params = structuredClone(paramsEVM)
+    params['1679']['bn254AddGas'] = 100n // 150
     evm = await createEVM({ params })
     assert.strictEqual(
       evm.common.param('bn254AddGas'),

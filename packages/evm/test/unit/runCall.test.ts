@@ -1,7 +1,11 @@
 // TODO: @ethereumjs/testdata is not available - need to find alternative or define locally
 // import { SIGNER_G, eip4844GethGenesis } from '@ts-ethereum/testdata'
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  createCustomCommon,
+  Hardfork,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import {
   Account,
   Address,
@@ -41,8 +45,7 @@ function create2address(
 
 describe('RunCall tests', () => {
   it('Create where FROM account nonce is 0', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Constantinople,
     })
     const evm = await createEVM({ common })
@@ -71,8 +74,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     ) // contract address
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Constantinople,
     })
     const evm = await createEVM({ common })
@@ -145,14 +147,12 @@ describe('RunCall tests', () => {
     ) // contract address
     // setup the evm
     const evmByzantium = await createEVM({
-      common: new GlobalConfig({
-        chain: Mainnet,
+      common: createCustomCommon({}, Mainnet, {
         hardfork: Hardfork.Byzantium,
       }),
     })
     const evmConstantinople = await createEVM({
-      common: new GlobalConfig({
-        chain: Mainnet,
+      common: createCustomCommon({}, Mainnet, {
         hardfork: Hardfork.Constantinople,
       }),
     })
@@ -199,8 +199,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     )
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Istanbul,
     })
     const evm = await createEVM({ common })
@@ -263,8 +262,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     )
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Chainstart,
     })
     const evm = await createEVM({ common })
@@ -303,8 +301,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     )
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Homestead,
     })
     const evm = await createEVM({ common })
@@ -345,8 +342,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     )
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Homestead,
     })
     const evm = await createEVM({ common })
@@ -391,8 +387,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     )
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.TangerineWhistle,
     })
     const evm = await createEVM({ common })
@@ -434,8 +429,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ff'),
     )
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Chainstart,
     })
     const evm = await createEVM({ common })
@@ -516,8 +510,7 @@ describe('RunCall tests', () => {
     const slot = hexToBytes(`0x${'00'.repeat(32)}`)
     const emptyBytes = hexToBytes('0x')
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.London,
     })
     const evm = await createEVM({ common })
@@ -573,8 +566,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x1a02a619e51cc5f8a2a61d2a60f6c80476ee8ead'),
     ) // caller address
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.London,
     })
     const evm = await createEVM({ common })
@@ -613,8 +605,7 @@ describe('RunCall tests', () => {
 
   it('Throws on negative call value', async () => {
     // setup the vm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Istanbul,
     })
     const evm = await createEVM({ common })
@@ -637,8 +628,7 @@ describe('RunCall tests', () => {
   })
 
   it('runCall() -> skipBalance behavior', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Berlin,
     })
     const evm = await createEVM({ common })
@@ -701,8 +691,7 @@ describe('RunCall tests', () => {
       hexToBytes('0x00000000000000000000000000000000000000ee'),
     ) // caller address
     // setup the evm
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Istanbul,
     })
     const evm = await createEVM({ common })
@@ -731,8 +720,7 @@ describe('RunCall tests', () => {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Cancun,
     })
     const evm = await createEVM({ common })
@@ -773,8 +761,7 @@ describe('RunCall tests', () => {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Cancun,
     })
     const evm = await createEVM({ common })
@@ -810,8 +797,7 @@ describe('RunCall tests', () => {
   })
 
   it('step event: ensure EVM memory and not internal memory gets reported', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Berlin,
     })
     const evm = await createEVM({ common })
@@ -840,8 +826,7 @@ describe('RunCall tests', () => {
   })
 
   it('ensure code deposit errors are logged correctly (>= Homestead)', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Berlin,
     })
     const evm = await createEVM({ common })
@@ -872,8 +857,7 @@ describe('RunCall tests', () => {
   })
 
   it('ensure code deposit errors are logged correctly (Frontier)', async () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Chainstart,
     })
     const evm = await createEVM({ common })
@@ -905,8 +889,7 @@ describe('RunCall tests', () => {
 
   it('ensure call and callcode handle gas stipend correctly', async () => {
     // See: https://github.com/ethereumjs/ethereumjs-monorepo/issues/3194
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Shanghai,
     })
     const evm = await createEVM({ common })

@@ -70,5 +70,5 @@ export function createCommonFromGethGenesis(
     common.setForkHashes(genesisHash)
   }
 
-  return common
+  return common as GlobalConfig<any, any>
 }
