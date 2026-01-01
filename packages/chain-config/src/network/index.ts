@@ -1,5 +1,5 @@
 export * from './accounts'
-export * from './chain-configs'
+export * from './bootnodes'
 export * from './init'
 export * from './keys'
 export * from './paths'

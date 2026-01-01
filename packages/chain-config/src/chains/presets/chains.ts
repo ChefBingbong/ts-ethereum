@@ -1,4 +1,4 @@
-import type { ChainConfig } from '../types'
+import type { ChainConfig } from '../../types'
 
 export const Mainnet: ChainConfig = {
   name: 'mainnet',
@@ -91,8 +91,6 @@ export const Mainnet: ChainConfig = {
       forkHash: '0xf0afd0e3',
     },
     {
-      // The forkHash will remain same as mergeNetsplitBlock is post merge
-      // terminal block: https://etherscan.io/block/15537393
       name: 'paris',
       block: 15537394n,
       forkHash: '0xf0afd0e3',
@@ -176,7 +174,7 @@ export const Mainnet: ChainConfig = {
 
 export const Sepolia: ChainConfig = {
   name: 'sepolia',
-  chainId: 11155111n, // TODO: check if this is correct
+  chainId: 11155111n,
   defaultHardfork: 'prague',
   consensus: {
     type: 'pow',
@@ -251,8 +249,6 @@ export const Sepolia: ChainConfig = {
       forkHash: '0xfe3366e7',
     },
     {
-      // The forkHash will remain same as mergeNetsplitBlock is post merge,
-      // terminal block: https://sepolia.etherscan.io/block/1450408
       name: 'paris',
       block: 1450409n,
       forkHash: '0xfe3366e7',
@@ -336,7 +332,7 @@ export const Sepolia: ChainConfig = {
 
 export const Holesky: ChainConfig = {
   name: 'holesky',
-  chainId: 17000n, // TODO: check if this is correct
+  chainId: 17000n,
   defaultHardfork: 'prague',
   consensus: {
     type: 'pos',

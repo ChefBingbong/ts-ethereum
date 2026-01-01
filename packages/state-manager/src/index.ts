@@ -1,5 +1,6 @@
 export * from './binary-tree/index'
 export * from './cache/index'
+export * from './interfaces'
 export * from './merkleStateManager'
 export * from './proof/index'
 export * from './rpcStateManager'

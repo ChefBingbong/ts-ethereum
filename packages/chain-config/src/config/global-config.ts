@@ -1,22 +1,23 @@
 import {
+  EthereumJSErrorWithoutCode,
+  TypeOutput,
   bytesToHex,
   concatBytes,
-  EthereumJSErrorWithoutCode,
   hexToBytes,
   intToBytes,
-  type PrefixedHexString,
-  TypeOutput,
   toType,
+  type PrefixedHexString,
 } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
+import { ConsensusAlgorithm, ConsensusType } from '../chains'
 import { crc32 } from '../crc'
+import type { EIP } from '../hardforks/eips'
 import {
-  ConsensusAlgorithm,
-  ConsensusType,
-  type EIP,
   HARDFORK_ORDER,
   Hardfork,
-} from '../fork-params/enums'
+  type Hardfork as HardforkType,
+} from '../hardforks/hardforks'
+import type { AllParamNames } from '../hardforks/params'
 import type {
   ChainConfig,
   ChainParams,
@@ -27,25 +28,16 @@ import type {
   ParamsConfig,
   ParamsDict,
 } from '../types'
-import {
-  type CleanSchemaChainRules,
-  type ExtractHardforkNames,
-  HardforkParamManager,
-  type HardforkSchemaEntry,
-  type TypedHardforkSchema,
-} from './param-manager'
-import type {
-  ChainSchemaDef,
-  ExtractSchemaHardforkNames,
-  HardforkWithEIPs,
-  InferParamsFromSchema,
-} from './schema.types'
+import { HardforkParamManager } from './param-manager'
 import type {
   EIPParamKeys,
   EIPParamType,
   EIPWithHardfork,
   EIPWithParams,
+  ExtractHardforkNames,
+  HardforkSchemaEntry,
   MinHardforkFor,
+  TypedHardforkSchema,
 } from './types'
 
 export interface TypedGlobalConfigOpts<
@@ -57,38 +49,15 @@ export interface TypedGlobalConfigOpts<
   overrides?: ParamsConfig
 }
 
-/**
- * Options for creating GlobalConfig from a unified chain schema.
- */
-export interface ChainSchemaConfigOpts<S extends ChainSchemaDef> {
-  /** The unified chain schema */
-  schema: S
-  /** Initial hardfork (defaults to first in schema) */
-  hardfork?: ExtractSchemaHardforkNames<S['hardforks']>
-  /** Custom crypto implementations */
+interface GlobalConfigInit<H extends string, SchemaH extends string> {
+  chainId: bigint
   customCrypto?: CustomCrypto
-  /** Parameter overrides */
-  overrides?: ParamsConfig
+  hardfork: H
+  hardforkParams: HardforkParamManager<H, SchemaH>
+  schemaHardforks: readonly HardforkSchemaEntry<string>[]
+  chain?: ChainConfig
 }
 
-/**
- * GlobalConfig manages chain configuration, hardforks, and EIP parameters.
- *
- * @typeParam H - Current hardfork type
- * @typeParam SchemaH - All hardforks available in the schema
- * @typeParam Params - Inferred params type from schema EIPs (defaults to ChainParams)
- *
- * @example
- * ```ts
- * // Using unified chain schema (recommended)
- * const config = GlobalConfig.fromChainSchema({
- *   schema: myChainSchema,
- * })
- *
- * // TypeScript knows exactly what params are available
- * const baseFee = config.param('baseFeeMaxChangeDenominator') // typed!
- * ```
- */
 export class GlobalConfig<
   H extends string = Hardfork,
   SchemaH extends string = Hardfork,
@@ -102,113 +71,11 @@ export class GlobalConfig<
   public _hardforkParams: HardforkParamManager<H, SchemaH>
   protected _schemaHardforks: readonly HardforkSchemaEntry<string>[]
 
-  /** Store the original chain schema for reference */
-  protected _chainSchema?: ChainSchemaDef
-
   private _eipsCache?: number[]
   private _hardforkMap?: Map<string, HardforkSchemaEntry<string>>
 
   public chain?: ChainConfig
 
-  /**
-   * Create GlobalConfig from a unified chain schema.
-   * This is the RECOMMENDED way to create a GlobalConfig as it provides
-   * full type inference for available params based on the schema's EIPs.
-   *
-   * @param opts - Configuration options with the chain schema
-   * @returns A fully typed GlobalConfig instance
-   *
-   * @example
-   * ```ts
-   * const mainnetSchema = createChainSchema({
-   *   chainId: 1n,
-   *   name: 'mainnet',
-   *   genesis: { ... },
-   *   consensus: { type: 'pow', algorithm: 'ethash' },
-   *   hardforks: [
-   *     hardfork('chainstart', { block: 0n, eips: [1] }),
-   *     hardfork('london', { block: 12965000n, eips: [1559, 3198, 3529] }),
-   *   ],
-   * })
-   *
-   * const config = GlobalConfig.fromChainSchema({ schema: mainnetSchema })
-   *
-   * // Strongly typed param access
-   * config.param('baseFeeMaxChangeDenominator') // OK - EIP-1559 in schema
-   * config.param('blobGasPerBlob') // ERROR - EIP-4844 not in schema
-   * ```
-   */
-  static fromChainSchema<const S extends ChainSchemaDef>(
-    opts: ChainSchemaConfigOpts<S>,
-  ): GlobalConfig<
-    ExtractSchemaHardforkNames<S['hardforks']>,
-    ExtractSchemaHardforkNames<S['hardforks']>,
-    InferParamsFromSchema<S>
-  > {
-    type HF = ExtractSchemaHardforkNames<S['hardforks']>
-    type InferredParams = InferParamsFromSchema<S>
-
-    const schema = opts.schema
-    const firstHardfork = schema.hardforks[0]?.name as HF
-    const initialHardfork = (opts.hardfork ?? firstHardfork) as HF
-
-    // Convert HardforkWithEIPs to HardforkSchemaEntry for compatibility
-    const hardforkEntries: HardforkSchemaEntry<string>[] = schema.hardforks.map(
-      (hf: HardforkWithEIPs) => ({
-        name: hf.name,
-        block: hf.block,
-        timestamp: hf.timestamp,
-        forkHash: hf.forkHash,
-        optional: hf.optional,
-      }),
-    )
-
-    // Build the TypedHardforkSchema for the param manager
-    const typedSchema: TypedHardforkSchema<typeof hardforkEntries> = {
-      hardforks: hardforkEntries,
-      chainId: schema.chainId,
-    }
-
-    const manager = HardforkParamManager.createFromSchema(
-      initialHardfork,
-      typedSchema as any,
-      opts.overrides,
-    )
-
-    const config = new GlobalConfig<HF, HF, InferredParams>()
-    config._currentHardfork = initialHardfork
-    config._hardforkParams = manager as unknown as HardforkParamManager<HF, HF>
-    config._schemaHardforks = hardforkEntries
-    config._chainSchema = schema
-    ;(config as { _chainId: bigint })._chainId = schema.chainId
-    ;(config as { customCrypto: CustomCrypto }).customCrypto =
-      opts.customCrypto ?? {}
-
-    // Build ChainConfig from schema for backwards compatibility
-    config.chain = {
-      name: schema.name,
-      chainId: schema.chainId,
-      consensus: schema.consensus as any,
-      genesis: schema.genesis as any,
-      hardforks: hardforkEntries.map((hf) => ({
-        name: hf.name as Hardfork,
-        block: hf.block,
-        timestamp: hf.timestamp,
-        forkHash: hf.forkHash as PrefixedHexString | null | undefined,
-        optional: hf.optional,
-      })),
-      bootstrapNodes: (schema.bootstrapNodes ?? []) as any,
-      dnsNetworks: schema.dnsNetworks as any,
-      depositContractAddress: schema.depositContractAddress,
-    }
-
-    return config as GlobalConfig<HF, HF, InferredParams>
-  }
-
-  /**
-   * Create GlobalConfig from a hardfork schema (legacy method).
-   * For new code, prefer `fromChainSchema()` which provides better type inference.
-   */
   static fromSchema<
     const Entries extends readonly HardforkSchemaEntry<string>[],
   >(
@@ -228,28 +95,24 @@ export class GlobalConfig<
       opts.overrides,
     )
 
-    const config = new GlobalConfig<HF, HF>()
-    config.chain = opts.schema.chain
-    config._currentHardfork = initialHardfork
-    config._hardforkParams = manager
-    config._schemaHardforks = opts.schema.hardforks
-    ;(config as { _chainId: bigint })._chainId = opts.schema.chainId
-    ;(config as { customCrypto: CustomCrypto }).customCrypto =
-      opts.customCrypto ?? {}
-
-    return config
+    return new GlobalConfig<HF, HF>({
+      chainId: opts.schema.chainId,
+      customCrypto: opts.customCrypto,
+      hardfork: initialHardfork,
+      hardforkParams: manager as unknown as HardforkParamManager<HF, HF>,
+      schemaHardforks: opts.schema.hardforks,
+      chain: opts.schema.chain,
+    })
   }
 
-  protected constructor() {
+  protected constructor(opts: GlobalConfigInit<H, SchemaH>) {
     this.events = new EventEmitter<CommonEvent>()
-    this.customCrypto = {}
-    this._chainId = 0n
-    this.chain = undefined
-    this._currentHardfork = Hardfork.Chainstart as H
-    this._hardforkParams = new HardforkParamManager(
-      Hardfork.Chainstart,
-    ) as unknown as HardforkParamManager<H, SchemaH>
-    this._schemaHardforks = []
+    this.customCrypto = opts.customCrypto ?? {}
+    this._chainId = opts.chainId
+    this.chain = opts.chain
+    this._currentHardfork = opts.hardfork
+    this._hardforkParams = opts.hardforkParams
+    this._schemaHardforks = opts.schemaHardforks
   }
 
   setHardfork<NewH extends SchemaH>(hardfork: NewH): NewH {
@@ -260,7 +123,7 @@ export class GlobalConfig<
     }
     this._currentHardfork = hardfork as unknown as H
     this._hardforkParams = this._hardforkParams.withHardfork(
-      hardfork,
+      hardfork as unknown as HardforkType,
     ) as unknown as HardforkParamManager<H, SchemaH>
 
     this._eipsCache = undefined
@@ -282,13 +145,6 @@ export class GlobalConfig<
 
   genesis(): GenesisBlockConfig | undefined {
     return this.chain?.genesis
-  }
-
-  rules(
-    blockNumber: bigint,
-    timestamp: bigint,
-  ): CleanSchemaChainRules<SchemaH> {
-    return this._hardforkParams.rules(blockNumber, timestamp)
   }
 
   isActivatedEIP(eip: number | EIP): boolean {
@@ -315,44 +171,11 @@ export class GlobalConfig<
   }
 
   getParam<T extends keyof ChainParams>(name: T) {
-    return this._hardforkParams.getParam(name)
+    return this._hardforkParams.getParam(name as AllParamNames)
   }
 
-  /**
-   * Get a parameter value with full type inference from the schema.
-   *
-   * When using `fromChainSchema()`, the available params are inferred from
-   * the EIPs declared in your schema. This provides compile-time safety.
-   *
-   * @param name - The parameter name (must exist in schema's EIPs)
-   * @returns The parameter value with the correct type
-   *
-   * @example
-   * ```ts
-   * // With a schema that includes EIP-1559
-   * const baseFee = config.param('baseFeeMaxChangeDenominator')
-   * // Type: bigint
-   *
-   * // With a schema that doesn't include EIP-4844
-   * const blobGas = config.param('blobGasPerBlob')
-   * // Error: 'blobGasPerBlob' does not exist on type Params
-   * ```
-   */
   param<T extends keyof Params & keyof ChainParams>(name: T): Params[T] {
-    return this._hardforkParams.getParam(name as keyof ChainParams) as Params[T]
-  }
-
-  /**
-   * Legacy param access (returns undefined for missing params).
-   * Prefer `param()` for type-safe access when using `fromChainSchema()`.
-   */
-  paramOrUndefined<T extends keyof Omit<ChainParams, 'target' | 'max'>>(
-    name: T,
-  ): T extends EIPParamKeys<1>
-    ? EIPParamType<1, T>
-    : Omit<ChainParams, 'target' | 'max'>[T] | undefined {
-    // @ts-expect-error - this is a workaround to fix the type error
-    return this._hardforkParams.getParam(name)
+    return this._hardforkParams.getParam(name as AllParamNames) as Params[T]
   }
 
   consensusAlgorithm(): ConsensusAlgorithm {
@@ -364,7 +187,6 @@ export class GlobalConfig<
   }
 
   consensusConfig(): Record<string, unknown> {
-    // TODO: Could store this in the schema if needed for Clique chains
     return {}
   }
 
@@ -372,12 +194,7 @@ export class GlobalConfig<
     return this._chainId
   }
 
-  /**
-   * Returns the block number at which a specific EIP was activated.
-   * Returns null if the EIP is not part of a block-based hardfork.
-   */
   eipBlock(eip: number): bigint | null {
-    // Find which hardfork introduced this EIP, then return that hardfork's block
     const hardforkName = this._hardforkParams.getHardforkForEIP(eip)
     if (!hardforkName) return null
 
@@ -386,10 +203,6 @@ export class GlobalConfig<
     return BigInt(hf.block)
   }
 
-  /**
-   * Returns blob gas schedule parameters for the current hardfork.
-   * Returns zeros for chains without blob gas support (pre-Cancun).
-   */
   getBlobGasSchedule(): {
     targetBlobGasPerBlock: bigint
     maxBlobGasPerBlock: bigint
@@ -413,7 +226,7 @@ export class GlobalConfig<
 
   updateBatchParams(overrides: ParamsDict) {
     for (const [, params] of Object.entries(overrides)) {
-      // this._hardforkParams.updateParams(params)
+      this._hardforkParams.updateParams(params)
     }
   }
 
@@ -515,10 +328,6 @@ export class GlobalConfig<
     return false
   }
 
-  activeOnBlock(blockNumber: bigint): boolean {
-    return this.hardforkIsActiveOnBlock(null, blockNumber)
-  }
-
   hardfork(): H {
     return this._currentHardfork
   }
@@ -530,7 +339,6 @@ export class GlobalConfig<
     )
     const targetIdx = hardforks.findIndex((hf) => hf.name === hardfork)
     if (targetIdx === -1) {
-      // If hardfork not found in schema, check HARDFORK_ORDER
       const orderCurrentIdx = HARDFORK_ORDER.findIndex(
         (hf) => hf === this._currentHardfork,
       )
@@ -541,20 +349,15 @@ export class GlobalConfig<
     return currentIdx >= targetIdx
   }
 
-  /**
-   * Create a copy of this GlobalConfig.
-   * Preserves all type information including inferred params.
-   */
   copy(): GlobalConfig<H, SchemaH, Params> {
-    const copy = new GlobalConfig<H, SchemaH, Params>()
-    copy._currentHardfork = this._currentHardfork
-    copy._hardforkParams = this._hardforkParams.copy()
-    copy._schemaHardforks = [...this._schemaHardforks]
-    copy._chainSchema = this._chainSchema
-    copy.chain = this.chain
-    ;(copy as { _chainId: bigint })._chainId = this._chainId
-    ;(copy as { customCrypto: CustomCrypto }).customCrypto = this.customCrypto
-    return copy
+    return new GlobalConfig<H, SchemaH, Params>({
+      chainId: this._chainId,
+      customCrypto: this.customCrypto,
+      hardfork: this._currentHardfork,
+      hardforkParams: this._hardforkParams.copy(),
+      schemaHardforks: [...this._schemaHardforks],
+      chain: this.chain,
+    })
   }
 
   protected _calcForkHash(
@@ -566,14 +369,9 @@ export class GlobalConfig<
 
     for (const hf of this._schemaHardforks) {
       const { block, timestamp, name } = hf
-      // Timestamp to be used for timestamp based hfs even if we may bundle
-      // block number with them retrospectively
       const blockOrTime: bigint | null =
         timestamp !== undefined ? BigInt(timestamp) : block
 
-      // Skip for chainstart (0), not applied HFs (null) and
-      // when already applied on same blockOrTime HFs
-      // and on the merge since forkhash doesn't change on merge hf
       if (
         blockOrTime !== null &&
         blockOrTime !== 0n &&
@@ -592,8 +390,6 @@ export class GlobalConfig<
 
     const inputBytes = concatBytes(genesisHash, hfBytes)
 
-    // CRC32 delivers result as signed (negative) 32-bit integer,
-    // convert to hex string
     const forkhash = bytesToHex(intToBytes(crc32(inputBytes) >>> 0))
     return forkhash
   }
@@ -624,7 +420,6 @@ export class GlobalConfig<
   }
 
   setForkHashes(genesisHash: Uint8Array): void {
-    // Create mutable copies of hardfork entries to set fork hashes
     const mutableHardforks = this._schemaHardforks.map((hf) => ({ ...hf }))
 
     for (const hf of mutableHardforks) {
@@ -640,7 +435,6 @@ export class GlobalConfig<
         )
       }
     }
-    // Update the schema hardforks with the new fork hashes
     ;(
       this as unknown as { _schemaHardforks: typeof mutableHardforks }
     )._schemaHardforks = mutableHardforks
@@ -677,73 +471,5 @@ export class GlobalConfig<
 
   get paramManager(): HardforkParamManager<H, SchemaH> {
     return this._hardforkParams
-  }
-
-  /**
-   * Get the unified chain schema if created via `fromChainSchema()`.
-   * Returns undefined if created via the legacy `fromSchema()` method.
-   */
-  get chainSchema(): ChainSchemaDef | undefined {
-    return this._chainSchema
-  }
-
-  /**
-   * Check if an EIP is defined in the chain schema.
-   * Only works when created via `fromChainSchema()`.
-   *
-   * @param eip - The EIP number to check
-   * @returns true if the EIP is in the schema's hardforks
-   */
-  isEIPInSchema(eip: number): boolean {
-    if (!this._chainSchema) {
-      // Fall back to checking if EIP is active at current hardfork
-      return this.isActivatedEIP(eip)
-    }
-
-    for (const hf of this._chainSchema.hardforks) {
-      if (hf.eips.includes(eip)) {
-        return true
-      }
-    }
-    return false
-  }
-
-  /**
-   * Get all EIPs defined in the chain schema.
-   * Only works when created via `fromChainSchema()`.
-   *
-   * @returns Array of all EIP numbers in the schema
-   */
-  getSchemaEIPs(): number[] {
-    if (!this._chainSchema) {
-      return this.eips
-    }
-
-    const eips = new Set<number>()
-    for (const hf of this._chainSchema.hardforks) {
-      for (const eip of hf.eips) {
-        eips.add(eip)
-      }
-    }
-    return [...eips].sort((a, b) => a - b)
-  }
-
-  /**
-   * Get the hardfork that activates a specific EIP in the schema.
-   *
-   * @param eip - The EIP number
-   * @returns The hardfork name, or undefined if not in schema
-   */
-  getEIPHardfork(eip: number): string | undefined {
-    if (!this._chainSchema) {
-      return this._hardforkParams.getHardforkForEIP(eip)
-    }
-
-    for (const hf of this._chainSchema.hardforks) {
-      if (hf.eips.includes(eip)) {
-        return hf.name
-      }
-    }
-    return undefined
   }
 }

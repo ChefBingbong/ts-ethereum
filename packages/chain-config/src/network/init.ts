@@ -2,16 +2,8 @@ import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
 import { schemaFromChainConfig } from '../builder'
-import type { GenesisState } from '../defaults'
-import {
-  enodeToDPTPeerInfo,
-  readBootnodeInfo,
-  writeBootnodeInfo,
-} from '../defaults/bootnodes'
-import { Hardfork } from '../fork-params/enums'
-import { GlobalConfig } from '../global'
-import { initPrivateKey } from '../setup/keys'
-import { getClientPaths } from '../setup/paths'
+import type { GenesisState } from '../chains'
+import { GlobalConfig } from '../config'
 import type { ChainConfig } from '../types'
 import {
   generateAccounts,
@@ -19,27 +11,24 @@ import {
   readAccounts,
   writeAccounts,
 } from './accounts'
+import {
+  enodeToDPTPeerInfo,
+  readBootnodeInfo,
+  writeBootnodeInfo,
+} from './bootnodes'
+import { initPrivateKey } from './keys'
+import { getClientPaths } from './paths'
 
 export interface ClientInitArgs extends Partial<any> {
-  /** Root data directory */
   dataDir?: string
-  /** Network name */
   network?: string
-  /** Node port */
   port?: number
-  /** Chain configuration */
   chainConfig?: ChainConfig
-  /** Genesis state */
   genesisState?: GenesisState
-  /** Whether this is a bootnode */
   isBootnode?: boolean
-  /** Whether this node is a miner */
   isMiner?: boolean
-  /** Account seeds for deterministic account generation */
   accountSeeds?: string[]
-  /** Bootnode port (default: 8000) */
   bootnodePort?: number
-  /** Whether to persist network identity (default: true) */
   persistNetworkIdentity?: boolean
 }
 
@@ -51,10 +40,6 @@ export interface ClientConfig {
   bootnodes?: PeerInfo[]
 }
 
-/**
- * Initialize client configuration with all necessary setup
- * Similar to Lodestar's beaconHandlerInit pattern
- */
 export async function initClientConfig(args: ClientInitArgs): Promise<any> {
   const network = args.network ?? process.env.NETWORK ?? 'testnet'
   const port = args.port ?? Number.parseInt(process.env.PORT || '8000', 10)
@@ -62,7 +47,6 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
   const isBootnode = args.isBootnode ?? port === bootnodePort
   const isMiner = args.isMiner ?? false
 
-  // Get paths
   const paths = getClientPaths(
     {
       dataDir: args.dataDir,
@@ -70,7 +54,6 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     network,
   )
 
-  // Initialize private key
   const persistNetworkIdentity =
     args.persistNetworkIdentity ??
     process.env.PERSIST_NETWORK_IDENTITY !== 'false'
@@ -80,7 +63,6 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     persistNetworkIdentity,
   )
 
-  // Handle accounts
   let accounts: any[] = []
   const accountSeeds = args.accountSeeds ?? [
     'testnet-account-seed-0',
@@ -91,14 +73,11 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
   ]
 
   if (isBootnode) {
-    // Bootnode generates and saves accounts
     accounts = generateAccounts(accountSeeds)
     writeAccounts(paths.accountsFile, accounts)
   } else {
-    // Other nodes read accounts from file
     accounts = readAccounts(paths.accountsFile)
     if (accounts.length === 0) {
-      // Fallback: generate accounts if file doesn't exist
       accounts = generateAccounts(accountSeeds)
       writeAccounts(paths.accountsFile, accounts)
     }
@@ -106,13 +85,10 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
 
   const nodeAccount = getNodeAccount(accounts, port, bootnodePort)
 
-  // Handle bootnode info
   let bootnodes: PeerInfo[] | undefined
   if (isBootnode) {
-    // Write bootnode info
     writeBootnodeInfo(paths.bootnodeFile, port, privateKey)
   } else {
-    // Read bootnode info and convert to DPT format
     const enodeUrl = readBootnodeInfo(paths.bootnodeFile)
     if (enodeUrl) {
       const peerInfo = enodeToDPTPeerInfo(enodeUrl)
@@ -122,7 +98,6 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     }
   }
 
-  // Create GlobalConfig instance
   const chainConfig = args.chainConfig
   if (!chainConfig) {
     throw new Error('chainConfig is required')
@@ -131,13 +106,11 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
   const schema = schemaFromChainConfig(chainConfig)
   const common = GlobalConfig.fromSchema({
     schema,
-    hardfork: Hardfork.TangerineWhistle,
+    hardfork: chainConfig.defaultHardfork,
   })
 
-  // Convert viem Address to utils Address for ConfigOptions
   const nodeAccountAddress = createAddressFromString(nodeAccount[0])
 
-  // Merge with existing ConfigOptions
   const config = {
     common,
     datadir: paths.dataDir,

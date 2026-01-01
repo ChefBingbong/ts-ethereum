@@ -8,17 +8,11 @@ export interface PrivateKeyInfo {
   nodeId: Uint8Array
 }
 
-/**
- * Write file with 600 permissions (owner read/write only)
- */
 function writeFile600Perm(filepath: string, content: string): void {
   mkdirSync(path.dirname(filepath), { recursive: true })
   writeFileSync(filepath, content, { mode: 0o600 })
 }
 
-/**
- * Read private key from JSON file
- */
 export function readPrivateKey(filepath: string): Uint8Array {
   if (!existsSync(filepath)) {
     throw new Error(`Private key file not found: ${filepath}`)
@@ -28,7 +22,6 @@ export function readPrivateKey(filepath: string): Uint8Array {
     const content = readFileSync(filepath, 'utf-8')
     const parsed = JSON.parse(content)
 
-    // Support both formats: { privateKey: "0x..." } or just "0x..."
     const keyHex = parsed.privateKey ?? parsed
     if (typeof keyHex !== 'string') {
       throw new Error('Invalid private key format')
@@ -40,27 +33,16 @@ export function readPrivateKey(filepath: string): Uint8Array {
   }
 }
 
-/**
- * Write private key to JSON file with 600 permissions
- */
 export function writePrivateKey(filepath: string, key: Uint8Array): void {
   const keyHex = bytesToHex(key)
   const content = JSON.stringify({ privateKey: keyHex }, null, 2)
   writeFile600Perm(filepath, content)
 }
 
-/**
- * Get node ID from private key (64-byte public key without 0x04 prefix)
- */
 export function getNodeId(privateKey: Uint8Array): Uint8Array {
-  // Get uncompressed public key and remove the 0x04 prefix
   return secp256k1.getPublicKey(privateKey, false).slice(1)
 }
 
-/**
- * Initialize or load private key from file
- * Similar to Lodestar's initPrivateKeyAndEnr pattern
- */
 export function initPrivateKey(
   paths: { peerIdFile: string },
   logger?: any,

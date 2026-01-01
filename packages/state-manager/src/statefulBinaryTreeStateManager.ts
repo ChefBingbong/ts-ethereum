@@ -1,16 +1,6 @@
 import { blake3 } from '@noble/hashes/blake3.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type {
-  AccountFields,
-  BinaryTreeAccessedStateWithAddress,
-  BinaryTreeAccessWitnessInterface,
-  GenesisState,
-  StateManagerInterface,
-  StorageDump,
-  StoragePair,
-  StorageRange,
-} from '@ts-ethereum/chain-config'
-import { BinaryTreeAccessedStateType } from '@ts-ethereum/chain-config'
+import { GenesisState } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type {
   Address,
@@ -19,11 +9,11 @@ import type {
 } from '@ts-ethereum/utils'
 import {
   Account,
+  bigIntToBytes,
   BINARY_TREE_CODE_CHUNK_SIZE,
   BINARY_TREE_CODE_OFFSET,
   BINARY_TREE_NODE_WIDTH,
   BinaryTreeLeafType,
-  bigIntToBytes,
   bytesToBigInt,
   bytesToHex,
   chunkifyBinaryTreeCode,
@@ -31,9 +21,9 @@ import {
   createPartialAccount,
   createPartialAccountFromRLP,
   decodeBinaryTreeLeafBasicData,
-  EthereumJSErrorWithoutCode,
   encodeBinaryTreeLeafBasicData,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   generateBinaryTreeChunkSuffixes,
   generateBinaryTreeCodeStems,
   getBinaryTreeKeyForStorageSlot,
@@ -53,6 +43,16 @@ import debugDefault from 'debug'
 import { BinaryTree } from './binary-tree/binaryTree'
 import type { Caches } from './cache/caches'
 import { OriginalStorageCache } from './cache/originalStorageCache'
+import {
+  type AccountFields,
+  BinaryTreeAccessedStateType,
+  type BinaryTreeAccessedStateWithAddress,
+  type BinaryTreeAccessWitnessInterface,
+  type StateManagerInterface,
+  type StorageDump,
+  StoragePair,
+  type StorageRange,
+} from './interfaces'
 import type {
   BinaryTreeState,
   StatefulBinaryTreeStateManagerOpts,

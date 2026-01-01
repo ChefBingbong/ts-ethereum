@@ -1,9 +1,9 @@
-import { Hardfork } from '../../fork-params/enums'
 import {
   createHardforkSchema,
-  HardforkParamManager,
   hardforkEntry,
-} from '../../global/param-manager'
+  HardforkParamManager,
+} from '../../config/param-manager'
+import { Hardfork } from '../../hardforks'
 import type { ChainConfig, ParamsConfig } from '../../types'
 
 export const customChainConfig: ChainConfig = {
@@ -29,20 +29,11 @@ export const customChainConfig: ChainConfig = {
   ],
   bootstrapNodes: [],
 }
-/**
- * Mainnet hardfork schema starting at Prague.
- * Includes all mainnet hardforks from genesis through Prague.
- *
- * Block numbers and timestamps are from Ethereum mainnet:
- * - Block-based forks: chainstart through London
- * - Timestamp-based forks: Paris through Prague
- */
+
 export const mainnetSchema = createHardforkSchema({
   hardforks: [
-    // Genesis
     hardforkEntry(Hardfork.Chainstart, { block: 0n }),
 
-    // Block-based forks
     hardforkEntry(Hardfork.Homestead, { block: 1150000n }),
     hardforkEntry(Hardfork.Dao, { block: 1920000n, optional: true }),
     hardforkEntry(Hardfork.TangerineWhistle, { block: 2463000n }),
@@ -57,7 +48,6 @@ export const mainnetSchema = createHardforkSchema({
     hardforkEntry(Hardfork.ArrowGlacier, { block: 13773000n, optional: true }),
     hardforkEntry(Hardfork.GrayGlacier, { block: 15050000n, optional: true }),
 
-    // Timestamp-based forks (post-merge)
     hardforkEntry(Hardfork.Paris, { block: null, timestamp: '1681338455' }),
     hardforkEntry(Hardfork.Shanghai, { block: null, timestamp: '1681338455' }),
     hardforkEntry(Hardfork.Cancun, { block: null, timestamp: '1710338135' }),
@@ -68,38 +58,10 @@ export const mainnetSchema = createHardforkSchema({
   ] as const,
   chainId: 12345n,
   chain: customChainConfig,
-  validationOpts: {
-    customOptionalForks: [
-      Hardfork.Dao,
-      Hardfork.MuirGlacier,
-      Hardfork.ArrowGlacier,
-      Hardfork.GrayGlacier,
-    ],
-  },
 })
 
-/**
- * Type representing the hardforks available in the mainnet schema
- */
 export type MainnetHardfork = (typeof mainnetSchema.hardforks)[number]['name']
 
-/**
- * Create a HardforkParamManager for mainnet starting at Prague.
- * This is the recommended entry point for mainnet configuration.
- *
- * @param overrides - Optional parameter overrides
- * @returns A type-safe HardforkParamManager for mainnet
- *
- * @example
- * ```ts
- * const manager = createMainnetManager()
- * const rules = manager.rules(blockNumber, timestamp)
- *
- * // Type-safe access to mainnet hardforks
- * manager.withHardfork('prague')  // ✅ OK
- * manager.withHardfork('osaka')   // ❌ Error: not on mainnet yet
- * ```
- */
 export function createMainnetManager(overrides?: ParamsConfig) {
   return HardforkParamManager.createFromSchema(
     Hardfork.Prague,
@@ -108,7 +70,4 @@ export function createMainnetManager(overrides?: ParamsConfig) {
   )
 }
 
-/**
- * Pre-configured mainnet manager at Prague
- */
 export const mainnetManager = createMainnetManager()

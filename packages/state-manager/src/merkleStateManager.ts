@@ -1,10 +1,4 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type {
-  AccountFields,
-  StateManagerInterface,
-  StorageDump,
-  StorageRange,
-} from '@ts-ethereum/chain-config'
 import {
   GlobalConfig,
   Hardfork,
@@ -20,8 +14,8 @@ import {
   createAccount,
   createAccountFromRLP,
   createAddressFromString,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   short,
   toBytes,
@@ -33,6 +27,12 @@ import type { Debugger } from 'debug'
 import debugDefault from 'debug'
 import { OriginalStorageCache } from './cache/index'
 import type { Caches, MerkleStateManagerOpts } from './index'
+import type {
+  AccountFields,
+  StateManagerInterface,
+  StorageDump,
+  StorageRange,
+} from './interfaces'
 import { modifyAccountFields } from './util'
 
 /**

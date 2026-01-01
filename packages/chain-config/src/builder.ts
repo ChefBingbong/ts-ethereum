@@ -1,5 +1,5 @@
-import type { GethGenesis } from './defaults/gethGenesis.js'
-import { Hardfork } from './fork-params/enums'
+import type { GethGenesis } from './chains/gethGenesis.js'
+import { Hardfork } from './hardforks/hardforks.js'
 import {
   createHardforkSchema,
   GlobalConfig,

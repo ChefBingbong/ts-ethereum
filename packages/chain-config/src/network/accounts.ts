@@ -17,16 +17,10 @@ export interface AccountInfo {
   role: string
 }
 
-/**
- * Derive private key from seed string
- */
 export function derivePrivateKey(seed: string): Uint8Array {
   return createHash('sha256').update(seed).digest()
 }
 
-/**
- * Generate deterministic account from seed
- */
 export function generateDeterministicAccount(
   seed: string,
   _index: number,
@@ -36,16 +30,10 @@ export function generateDeterministicAccount(
   return [address.toString() as Address, privKey]
 }
 
-/**
- * Generate multiple accounts from seeds
- */
 export function generateAccounts(seeds: string[]): Account[] {
   return seeds.map((seed, i) => generateDeterministicAccount(seed, i))
 }
 
-/**
- * Read accounts from JSON file
- */
 export function readAccounts(filepath: string, seeds?: string[]): Account[] {
   if (!existsSync(filepath)) {
     return []
@@ -60,11 +48,9 @@ export function readAccounts(filepath: string, seeds?: string[]): Account[] {
     }
 
     return accountsInfo.map((info) => {
-      // Ensure address is properly formatted as viem Address type
       const address = info.address.startsWith('0x')
         ? (info.address as Address)
         : (`0x${info.address}` as Address)
-      // Ensure private key has 0x prefix for hexToBytes
       const privateKeyHex = info.privateKey.startsWith('0x')
         ? info.privateKey
         : `0x${info.privateKey}`
@@ -76,9 +62,6 @@ export function readAccounts(filepath: string, seeds?: string[]): Account[] {
   }
 }
 
-/**
- * Write accounts to JSON file
- */
 export function writeAccounts(filepath: string, accounts: Account[]): void {
   mkdirSync(path.dirname(filepath), { recursive: true })
 
@@ -92,10 +75,6 @@ export function writeAccounts(filepath: string, accounts: Account[]): void {
   writeFileSync(filepath, JSON.stringify(accountsInfo, null, 2))
 }
 
-/**
- * Get account for specific node port
- * Maps port to account index (assuming ports start from BOOTNODE_PORT)
- */
 export function getNodeAccount(
   accounts: Account[],
   port: number,

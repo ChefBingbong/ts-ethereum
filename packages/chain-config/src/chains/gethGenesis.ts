@@ -5,9 +5,6 @@ import {
 } from '@ts-ethereum/utils'
 import type { ConsensusConfig } from '../types'
 
-/**
- * Interface for Geth Genesis Config
- */
 export interface GethGenesisConfig {
   chainId: number
   depositContractAddress?: string
@@ -57,9 +54,6 @@ export interface GethGenesisConfig {
   proofInBlocks?: boolean
 }
 
-/**
- * Interface for account allocation in Geth Genesis
- */
 export interface GethGenesisAlloc {
   [address: string]: {
     balance: string
@@ -69,9 +63,6 @@ export interface GethGenesisAlloc {
   }
 }
 
-/**
- * Interface for blob schedule in Geth Genesis (EIP-7840)
- */
 export interface GethGenesisBlobSchedule {
   [fork: string]: {
     target?: number
@@ -80,9 +71,6 @@ export interface GethGenesisBlobSchedule {
   }
 }
 
-/**
- * Interface for Geth Genesis object
- */
 export interface GethGenesis {
   config: GethGenesisConfig
   name: string
@@ -103,9 +91,6 @@ export interface GethGenesis {
   baseFeePerGas?: PrefixedHexString | number | null
 }
 
-/**
- * Type for the options passed to createCommonFromGethGenesis
- */
 export interface CreateCommonFromGethGenesisOpts {
   chain?: string
   genesisHash?: string
@@ -121,39 +106,10 @@ export type AccountState = [
   nonce?: PrefixedHexString,
 ]
 
-/**
- * If you are using a custom chain {@link GlobalConfig}, pass the genesis state.
- *
- * Pattern 1 (with genesis state see {@link GenesisState} for format):
- *
- * ```javascript
- * {
- *   '0x0...01': '0x100', // For EoA
- * }
- * ```
- *
- * Pattern 2 (with complex genesis state, containing contract accounts and storage).
- * Note that in {@link AccountState} there are two
- * accepted types. This allows to easily insert accounts in the genesis state:
- *
- * A complex genesis state with Contract and EoA states would have the following format:
- *
- * ```javascript
- * {
- *   '0x0...01': '0x100', // For EoA
- *   '0x0...02': ['0x1', '0xRUNTIME_BYTECODE', [[storageKey1, storageValue1], [storageKey2, storageValue2]]] // For contracts
- * }
- * ```
- */
 export interface GenesisState {
   [key: PrefixedHexString]: PrefixedHexString | AccountState
 }
 
-/**
- * Parses the geth genesis state into Blockchain {@link GenesisState}
- * @param gethGenesis GethGenesis object
- * @returns Parsed {@link GenesisState}
- */
 export function parseGethGenesisState(gethGenesis: GethGenesis): GenesisState {
   const genesisAllocation = Object.entries(gethGenesis?.alloc ?? {})
   const state: GenesisState = {}

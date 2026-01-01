@@ -1,9 +1,8 @@
-import type {
+import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
+import {
   BinaryTreeAccessWitnessInterface,
-  GlobalConfig,
-  ParamsDict,
   StateManagerInterface,
-} from '@ts-ethereum/chain-config'
+} from '@ts-ethereum/state-manager/src/interfaces'
 import type { Account, Address, PrefixedHexString } from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
 import type { BinaryTreeAccessWitness } from './binaryTreeAccessWitness'

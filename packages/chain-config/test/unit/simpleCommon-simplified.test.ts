@@ -362,7 +362,7 @@ describe('GlobalConfig - Simplified Layout Tests', () => {
         chain: Mainnet,
         hardfork: Hardfork.Berlin,
       })
-      expect(common.isHardforkAfter(Hardfork.Berlin)).toBe(true)
+      expect(common.gteHardfork(Hardfork.Berlin)).toBe(true)
     })
 
     it('should return true for earlier hardfork', () => {
@@ -370,7 +370,7 @@ describe('GlobalConfig - Simplified Layout Tests', () => {
         chain: Mainnet,
         hardfork: Hardfork.Berlin,
       })
-      expect(common.isHardforkAfter(Hardfork.Chainstart)).toBe(true)
+      expect(common.gteHardfork(Hardfork.Chainstart)).toBe(true)
     })
 
     it('should return false for later hardfork', () => {
@@ -378,7 +378,7 @@ describe('GlobalConfig - Simplified Layout Tests', () => {
         chain: Mainnet,
         hardfork: Hardfork.Berlin,
       })
-      expect(common.isHardforkAfter(Hardfork.London)).toBe(false)
+      expect(common.gteHardfork(Hardfork.London)).toBe(false)
     })
   })
 

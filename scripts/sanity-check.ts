@@ -1,15 +1,12 @@
 #!/usr/bin/env bun
 
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
+  GlobalConfig,
   Hardfork,
-  paramsBlock,
   readAccounts,
   readPrivateKey,
   schemaFromChainConfig,
@@ -17,6 +14,8 @@ import {
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
 import debug from 'debug'
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import {
   createPublicClient,
   createWalletClient,
@@ -27,6 +26,7 @@ import {
   publicActions,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { paramsBlock } from '../packages/block/src'
 import {
   Config,
   createConfigOptions,
@@ -80,7 +80,7 @@ export const testChainConfig: ChainConfig = {
     extraData:
       '0xcc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
   },
-  hardforks: [{ name: 'chainstart', block: 0n, t }],
+  hardforks: [{ name: 'chainstart', block: 0n }],
   bootstrapNodes: [],
 }
 

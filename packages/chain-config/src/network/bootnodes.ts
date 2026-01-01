@@ -1,9 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
 import { type Multiaddr, multiaddr } from '@multiformats/multiaddr'
 import { bytesToUnprefixedHex, hexToBytes } from '@ts-ethereum/utils'
-// import type { PeerInfo } from '../kademlia/types'
-import { getNodeId } from '../setup/keys'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { getNodeId } from './keys'
 
 type PeerInfo = {
   id?: Uint8Array
@@ -12,9 +11,7 @@ type PeerInfo = {
   tcpPort?: number | null
   vectorClock?: number
 }
-/**
- * Read bootnode enode URL from file
- */
+
 export function readBootnodeInfo(filepath: string): string | null {
   if (!existsSync(filepath)) {
     return null
@@ -28,9 +25,6 @@ export function readBootnodeInfo(filepath: string): string | null {
   }
 }
 
-/**
- * Write bootnode enode URL to file
- */
 export function writeBootnodeInfo(
   filepath: string,
   port: number,
@@ -44,9 +38,6 @@ export function writeBootnodeInfo(
   writeFileSync(filepath, enodeUrl)
 }
 
-/**
- * Convert enode URL to Multiaddr format
- */
 export function enodeToMultiaddr(enodeUrl: string): Multiaddr | null {
   const match = enodeUrl.match(/^enode:\/\/([a-fA-F0-9]+)@([^:]+):(\d+)$/)
   if (!match) {
@@ -57,9 +48,6 @@ export function enodeToMultiaddr(enodeUrl: string): Multiaddr | null {
   return multiaddr(`/ip4/${ip}/tcp/${port}`)
 }
 
-/**
- * Convert enode URL to DPT PeerInfo format
- */
 export function enodeToDPTPeerInfo(enodeUrl: string): PeerInfo | null {
   const match = enodeUrl.match(/^enode:\/\/([a-fA-F0-9]+)@([^:]+):(\d+)$/)
   if (!match) {
@@ -69,7 +57,7 @@ export function enodeToDPTPeerInfo(enodeUrl: string): PeerInfo | null {
   const [, nodeIdHex, ip, port] = match
   const nodeId = hexToBytes(`0x${nodeIdHex}`)
   const tcpPort = Number.parseInt(port, 10)
-  const udpPort = tcpPort // DPT uses same port for UDP
+  const udpPort = tcpPort
 
   return {
     id: nodeId,

@@ -1,8 +1,6 @@
-import type {
-  GlobalConfig,
-  StateManagerInterface,
-} from '@ts-ethereum/chain-config'
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
+import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import {
   Account,
   Address,
@@ -11,8 +9,8 @@ import {
   bigIntToBytes,
   bytesToUnprefixedHex,
   createZeroAddress,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   generateAddress,
   generateAddress2,
   KECCAK256_NULL,

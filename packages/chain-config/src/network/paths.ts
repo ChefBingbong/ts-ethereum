@@ -22,26 +22,10 @@ export type ClientPaths = {
   bootnodeFile: string
 }
 
-/**
- * Defines the path structure of the files relevant to the client
- *
- * ```bash
- * $dataDir
- * ├── chain/          # Chain database
- * ├── state/           # State database
- * ├── meta/            # Meta database
- * ├── config/          # Config database
- * ├── peer-id.json     # Peer ID/private key
- * └── ../              # Shared files (parent directory)
- *     ├── accounts.json    # Accounts file (shared across nodes)
- *     └── bootnode.txt     # Bootnode info (shared)
- * ```
- */
 export function getClientPaths(
   args: ClientPathsPartial & { dataDir?: string },
   network: string,
 ): ClientPaths {
-  // Get dataDir from args or environment variable, with fallback
   const dataDir =
     args.dataDir ??
     process.env.DATA_DIR ??
@@ -64,13 +48,11 @@ export function getClientPaths(
     process.env.PEER_ID_FILE ??
     path.join(dataDir, 'peer-id.json')
 
-  // Accounts file is shared across nodes, so default to parent directory
   const accountsFile =
     args.accountsFile ??
     process.env.ACCOUNTS_FILE ??
     path.join(dataDir, '..', 'accounts.json')
 
-  // Bootnode file is typically shared across nodes, so default to parent directory
   const bootnodeFile =
     args.bootnodeFile ??
     process.env.BOOTNODE_FILE ??
@@ -88,9 +70,6 @@ export function getClientPaths(
   }
 }
 
-/**
- * Constructs representations of the path structure to show in command's description
- */
 export const defaultClientPaths = getClientPaths(
   { dataDir: '$dataDir' },
   '$network',

@@ -1,7 +1,3 @@
-/**
- * External Interfaces for other EthereumJS libraries
- */
-
 import type {
   Account,
   Address,
@@ -13,26 +9,13 @@ export interface StorageDump {
   [key: string]: string
 }
 
-/**
- * Object that can contain a set of storage keys associated with an account.
- */
 export interface StorageRange {
-  /**
-   * A dictionary where the keys are hashed storage keys, and the values are
-   * objects containing the preimage of the hashed key (in `key`) and the
-   * storage key (in `value`). Currently, there is no way to retrieve preimages,
-   * so they are always `null`.
-   */
   storage: {
     [key: string]: {
       key: string | null
       value: string
     }
   }
-  /**
-   * The next (hashed) storage key after the greatest storage key
-   * contained in `storage`.
-   */
   nextKey: string | null
 }
 
@@ -40,27 +23,8 @@ export type AccountFields = Partial<
   Pick<Account, 'nonce' | 'balance' | 'storageRoot' | 'codeHash' | 'codeSize'>
 >
 
-export type StorageProof = {
-  key: PrefixedHexString
-  proof: PrefixedHexString[]
-  value: PrefixedHexString
-}
+export type StoragePair = [key: PrefixedHexString, value: PrefixedHexString]
 
-export type Proof = {
-  address: PrefixedHexString
-  balance: PrefixedHexString
-  codeHash: PrefixedHexString
-  nonce: PrefixedHexString
-  storageHash: PrefixedHexString
-  accountProof: PrefixedHexString[]
-  storageProof: StorageProof[]
-}
-
-/**
- * Binary tree related
- *
- * Experimental (do not implement)
- */
 export type AccessEventFlags = {
   stemRead: boolean
   stemWrite: boolean
@@ -128,15 +92,7 @@ export interface BinaryTreeAccessWitnessInterface {
   revert(): void
 }
 
-/*
- * Generic StateManager interface corresponding with the @ethereumjs/statemanager package
- *
- */
 export interface StateManagerInterface {
-  /*
-   * Core Access Functionality
-   */
-  // Account methods
   getAccount(address: Address): Promise<Account | undefined>
   putAccount(address: Address, account?: Account): Promise<void>
   deleteAccount(address: Address): Promise<void>
@@ -145,12 +101,10 @@ export interface StateManagerInterface {
     accountFields: AccountFields,
   ): Promise<void>
 
-  // Code methods
   putCode(address: Address, value: Uint8Array): Promise<void>
   getCode(address: Address): Promise<Uint8Array>
   getCodeSize(address: Address): Promise<number>
 
-  // Storage methods
   getStorage(address: Address, key: Uint8Array): Promise<Uint8Array>
   putStorage(
     address: Address,
@@ -159,27 +113,14 @@ export interface StateManagerInterface {
   ): Promise<void>
   clearStorage(address: Address): Promise<void>
 
-  /*
-   * Checkpointing Functionality
-   */
   checkpoint(): Promise<void>
   commit(): Promise<void>
   revert(): Promise<void>
 
-  /*
-   * State Root Functionality
-   */
   getStateRoot(): Promise<Uint8Array>
   setStateRoot(stateRoot: Uint8Array, clearCache?: boolean): Promise<void>
-  hasStateRoot(root: Uint8Array): Promise<boolean> // only used in client
+  hasStateRoot(root: Uint8Array): Promise<boolean>
 
-  /*
-   * Extra Functionality
-   *
-   * Optional non-essential methods, these methods should always be guarded
-   * on usage (check for existence)
-   */
-  // Client RPC
   dumpStorage?(address: Address): Promise<StorageDump>
   dumpStorageRange?(
     address: Address,
@@ -187,14 +128,11 @@ export interface StateManagerInterface {
     limit: number,
   ): Promise<StorageRange>
 
-  /*
-   * EVM/VM Specific Functionality
-   */
   originalStorageCache: {
     get(address: Address, key: Uint8Array): Promise<Uint8Array>
     clear(): void
   }
-  generateCanonicalGenesis?(initState: any): Promise<void> // TODO make input more typesafe
+  generateCanonicalGenesis?(initState: any): Promise<void>
   initBinaryTreeExecutionWitness?(
     blockNum: bigint,
     executionWitness?: BinaryTreeExecutionWitness | null,
@@ -206,11 +144,8 @@ export interface StateManagerInterface {
     contract: Address,
     programCounter: number,
   ): Promise<boolean>
-  getAppliedKey?(address: Uint8Array): Uint8Array // only for preimages
+  getAppliedKey?(address: Uint8Array): Uint8Array
 
-  /*
-   * Utility
-   */
   clearCaches(): void
   shallowCopy(downlevelCaches?: boolean): StateManagerInterface
 }

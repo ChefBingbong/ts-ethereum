@@ -1,9 +1,9 @@
+import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import { ConsensusAlgorithm } from '@ts-ethereum/chain-config'
 import type {
   BinaryTreeAccessWitnessInterface,
-  GlobalConfig,
   StateManagerInterface,
-} from '@ts-ethereum/chain-config'
-import { ConsensusAlgorithm } from '@ts-ethereum/chain-config'
+} from '@ts-ethereum/state-manager'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   Account,
@@ -13,8 +13,8 @@ import {
   bigIntToHex,
   bytesToBigInt,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   MAX_UINT64,
   setLengthRight,
 } from '@ts-ethereum/utils'
