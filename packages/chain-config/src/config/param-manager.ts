@@ -12,30 +12,13 @@ import {
   type EIPWithParams,
   type ParamValue,
 } from '../hardforks/params'
-import type { ChainConfig, ParamsConfig } from '../types'
+import type { ParamsConfig } from '../types'
 import type {
   HardforkSchemaEntry,
   ParamsManagerOptions,
   ParamsOverrides,
   TypedHardforkSchema,
 } from './types'
-
-export function createHardforkSchema<
-  const Entries extends readonly HardforkSchemaEntry<string>[],
->(config: {
-  hardforks: Entries
-  chainId: bigint
-  chain?: ChainConfig
-}): TypedHardforkSchema<Entries> {
-  return config
-}
-
-export function hardforkEntry<Name extends string>(
-  name: Name,
-  config: Omit<HardforkSchemaEntry<Name>, 'name'>,
-): HardforkSchemaEntry<Name> {
-  return { name, ...config }
-}
 
 export class ParamsManager<H extends Hardfork = Hardfork> {
   private _hardfork: H
@@ -147,15 +130,3 @@ export class ParamsManager<H extends Hardfork = Hardfork> {
 }
 
 export const HardforkParamManager = ParamsManager
-
-export type HardforkParamManager<
-  H extends string = string,
-  _SchemaH extends string = string,
-> = ParamsManager<H extends Hardfork ? H : Hardfork>
-
-export function createParamsManager<H extends Hardfork>(
-  hardfork: H,
-  options?: ParamsManagerOptions,
-): ParamsManager<H> {
-  return new ParamsManager(hardfork, options)
-}

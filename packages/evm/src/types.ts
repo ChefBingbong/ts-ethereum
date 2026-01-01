@@ -1,5 +1,5 @@
 import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
-import {
+import type {
   BinaryTreeAccessWitnessInterface,
   StateManagerInterface,
 } from '@ts-ethereum/state-manager/src/interfaces'

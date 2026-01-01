@@ -28,35 +28,19 @@ import type {
   ParamsConfig,
   ParamsDict,
 } from '../types'
-import { HardforkParamManager } from './param-manager'
+import { ParamsManager } from './param-manager'
 import type {
   EIPParamKeys,
   EIPParamType,
   EIPWithHardfork,
   EIPWithParams,
   ExtractHardforkNames,
+  GlobalConfigInit,
+  HardforkParamManager,
   HardforkSchemaEntry,
   MinHardforkFor,
-  TypedHardforkSchema,
+  TypedGlobalConfigOpts,
 } from './types'
-
-export interface TypedGlobalConfigOpts<
-  Entries extends readonly HardforkSchemaEntry<string>[],
-> {
-  schema: TypedHardforkSchema<Entries>
-  hardfork?: ExtractHardforkNames<Entries>
-  customCrypto?: CustomCrypto
-  overrides?: ParamsConfig
-}
-
-interface GlobalConfigInit<H extends string, SchemaH extends string> {
-  chainId: bigint
-  customCrypto?: CustomCrypto
-  hardfork: H
-  hardforkParams: HardforkParamManager<H, SchemaH>
-  schemaHardforks: readonly HardforkSchemaEntry<string>[]
-  chain?: ChainConfig
-}
 
 export class GlobalConfig<
   H extends string = Hardfork,
@@ -89,7 +73,7 @@ export class GlobalConfig<
     const firstHardfork = opts.schema.hardforks[0]?.name as HF
     const initialHardfork = (opts.hardfork ?? firstHardfork) as HF
 
-    const manager = HardforkParamManager.createFromSchema(
+    const manager = ParamsManager.createFromSchema(
       initialHardfork,
       opts.schema,
       opts.overrides,

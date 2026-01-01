@@ -3,8 +3,6 @@ import type { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import type { ConsensusAlgorithm, ConsensusType } from './chains'
 import type { Hardfork } from './hardforks'
 
-export type Chain = any
-
 export interface CommonEvent {
   hardforkChanged: [hardfork: string]
 }

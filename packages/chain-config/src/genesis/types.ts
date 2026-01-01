@@ -1,9 +1,9 @@
-import {
-  addHexPrefix,
-  bigIntToHex,
-  type PrefixedHexString,
-} from '@ts-ethereum/utils'
+import type { PrefixedHexString } from '@ts-ethereum/utils'
 import type { ConsensusConfig } from '../types'
+
+export type ConfigHardfork =
+  | { name: string; block: null; timestamp: number }
+  | { name: string; block: bigint; timestamp?: number }
 
 export interface GethGenesisConfig {
   chainId: number
@@ -108,24 +108,4 @@ export type AccountState = [
 
 export interface GenesisState {
   [key: PrefixedHexString]: PrefixedHexString | AccountState
-}
-
-export function parseGethGenesisState(gethGenesis: GethGenesis): GenesisState {
-  const genesisAllocation = Object.entries(gethGenesis?.alloc ?? {})
-  const state: GenesisState = {}
-
-  if (genesisAllocation.length === 0) return state
-
-  for (const [address, genState] of genesisAllocation) {
-    const prefixedAddress = addHexPrefix(address.toLowerCase())
-    const balance = bigIntToHex(BigInt(genState.balance))
-    const code = genState.code && addHexPrefix(genState.code)
-
-    const entries = Object.entries(genState.storage ?? {})
-    const storage = entries.map((s) => s.map(addHexPrefix)) as StoragePair[]
-
-    const nonce = genState.nonce && addHexPrefix(genState.nonce)
-    state[prefixedAddress] = [balance, code, storage, nonce] as AccountState
-  }
-  return state
 }

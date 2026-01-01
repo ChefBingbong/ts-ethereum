@@ -13,7 +13,6 @@ import {
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
-import debug from 'debug'
 import { cpSync, existsSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
@@ -46,7 +45,6 @@ import {
   waitForCondition,
 } from './lib/test-utils'
 
-debug.enable('p2p:*')
 const FIXTURES_DIR = path.join(import.meta.dir, 'fixtures')
 const GREETER_SOL_PATH = path.join(
   import.meta.dir,
@@ -1190,6 +1188,7 @@ async function main(): Promise<void> {
     // Exit with appropriate code
     const allPassed = results.every((r) => r.passed)
     process.exitCode = allPassed ? 0 : 1
+    process.exit(process.exitCode)
   }
 }
 

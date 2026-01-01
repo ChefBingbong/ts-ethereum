@@ -1,4 +1,4 @@
-import { type GenesisState, type GlobalConfig } from '@ts-ethereum/chain-config'
+import type { GenesisState, GlobalConfig } from '@ts-ethereum/chain-config'
 import { genesisMPTStateRoot } from '@ts-ethereum/mpt'
 
 /**

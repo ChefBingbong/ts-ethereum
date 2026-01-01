@@ -1,10 +1,7 @@
-import {
-  createHardforkSchema,
-  hardforkEntry,
-  HardforkParamManager,
-} from '../../config/param-manager'
+import { HardforkParamManager } from '../../config/param-manager'
 import { Hardfork } from '../../hardforks'
 import type { ParamsConfig } from '../../types'
+import { createHardforkSchema, hardforkEntry } from '../schema'
 
 export const testnetSchema = createHardforkSchema({
   hardforks: [

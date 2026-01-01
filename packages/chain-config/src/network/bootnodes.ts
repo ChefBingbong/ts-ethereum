@@ -1,7 +1,7 @@
-import { type Multiaddr, multiaddr } from '@multiformats/multiaddr'
-import { bytesToUnprefixedHex, hexToBytes } from '@ts-ethereum/utils'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { type Multiaddr, multiaddr } from '@multiformats/multiaddr'
+import { bytesToUnprefixedHex, hexToBytes } from '@ts-ethereum/utils'
 import { getNodeId } from './keys'
 
 type PeerInfo = {

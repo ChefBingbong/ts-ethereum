@@ -1,27 +1,39 @@
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
   addHexPrefix,
+  bigIntToHex,
   EthereumJSErrorWithoutCode,
   isHexString,
   stripHexPrefix,
 } from '@ts-ethereum/utils'
-import type { GethGenesis } from './chains/gethGenesis'
-import { Holesky, Hoodi, Mainnet, Sepolia } from './chains/presets/chains'
-import { Hardfork } from './hardforks'
-import type { HardforksDict } from './types.ts'
+import { Hardfork } from '../hardforks'
+import type { HardforksDict } from '../types'
+import type {
+  AccountState,
+  ConfigHardfork,
+  GenesisState,
+  GethGenesis,
+  StoragePair,
+} from './types'
 
-type ConfigHardfork =
-  | { name: string; block: null; timestamp: number }
-  | { name: string; block: bigint; timestamp?: number }
+export function parseGethGenesisState(gethGenesis: GethGenesis): GenesisState {
+  const genesisAllocation = Object.entries(gethGenesis?.alloc ?? {})
+  const state: GenesisState = {}
 
-function formatNonce(nonce: string): PrefixedHexString {
-  if (!nonce || nonce === '0x0') {
-    return '0x0000000000000000'
+  if (genesisAllocation.length === 0) return state
+
+  for (const [address, genState] of genesisAllocation) {
+    const prefixedAddress = addHexPrefix(address.toLowerCase())
+    const balance = bigIntToHex(BigInt(genState.balance))
+    const code = genState.code && addHexPrefix(genState.code)
+
+    const entries = Object.entries(genState.storage ?? {})
+    const storage = entries.map((s) => s.map(addHexPrefix)) as StoragePair[]
+
+    const nonce = genState.nonce && addHexPrefix(genState.nonce)
+    state[prefixedAddress] = [balance, code, storage, nonce] as AccountState
   }
-  if (isHexString(nonce)) {
-    return `0x${stripHexPrefix(nonce).padStart(16, '0')}`
-  }
-  return `0x${nonce.padStart(16, '0')}`
+  return state
 }
 
 function parseGethParams(gethGenesis: GethGenesis) {
@@ -297,20 +309,12 @@ export function parseGethGenesis(gethGenesis: GethGenesis, name?: string) {
   }
 }
 
-export const getPresetChainConfig = (chain: string | number) => {
-  switch (chain) {
-    case 'holesky':
-    case 17000:
-      return Holesky
-    case 'hoodi':
-    case 560048:
-      return Hoodi
-    case 'sepolia':
-    case 11155111:
-      return Sepolia
-    case 'mainnet':
-    case 1:
-    default:
-      return Mainnet
+function formatNonce(nonce: string): PrefixedHexString {
+  if (!nonce || nonce === '0x0') {
+    return '0x0000000000000000'
   }
+  if (isHexString(nonce)) {
+    return `0x${stripHexPrefix(nonce).padStart(16, '0')}`
+  }
+  return `0x${nonce.padStart(16, '0')}`
 }

@@ -2,8 +2,8 @@ import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
 import { schemaFromChainConfig } from '../builder'
-import type { GenesisState } from '../chains'
 import { GlobalConfig } from '../config'
+import type { GenesisState } from '../genesis/types'
 import type { ChainConfig } from '../types'
 import {
   generateAccounts,

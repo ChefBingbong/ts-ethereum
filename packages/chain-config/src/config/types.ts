@@ -5,7 +5,8 @@ import type {
   EIPWithParams,
   ParamValue,
 } from '../hardforks/params'
-import type { ChainConfig } from '../types'
+import type { ChainConfig, CustomCrypto, ParamsConfig } from '../types'
+import { ParamsManager } from './param-manager'
 
 export type { EIPWithParams } from '../hardforks/params'
 
@@ -53,4 +54,27 @@ export interface TypedHardforkSchema<
   readonly hardforks: Entries
   readonly chainId: bigint
   readonly chain?: ChainConfig
+}
+
+export interface TypedGlobalConfigOpts<
+  Entries extends readonly HardforkSchemaEntry<string>[],
+> {
+  schema: TypedHardforkSchema<Entries>
+  hardfork?: ExtractHardforkNames<Entries>
+  customCrypto?: CustomCrypto
+  overrides?: ParamsConfig
+}
+
+export type HardforkParamManager<
+  H extends string = string,
+  _SchemaH extends string = string,
+> = ParamsManager<H extends Hardfork ? H : Hardfork>
+
+export interface GlobalConfigInit<H extends string, SchemaH extends string> {
+  chainId: bigint
+  customCrypto?: CustomCrypto
+  hardfork: H
+  hardforkParams: HardforkParamManager<H, SchemaH>
+  schemaHardforks: readonly HardforkSchemaEntry<string>[]
+  chain?: ChainConfig
 }

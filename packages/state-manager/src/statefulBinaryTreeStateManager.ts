@@ -1,6 +1,6 @@
 import { blake3 } from '@noble/hashes/blake3.js'
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import { GenesisState } from '@ts-ethereum/chain-config'
+import type { GenesisState } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type {
   Address,
@@ -9,11 +9,11 @@ import type {
 } from '@ts-ethereum/utils'
 import {
   Account,
-  bigIntToBytes,
   BINARY_TREE_CODE_CHUNK_SIZE,
   BINARY_TREE_CODE_OFFSET,
   BINARY_TREE_NODE_WIDTH,
   BinaryTreeLeafType,
+  bigIntToBytes,
   bytesToBigInt,
   bytesToHex,
   chunkifyBinaryTreeCode,
@@ -21,9 +21,9 @@ import {
   createPartialAccount,
   createPartialAccountFromRLP,
   decodeBinaryTreeLeafBasicData,
+  EthereumJSErrorWithoutCode,
   encodeBinaryTreeLeafBasicData,
   equalsBytes,
-  EthereumJSErrorWithoutCode,
   generateBinaryTreeChunkSuffixes,
   generateBinaryTreeCodeStems,
   getBinaryTreeKeyForStorageSlot,
@@ -50,7 +50,7 @@ import {
   type BinaryTreeAccessWitnessInterface,
   type StateManagerInterface,
   type StorageDump,
-  StoragePair,
+  type StoragePair,
   type StorageRange,
 } from './interfaces'
 import type {
