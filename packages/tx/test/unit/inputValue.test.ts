@@ -1,4 +1,8 @@
-import { GlobalConfig, Hardfork, Mainnet } from '@ts-ethereum/chain-config'
+import {
+  createCustomCommon,
+  Hardfork,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import type {
   AddressLike,
   BigIntLike,
@@ -108,8 +112,7 @@ const legacyTxValues = {
 
 describe('[Transaction Input Values]', () => {
   it('Legacy Transaction Values', () => {
-    const common = new GlobalConfig({
-      chain: Mainnet,
+    const common = createCustomCommon({}, Mainnet, {
       hardfork: Hardfork.Chainstart,
     })
     const options = { ...baseTxValues, ...legacyTxValues, type: '0' }
