@@ -133,7 +133,10 @@ describe('schema', () => {
         hardforks: [
           hardforkEntry(Hardfork.Chainstart, { block: 0n }),
           hardforkEntry(Hardfork.London, { block: 1000n }),
-          hardforkEntry(Hardfork.Paris, { block: null, timestamp: '1681338455' }),
+          hardforkEntry(Hardfork.Paris, {
+            block: null,
+            timestamp: '1681338455',
+          }),
           hardforkEntry(Hardfork.Shanghai, {
             block: null,
             timestamp: '1681338456',
@@ -172,4 +175,3 @@ describe('schema', () => {
     })
   })
 })
-

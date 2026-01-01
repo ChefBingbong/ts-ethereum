@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { EIP } from '../src/hardforks/eips'
 import {
+  EIP_PARAMS,
   EIP1_PARAMS,
   EIP1559_PARAMS,
   EIP2929_PARAMS,
   EIP4844_PARAMS,
-  EIP_PARAMS,
 } from '../src/hardforks/params'
 
 describe('params', () => {
@@ -159,4 +159,3 @@ describe('params', () => {
     })
   })
 })
-

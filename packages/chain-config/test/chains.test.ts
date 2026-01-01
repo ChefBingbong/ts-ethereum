@@ -8,8 +8,14 @@ import {
   Mainnet,
   Sepolia,
 } from '../src/chains'
-import { mainnetSchema, createMainnetManager } from '../src/chains/presets/mainnet'
-import { testnetSchema, createTestnetManager } from '../src/chains/presets/testnet'
+import {
+  createMainnetManager,
+  mainnetSchema,
+} from '../src/chains/presets/mainnet'
+import {
+  createTestnetManager,
+  testnetSchema,
+} from '../src/chains/presets/testnet'
 import { Hardfork } from '../src/hardforks'
 
 describe('chains', () => {
@@ -138,9 +144,7 @@ describe('chains', () => {
     })
 
     it('should have all hardforks at genesis', () => {
-      const genesisHardforks = Sepolia.hardforks.filter(
-        (hf) => hf.block === 0n,
-      )
+      const genesisHardforks = Sepolia.hardforks.filter((hf) => hf.block === 0n)
       expect(genesisHardforks.length).toBeGreaterThan(5)
     })
   })
@@ -226,4 +230,3 @@ describe('chains', () => {
     })
   })
 })
-

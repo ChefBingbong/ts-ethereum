@@ -169,9 +169,7 @@ describe('genesis', () => {
       }
 
       const state = parseGethGenesisState(gethGenesis as any)
-      expect(
-        state['0xabcdef1234567890abcdef1234567890abcdef12'],
-      ).toBeDefined()
+      expect(state['0xabcdef1234567890abcdef1234567890abcdef12']).toBeDefined()
     })
   })
 
@@ -315,4 +313,3 @@ describe('genesis', () => {
     })
   })
 })
-

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { GlobalConfig } from '../src/config/global-config'
 import { createHardforkSchema, hardforkEntry } from '../src/chains/schema'
+import { GlobalConfig } from '../src/config/global-config'
 import { EIP, Hardfork } from '../src/hardforks'
 
 const testSchema = createHardforkSchema({
@@ -182,7 +182,9 @@ describe('GlobalConfig', () => {
       })
 
       // EIP-1559 params only available at London+
-      expect(configBerlin.getParam('baseFeeMaxChangeDenominator')).toBeUndefined()
+      expect(
+        configBerlin.getParam('baseFeeMaxChangeDenominator'),
+      ).toBeUndefined()
       expect(configLondon.getParam('baseFeeMaxChangeDenominator')).toBe(8n)
     })
   })
@@ -426,4 +428,3 @@ describe('GlobalConfig', () => {
     })
   })
 })
-

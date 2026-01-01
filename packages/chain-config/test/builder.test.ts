@@ -219,7 +219,9 @@ describe('builder', () => {
       })
 
       // Fork hashes should be set
-      expect(() => config.forkHash(Hardfork.Chainstart, genesisHash)).not.toThrow()
+      expect(() =>
+        config.forkHash(Hardfork.Chainstart, genesisHash),
+      ).not.toThrow()
     })
 
     it('should parse hardforks from block numbers', () => {
@@ -266,4 +268,3 @@ describe('builder', () => {
     })
   })
 })
-
