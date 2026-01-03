@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 
-import { cpSync, existsSync, rmSync } from 'node:fs'
-import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
+  GlobalConfig,
   Hardfork,
   readAccounts,
   readPrivateKey,
@@ -15,6 +13,8 @@ import {
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import {
   createPublicClient,
   createWalletClient,
