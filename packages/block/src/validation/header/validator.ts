@@ -6,16 +6,16 @@ import {
   BIGINT_2,
   bytesToHex,
   bytesToUtf8,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   hexToBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   SHA256_NULL,
 } from '@ts-ethereum/utils'
-import { HeaderData } from 'src'
+import type { HeaderData } from 'src'
 import {
-  ValidatedHeader,
+  type ValidatedHeader,
   zCoreHeaderSchema,
   zOptionalBigInt,
   zOptionalBytes32,

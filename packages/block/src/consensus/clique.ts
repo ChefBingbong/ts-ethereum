@@ -11,9 +11,9 @@ import {
   concatBytes,
   createAddressFromPublicKey,
   createZeroAddress,
+  EthereumJSErrorWithoutCode,
   ecrecover,
   equalsBytes,
-  EthereumJSErrorWithoutCode,
 } from '@ts-ethereum/utils'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 
