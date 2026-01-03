@@ -23,9 +23,9 @@ import {
   bytesToHex,
   bytesToUnprefixedHex,
   concatBytes,
-  EthereumJSErrorWithoutCode,
   eoaCode7702RecoverAuthority,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   KECCAK256_NULL,
   MAX_UINT64,
@@ -965,7 +965,7 @@ function _errorMsg(
 ) {
   const blockOrHeader = block ?? DEFAULT_HEADER
   const blockErrorStr =
-    'errorStr' in blockOrHeader ? blockOrHeader.errorStr() : 'block'
+    'errorStr' in blockOrHeader ? blockOrHeader.errorStr() : 'block or header'
   const txErrorStr = 'errorStr' in tx ? tx.errorStr() : 'tx'
 
   const errorMsg = `${msg} (${vm.errorStr()} -> ${blockErrorStr} -> ${txErrorStr})`

@@ -13,13 +13,13 @@ import {
   BIGINT_0,
   BIGINT_1,
   BIGINT_2,
+  TypeOutput,
   bigIntToBytes,
   bytesToBigInt,
   equalsBytes,
   hexToBytes,
-  type NestedUint8Array,
-  TypeOutput,
   toType,
+  type NestedUint8Array,
 } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import type { Blockchain } from '../index'
@@ -190,14 +190,14 @@ export class CliqueConsensus implements Consensus {
       header.difficulty !== CLIQUE_DIFF_NOTURN
     ) {
       const msg = `difficulty for clique block must be INTURN (2) or NOTURN (1), received: ${header.difficulty}`
-      throw Error(`${msg} ${header.errorStr()}`)
+      throw Error(msg)
     }
 
     const signers = this.cliqueActiveSigners(header.number)
     if (signers.length === 0) {
       // abort if signers are unavailable
       const msg = 'no signers available'
-      throw Error(`${msg} ${header.errorStr()}`)
+      throw Error(msg)
     }
     const signerIndex = signers.findIndex((address: Address) =>
       address.equals(cliqueSigner(header)),
@@ -210,7 +210,7 @@ export class CliqueConsensus implements Consensus {
     ) {
       return
     }
-    throw Error(`'invalid clique difficulty ${header.errorStr()}`)
+    throw Error('invalid clique difficulty')
   }
 
   async newBlock(

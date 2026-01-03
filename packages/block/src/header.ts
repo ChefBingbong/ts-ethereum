@@ -4,6 +4,7 @@ import {
   GlobalConfig,
   Hardfork,
   mainnetSchema,
+  paramsBlock,
 } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -11,23 +12,28 @@ import {
   BIGINT_0,
   BIGINT_1,
   BIGINT_2,
+  bigIntToBytes,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   KECCAK256_RLP_ARRAY,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import { computeBlobGasPrice } from '../helpers'
-import { paramsBlock } from '../params'
+import {
+  computeBlobGasPrice,
+  numberToHex,
+  valuesArrayToHeaderData,
+} from './helpers'
 import type {
   BlockHeaderBytes,
   BlockOptions,
   HeaderData,
   JSONHeader,
-} from '../types'
-import { validateBlockHeader, zCoreHeaderSchema } from '../validation'
+  JSONRPCBlock,
+} from './types'
+import { validateBlockHeader, zCoreHeaderSchema } from './validation'
 
 interface HeaderCache {
   hash: Uint8Array | undefined
@@ -103,6 +109,148 @@ export class BlockHeader {
     )
 
     if (opts.freeze !== false) Object.freeze(this)
+  }
+
+  /**
+   * Static factory method to create a block header from a header data dictionary
+   */
+  static fromHeaderData(
+    headerData: HeaderData = {},
+    opts: BlockOptions = {},
+  ): BlockHeader {
+    return new BlockHeader(headerData, opts)
+  }
+
+  /**
+   * Static factory method to create a block header from an array of bytes values
+   */
+  static fromBytesArray(
+    values: BlockHeaderBytes,
+    opts: BlockOptions = {},
+  ): BlockHeader {
+    const headerData = valuesArrayToHeaderData(values)
+    const {
+      number,
+      baseFeePerGas,
+      excessBlobGas,
+      blobGasUsed,
+      parentBeaconBlockRoot,
+      requestsHash,
+    } = headerData
+    const header = new BlockHeader(headerData, opts)
+    if (header.common.isActivatedEIP(1559) && baseFeePerGas === undefined) {
+      const eip1559ActivationBlock = bigIntToBytes(
+        header.common.eipBlock(1559)!,
+      )
+      if (
+        eip1559ActivationBlock !== undefined &&
+        equalsBytes(eip1559ActivationBlock, number as Uint8Array)
+      ) {
+        throw EthereumJSErrorWithoutCode(
+          'invalid header. baseFeePerGas should be provided',
+        )
+      }
+    }
+    if (header.common.isActivatedEIP(4844)) {
+      if (excessBlobGas === undefined) {
+        throw EthereumJSErrorWithoutCode(
+          'invalid header. excessBlobGas should be provided',
+        )
+      } else if (blobGasUsed === undefined) {
+        throw EthereumJSErrorWithoutCode(
+          'invalid header. blobGasUsed should be provided',
+        )
+      }
+    }
+    if (
+      header.common.isActivatedEIP(4788) &&
+      parentBeaconBlockRoot === undefined
+    ) {
+      throw EthereumJSErrorWithoutCode(
+        'invalid header. parentBeaconBlockRoot should be provided',
+      )
+    }
+    if (header.common.isActivatedEIP(7685) && requestsHash === undefined) {
+      throw EthereumJSErrorWithoutCode(
+        'invalid header. requestsHash should be provided',
+      )
+    }
+    return header
+  }
+
+  /**
+   * Static factory method to create a block header from a RLP-serialized header
+   */
+  static fromRLP(
+    serializedHeaderData: Uint8Array,
+    opts: BlockOptions = {},
+  ): BlockHeader {
+    const values = RLP.decode(serializedHeaderData)
+    if (!Array.isArray(values)) {
+      throw EthereumJSErrorWithoutCode(
+        'Invalid serialized header input. Must be array',
+      )
+    }
+    return BlockHeader.fromBytesArray(values as Uint8Array[], opts)
+  }
+
+  /**
+   * Static factory method to create a block header from Ethereum JSON RPC
+   */
+  static fromRPC(
+    blockParams: JSONRPCBlock,
+    options?: BlockOptions,
+  ): BlockHeader {
+    const {
+      parentHash,
+      sha3Uncles,
+      miner,
+      stateRoot,
+      transactionsRoot,
+      receiptsRoot,
+      logsBloom,
+      difficulty,
+      number,
+      gasLimit,
+      gasUsed,
+      timestamp,
+      extraData,
+      mixHash,
+      nonce,
+      baseFeePerGas,
+      withdrawalsRoot,
+      blobGasUsed,
+      excessBlobGas,
+      parentBeaconBlockRoot,
+      requestsHash,
+    } = blockParams
+
+    return new BlockHeader(
+      {
+        parentHash,
+        uncleHash: sha3Uncles,
+        coinbase: miner,
+        stateRoot,
+        transactionsTrie: transactionsRoot,
+        receiptTrie: receiptsRoot,
+        logsBloom,
+        difficulty: numberToHex(difficulty),
+        number,
+        gasLimit,
+        gasUsed,
+        timestamp,
+        extraData,
+        mixHash,
+        nonce,
+        baseFeePerGas,
+        withdrawalsRoot,
+        blobGasUsed,
+        excessBlobGas,
+        parentBeaconBlockRoot,
+        requestsHash,
+      },
+      options,
+    )
   }
 
   validateGasLimit(parentBlockHeader: { gasLimit: bigint }): void {

@@ -1,67 +1,55 @@
-import {
-  ConsensusType,
-  EIP,
-  type GlobalConfig,
-} from '@ts-ethereum/chain-config'
+import { EIP, type GlobalConfig } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   Blob4844Tx,
   Capability,
+  createTx,
+  createTxFromBlockBodyData,
+  createTxFromRLP,
   type FeeMarket1559Tx,
   type LegacyTx,
+  normalizeTxParams,
+  type TxOptions,
   type TypedTransaction,
 } from '@ts-ethereum/tx'
+import type { EthersProvider, WithdrawalBytes } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
+  bigIntToHex,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
+  createWithdrawal,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
+  fetchFromProvider,
+  getProvider,
+  hexToBytes,
+  intToHex,
+  isHexString,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   type Withdrawal,
 } from '@ts-ethereum/utils'
-/* eslint-enable */
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import { sha256 } from 'ethereum-cryptography/sha256.js'
-import { genWithdrawalsTrieRoot } from '../helpers'
-/* eslint-disable */
-// This is to allow for a proper and linked collection of constructors for the class header.
-// For tree shaking/code size this should be no problem since types go away on transpilation.
-// TODO: See if there is an easier way to achieve the same result.
-// See: https://github.com/microsoft/TypeScript/issues/47558
-// (situation will eventually improve on Typescript and/or Eslint update)
-import {
-  BlockHeader,
-  type createBlock,
-  type createBlockFromBytesArray,
-  type createBlockFromRLP,
-  type createBlockFromRPC,
-  genTransactionsTrieRoot,
-} from '../index'
+import { generateCliqueBlockExtraData } from './consensus/clique'
+import { BlockHeader } from './header'
+import { genTransactionsTrieRoot, genWithdrawalsTrieRoot } from './helpers'
 import type {
   BlockBytes,
+  BlockData,
   BlockOptions,
   ExecutionPayload,
+  HeaderData,
   JSONBlock,
-} from '../types'
+  JSONRPCBlock,
+  WithdrawalsBytes,
+} from './types'
+import {
+  validateBlockConstructor,
+  validateUncleHeaders,
+} from './validation/block'
 
-/**
- * Class representing a block in the Ethereum network. The {@link BlockHeader} has its own
- * class and can be used independently, for a block it is included in the form of the
- * {@link Block.header} property.
- *
- * A block object can be created with one of the following constructor methods
- * (separate from the Block class to allow for tree shaking):
- *
- * - {@link createBlock }
- * - {@link createBlockFromBytesArray }
- * - {@link createBlockFromRLP }
- * - {@link createBlockFromRPC }
- * - {@link createBlockFromJSONRPCProvider }
- * - {@link createBlockFromExecutionPayload }
- * - {@link createBlockFromBeaconPayloadJSON }
- */
 export class Block {
   public readonly header: BlockHeader
   public readonly transactions: TypedTransaction[] = []
@@ -76,12 +64,6 @@ export class Block {
     withdrawalsTrieRoot?: Uint8Array
   } = {}
 
-  /**
-   * This constructor takes the values, validates them, assigns them and freezes the object.
-   *
-   * @deprecated Use the static factory methods (see {@link Block} for an overview) to assist in creating
-   * a Block object from varying data types and options.
-   */
   constructor(
     header?: BlockHeader,
     transactions: TypedTransaction[] = [],
@@ -94,42 +76,314 @@ export class Block {
     this.keccakFunction = this.common.customCrypto.keccak256 ?? keccak256
     this.sha256Function = this.common.customCrypto.sha256 ?? sha256
 
+    // Validate block data using Zod schema
+    const validated = validateBlockConstructor(
+      {
+        uncleHeaders,
+        withdrawals,
+        isGenesis: this.header.isGenesis(),
+      },
+      { common: this.common },
+    )
+
     this.transactions = transactions
-    this.withdrawals =
-      withdrawals ?? (this.common.isActivatedEIP(4895) ? [] : undefined)
+    this.uncleHeaders = validated.uncleHeaders
+    this.withdrawals = validated.withdrawals
 
-    this.uncleHeaders = uncleHeaders
-    if (uncleHeaders.length > 0) {
-      this.validateUncles()
-      if (this.common.consensusType() === ConsensusType.ProofOfAuthority) {
-        const msg = this._errorMsg(
-          'Block initialization with uncleHeaders on a PoA network is not allowed',
-        )
-        throw EthereumJSErrorWithoutCode(msg)
-      }
-      if (this.common.consensusType() === ConsensusType.ProofOfStake) {
-        const msg = this._errorMsg(
-          'Block initialization with uncleHeaders on a PoS network is not allowed',
-        )
-        throw EthereumJSErrorWithoutCode(msg)
-      }
-    }
-
-    if (!this.common.isActivatedEIP(4895) && withdrawals !== undefined) {
-      throw EthereumJSErrorWithoutCode(
-        'Cannot have a withdrawals field if EIP 4895 is not active',
-      )
-    }
-
-    const freeze = opts?.freeze ?? true
-    if (freeze) {
+    if (opts?.freeze !== false) {
       Object.freeze(this)
     }
   }
 
-  /**
-   * Returns an array of the raw byte arrays for this block, in order.
-   */
+  static fromBlockData(blockData: BlockData = {}, opts?: BlockOptions): Block {
+    const {
+      header: headerData,
+      transactions: txsData,
+      uncleHeaders: uhsData,
+      withdrawals: withdrawalsData,
+    } = blockData
+
+    const header = BlockHeader.fromHeaderData(headerData, opts)
+
+    // parse transactions
+    const transactions = []
+    for (const txData of txsData ?? []) {
+      const tx = createTx(txData, {
+        ...opts,
+        common: header.common,
+      } as TxOptions)
+      transactions.push(tx)
+    }
+
+    // parse uncle headers
+    const uncleHeaders = []
+    const uncleOpts: BlockOptions = {
+      ...opts,
+      common: header.common,
+      calcDifficultyFromHeader: undefined,
+    }
+    if (opts?.setHardfork !== undefined) {
+      uncleOpts.setHardfork = true
+    }
+    for (const uhData of uhsData ?? []) {
+      const uh = BlockHeader.fromHeaderData(uhData, uncleOpts)
+      uncleHeaders.push(uh)
+    }
+
+    const withdrawals = withdrawalsData?.map(createWithdrawal)
+
+    return new Block(header, transactions, uncleHeaders, withdrawals, opts)
+  }
+
+  static createEmpty(headerData: HeaderData, opts?: BlockOptions): Block {
+    const header = BlockHeader.fromHeaderData(headerData, opts)
+    return new Block(header)
+  }
+
+  static fromBytesArray(values: BlockBytes, opts?: BlockOptions): Block {
+    if (values.length > 5) {
+      throw EthereumJSErrorWithoutCode(
+        `invalid  More values=${values.length} than expected were received (at most 5)`,
+      )
+    }
+
+    const [headerData, txsData, uhsData, ...valuesTail] = values
+    const header = BlockHeader.fromBytesArray(headerData, opts)
+
+    const withdrawalBytes = header.common.isActivatedEIP(4895)
+      ? (valuesTail.splice(0, 1)[0] as WithdrawalsBytes)
+      : undefined
+
+    if (
+      header.common.isActivatedEIP(4895) &&
+      (withdrawalBytes === undefined || !Array.isArray(withdrawalBytes))
+    ) {
+      throw EthereumJSErrorWithoutCode(
+        'Invalid serialized block input: EIP-4895 is active, and no withdrawals were provided as array',
+      )
+    }
+
+    const transactions = []
+    for (const txData of txsData ?? []) {
+      transactions.push(
+        createTxFromBlockBodyData(txData, {
+          ...opts,
+          common: header.common,
+        }),
+      )
+    }
+
+    const uncleHeaders = []
+    const uncleOpts: BlockOptions = {
+      ...opts,
+      common: header.common,
+      calcDifficultyFromHeader: undefined,
+    }
+    if (opts?.setHardfork !== undefined) {
+      uncleOpts.setHardfork = true
+    }
+    for (const uncleHeaderData of uhsData ?? []) {
+      uncleHeaders.push(BlockHeader.fromBytesArray(uncleHeaderData, uncleOpts))
+    }
+
+    const withdrawals = (withdrawalBytes as WithdrawalBytes[])
+      ?.map(([index, validatorIndex, address, amount]) => ({
+        index,
+        validatorIndex,
+        address,
+        amount,
+      }))
+      ?.map(createWithdrawal)
+
+    return new Block(header, transactions, uncleHeaders, withdrawals, opts)
+  }
+
+  static fromRLP(serialized: Uint8Array, opts?: BlockOptions): Block {
+    if (opts?.common?.isActivatedEIP(7934) === true) {
+      const maxRlpBlockSize = opts.common.getParamByEIP(7934, 'maxRlpBlockSize')
+      if (serialized.length > maxRlpBlockSize) {
+        throw EthereumJSErrorWithoutCode(
+          `Block size exceeds limit: ${serialized.length} > ${maxRlpBlockSize}`,
+        )
+      }
+    }
+    const values = RLP.decode(Uint8Array.from(serialized)) as BlockBytes
+
+    if (!Array.isArray(values)) {
+      throw EthereumJSErrorWithoutCode(
+        'Invalid serialized block input. Must be array',
+      )
+    }
+
+    return Block.fromBytesArray(values, opts)
+  }
+
+  static fromRPC(
+    blockParams: JSONRPCBlock,
+    uncles: any[] = [],
+    options?: BlockOptions,
+  ): Block {
+    const header = BlockHeader.fromRPC(blockParams, options)
+
+    const transactions: TypedTransaction[] = []
+    const opts = { common: header.common }
+    for (const _txParams of blockParams.transactions ?? []) {
+      const txParams = normalizeTxParams(_txParams)
+      const tx = createTx(txParams, opts)
+      transactions.push(tx)
+    }
+
+    const uncleHeaders = uncles.map((uh) => BlockHeader.fromRPC(uh, options))
+
+    return Block.fromBlockData(
+      {
+        header,
+        transactions,
+        uncleHeaders,
+        withdrawals: blockParams.withdrawals,
+      },
+      options,
+    )
+  }
+
+  static async fromJSONRPCProvider(
+    provider: string | EthersProvider,
+    blockTag: string | bigint,
+    opts: BlockOptions,
+  ): Promise<Block> {
+    let blockData
+    const providerUrl = getProvider(provider)
+
+    if (typeof blockTag === 'string' && blockTag.length === 66) {
+      blockData = await fetchFromProvider(providerUrl, {
+        method: 'eth_getBlockByHash',
+        params: [blockTag, true],
+      })
+    } else if (typeof blockTag === 'bigint') {
+      blockData = await fetchFromProvider(providerUrl, {
+        method: 'eth_getBlockByNumber',
+        params: [bigIntToHex(blockTag), true],
+      })
+    } else if (
+      isHexString(blockTag) ||
+      blockTag === 'latest' ||
+      blockTag === 'earliest' ||
+      blockTag === 'pending' ||
+      blockTag === 'finalized' ||
+      blockTag === 'safe'
+    ) {
+      blockData = await fetchFromProvider(providerUrl, {
+        method: 'eth_getBlockByNumber',
+        params: [blockTag, true],
+      })
+    } else {
+      throw EthereumJSErrorWithoutCode(
+        `expected blockTag to be block hash, bigint, hex prefixed string, or earliest/latest/pending; got ${blockTag}`,
+      )
+    }
+
+    if (blockData === null) {
+      throw EthereumJSErrorWithoutCode('No block data returned from provider')
+    }
+
+    const uncleHeaders = []
+    if (blockData.uncles.length > 0) {
+      for (let x = 0; x < blockData.uncles.length; x++) {
+        const headerData = await fetchFromProvider(providerUrl, {
+          method: 'eth_getUncleByBlockHashAndIndex',
+          params: [blockData.hash, intToHex(x)],
+        })
+        uncleHeaders.push(headerData)
+      }
+    }
+
+    return Block.fromRPC(blockData, uncleHeaders, opts)
+  }
+
+  static async fromExecutionPayload(
+    payload: ExecutionPayload,
+    opts?: BlockOptions,
+  ): Promise<Block> {
+    const {
+      blockNumber: number,
+      receiptsRoot: receiptTrie,
+      prevRandao: mixHash,
+      feeRecipient: coinbase,
+      transactions,
+      withdrawals: withdrawalsData,
+    } = payload
+
+    const txs = []
+    for (const [index, serializedTx] of transactions.entries()) {
+      try {
+        const tx = createTxFromRLP(hexToBytes(serializedTx), {
+          common: opts?.common,
+        })
+        txs.push(tx)
+      } catch (error) {
+        const validationError = `Invalid tx at index ${index}: ${error}`
+        throw validationError
+      }
+    }
+
+    const transactionsTrie = await genTransactionsTrieRoot(
+      txs,
+      new MerklePatriciaTrie({ common: opts?.common }),
+    )
+    const withdrawals = withdrawalsData?.map((wData) => createWithdrawal(wData))
+    const withdrawalsRoot = withdrawals
+      ? await genWithdrawalsTrieRoot(
+          withdrawals,
+          new MerklePatriciaTrie({ common: opts?.common }),
+        )
+      : undefined
+
+    const header: HeaderData = {
+      ...payload,
+      number,
+      receiptTrie,
+      transactionsTrie,
+      withdrawalsRoot,
+      mixHash,
+      coinbase,
+    }
+
+    const block = Block.fromBlockData(
+      { header, transactions: txs, withdrawals },
+      opts,
+    )
+    if (!equalsBytes(block.hash(), hexToBytes(payload.blockHash))) {
+      const validationError = `Invalid blockHash, expected: ${
+        payload.blockHash
+      }, received: ${bytesToHex(block.hash())}`
+      throw Error(validationError)
+    }
+
+    return block
+  }
+
+  static createSealedClique(
+    cliqueSigner: Uint8Array,
+    blockData: BlockData = {},
+    opts: BlockOptions = {},
+  ): Block {
+    const sealedCliqueBlock = Block.fromBlockData(blockData, {
+      ...opts,
+      ...{ freeze: false, skipConsensusFormatValidation: true },
+    })
+    ;(sealedCliqueBlock.header.extraData as any) = generateCliqueBlockExtraData(
+      sealedCliqueBlock.header,
+      cliqueSigner,
+    )
+    if (opts?.freeze === true) {
+      Object.freeze(sealedCliqueBlock)
+    }
+    if (opts?.skipConsensusFormatValidation === false) {
+      sealedCliqueBlock.header['_consensusFormatValidation']()
+    }
+    return sealedCliqueBlock
+  }
+
   raw(): BlockBytes {
     const bytesArray: BlockBytes = [
       this.header.raw(),
@@ -148,30 +402,18 @@ export class Block {
     return bytesArray
   }
 
-  /**
-   * Returns the hash of the block.
-   */
   hash(): Uint8Array {
     return this.header.hash()
   }
 
-  /**
-   * Determines if this block is the genesis block.
-   */
   isGenesis(): boolean {
     return this.header.isGenesis()
   }
 
-  /**
-   * Returns the rlp encoding of the block.
-   */
   serialize(): Uint8Array {
     return RLP.encode(this.raw())
   }
 
-  /**
-   * Generates transaction trie for validation.
-   */
   async genTxTrie(): Promise<Uint8Array> {
     return genTransactionsTrieRoot(
       this.transactions,
@@ -179,11 +421,6 @@ export class Block {
     )
   }
 
-  /**
-   * Validates the transaction trie by generating a trie
-   * and do a check on the root hash.
-   * @returns True if the transaction trie is valid, false otherwise
-   */
   async transactionsTrieIsValid(): Promise<boolean> {
     let result
     if (this.transactions.length === 0) {
@@ -198,10 +435,6 @@ export class Block {
     return result
   }
 
-  /**
-   * Validates transaction signatures and minimum gas requirements.
-   * @returns {string[]} an array of error strings
-   */
   getTransactionsValidationErrors(): string[] {
     const errors: string[] = []
     let blobGasUsed = BIGINT_0
@@ -253,28 +486,12 @@ export class Block {
     return errors
   }
 
-  /**
-   * Validates transaction signatures and minimum gas requirements.
-   * @returns True if all transactions are valid, false otherwise
-   */
   transactionsAreValid(): boolean {
     const errors = this.getTransactionsValidationErrors()
 
     return errors.length === 0
   }
 
-  /**
-   * Validates the block data, throwing if invalid.
-   * This can be checked on the Block itself without needing access to any parent block
-   * It checks:
-   * - All transactions are valid
-   * - The transactions trie is valid
-   * - The uncle hash is valid
-   * - Block size limit (EIP-7934)
-   * @param onlyHeader if only passed the header, skip validating txTrie and unclesHash (default: false)
-   * @param verifyTxs if set to `false`, will not check for transaction validation errors (default: true)
-   * @param validateBlockSize if set to `true`, will check for block size limit (EIP-7934) (default: false)
-   */
   async validateData(
     onlyHeader = false,
     verifyTxs = true,
@@ -336,12 +553,6 @@ export class Block {
     }
   }
 
-  /**
-   * Validates that blob gas fee for each transaction is greater than or equal to the
-   * blobGasPrice for the block and that total blob gas in block is less than maximum
-   * blob gas per block
-   * @param parentHeader header of parent block
-   */
   validateBlobTransactions(parentHeader: BlockHeader) {
     if (this.common.isActivatedEIP(4844)) {
       const blobGasLimit = this.common.getParamByEIP(4844, 'maxBlobGasPerBlock')
@@ -388,10 +599,6 @@ export class Block {
     }
   }
 
-  /**
-   * Validates the uncle's hash.
-   * @returns true if the uncle's hash is valid, false otherwise.
-   */
   uncleHashIsValid(): boolean {
     if (this.uncleHeaders.length === 0) {
       return equalsBytes(KECCAK256_RLP_ARRAY, this.header.uncleHash)
@@ -401,10 +608,6 @@ export class Block {
     return equalsBytes(this.keccakFunction(raw), this.header.uncleHash)
   }
 
-  /**
-   * Validates the withdrawal root
-   * @returns true if the withdrawals trie root is valid, false otherwise
-   */
   async withdrawalsTrieIsValid(): Promise<boolean> {
     if (!this.common.isActivatedEIP(4895)) {
       throw EthereumJSErrorWithoutCode('EIP 4895 is not activated')
@@ -429,49 +632,17 @@ export class Block {
     return result
   }
 
-  /**
-   * Consistency checks for uncles included in the block, if any.
-   *
-   * Throws if invalid.
-   *
-   * The rules for uncles checked are the following:
-   * Header has at most 2 uncles.
-   * Header does not count an uncle twice.
-   */
   validateUncles() {
     if (this.isGenesis()) {
       return
     }
-
-    // Header has at most 2 uncles
-    if (this.uncleHeaders.length > 2) {
-      const msg = this._errorMsg('too many uncle headers')
-      throw EthereumJSErrorWithoutCode(msg)
-    }
-
-    // Header does not count an uncle twice.
-    const uncleHashes = this.uncleHeaders.map((header) =>
-      bytesToHex(header.hash()),
-    )
-    if (!(new Set(uncleHashes).size === uncleHashes.length)) {
-      const msg = this._errorMsg('duplicate uncles')
-      throw EthereumJSErrorWithoutCode(msg)
-    }
+    validateUncleHeaders(this.uncleHeaders)
   }
 
-  /**
-   * Validates if the block gasLimit remains in the boundaries set by the protocol.
-   * Throws if invalid
-   *
-   * @param parentBlock - the parent of this `Block`
-   */
   validateGasLimit(parentBlock: Block) {
     return this.header.validateGasLimit(parentBlock.header)
   }
 
-  /**
-   * Returns the block in JSON format.
-   */
   toJSON(): JSONBlock {
     const withdrawalsAttr = this.withdrawals
       ? {
@@ -486,12 +657,6 @@ export class Block {
     }
   }
 
-  /**
-   * Maps the block properties to the execution payload structure from the beacon chain,
-   * see https://github.com/ethereum/consensus-specs/blob/dev/specs/bellatrix/beacon-chain.md#ExecutionPayload
-   *
-   * @returns dict with the execution payload parameters with camel case naming
-   */
   toExecutionPayload(): ExecutionPayload {
     const blockJSON = this.toJSON()
     const header = blockJSON.header!
@@ -526,9 +691,6 @@ export class Block {
     return executionPayload
   }
 
-  /**
-   * Return a compact error string representation of the object
-   */
   public errorStr() {
     let hash = ''
     try {

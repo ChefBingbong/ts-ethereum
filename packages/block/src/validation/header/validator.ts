@@ -6,14 +6,14 @@ import {
   BIGINT_2,
   bytesToHex,
   bytesToUtf8,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
   SHA256_NULL,
 } from '@ts-ethereum/utils'
-import type { HeaderData } from 'src'
+import type { HeaderData } from '../../types'
 import {
   type ValidatedHeader,
   zCoreHeaderSchema,
