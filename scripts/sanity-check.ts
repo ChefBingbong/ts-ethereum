@@ -5,9 +5,9 @@ import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
+  getNodeId,
   enodeToDPTPeerInfo,
   GlobalConfig,
-  getNodeId,
   Hardfork,
   readAccounts,
   readPrivateKey,

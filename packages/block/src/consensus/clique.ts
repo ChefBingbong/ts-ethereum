@@ -11,9 +11,9 @@ import {
   concatBytes,
   createAddressFromPublicKey,
   createZeroAddress,
-  EthereumJSErrorWithoutCode,
   ecrecover,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
 } from '@ts-ethereum/utils'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 
@@ -27,9 +27,8 @@ export const CLIQUE_EXTRA_SEAL = 65
 // This function is not exported in the index file to keep it internal
 export function requireClique(header: BlockHeader, name: string) {
   if (header.common.consensusAlgorithm() !== ConsensusAlgorithm.Clique) {
-    const msg = header['_errorMsg'](
-      `BlockHeader.${name}() call only supported for clique PoA networks`,
-    )
+    const msg = `BlockHeader.${name}() call only supported for clique PoA networks`
+
     throw EthereumJSErrorWithoutCode(msg)
   }
 }
@@ -88,9 +87,7 @@ export function cliqueExtraSeal(header: BlockHeader): Uint8Array {
 export function cliqueEpochTransitionSigners(header: BlockHeader): Address[] {
   requireClique(header, 'cliqueEpochTransitionSigners')
   if (!cliqueIsEpochTransition(header)) {
-    const msg = header['_errorMsg'](
-      'Signers are only included in epoch transition blocks (clique)',
-    )
+    const msg = 'Signers are only included in epoch transition blocks (clique)'
     throw EthereumJSErrorWithoutCode(msg)
   }
 
