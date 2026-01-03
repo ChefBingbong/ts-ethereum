@@ -84,6 +84,7 @@
         "@ts-ethereum/chain-config": "workspace:*",
         "@ts-ethereum/mpt": "workspace:*",
         "@ts-ethereum/rlp": "workspace:*",
+        "@ts-ethereum/schema": "workspace:*",
         "@ts-ethereum/tx": "workspace:*",
         "@ts-ethereum/utils": "workspace:*",
         "ethereum-cryptography": "^3.2.0",
@@ -316,6 +317,21 @@
       },
       "devDependencies": {
         "@types/benchmark": "^2.1.5",
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/schema": {
+      "name": "@ts-ethereum/schema",
+      "version": "0.0.0",
+      "dependencies": {
+        "@ts-ethereum/utils": "workspace:*",
+        "viem": "^2.23.6",
+        "zod": "^4.3.4",
+      },
+      "devDependencies": {
         "@types/bun": "latest",
       },
       "peerDependencies": {
@@ -689,6 +705,8 @@
     "@ts-ethereum/p2p": ["@ts-ethereum/p2p@workspace:packages/p2p"],
 
     "@ts-ethereum/rlp": ["@ts-ethereum/rlp@workspace:packages/rlp"],
+
+    "@ts-ethereum/schema": ["@ts-ethereum/schema@workspace:packages/schema"],
 
     "@ts-ethereum/state-manager": ["@ts-ethereum/state-manager@workspace:packages/state-manager"],
 
@@ -1390,6 +1408,10 @@
 
     "@ts-ethereum/rlp/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
+    "@ts-ethereum/schema/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
+
+    "@ts-ethereum/schema/zod": ["zod@4.3.4", "", {}, "sha512-Zw/uYiiyF6pUT1qmKbZziChgNPRu+ZRneAsMUDU6IwmXdWt5JwcUfy2bvLOCUtz5UniaN/Zx5aFttZYbYc7O/A=="],
+
     "@ts-ethereum/state-manager/@types/bun": ["@types/bun@1.3.5", "", { "dependencies": { "bun-types": "1.3.5" } }, "sha512-RnygCqNrd3srIPEWBd5LFeUYG7plCoH2Yw9WaZGyNmdTEei+gWaHqydbaIRkIkcbXwhBT94q78QljxN0Sk838w=="],
 
     "@ts-ethereum/state-manager/lru-cache": ["lru-cache@11.2.4", "", {}, "sha512-B5Y16Jr9LB9dHVkh6ZevG+vAbOsNOYCX+sXvFWFu7B3Iz5mijW3zdbMyhsh8ANd2mSWBYdJgnqi+mL7/LrOPYg=="],
@@ -1479,6 +1501,8 @@
     "@ts-ethereum/p2p/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 
     "@ts-ethereum/rlp/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
+
+    "@ts-ethereum/schema/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 
     "@ts-ethereum/state-manager/@types/bun/bun-types": ["bun-types@1.3.5", "", { "dependencies": { "@types/node": "*" } }, "sha512-inmAYe2PFLs0SUbFOWSVD24sg1jFlMPxOjOSSCYqUgn4Hsc3rDc7dFvfVYjFPNHtov6kgUeulV4SxbuIV/stPw=="],
 
