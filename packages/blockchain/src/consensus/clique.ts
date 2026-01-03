@@ -13,13 +13,13 @@ import {
   BIGINT_0,
   BIGINT_1,
   BIGINT_2,
-  TypeOutput,
   bigIntToBytes,
   bytesToBigInt,
   equalsBytes,
   hexToBytes,
-  toType,
   type NestedUint8Array,
+  TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import type { Blockchain } from '../index'

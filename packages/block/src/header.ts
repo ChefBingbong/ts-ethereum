@@ -16,8 +16,8 @@ import {
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   KECCAK256_RLP_ARRAY,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
