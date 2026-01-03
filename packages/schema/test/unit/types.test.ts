@@ -1,4 +1,4 @@
-import { TypeOutput, hexToBytes, toType } from '@ts-ethereum/utils'
+import { hexToBytes, TypeOutput, toType } from '@ts-ethereum/utils'
 import { describe, expect, it } from 'vitest'
 import {
   TypeOutput as ZodTypeOutput,
