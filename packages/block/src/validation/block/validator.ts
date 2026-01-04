@@ -1,6 +1,10 @@
-import { ConsensusType, type GlobalConfig } from '@ts-ethereum/chain-config'
-import { z } from '@ts-ethereum/schema'
-import { EthereumJSErrorWithoutCode, type Withdrawal } from '@ts-ethereum/utils'
+import { ConsensusType, type HardforkManager } from '@ts-ethereum/chain-config'
+import { z, zBigInt } from '@ts-ethereum/schema'
+import {
+  type BigIntLike,
+  EthereumJSErrorWithoutCode,
+  type Withdrawal,
+} from '@ts-ethereum/utils'
 import type { BlockHeader } from '../../header'
 import {
   type BlockConstructorInput,
@@ -14,7 +18,8 @@ import {
  * Options for block constructor validation
  */
 export interface BlockValidatorOptions {
-  common: GlobalConfig
+  hardforkManager: HardforkManager
+  number: BigIntLike
 }
 
 /**
@@ -22,9 +27,10 @@ export interface BlockValidatorOptions {
  * and consensus type from GlobalConfig
  */
 export function createBlockConstructorSchema(opts: BlockValidatorOptions) {
-  const { common } = opts
-  const consensusType = common.consensusType()
-  const isEIP4895Active = common.isActivatedEIP(4895)
+  const { hardforkManager: common } = opts
+  const consensusType = common.config.spec.chain.consensus.type
+  const blockNumber = zBigInt().parse(opts.number ?? 0)
+  const isEIP4895Active = common.isEIPActiveAtBlock(4895, { blockNumber })
 
   return z
     .object({
@@ -80,7 +86,9 @@ export function createBlockConstructorSchema(opts: BlockValidatorOptions) {
 export function validateBlockConstructor(
   input: BlockConstructorInput,
   opts: BlockValidatorOptions,
+  number: BigIntLike,
 ): ValidatedBlockData {
+  const blockNumber = zBigInt().parse(number ?? 0)
   const schema = createBlockConstructorSchema(opts)
   const result = schema.safeParse(input)
 
@@ -99,7 +107,10 @@ export function validateBlockConstructor(
 
   // Apply default withdrawals for EIP-4895 if not provided
   const finalWithdrawals =
-    withdrawals ?? (opts.common.isActivatedEIP(4895) ? [] : undefined)
+    withdrawals ??
+    (opts.hardforkManager.isEIPActiveAtBlock(4895, { blockNumber })
+      ? []
+      : undefined)
 
   return {
     uncleHeaders,
@@ -140,14 +151,18 @@ export function validateUncleHeaders(uncleHeaders: BlockHeader[]): boolean {
  * Validates withdrawals for EIP-4895 compliance
  *
  * @param withdrawals - Array of withdrawals or undefined
- * @param common - GlobalConfig for EIP check
+ * @param hardforkManager - HardforkManager for EIP check
+ * @param blockNumber - Block number to check EIP activation
  * @returns Validated withdrawals (defaulting to empty array if EIP-4895 is active)
  */
 export function validateWithdrawals(
   withdrawals: Withdrawal[] | undefined,
-  common: GlobalConfig,
+  hardforkManager: HardforkManager,
+  blockNumber: bigint,
 ): Withdrawal[] | undefined {
-  const isEIP4895Active = common.isActivatedEIP(4895)
+  const isEIP4895Active = hardforkManager.isEIPActiveAtBlock(4895, {
+    blockNumber,
+  })
 
   if (!isEIP4895Active && withdrawals !== undefined) {
     throw EthereumJSErrorWithoutCode(

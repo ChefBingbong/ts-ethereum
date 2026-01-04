@@ -3,6 +3,7 @@ import type {
   ConsensusAlgorithm,
   GenesisState,
   GlobalConfig,
+  HardforkManager,
 } from '@ts-ethereum/chain-config'
 import type { DB, DBObject } from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
@@ -18,6 +19,7 @@ export type BlockchainEvent = {
 }
 
 export interface BlockchainInterface {
+  hardforkManager: HardforkManager
   consensus: Consensus | undefined
   /**
    * Adds a block to the blockchain.
@@ -154,7 +156,7 @@ export interface BlockchainOptions extends GenesisOptions {
    * If not provided this defaults to chain `mainnet` and hardfork `chainstart`
    *
    */
-  common?: GlobalConfig
+  hardforkManager: HardforkManager
 
   /**
    * Set the HF to the fork determined by the head block and update on head updates.

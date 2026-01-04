@@ -33,6 +33,10 @@ export interface HardforkManager {
   chainName(): string
   getHardforkByBlock(blockNumber: bigint, timestamp?: bigint): string
   isEIPActiveAtHardfork(eip: number, hardfork: string): boolean
+  isEIPActiveAtBlock(
+    eip: number,
+    blockNum: { blockNumber: bigint; timestamp?: bigint },
+  ): boolean
   getParamAtHardfork<P extends AllParamNames>(
     param: P,
     hardfork: string,

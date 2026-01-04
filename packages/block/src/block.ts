@@ -1,4 +1,9 @@
-import { EIP, type GlobalConfig } from '@ts-ethereum/chain-config'
+import {
+  type AllParamNames,
+  EIP,
+  type HardforkManager,
+  type ParamType,
+} from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -10,7 +15,6 @@ import {
   type FeeMarket1559Tx,
   type LegacyTx,
   normalizeTxParams,
-  type TxOptions,
   type TypedTransaction,
 } from '@ts-ethereum/tx'
 import type { EthersProvider, WithdrawalBytes } from '@ts-ethereum/utils'
@@ -55,7 +59,7 @@ export class Block {
   public readonly transactions: TypedTransaction[] = []
   public readonly uncleHeaders: BlockHeader[] = []
   public readonly withdrawals?: Withdrawal[]
-  public readonly common: GlobalConfig
+  public readonly hardforkManager: HardforkManager
   protected keccakFunction: (msg: Uint8Array) => Uint8Array
   protected sha256Function: (msg: Uint8Array) => Uint8Array
 
@@ -64,17 +68,38 @@ export class Block {
     withdrawalsTrieRoot?: Uint8Array
   } = {}
 
+  /**
+   * Helper to check if an EIP is active at this block
+   */
+  isEIPActive(eip: number): boolean {
+    return this.header.isEIPActive(eip)
+  }
+
+  /**
+   * Helper to get a param value at this block's hardfork
+   */
+  param<P extends AllParamNames>(name: P): ParamType<P> | undefined {
+    return this.header.param(name)
+  }
+
+  /**
+   * Gets the hardfork active at this block
+   */
+  get hardfork(): string {
+    return this.header.hardfork
+  }
+
   constructor(
-    header?: BlockHeader,
-    transactions: TypedTransaction[] = [],
-    uncleHeaders: BlockHeader[] = [],
-    withdrawals?: Withdrawal[],
-    opts: BlockOptions = {},
+    header: BlockHeader,
+    transactions: TypedTransaction[],
+    uncleHeaders: BlockHeader[],
+    withdrawals: Withdrawal[] | undefined,
+    opts: BlockOptions,
   ) {
-    this.header = header ?? new BlockHeader({}, opts)
-    this.common = this.header.common
-    this.keccakFunction = this.common.customCrypto.keccak256 ?? keccak256
-    this.sha256Function = this.common.customCrypto.sha256 ?? sha256
+    this.header = header
+    this.hardforkManager = opts.hardforkManager
+    this.keccakFunction = keccak256
+    this.sha256Function = sha256
 
     // Validate block data using Zod schema
     const validated = validateBlockConstructor(
@@ -83,7 +108,8 @@ export class Block {
         withdrawals,
         isGenesis: this.header.isGenesis(),
       },
-      { common: this.common },
+      { hardforkManager: this.hardforkManager, number: this.header.number },
+      this.header.number,
     )
 
     this.transactions = transactions
@@ -95,7 +121,7 @@ export class Block {
     }
   }
 
-  static fromBlockData(blockData: BlockData = {}, opts?: BlockOptions): Block {
+  static fromBlockData(blockData: BlockData, opts: BlockOptions): Block {
     const {
       header: headerData,
       transactions: txsData,
@@ -103,15 +129,13 @@ export class Block {
       withdrawals: withdrawalsData,
     } = blockData
 
-    const header = BlockHeader.fromHeaderData(headerData, opts)
+    const header = BlockHeader.fromHeaderData(headerData ?? {}, opts)
 
     // parse transactions
     const transactions = []
     for (const txData of txsData ?? []) {
-      const tx = createTx(txData, {
-        ...opts,
-        common: header.common,
-      } as TxOptions)
+      // TODO: Migrate tx package to use hardforkManager
+      const tx = createTx(txData, opts)
       transactions.push(tx)
     }
 
@@ -119,7 +143,7 @@ export class Block {
     const uncleHeaders = []
     const uncleOpts: BlockOptions = {
       ...opts,
-      common: header.common,
+      hardforkManager: opts.hardforkManager,
       calcDifficultyFromHeader: undefined,
     }
     if (opts?.setHardfork !== undefined) {
@@ -135,12 +159,12 @@ export class Block {
     return new Block(header, transactions, uncleHeaders, withdrawals, opts)
   }
 
-  static createEmpty(headerData: HeaderData, opts?: BlockOptions): Block {
+  static createEmpty(headerData: HeaderData, opts: BlockOptions): Block {
     const header = BlockHeader.fromHeaderData(headerData, opts)
-    return new Block(header)
+    return new Block(header, [], [], undefined, opts)
   }
 
-  static fromBytesArray(values: BlockBytes, opts?: BlockOptions): Block {
+  static fromBytesArray(values: BlockBytes, opts: BlockOptions): Block {
     if (values.length > 5) {
       throw EthereumJSErrorWithoutCode(
         `invalid  More values=${values.length} than expected were received (at most 5)`,
@@ -150,12 +174,12 @@ export class Block {
     const [headerData, txsData, uhsData, ...valuesTail] = values
     const header = BlockHeader.fromBytesArray(headerData, opts)
 
-    const withdrawalBytes = header.common.isActivatedEIP(4895)
+    const withdrawalBytes = header.isEIPActive(4895)
       ? (valuesTail.splice(0, 1)[0] as WithdrawalsBytes)
       : undefined
 
     if (
-      header.common.isActivatedEIP(4895) &&
+      header.isEIPActive(4895) &&
       (withdrawalBytes === undefined || !Array.isArray(withdrawalBytes))
     ) {
       throw EthereumJSErrorWithoutCode(
@@ -165,18 +189,14 @@ export class Block {
 
     const transactions = []
     for (const txData of txsData ?? []) {
-      transactions.push(
-        createTxFromBlockBodyData(txData, {
-          ...opts,
-          common: header.common,
-        }),
-      )
+      // TODO: Migrate tx package to use hardforkManager
+      transactions.push(createTxFromBlockBodyData(txData, opts))
     }
 
     const uncleHeaders = []
     const uncleOpts: BlockOptions = {
       ...opts,
-      common: header.common,
+      hardforkManager: header.hardforkManager,
       calcDifficultyFromHeader: undefined,
     }
     if (opts?.setHardfork !== undefined) {
@@ -198,9 +218,11 @@ export class Block {
     return new Block(header, transactions, uncleHeaders, withdrawals, opts)
   }
 
-  static fromRLP(serialized: Uint8Array, opts?: BlockOptions): Block {
-    if (opts?.common?.isActivatedEIP(7934) === true) {
-      const maxRlpBlockSize = opts.common.getParamByEIP(7934, 'maxRlpBlockSize')
+  static fromRLP(serialized: Uint8Array, opts: BlockOptions): Block {
+    if (opts.hardforkManager.isEIPActiveAtHardfork(7934, 'osaka')) {
+      const maxRlpBlockSize =
+        opts.hardforkManager.getParamAtHardfork('maxRlpBlockSize', 'osaka') ??
+        1000000000n
       if (serialized.length > maxRlpBlockSize) {
         throw EthereumJSErrorWithoutCode(
           `Block size exceeds limit: ${serialized.length} > ${maxRlpBlockSize}`,
@@ -220,16 +242,16 @@ export class Block {
 
   static fromRPC(
     blockParams: JSONRPCBlock,
-    uncles: any[] = [],
-    options?: BlockOptions,
+    uncles: any[],
+    options: BlockOptions,
   ): Block {
     const header = BlockHeader.fromRPC(blockParams, options)
 
     const transactions: TypedTransaction[] = []
-    const opts = { common: header.common }
+    // TODO: Migrate tx package to use hardforkManager
     for (const _txParams of blockParams.transactions ?? []) {
       const txParams = normalizeTxParams(_txParams)
-      const tx = createTx(txParams, opts)
+      const tx = createTx(txParams, options)
       transactions.push(tx)
     }
 
@@ -302,7 +324,7 @@ export class Block {
 
   static async fromExecutionPayload(
     payload: ExecutionPayload,
-    opts?: BlockOptions,
+    opts: BlockOptions,
   ): Promise<Block> {
     const {
       blockNumber: number,
@@ -316,9 +338,8 @@ export class Block {
     const txs = []
     for (const [index, serializedTx] of transactions.entries()) {
       try {
-        const tx = createTxFromRLP(hexToBytes(serializedTx), {
-          common: opts?.common,
-        })
+        // TODO: Migrate tx package to use hardforkManager
+        const tx = createTxFromRLP(hexToBytes(serializedTx), opts)
         txs.push(tx)
       } catch (error) {
         const validationError = `Invalid tx at index ${index}: ${error}`
@@ -328,13 +349,13 @@ export class Block {
 
     const transactionsTrie = await genTransactionsTrieRoot(
       txs,
-      new MerklePatriciaTrie({ common: opts?.common }),
+      new MerklePatriciaTrie({ common: opts.hardforkManager }),
     )
     const withdrawals = withdrawalsData?.map((wData) => createWithdrawal(wData))
     const withdrawalsRoot = withdrawals
       ? await genWithdrawalsTrieRoot(
           withdrawals,
-          new MerklePatriciaTrie({ common: opts?.common }),
+          new MerklePatriciaTrie({ common: opts.hardforkManager }),
         )
       : undefined
 
@@ -364,12 +385,13 @@ export class Block {
 
   static createSealedClique(
     cliqueSigner: Uint8Array,
-    blockData: BlockData = {},
-    opts: BlockOptions = {},
+    blockData: BlockData,
+    opts: BlockOptions,
   ): Block {
     const sealedCliqueBlock = Block.fromBlockData(blockData, {
       ...opts,
-      ...{ freeze: false, skipConsensusFormatValidation: true },
+      freeze: false,
+      skipConsensusFormatValidation: true,
     })
     ;(sealedCliqueBlock.header.extraData as any) = generateCliqueBlockExtraData(
       sealedCliqueBlock.header,
@@ -415,10 +437,7 @@ export class Block {
   }
 
   async genTxTrie(): Promise<Uint8Array> {
-    return genTransactionsTrieRoot(
-      this.transactions,
-      new MerklePatriciaTrie({ common: this.common }),
-    )
+    return genTransactionsTrieRoot(this.transactions, new MerklePatriciaTrie())
   }
 
   async transactionsTrieIsValid(): Promise<boolean> {
@@ -442,7 +461,7 @@ export class Block {
     // eslint-disable-next-line prefer-const
     for (let [i, tx] of this.transactions.entries()) {
       const errs = tx.getValidationErrors()
-      if (this.common.isActivatedEIP(1559)) {
+      if (this.isEIPActive(1559)) {
         if (tx.supports(Capability.EIP1559FeeMarket)) {
           tx = tx as FeeMarket1559Tx
           if (tx.maxFeePerGas < this.header.baseFeePerGas!) {
@@ -455,12 +474,9 @@ export class Block {
           }
         }
       }
-      if (this.common.isActivatedEIP(4844)) {
-        const blobGasLimit = this.common.getParamByEIP(
-          4844,
-          'maxBlobGasPerBlock',
-        )
-        const blobGasPerBlob = this.common.getParamByEIP(4844, 'blobGasPerBlob')
+      if (this.isEIPActive(4844)) {
+        const blobGasLimit = this.param('maxBlobGasPerBlock') ?? BIGINT_0
+        const blobGasPerBlob = this.param('blobGasPerBlob') ?? 131072n
         if (tx instanceof Blob4844Tx) {
           blobGasUsed += BigInt(tx.numBlobs()) * blobGasPerBlob
           if (blobGasUsed > blobGasLimit) {
@@ -475,7 +491,7 @@ export class Block {
       }
     }
 
-    if (this.common.isActivatedEIP(4844)) {
+    if (this.isEIPActive(4844)) {
       if (blobGasUsed !== this.header.blobGasUsed) {
         errors.push(
           `invalid blobGasUsed expected=${this.header.blobGasUsed} actual=${blobGasUsed}`,
@@ -498,9 +514,9 @@ export class Block {
     validateBlockSize = false,
   ): Promise<void> {
     // EIP-7934: RLP Execution Block Size Limit validation
-    if (validateBlockSize && this.common.isActivatedEIP(EIP.EIP_7934)) {
+    if (validateBlockSize && this.isEIPActive(EIP.EIP_7934)) {
       const rlpEncoded = this.serialize()
-      const maxRlpBlockSize = this.common.getParamByEIP(7934, 'maxRlpBlockSize')
+      const maxRlpBlockSize = this.param('maxRlpBlockSize') ?? 1000000000n
       if (rlpEncoded.length > maxRlpBlockSize) {
         const msg = this._errorMsg(
           `Block size exceeds maximum RLP block size limit: ${rlpEncoded.length} bytes > ${maxRlpBlockSize} bytes`,
@@ -544,23 +560,20 @@ export class Block {
       throw EthereumJSErrorWithoutCode(msg)
     }
 
-    if (
-      this.common.isActivatedEIP(4895) &&
-      !(await this.withdrawalsTrieIsValid())
-    ) {
+    if (this.isEIPActive(4895) && !(await this.withdrawalsTrieIsValid())) {
       const msg = this._errorMsg('invalid withdrawals trie')
       throw EthereumJSErrorWithoutCode(msg)
     }
   }
 
   validateBlobTransactions(parentHeader: BlockHeader) {
-    if (this.common.isActivatedEIP(4844)) {
-      const blobGasLimit = this.common.getParamByEIP(4844, 'maxBlobGasPerBlock')
-      const blobGasPerBlob = this.common.getParamByEIP(4844, 'blobGasPerBlob')
+    if (this.isEIPActive(4844)) {
+      const blobGasLimit = this.param('maxBlobGasPerBlock') ?? BIGINT_0
+      const blobGasPerBlob = this.param('blobGasPerBlob') ?? 131072n
       let blobGasUsed = BIGINT_0
 
       const expectedExcessBlobGas = parentHeader.calcNextExcessBlobGas(
-        this.common,
+        this.hardfork,
       )
       if (this.header.excessBlobGas !== expectedExcessBlobGas) {
         throw EthereumJSErrorWithoutCode(
@@ -609,7 +622,7 @@ export class Block {
   }
 
   async withdrawalsTrieIsValid(): Promise<boolean> {
-    if (!this.common.isActivatedEIP(4895)) {
+    if (!this.isEIPActive(4895)) {
       throw EthereumJSErrorWithoutCode('EIP 4895 is not activated')
     }
 
@@ -622,7 +635,7 @@ export class Block {
     if (this.cache.withdrawalsTrieRoot === undefined) {
       this.cache.withdrawalsTrieRoot = await genWithdrawalsTrieRoot(
         this.withdrawals!,
-        new MerklePatriciaTrie({ common: this.common }),
+        new MerklePatriciaTrie(),
       )
     }
     result = equalsBytes(
@@ -700,7 +713,7 @@ export class Block {
     }
     let hf = ''
     try {
-      hf = this.common.hardfork()
+      hf = this.hardfork
     } catch {
       hf = 'error'
     }

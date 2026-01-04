@@ -1,12 +1,15 @@
 import type { HeaderData } from '@ts-ethereum/block'
 import { Block, BlockHeader, createBlock } from '@ts-ethereum/block'
-import type { CliqueConfig, GenesisState } from '@ts-ethereum/chain-config'
+import type {
+  CliqueConfig,
+  GenesisState,
+  HardforkManager,
+} from '@ts-ethereum/chain-config'
 import {
   ConsensusAlgorithm,
   ConsensusType,
   GlobalConfig,
   Hardfork,
-  mainnetSchema,
 } from '@ts-ethereum/chain-config'
 import { Ethash } from '@ts-ethereum/consensus'
 import type { BigIntLike, DB, DBObject } from '@ts-ethereum/utils'
@@ -89,7 +92,7 @@ export class Blockchain implements BlockchainInterface {
 
   private _lock: Lock
 
-  public readonly common: GlobalConfig
+  public readonly hardforkManager: HardforkManager
   private _hardforkByHeadBlockNumber: boolean
   private readonly _validateBlocks: boolean
   private readonly _validateConsensus: boolean
@@ -115,22 +118,14 @@ export class Blockchain implements BlockchainInterface {
    * @param opts An object with the options that this constructor takes. See
    * {@link BlockchainOptions}.
    */
-  constructor(opts: BlockchainOptions = {}) {
+  constructor(opts: BlockchainOptions) {
     this.DEBUG =
       typeof window === 'undefined'
         ? (process?.env?.DEBUG?.includes('ethjs') ?? false)
         : false
     this._debug = debugDefault('blockchain:#')
 
-    if (opts.common) {
-      this.common = opts.common
-    } else {
-      const DEFAULT_HARDFORK = Hardfork.Chainstart
-      this.common = GlobalConfig.fromSchema({
-        schema: mainnetSchema,
-        hardfork: DEFAULT_HARDFORK,
-      })
-    }
+    this.hardforkManager = opts.hardforkManager
 
     this._hardforkByHeadBlockNumber = opts.hardforkByHeadBlockNumber ?? false
     this._validateBlocks = opts.validateBlocks ?? true
@@ -139,7 +134,7 @@ export class Blockchain implements BlockchainInterface {
 
     this.db = opts.db ?? new MapDB()
 
-    this.dbManager = new DBManager(this.db, this.common)
+    this.dbManager = new DBManager(this.db, this.hardforkManager)
 
     this.events = new EventEmitter<BlockchainEvent>()
 
@@ -191,7 +186,6 @@ export class Blockchain implements BlockchainInterface {
       Object.getPrototypeOf(this),
       Object.getOwnPropertyDescriptors(this),
     )
-    copiedBlockchain.common = this.common.copy()
     return copiedBlockchain
   }
 
@@ -430,7 +424,7 @@ export class Blockchain implements BlockchainInterface {
         const currentTd = { header: BIGINT_0, block: BIGINT_0 }
         let dbOps: DBOp[] = []
 
-        if (block.common.chainId() !== this.common.chainId()) {
+        if (block.common.chainId() !== this.hardforkManager.chainId()) {
           throw EthereumJSErrorWithoutCode(
             `Chain mismatch while trying to put block or header. Chain ID of block: ${block.common.chainId}, chain ID of blockchain : ${this.common.chainId}`,
           )

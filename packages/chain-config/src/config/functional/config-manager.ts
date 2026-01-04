@@ -55,6 +55,13 @@ export function createHardforkManager(spec: ChainSpec): HardforkManager {
       hardforkTimestamp(config, hardfork),
 
     getActiveEips: (hardfork: string) => getActiveEips(config, hardfork),
+    isEIPActiveAtBlock: (
+      eip: number,
+      { blockNumber, timestamp }: { blockNumber: bigint; timestamp?: bigint },
+    ) => {
+      const hardfork = getHardforkByBlock(config, blockNumber, timestamp)
+      return hardfork ? isEIPActiveAtHardfork(config, eip, hardfork) : false
+    },
 
     getHardforkForEIP: (eip: number) => getHardforkForEIP(config, eip),
   })

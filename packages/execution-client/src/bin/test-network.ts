@@ -121,7 +121,7 @@ async function startClient() {
 
   const blockchain = await createBlockchain({
     db: new LevelDB(databases.chainDB),
-    common: clientConfig.common,
+    hardforkManager: clientConfig.hardforkManager,
     hardforkByHeadBlockNumber: true,
     validateBlocks: true,
     validateConsensus: true,

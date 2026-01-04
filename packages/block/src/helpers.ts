@@ -1,5 +1,5 @@
 import { concatBytes } from '@noble/hashes/utils.js'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import { Blob4844Tx, type TypedTransaction } from '@ts-ethereum/tx'
@@ -154,16 +154,21 @@ export const fakeExponential = (
 /**
  * Returns the blob gas price depending upon the `excessBlobGas` value
  * @param excessBlobGas
- * @param common
+ * @param hardforkManager - HardforkManager instance
+ * @param hardfork - The hardfork to get params from
  */
 export const computeBlobGasPrice = (
   excessBlobGas: bigint,
-  common: GlobalConfig,
+  hardforkManager: HardforkManager,
+  hardfork: string,
 ) => {
   return fakeExponential(
-    common.getParamByEIP(4844, 'minBlobGas'),
+    hardforkManager.getParamAtHardfork('minBlobGas', hardfork) ?? 1n,
     excessBlobGas,
-    common.getParamByEIP(4844, 'blobGasPriceUpdateFraction'),
+    hardforkManager.getParamAtHardfork(
+      'blobGasPriceUpdateFraction',
+      hardfork,
+    ) ?? 3338477n,
   )
 }
 
