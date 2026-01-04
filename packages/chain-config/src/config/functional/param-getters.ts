@@ -1,8 +1,8 @@
 import { HARDFORK_EIPS, type Hardfork } from '../../hardforks/hardforks'
 import {
-  EIP1_PARAMS,
-  EIP_PARAMS,
   type AllParamNames,
+  EIP_PARAMS,
+  EIP1_PARAMS,
   type EIPWithParams,
   type HardforkParamsMap,
   type ParamsAtHardfork,

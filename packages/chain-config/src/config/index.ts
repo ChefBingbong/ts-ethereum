@@ -1,7 +1,7 @@
 export { paramsBlock } from './default-params/params-block'
 export {
-  createHardforkManager,
   type ChainSpec,
+  createHardforkManager,
   type FrozenChainConfig,
   type HardforkEntry,
   type HardforkManager,

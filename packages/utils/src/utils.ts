@@ -1,17 +1,17 @@
+import os from 'node:os'
+import path from 'node:path'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_UNIX, multiaddr } from '@multiformats/multiaddr'
 import { Unix } from '@multiformats/multiaddr-matcher'
 import { RLP } from '@ts-ethereum/rlp'
 import debug from 'debug'
-import { publicKeyConvert } from 'ethereum-cryptography/secp256k1-compat.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
+import { publicKeyConvert } from 'ethereum-cryptography/secp256k1-compat.js'
 import type {
   IpcSocketConnectOpts,
   ListenOptions,
   TcpSocketConnectOpts,
 } from 'net'
-import os from 'node:os'
-import path from 'node:path'
 import { bytesToHex, bytesToUnprefixedHex, concatBytes, equalsBytes } from '.'
 import { getNetConfig } from './getNetConfig'
 
