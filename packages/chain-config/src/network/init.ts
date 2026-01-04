@@ -1,9 +1,9 @@
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
-import { createHardforkManager, HardforkEntry } from 'src/config/functional'
 import { schemaFromChainConfig } from '../builder'
 import { GlobalConfig } from '../config'
+import { createHardforkManager, type HardforkEntry } from '../config/functional'
 import type { GenesisState } from '../genesis/types'
 import type { ChainConfig } from '../types'
 import {
