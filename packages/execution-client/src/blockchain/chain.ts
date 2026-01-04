@@ -343,6 +343,11 @@ export class Chain {
     this._headers = headers
     this._blocks = blocks
 
+    this.config.chainCommon.setHardforkBy({
+      blockNumber: headers.latest.number,
+      timestamp: headers.latest.timestamp,
+    })
+
     if (emit) {
       this.config.events.emit(Event.CHAIN_UPDATED)
     }
@@ -418,6 +423,7 @@ export class Chain {
 
       const block = createBlockFromBytesArray(b.raw(), {
         common: this.config.chainCommon,
+        setHardfork: true,
       })
 
       await this.blockchain.putBlock(block)
@@ -461,6 +467,7 @@ export class Chain {
       // Frontier/Chainstart only - PoW
       const header = createBlockHeaderFromBytesArray(h.raw(), {
         common: this.config.chainCommon,
+        setHardfork: true,
       })
       await this.blockchain.putHeader(header)
       numAdded++

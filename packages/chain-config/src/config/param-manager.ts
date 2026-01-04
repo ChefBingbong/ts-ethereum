@@ -114,7 +114,7 @@ export class ParamsManager<H extends Hardfork = Hardfork> {
   }
 
   copy(): ParamsManager<H> {
-    return new ParamsManager(this._hardfork, {
+    return new ParamsManager(this.currentHardfork, {
       overrides: { ...this._overrides },
     })
   }

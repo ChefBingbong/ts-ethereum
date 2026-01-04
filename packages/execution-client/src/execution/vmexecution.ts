@@ -255,6 +255,10 @@ export class VMExecution extends Execution {
           'cannot get iterator head: blockchain has no getTotalDifficulty function',
         )
       }
+      this.config.execCommon.setHardforkBy({
+        blockNumber: number,
+        timestamp: headBlock.header.timestamp,
+      })
       this.hardfork = this.config.execCommon.hardfork()
 
       this.config.options.logger?.info(
@@ -302,7 +306,10 @@ export class VMExecution extends Execution {
 
     // there could to be checks here that the resetted head is a parent of the chainStatus
     // but we can skip it for now trusting the chain reset has been correctly performed
-    this.hardfork = this.config.execCommon.hardfork()
+    this.hardfork = this.config.execCommon.setHardforkBy({
+      blockNumber: number,
+      timestamp: headBlock.header.timestamp,
+    })
 
     await this.setupMerkleVM()
     this.vm = this.merkleVM!
@@ -643,15 +650,21 @@ export class VMExecution extends Execution {
 
                 // run block, update head if valid
                 try {
-                  const { number } = block.header
+                  const { number, timestamp } = block.header
 
-                  const hardfork = this.config.execCommon.hardfork()
+                  const hardfork = this.config.execCommon.getHardforkBy({
+                    blockNumber: number,
+                    timestamp,
+                  })
                   if (hardfork !== this.hardfork) {
                     const hash = short(block.hash())
                     this.config.options.logger?.info(
                       `Execution hardfork switch on block number=${number} hash=${hash} old=${this.hardfork} new=${hardfork}`,
                     )
-                    this.hardfork = this.config.execCommon.hardfork()
+                    this.hardfork = this.config.execCommon.setHardforkBy({
+                      blockNumber: number,
+                      timestamp,
+                    })
                   }
 
                   const skipBlockValidation = false
@@ -739,6 +752,7 @@ export class VMExecution extends Execution {
             // Ensure to catch and not throw as this would lead to unCaughtException with process exit
             .catch(async (error) => {
               // Track error
+              console.error(error)
               const context = createErrorContext('VMExecution', 'run', {
                 hardfork: this.hardfork,
               })

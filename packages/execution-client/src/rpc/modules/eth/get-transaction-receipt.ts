@@ -1,4 +1,8 @@
-import type { LegacyTx } from '@ts-ethereum/tx'
+import {
+  Capability,
+  type FeeMarket1559Tx,
+  type LegacyTx,
+} from '@ts-ethereum/tx'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
   equalsBytes,
@@ -46,18 +50,26 @@ export const getTransactionReceipt = (node: ExecutionNode) => {
           return safeResult(null)
         }
 
-        const parentBlock = await chain.getBlock(block.header.parentHash)
+        const parentBlock = await node.chain.getBlock(block.header.parentHash)
         const tx = block.transactions[txIdx]
-        const effectiveGasPrice = (tx as LegacyTx).gasPrice
+        const effectiveGasPrice = tx.supports(Capability.EIP1559FeeMarket)
+          ? (tx as FeeMarket1559Tx).maxPriorityFeePerGas <
+            (tx as FeeMarket1559Tx).maxFeePerGas - block.header.baseFeePerGas!
+            ? (tx as FeeMarket1559Tx).maxPriorityFeePerGas
+            : (tx as FeeMarket1559Tx).maxFeePerGas -
+              block.header.baseFeePerGas! +
+              block.header.baseFeePerGas!
+          : (tx as LegacyTx).gasPrice
 
-        const vmCopy = await vm.shallowCopy()
+        const vmCopy = await vm!.shallowCopy()
+        vmCopy.common.setHardfork(tx.common.hardfork())
         const runBlockResult = await runBlock(vmCopy, {
           block,
           root: parentBlock.header.stateRoot,
           skipBlockValidation: true,
         })
 
-        const { createdAddress, totalGasSpent } = runBlockResult.results[txIdx]
+        const { totalGasSpent, createdAddress } = runBlockResult.results[txIdx]
         const { blobGasPrice, blobGasUsed } = runBlockResult.receipts[
           txIdx
         ] as EIP4844BlobTxReceipt

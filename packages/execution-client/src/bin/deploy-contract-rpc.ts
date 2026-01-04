@@ -143,7 +143,7 @@ function getSolcInput() {
         enabled: true,
         runs: 200,
       },
-      evmVersion: 'homestead',
+      evmVersion: 'spuriousDragon',
       outputSelection: {
         '*': {
           '*': ['abi', 'evm.bytecode'],
@@ -212,9 +212,9 @@ async function deployContract(
     account: walletClient.account,
     data: data as Hex,
     gas: 2_000_000n,
-    gasPrice: 10_000_000_000n, // 1 gwei
+    gasPrice: 100_000_000_000n, // 1 gwei
     nonce,
-    type: 'legacy',
+    // type: 'legacy',
   })
 
   console.log(`Transaction hash: ${hash}`)
@@ -261,9 +261,9 @@ async function setGreeting(
     to: contractAddress as Hex,
     data: data as Hex,
     gas: 2_000_000n,
-    gasPrice: 1_000_000_000n,
+    gasPrice: 10_000_000_000n,
     nonce,
-    type: 'legacy',
+    // type: 'legacy',
   })
 
   console.log(`Transaction hash: ${hash}`)
@@ -294,8 +294,8 @@ async function getGreeting(
     from: callerAddress as Hex,
     data: sigHash as Hex,
     gas: 2_000_000n,
-    gasPrice: 1_000_000_000n,
-    type: 'legacy',
+    gasPrice: 10_000_000_000n,
+    // type: 'legacy',
   })
 
   if (!result.data || result.data === '0x') {

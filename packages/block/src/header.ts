@@ -262,26 +262,32 @@ export class BlockHeader {
       londonHfBlock !== BIGINT_0 &&
       this.number === londonHfBlock
     ) {
-      parentGasLimit *= this.common.getParamByEIP(1559, 'elasticityMultiplier')
+      const elasticity = this.common.param('elasticityMultiplier')
+      if (elasticity !== undefined) {
+        parentGasLimit = parentGasLimit * BigInt(elasticity)
+      }
     }
 
-    const a = parentGasLimit / BigInt(this.common.param('gasLimitBoundDivisor'))
+    const gasLimit = this.gasLimit
+
+    const a =
+      parentGasLimit / BigInt(this.common.param('gasLimitBoundDivisor') ?? 0n)
     const maxGasLimit = parentGasLimit + a
     const minGasLimit = parentGasLimit - a
 
-    if (this.gasLimit >= maxGasLimit) {
+    if (gasLimit >= maxGasLimit) {
       throw EthereumJSErrorWithoutCode(
-        `gas limit increased too much: ${this.gasLimit} >= ${maxGasLimit}`,
+        `gas limit increased too much: ${gasLimit} >= ${maxGasLimit}`,
       )
     }
-    if (this.gasLimit <= minGasLimit) {
+    // if (gasLimit <= minGasLimit) {
+    //   throw EthereumJSErrorWithoutCode(
+    //     `gas limit decreased too much: ${gasLimit} <= ${minGasLimit}`,
+    //   )
+    // }
+    if (gasLimit < this.common.param('minGasLimit')) {
       throw EthereumJSErrorWithoutCode(
-        `gas limit decreased too much: ${this.gasLimit} <= ${minGasLimit}`,
-      )
-    }
-    if (this.gasLimit < this.common.param('minGasLimit')) {
-      throw EthereumJSErrorWithoutCode(
-        `gas limit below minimum: ${this.gasLimit} < ${this.common.param('minGasLimit')}`,
+        `gas limit below minimum: ${gasLimit} < ${this.common.param('minGasLimit')}`,
       )
     }
   }
@@ -293,7 +299,7 @@ export class BlockHeader {
       )
     }
 
-    const elasticity = this.common.getParamByEIP(1559, 'elasticityMultiplier')
+    const elasticity = BigInt(this.common.param('elasticityMultiplier') ?? 0n)
     const parentGasTarget = this.gasLimit / elasticity
 
     if (parentGasTarget === this.gasUsed) {
@@ -364,7 +370,7 @@ export class BlockHeader {
   }
 
   raw(): BlockHeaderBytes {
-    const rawItems = [
+    const rawItems: Uint8Array[] = [
       this.parentHash,
       this.uncleHash,
       this.coinbase.bytes,
@@ -486,12 +492,16 @@ export class BlockHeader {
   }
 
   toJSON(): JSONHeader {
-    const json: JSONHeader = {
+    const withdrawalAttr = this.withdrawalsRoot
+      ? { withdrawalsRoot: bytesToHex(this.withdrawalsRoot) }
+      : {}
+    const JSONDict: JSONHeader = {
       parentHash: bytesToHex(this.parentHash),
       uncleHash: bytesToHex(this.uncleHash),
       coinbase: this.coinbase.toString(),
       stateRoot: bytesToHex(this.stateRoot),
       transactionsTrie: bytesToHex(this.transactionsTrie),
+      ...withdrawalAttr,
       receiptTrie: bytesToHex(this.receiptTrie),
       logsBloom: bytesToHex(this.logsBloom),
       difficulty: bigIntToHex(this.difficulty),
@@ -503,25 +513,20 @@ export class BlockHeader {
       mixHash: bytesToHex(this.mixHash),
       nonce: bytesToHex(this.nonce),
     }
-
-    if (this.withdrawalsRoot) {
-      json.withdrawalsRoot = bytesToHex(this.withdrawalsRoot)
-    }
     if (this.common.isActivatedEIP(1559)) {
-      json.baseFeePerGas = bigIntToHex(this.baseFeePerGas!)
+      JSONDict.baseFeePerGas = bigIntToHex(this.baseFeePerGas!)
     }
     if (this.common.isActivatedEIP(4844)) {
-      json.blobGasUsed = bigIntToHex(this.blobGasUsed!)
-      json.excessBlobGas = bigIntToHex(this.excessBlobGas!)
+      JSONDict.blobGasUsed = bigIntToHex(this.blobGasUsed!)
+      JSONDict.excessBlobGas = bigIntToHex(this.excessBlobGas!)
     }
     if (this.common.isActivatedEIP(4788)) {
-      json.parentBeaconBlockRoot = bytesToHex(this.parentBeaconBlockRoot!)
+      JSONDict.parentBeaconBlockRoot = bytesToHex(this.parentBeaconBlockRoot!)
     }
     if (this.common.isActivatedEIP(7685)) {
-      json.requestsHash = bytesToHex(this.requestsHash!)
+      JSONDict.requestsHash = bytesToHex(this.requestsHash!)
     }
-
-    return json
+    return JSONDict
   }
 
   protected _consensusFormatValidation(): void {

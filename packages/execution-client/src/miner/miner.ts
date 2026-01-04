@@ -1,10 +1,11 @@
 import { type Block, type BlockHeader, createBlock } from '@ts-ethereum/block'
+import { Hardfork } from '@ts-ethereum/chain-config'
 import {
   Ethash,
   type Miner as EthashMiner,
   type Solution,
 } from '@ts-ethereum/consensus'
-import { BIGINT_0, BIGINT_1, bytesToHex } from '@ts-ethereum/utils'
+import { BIGINT_0, BIGINT_1, BIGINT_2, bytesToHex } from '@ts-ethereum/utils'
 import { buildBlock, type TxReceipt } from '@ts-ethereum/vm'
 import type { Chain } from '../blockchain/chain'
 import type { Config } from '../config/index'
@@ -216,7 +217,7 @@ export class Miner {
     const parentBlock = this.chain.blocks.latest!
 
     const number = parentBlock.header.number + BIGINT_1
-    const { gasLimit } = parentBlock.header
+    let { gasLimit } = parentBlock.header
 
     // Use a copy of the vm to not modify the existing state.
     // The state will be updated when the newly assembled block
@@ -251,15 +252,35 @@ export class Miner {
     const minerGasPrice = this.config.options.minerGasPrice
     const minerPriorityAddresses = this.config.options.minerPriorityAddresses
 
+    let baseFeePerGas
+    const londonHardforkBlock = this.config.chainCommon.hardforkBlock(
+      Hardfork.London,
+    )
+    if (
+      typeof londonHardforkBlock === 'bigint' &&
+      londonHardforkBlock !== BIGINT_0 &&
+      number === londonHardforkBlock
+    ) {
+      // Get baseFeePerGas from `paramByEIP` since 1559 not currently active on common
+      baseFeePerGas =
+        BigInt(vmCopy.common.param('initialBaseFee') ?? '0') ?? BIGINT_0
+      // Set initial EIP1559 block gas limit to 2x parent gas limit per logic in `block.validateGasLimit`
+      gasLimit = gasLimit * BIGINT_2
+    } else if (this.config.chainCommon.isActivatedEIP(1559)) {
+      baseFeePerGas = parentBlock.header.calcNextBaseFee()
+    }
+
     const blockBuilder = await buildBlock(vmCopy, {
       parentBlock,
       headerData: {
         number,
-        gasLimit: targetGasLimit,
+        gasLimit,
+        baseFeePerGas,
         coinbase,
         extraData: minerExtraData,
       },
       blockOpts: {
+        setHardfork: true,
         calcDifficultyFromHeader,
         putBlockIntoBlockchain: false,
       },
@@ -274,7 +295,7 @@ export class Miner {
     })
 
     this.config.options.logger?.info(
-      `Miner: Assembling block with target gas limit ${targetGasLimit}`,
+      `Miner: Assembling block with target gas limit ${targetGasLimit}, txSet empty: ${txSet.empty()}`,
     )
 
     // Track block size (in addition to gas)

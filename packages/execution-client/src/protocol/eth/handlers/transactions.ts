@@ -28,6 +28,8 @@ export async function handleTransactions(
       {
         chainCommon: handler.config.chainCommon,
         synchronized: handler.isReady,
+        chain: { headers: { latest: handler.chain.blocks.latest?.header } },
+        syncTargetHeight: handler.config.syncTargetHeight,
       },
     )
 

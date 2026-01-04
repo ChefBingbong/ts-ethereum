@@ -1,12 +1,12 @@
 import {
+  EthereumJSErrorWithoutCode,
+  TypeOutput,
   bytesToHex,
   concatBytes,
-  EthereumJSErrorWithoutCode,
   hexToBytes,
   intToBytes,
-  type PrefixedHexString,
-  TypeOutput,
   toType,
+  type PrefixedHexString,
 } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { ConsensusAlgorithm, ConsensusType } from '../chains'
@@ -71,7 +71,7 @@ export class GlobalConfig<
     type HF = ExtractHardforkNames<Entries>
 
     const firstHardfork = opts.schema.hardforks[0]?.name as HF
-    const initialHardfork = (opts.hardfork ?? firstHardfork) as HF
+    const initialHardfork = firstHardfork
 
     const manager = ParamsManager.createFromSchema(
       initialHardfork,
@@ -97,6 +97,8 @@ export class GlobalConfig<
     this._currentHardfork = opts.hardfork
     this._hardforkParams = opts.hardforkParams
     this._schemaHardforks = opts.schemaHardforks
+
+    this.setHardfork(opts.hardfork as unknown as SchemaH)
   }
 
   setHardfork<NewH extends SchemaH>(hardfork: NewH): NewH {
@@ -236,6 +238,49 @@ export class GlobalConfig<
     )?.name
   }
 
+  nextHardforkBlockOrTimestamp(hardfork?: string | Hardfork): bigint | null {
+    const targetHardfork = hardfork ?? this.activeHardfork
+    const hfs = this._schemaHardforks
+
+    let targetHfIndex = hfs.findIndex((hf) => hf.name === targetHardfork)
+
+    if (targetHardfork === Hardfork.Paris) {
+      targetHfIndex -= 1
+    }
+
+    if (targetHfIndex < 0) {
+      return null
+    }
+
+    const currentHf = hfs[targetHfIndex]
+    const currentBlockOrTimestamp = currentHf.timestamp ?? currentHf.block
+    if (
+      currentBlockOrTimestamp === null ||
+      currentBlockOrTimestamp === undefined
+    ) {
+      return null
+    }
+
+    const nextHf = hfs.slice(targetHfIndex + 1).find((hf) => {
+      const nextBlockOrTimestamp = hf.timestamp ?? hf.block
+      return (
+        nextBlockOrTimestamp !== null &&
+        nextBlockOrTimestamp !== undefined &&
+        nextBlockOrTimestamp !== currentBlockOrTimestamp
+      )
+    })
+    if (nextHf === undefined) {
+      return null
+    }
+
+    const nextBlockOrTimestamp = nextHf.timestamp ?? nextHf.block
+    if (nextBlockOrTimestamp === null || nextBlockOrTimestamp === undefined) {
+      return null
+    }
+
+    return BigInt(nextBlockOrTimestamp)
+  }
+
   getHardforkBy(opts: HardforkByOpts): SchemaH {
     const blockNumber =
       opts.blockNumber !== undefined
@@ -321,6 +366,7 @@ export class GlobalConfig<
     const currentIdx = hardforks.findIndex(
       (hf) => hf.name === this._currentHardfork,
     )
+    // @ts-nocheck
     const targetIdx = hardforks.findIndex((hf) => hf.name === hardfork)
     if (targetIdx === -1) {
       const orderCurrentIdx = HARDFORK_ORDER.findIndex(
@@ -378,29 +424,27 @@ export class GlobalConfig<
     return forkhash
   }
 
-  forkHash(hardfork?: SchemaH, genesisHash?: Uint8Array): PrefixedHexString {
-    hardfork = hardfork ?? (this._currentHardfork as unknown as SchemaH)
-    const data = this.lookupHardfork(hardfork)
-
+  forkHash(
+    hardfork?: string | Hardfork,
+    genesisHash?: Uint8Array,
+  ): PrefixedHexString {
+    hardfork = hardfork ?? this.activeHardfork
+    const data = this.hardforks.find((hf) => hf.name === hardfork)
     if (
-      data === undefined ||
-      (data.block === null && data.timestamp === undefined)
+      data === null ||
+      (data?.block === null && data?.timestamp === undefined)
     ) {
       const msg = 'No fork hash calculation possible for future hardfork'
       throw EthereumJSErrorWithoutCode(msg)
     }
-
-    if (data.forkHash !== null && data.forkHash !== undefined) {
-      return data.forkHash as PrefixedHexString
+    if (data?.forkHash !== null && data?.forkHash !== undefined) {
+      return data.forkHash as `0x${string}`
     }
-
-    if (!genesisHash) {
+    if (!genesisHash)
       throw EthereumJSErrorWithoutCode(
         'genesisHash required for forkHash calculation',
       )
-    }
-
-    return this._calcForkHash(hardfork, genesisHash)
+    return this._calcForkHash(hardfork as unknown as SchemaH, genesisHash)
   }
 
   setForkHashes(genesisHash: Uint8Array): void {
@@ -413,7 +457,7 @@ export class GlobalConfig<
         blockOrTime !== null &&
         blockOrTime !== undefined
       ) {
-        ;(hf as { forkHash: string }).forkHash = this._calcForkHash(
+        ;(hf as { forkHash: string }).forkHash = this.forkHash(
           hf.name as SchemaH,
           genesisHash,
         )

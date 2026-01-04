@@ -60,20 +60,21 @@ function validateVAndExtractChainID(
     }
   }
 
-  // No unsigned tx and EIP-155 activated and chain ID included
-  if (
-    v !== undefined &&
-    v !== 0 &&
-    common.gteHardfork('spuriousDragon') &&
-    v !== 27 &&
-    v !== 28
-  ) {
-    if (!meetsEIP155(BigInt(v), common.chainId())) {
-      throw EthereumJSErrorWithoutCode(
-        `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the GlobalConfig parameter of the Transaction constructor to set the chain id.`,
-      )
+  // Extract chainId from EIP-155 signed txs (v >= 37)
+  // NOTE: We do this regardless of hardfork because:
+  // 1. Modern wallets (like viem) always sign with EIP-155
+  // 2. We need the chainId for correct signature verification
+  // 3. Even pre-spuriousDragon nodes should accept EIP-155 signed txs
+  if (v !== undefined && v !== 0 && v !== 27 && v !== 28) {
+    // Validate chainId matches if we're at spuriousDragon+
+    if (common.gteHardfork('spuriousDragon')) {
+      if (!meetsEIP155(BigInt(v), common.chainId())) {
+        throw EthereumJSErrorWithoutCode(
+          `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the GlobalConfig parameter of the Transaction constructor to set the chain id.`,
+        )
+      }
     }
-    // Derive the original chain ID
+    // Derive the chain ID from v (works for any EIP-155 signed tx)
     let numSub
     if ((v - 35) % 2 === 0) {
       numSub = 35
@@ -156,20 +157,25 @@ export class LegacyTx
       )
     }
 
-    if (this.common.gteHardfork('spuriousDragon')) {
-      if (!this.isSigned()) {
+    // EIP-155 replay protection capability
+    // NOTE: We recognize EIP-155 signed txs regardless of hardfork because:
+    // 1. Modern wallets always sign with EIP-155 (chainId in v)
+    // 2. We need this capability set for correct signature verification
+    // 3. Pre-spuriousDragon nodes should still verify EIP-155 signed txs correctly
+    if (!this.isSigned()) {
+      // For unsigned txs: only enable EIP-155 if hardfork supports it (for signing)
+      if (this.common.gteHardfork('spuriousDragon')) {
         this.activeCapabilities.push(Capability.EIP155ReplayProtection)
-      } else {
-        // EIP155 spec:
-        // If block.number >= 2,675,000 and v = CHAIN_ID * 2 + 35 or v = CHAIN_ID * 2 + 36
-        // then when computing the hash of a transaction for purposes of signing or recovering
-        // instead of hashing only the first six elements (i.e. nonce, gasprice, startgas, to, value, data)
-        // hash nine elements, with v replaced by CHAIN_ID, r = 0 and s = 0.
-        // v and chain ID meet EIP-155 conditions
-        if (meetsEIP155(this.v!, this.common.chainId())) {
-          this.activeCapabilities.push(Capability.EIP155ReplayProtection)
-        }
       }
+    } else {
+      // For signed txs: detect if tx was signed with EIP-155 (v >= 37)
+      // and enable capability accordingly, regardless of current hardfork
+      const v = this.v !== undefined ? Number(this.v) : undefined
+      if (v !== undefined && v >= 37) {
+        // This is an EIP-155 signed tx (v encodes chainId)
+        this.activeCapabilities.push(Capability.EIP155ReplayProtection)
+      }
+      // If v is 27 or 28, it's a pre-EIP-155 signature - don't add capability
     }
 
     const freeze = opts?.freeze ?? true
@@ -349,22 +355,7 @@ export class LegacyTx
       const msg = Legacy.errorMsg(this, 'This transaction is not signed')
       throw EthereumJSErrorWithoutCode(msg)
     }
-    // Detect if this is an EIP-155 signature by checking v value
-    // Pre-EIP-155: v = 27 or 28
-    // EIP-155: v = chainId * 2 + 35 or chainId * 2 + 36
-    const vNum = Number(this.v!)
-    const isEIP155 = vNum !== 27 && vNum !== 28
 
-    if (isEIP155) {
-      // For EIP-155, the signed message includes chainId, 0, 0
-      const message = [
-        ...this.getMessageToSign(),
-        bigIntToUnpaddedBytes(this.common.chainId()),
-        new Uint8Array(0),
-        new Uint8Array(0),
-      ]
-      return this.keccakFunction(RLP.encode(message))
-    }
     return this.getHashedMessageToSign()
   }
 

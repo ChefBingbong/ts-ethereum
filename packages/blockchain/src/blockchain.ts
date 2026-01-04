@@ -560,15 +560,11 @@ export class Blockchain implements BlockchainInterface {
 
     const { number } = header
     if (number !== parentHeader.number + BIGINT_1) {
-      throw EthereumJSErrorWithoutCode(
-        `invalid number ${this.errorStr(header)}`,
-      )
+      throw EthereumJSErrorWithoutCode(`invalid number ${header.number}`)
     }
 
     if (header.timestamp <= parentHeader.timestamp) {
-      throw EthereumJSErrorWithoutCode(
-        `invalid timestamp ${this.errorStr(header)}`,
-      )
+      throw EthereumJSErrorWithoutCode(`invalid timestamp ${header.number}`)
     }
 
     if (!(header.common.consensusType() === 'pos'))
@@ -579,7 +575,7 @@ export class Blockchain implements BlockchainInterface {
       // Timestamp diff between blocks is lower than PERIOD (clique)
       if (parentHeader.timestamp + BigInt(period) > header.timestamp) {
         throw EthereumJSErrorWithoutCode(
-          `invalid timestamp diff (lower than period) ${this.errorStr(header)}`,
+          `invalid timestamp diff (lower than period) ${header.number}`,
         )
       }
     }
@@ -591,7 +587,7 @@ export class Blockchain implements BlockchainInterface {
 
       if (!(dif < BIGINT_8 && dif > BIGINT_1)) {
         throw EthereumJSErrorWithoutCode(
-          `uncle block has a parent that is too old or too young ${this.errorStr(header)}`,
+          `uncle block has a parent that is too old or too young ${header.number}`,
         )
       }
     }
@@ -603,14 +599,15 @@ export class Blockchain implements BlockchainInterface {
       const londonHfBlock = this.common.hardforkBlock(Hardfork.London)
       const isInitialEIP1559Block = number === londonHfBlock
       if (isInitialEIP1559Block) {
-        expectedBaseFee = header.common.getParamByEIP(1559, 'initialBaseFee')
+        expectedBaseFee = BigInt(header.common.param('initialBaseFee') ?? 0n)
       } else {
-        expectedBaseFee = parentHeader.calcNextBaseFee()
+        expectedBaseFee = BigInt(parentHeader.calcNextBaseFee())
       }
 
       if (header.baseFeePerGas! !== expectedBaseFee) {
+        console.log(header.baseFeePerGas!, expectedBaseFee, 'HH')
         throw EthereumJSErrorWithoutCode(
-          `Invalid block: base fee not correct ${this.errorStr(header)}`,
+          `Invalid block: base fee not correct ${header.number}`,
         )
       }
     }
@@ -1446,29 +1443,5 @@ export class Blockchain implements BlockchainInterface {
       },
       { common },
     )
-  }
-
-  errorStr(header: BlockHeader): string {
-    let hash = ''
-    try {
-      hash = bytesToHex(header.hash())
-    } catch {
-      hash = 'error'
-    }
-    let hf = ''
-    try {
-      hf = this.common.hardfork()
-    } catch {
-      hf = 'error'
-    }
-    return `block number=${header.number} hash=${hash} hf=${hf} baseFeePerGas=${header.baseFeePerGas ?? 'none'}`
-  }
-
-  /**
-   * Internal helper function to create an annotated error message
-   * @hidden
-   */
-  protected _errorMsg(msg: string, header: BlockHeader): string {
-    return `${msg} (${this.errorStr(header)})`
   }
 }

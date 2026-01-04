@@ -691,6 +691,7 @@ export class TxPool {
     try {
       await vmCopy.stateManager.setStateRoot(block.stateRoot)
     } catch (error) {
+      console.log(error)
       this.config.options.logger?.error(`Error setting state root: ${error}`)
       return
     }

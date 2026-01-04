@@ -3,7 +3,7 @@ import { Hardfork } from '@ts-ethereum/chain-config'
 import { z, zBigInt, zBytes32 } from '@ts-ethereum/schema'
 import {
   BIGINT_0,
-  BIGINT_2,
+  BIGINT_7,
   bytesToHex,
   bytesToUtf8,
   EthereumJSErrorWithoutCode,
@@ -22,21 +22,25 @@ import {
 } from './schema'
 
 export function createBlockHeaderSchema(opts: {
+  header: HeaderData
   common: GlobalConfig
   validateConsensus?: boolean
 }) {
   const { common, validateConsensus = true } = opts
 
-  // Build the schema with all validations
   return zCoreHeaderSchema
     .extend({
       // EIP-1559: baseFeePerGas (default is BIGINT_2 for non-London blocks)
       baseFeePerGas: common.isActivatedEIP(1559)
-        ? zBigInt({ defaultValue: BIGINT_2 })
+        ? zBigInt({
+            defaultValue:
+              opts.header.number === common.hardforkBlock(Hardfork.London)
+                ? common.param('initialBaseFee')
+                : BIGINT_7,
+          })
         : zOptionalBigInt.refine((val) => val === undefined, {
             message: 'baseFeePerGas cannot be set before EIP-1559',
           }),
-
       // EIP-4895: withdrawalsRoot
       withdrawalsRoot: common.isActivatedEIP(4895)
         ? zBytes32({ defaultValue: KECCAK256_RLP })
