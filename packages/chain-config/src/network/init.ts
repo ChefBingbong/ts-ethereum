@@ -1,6 +1,7 @@
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
+import { createHardforkManager, HardforkEntry } from 'src/config/functional'
 import { schemaFromChainConfig } from '../builder'
 import { GlobalConfig } from '../config'
 import type { GenesisState } from '../genesis/types'
@@ -109,6 +110,21 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     hardfork: chainConfig.defaultHardfork,
   })
 
+  const hardforkManager = createHardforkManager({
+    hardforks: chainConfig.hardforks.map(
+      (hf) =>
+        ({
+          block: hf.block,
+          timestamp: hf.timestamp,
+          forkHash: hf.forkHash,
+          optional: hf.optional,
+          name: hf.name,
+        }) as HardforkEntry,
+    ),
+    chainId: BigInt(chainConfig.chainId),
+    chain: chainConfig,
+  })
+
   const nodeAccountAddress = createAddressFromString(nodeAccount[0])
 
   const config = {
@@ -151,6 +167,7 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     useP2PServer: args.useP2PServer,
     node: args.node,
     metrics: args.metrics,
+    hardforkManager,
   }
 
   return config

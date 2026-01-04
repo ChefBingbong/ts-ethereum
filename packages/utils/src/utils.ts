@@ -1,17 +1,17 @@
-import os from 'node:os'
-import path from 'node:path'
 import type { Multiaddr } from '@multiformats/multiaddr'
 import { CODE_UNIX, multiaddr } from '@multiformats/multiaddr'
 import { Unix } from '@multiformats/multiaddr-matcher'
 import { RLP } from '@ts-ethereum/rlp'
 import debug from 'debug'
-import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import { publicKeyConvert } from 'ethereum-cryptography/secp256k1-compat.js'
+import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import type {
   IpcSocketConnectOpts,
   ListenOptions,
   TcpSocketConnectOpts,
 } from 'net'
+import os from 'node:os'
+import path from 'node:path'
 import { bytesToHex, bytesToUnprefixedHex, concatBytes, equalsBytes } from '.'
 import { getNetConfig } from './getNetConfig'
 
@@ -413,4 +413,24 @@ export function parseWithBigInt(jsonString: string): unknown {
     }
     return value
   })
+}
+
+export function deepFreeze<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+
+  if (obj instanceof Map || obj instanceof Set) {
+    return Object.freeze(obj) as T
+  }
+
+  const propNames = Object.getOwnPropertyNames(obj)
+  for (const name of propNames) {
+    const value = (obj as Record<string, unknown>)[name]
+    if (value && typeof value === 'object') {
+      deepFreeze(value)
+    }
+  }
+
+  return Object.freeze(obj)
 }
