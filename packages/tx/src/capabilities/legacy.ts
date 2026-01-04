@@ -123,7 +123,7 @@ export function hash(tx: LegacyTxInterface): Uint8Array {
     throw EthereumJSErrorWithoutCode(msg)
   }
 
-  const keccakFunction = keccak256
+  const keccakFunction = tx.common.customCrypto?.keccak256 ?? keccak256
 
   if (Object.isFrozen(tx)) {
     tx.cache.hash ??= keccakFunction(tx.serialize())
@@ -168,12 +168,6 @@ export function getSenderPublicKey(tx: LegacyTxInterface): Uint8Array {
   const { v, r, s } = tx
 
   validateHighS(tx)
-  // Detect if this is an EIP-155 signature by checking v value
-  // Pre-EIP-155: v = 27 or 28
-  // EIP-155: v = chainId * 2 + 35 or chainId * 2 + 36
-  const vNum = Number(v!)
-  const isEIP155 = vNum !== 27 && vNum !== 28
-  const chainId = isEIP155 ? tx.common.chainId() : undefined
 
   try {
     const ecrecoverFunction = tx.common.customCrypto?.ecrecover ?? ecrecover
@@ -182,7 +176,9 @@ export function getSenderPublicKey(tx: LegacyTxInterface): Uint8Array {
       v!,
       bigIntToUnpaddedBytes(r!),
       bigIntToUnpaddedBytes(s!),
-      chainId,
+      tx.supports(Capability.EIP155ReplayProtection)
+        ? tx.common.chainId()
+        : undefined,
     )
     if (Object.isFrozen(tx)) {
       tx.cache.senderPubKey = sender

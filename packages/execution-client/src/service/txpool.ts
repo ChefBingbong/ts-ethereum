@@ -691,6 +691,7 @@ export class TxPool {
     try {
       await vmCopy.stateManager.setStateRoot(block.stateRoot)
     } catch (error) {
+      console.log(error)
       this.config.options.logger?.error(`Error setting state root: ${error}`)
       return
     }
@@ -1311,7 +1312,7 @@ export class TxPool {
    * @param tx The tx
    * @param baseFee Unused for legacy transactions
    */
-  private normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint) {
+  protected normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint) {
     return (tx as LegacyTx).gasPrice
   }
 

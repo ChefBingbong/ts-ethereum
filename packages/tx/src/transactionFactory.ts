@@ -4,17 +4,33 @@ import {
   fetchFromProvider,
   getProvider,
 } from '@ts-ethereum/utils'
-import { createFeeMarket1559TxFromRLP } from './1559/constructors'
-import { createAccessList2930TxFromRLP } from './2930/constructors'
-import { createBlob4844TxFromRLP } from './4844/constructors'
-import { createEOACode7702TxFromRLP } from './7702/constructors'
+import {
+  createFeeMarket1559Tx,
+  createFeeMarket1559TxFromRLP,
+} from './1559/constructors'
+import {
+  createAccessList2930Tx,
+  createAccessList2930TxFromRLP,
+} from './2930/constructors'
+import { createBlob4844Tx, createBlob4844TxFromRLP } from './4844/constructors'
+import {
+  createEOACode7702Tx,
+  createEOACode7702TxFromRLP,
+} from './7702/constructors'
 import {
   createLegacyTx,
   createLegacyTxFromBytesArray,
   createLegacyTxFromRLP,
 } from './legacy/constructors'
 import type { Transaction, TxData, TxOptions, TypedTxData } from './types'
-import { TransactionType } from './types'
+import {
+  isAccessList2930TxData,
+  isBlob4844TxData,
+  isEOACode7702TxData,
+  isFeeMarket1559TxData,
+  isLegacyTxData,
+  TransactionType,
+} from './types'
 import { normalizeTxParams } from './util/general'
 /**
  * Create a transaction from a `txData` object
@@ -26,27 +42,26 @@ export function createTx<T extends TransactionType>(
   txData: TypedTxData,
   txOptions: TxOptions = {},
 ): Transaction[T] {
-  // if (!('type' in txData) || txData.type === undefined) {
-  //   // Assume legacy transaction
-  //   return createLegacyTx(txData, txOptions) as Transaction[T]
-  // } else {
-  //   if (isLegacyTxData(txData)) {
-  //     return createLegacyTx(txData, txOptions) as Transaction[T]
-  //   } else if (isAccessList2930TxData(txData)) {
-  //     return createAccessList2930Tx(txData, txOptions) as Transaction[T]
-  //   } else if (isFeeMarket1559TxData(txData)) {
-  //     return createFeeMarket1559Tx(txData, txOptions) as Transaction[T]
-  //   } else if (isBlob4844TxData(txData)) {
-  //     return createBlob4844Tx(txData, txOptions) as Transaction[T]
-  //   } else if (isEOACode7702TxData(txData)) {
-  //     return createEOACode7702Tx(txData, txOptions) as Transaction[T]
-  //   } else {
-  //     throw EthereumJSErrorWithoutCode(
-  //       `Tx instantiation with type ${(txData as TypedTxData)?.type} not supported`,
-  //     )
-  //   }
-  // }
-  return createLegacyTx(txData, txOptions) as Transaction[T]
+  if (!('type' in txData) || txData.type === undefined) {
+    // Assume legacy transaction
+    return createLegacyTx(txData, txOptions) as Transaction[T]
+  } else {
+    if (isLegacyTxData(txData)) {
+      return createLegacyTx(txData, txOptions) as Transaction[T]
+    } else if (isAccessList2930TxData(txData)) {
+      return createAccessList2930Tx(txData, txOptions) as Transaction[T]
+    } else if (isFeeMarket1559TxData(txData)) {
+      return createFeeMarket1559Tx(txData, txOptions) as Transaction[T]
+    } else if (isBlob4844TxData(txData)) {
+      return createBlob4844Tx(txData, txOptions) as Transaction[T]
+    } else if (isEOACode7702TxData(txData)) {
+      return createEOACode7702Tx(txData, txOptions) as Transaction[T]
+    } else {
+      throw EthereumJSErrorWithoutCode(
+        `Tx instantiation with type ${(txData as TypedTxData)?.type} not supported`,
+      )
+    }
+  }
 }
 
 /**

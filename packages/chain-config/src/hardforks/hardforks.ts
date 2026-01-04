@@ -77,15 +77,8 @@ export const HARDFORK_EIPS = {
 
   muirGlacier: [EIP.EIP_2384],
 
-  berlin: [EIP.EIP_2565, EIP.EIP_2929, EIP.EIP_2930],
-
-  london: [
-    EIP.EIP_1559,
-    EIP.EIP_3198,
-    EIP.EIP_3529,
-    EIP.EIP_3541,
-    EIP.EIP_3554,
-  ],
+  berlin: [EIP.EIP_2565, EIP.EIP_2929, EIP.EIP_2930, EIP.EIP_2718],
+  london: [EIP.EIP_1559, EIP.EIP_3198, EIP.EIP_3529, EIP.EIP_3541],
 
   arrowGlacier: [EIP.EIP_4345],
 

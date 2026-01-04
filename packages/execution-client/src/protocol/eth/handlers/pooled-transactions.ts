@@ -23,7 +23,11 @@ export function handlePooledTransactions(
   try {
     const decoded = ETH_MESSAGES[EthMessageCode.POOLED_TRANSACTIONS].decode(
       payload as any,
-      { chainCommon: handler.config.chainCommon },
+      {
+        chainCommon: handler.config.chainCommon,
+        chain: { headers: { latest: handler.chain.blocks.latest?.header } },
+        syncTargetHeight: handler.config.syncTargetHeight,
+      },
     ) as { reqId: bigint; txs: unknown[] } | [bigint, unknown[]]
 
     // Handle both object and tuple formats

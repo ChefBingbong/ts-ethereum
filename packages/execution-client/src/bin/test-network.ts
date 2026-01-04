@@ -32,7 +32,7 @@ const ACCOUNT_SEEDS = [
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
   chainId: 12345n,
-  defaultHardfork: 'tangerineWhistle',
+  defaultHardfork: 'london',
   consensus: {
     type: 'pow',
     algorithm: 'ethash',
@@ -46,9 +46,17 @@ export const customChainConfig: ChainConfig = {
   },
   hardforks: [
     { name: 'chainstart', block: 0n },
-    { name: 'homestead', block: 2n },
-    { name: 'dao', block: 3n },
-    { name: 'tangerineWhistle', block: 4n },
+    { name: 'homestead', block: 0n },
+    { name: 'dao', block: 0n },
+    { name: 'tangerineWhistle', block: 0n },
+    { name: 'spuriousDragon', block: 5n },
+    { name: 'byzantium', block: 6n },
+    { name: 'constantinople', block: 7n },
+    { name: 'petersburg', block: 8n },
+    { name: 'istanbul', block: 9n },
+    { name: 'muirGlacier', block: 10n },
+    { name: 'berlin', block: 11n },
+    { name: 'london', block: 12n },
   ],
   bootstrapNodes: [],
 }
@@ -81,7 +89,7 @@ async function startClient() {
   const cleanStart = process.env.CLEAN === 'true'
   const isMiner = [8002, 8001].includes(port)
   const isBootnode = port === BOOTNODE_PORT
-  const nodeLogger: Logger | undefined = getLogger()
+  const nodeLogger: Logger | undefined = getLogger({ logLevel: 'debug' })
 
   const _clientConfig = await initClientConfig({
     dataDir: process.env.DATA_DIR || `${SHARED_DIR}/node-${port}`,
@@ -119,6 +127,7 @@ async function startClient() {
     validateConsensus: true,
     genesisState: genesisState as any,
   })
+  clientConfig.common.setForkHashes(blockchain.genesisBlock.hash())
 
   const node = await ExecutionNode.init({
     config,

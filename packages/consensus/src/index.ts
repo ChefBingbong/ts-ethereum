@@ -297,7 +297,22 @@ export class Ethash {
   }
 
   headerHash(rawHeader: Uint8Array[]) {
-    return keccak256(RLP.encode(rawHeader.slice(0, -2)))
+    // For PoW hash, we need all fields EXCEPT mixHash (pos 13) and nonce (pos 14)
+    // The raw header layout is:
+    //   [0..12]: parentHash through extraData
+    //   [13]: mixHash (PoW solution - exclude)
+    //   [14]: nonce (PoW solution - exclude)
+    //   [15+]: EIP fields (baseFeePerGas, withdrawalsRoot, etc. - include)
+    //
+    // Pre-EIP-1559: slice(0, -2) works because mixHash/nonce are the last 2 elements
+    // EIP-1559+: slice(0, -2) is WRONG because baseFeePerGas comes AFTER mixHash/nonce
+    //
+    // Fix: explicitly exclude positions 13-14, include everything else
+    const hashInput = [
+      ...rawHeader.slice(0, 13), // Elements 0-12 (parentHash through extraData)
+      ...rawHeader.slice(15), // Elements 15+ (baseFeePerGas, withdrawalsRoot, etc.)
+    ]
+    return keccak256(RLP.encode(hashInput))
   }
 
   /**

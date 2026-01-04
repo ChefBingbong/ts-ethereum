@@ -1,7 +1,9 @@
 import type { Block, HeaderData } from '@ts-ethereum/block'
+import { Hardfork } from '@ts-ethereum/chain-config'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
   BIGINT_1,
+  BIGINT_2,
   bigIntToUnpaddedBytes,
   bytesToHex,
   bytesToUnprefixedHex,
@@ -129,9 +131,23 @@ export class PendingBlock {
     headerData: Partial<HeaderData> = {},
   ) {
     const number = parentBlock.header.number + BIGINT_1
-    const { timestamp, mixHash, coinbase } = headerData
-    const { gasLimit } = parentBlock.header
+    const { timestamp, mixHash, parentBeaconBlockRoot, coinbase } = headerData
     const parentHash = bytesToUnprefixedHex(parentBlock.hash())
+
+    let { gasLimit } = parentBlock.header
+
+    vm.common.setHardforkBy({
+      blockNumber: number,
+      timestamp,
+    })
+
+    const baseFeePerGas = parentBlock.header.common.isActivatedEIP(1559)
+      ? parentBlock.header.calcNextBaseFee()
+      : undefined
+
+    if (number === vm.common.hardforkBlock(Hardfork.London)) {
+      gasLimit = gasLimit * BIGINT_2
+    }
 
     // payload is uniquely defined by timestamp, parent and mixHash, gasLimit can also be
     // potentially included in the fcU in future and can be safely added in uniqueness calc
@@ -178,13 +194,17 @@ export class PendingBlock {
 
     const builder = await buildBlock(vm, {
       parentBlock,
+      // excessBlobGas will be correctly calculated and set in buildBlock constructor,
+      // unless already explicity provided in headerData
       headerData: {
         ...headerData,
         number,
         gasLimit,
+        baseFeePerGas,
       },
       blockOpts: {
         putBlockIntoBlockchain: false,
+        setHardfork: true,
       },
     })
 

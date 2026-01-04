@@ -110,14 +110,14 @@ export class BlockBuilder {
     }
     this.withdrawals = opts.withdrawals?.map(createWithdrawal)
 
+    console.log(this.headerData.baseFeePerGas, 'baseFeePerGas', this.headerData)
     if (
       this.vm.common.isActivatedEIP(1559) &&
       typeof this.headerData.baseFeePerGas === 'undefined'
     ) {
       if (this.headerData.number === vm.common.hardforkBlock(Hardfork.London)) {
-        this.headerData.baseFeePerGas = vm.common.getParamByEIP(
-          1559,
-          'initialBaseFee',
+        this.headerData.baseFeePerGas = BigInt(
+          vm.common.getParamByEIP(1559, 'initialBaseFee'),
         )
       } else {
         this.headerData.baseFeePerGas =

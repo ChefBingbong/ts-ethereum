@@ -9,16 +9,24 @@ import {
 } from '@ts-ethereum/block'
 import { RLP } from '@ts-ethereum/rlp'
 import {
+  createBlob4844TxFromSerializedNetworkWrapper,
   createTxFromBlockBodyData,
   createTxFromRLP,
+  isAccessList2930Tx,
+  isBlob4844Tx,
+  isEOACode7702Tx,
+  isFeeMarket1559Tx,
   isLegacyTx,
+  TransactionType,
   type TypedTransaction,
 } from '@ts-ethereum/tx'
 import {
+  BIGINT_0,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
   bytesToHex,
   bytesToInt,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   intToUnpaddedBytes,
   isNestedUint8Array,
@@ -33,6 +41,10 @@ import {
 import type { TxReceiptWithType } from '../../../execution/receipt'
 
 type Log = [address: Uint8Array, topics: Uint8Array[], data: Uint8Array]
+
+function exhaustiveTypeGuard(_value: never, errorMsg: string): never {
+  throw EthereumJSErrorWithoutCode(errorMsg)
+}
 
 export const ETH_PROTOCOL_NAME = 'eth' as const
 
@@ -172,16 +184,35 @@ export const ETH_MESSAGES = {
     encode: (txs: TypedTransaction[]) => {
       const serializedTxs = []
       for (const tx of txs) {
+        // Don't automatically broadcast blob transactions - they should only be announced using NewPooledTransactionHashes
+        if (isBlob4844Tx(tx)) continue
         serializedTxs.push(tx.serialize())
       }
       return serializedTxs
     },
     decode: (
       txs: Uint8Array[],
-      config: { synchronized: boolean; chainCommon: any },
+      config: {
+        synchronized: boolean
+        chainCommon: any
+        chain?: {
+          headers: { latest?: { number?: bigint; timestamp?: bigint } }
+        }
+        syncTargetHeight?: bigint
+      },
     ) => {
       if (!config.synchronized) return
       const common = config.chainCommon.copy()
+      common.setHardforkBy({
+        blockNumber:
+          config.chain?.headers.latest?.number ?? // Use latest header number if available OR
+          config.syncTargetHeight ?? // Use sync target height if available OR
+          common.hardforkBlock(common.hardfork()) ?? // Use current hardfork block number OR
+          BIGINT_0, // Use chainstart,
+        timestamp:
+          config.chain?.headers.latest?.timestamp ??
+          BigInt(Math.floor(Date.now() / 1000)),
+      })
       return txs.map((txData) => createTxFromRLP(txData, { common }))
     },
   },
@@ -201,6 +232,7 @@ export const ETH_MESSAGES = {
     ) => [
       createBlockFromBytesArray(block, {
         common: config.chainCommon,
+        setHardfork: true,
       }),
       td,
     ],
@@ -262,7 +294,10 @@ export const ETH_MESSAGES = {
       bytesToBigInt(reqId),
       headers.map((h) => {
         const common = config.chainCommon
-        const header = createBlockHeaderFromBytesArray(h, { common })
+        const header = createBlockHeaderFromBytesArray(h, {
+          common,
+          setHardfork: true,
+        })
         return header
       }),
     ],
@@ -452,8 +487,25 @@ export const ETH_MESSAGES = {
     encode: ({ reqId, txs }: { reqId: bigint; txs: TypedTransaction[] }) => {
       const serializedTxs = []
       for (const tx of txs) {
-        if (isLegacyTx(tx)) {
+        // serialize txs as per type
+        if (isBlob4844Tx(tx)) {
+          serializedTxs.push(tx.serializeNetworkWrapper())
+        } else if (
+          isFeeMarket1559Tx(tx) ||
+          isAccessList2930Tx(tx) ||
+          isEOACode7702Tx(tx)
+        ) {
+          serializedTxs.push(tx.serialize())
+        } else if (isLegacyTx(tx)) {
           serializedTxs.push(tx.raw())
+        } else {
+          // Dual use for this typeguard:
+          // 1. to enable typescript to throw build errors if any tx is missing above
+          // 2. to throw error in runtime if some corruption happens
+          exhaustiveTypeGuard(
+            tx,
+            `Invalid transaction type=${(tx as TypedTransaction).type}`,
+          )
         }
       }
 
@@ -461,13 +513,36 @@ export const ETH_MESSAGES = {
     },
     decode: (
       [reqId, txs]: [Uint8Array, any[]],
-      config: { chainCommon: any },
+      config: {
+        chainCommon: any
+        chain?: {
+          headers: { latest?: { number?: bigint; timestamp?: bigint } }
+        }
+        syncTargetHeight?: bigint
+      },
     ) => {
       const common = config.chainCommon.copy()
+      common.setHardforkBy({
+        blockNumber:
+          config.chain?.headers.latest?.number ?? // Use latest header number if available OR
+          config.syncTargetHeight ?? // Use sync target height if available OR
+          common.hardforkBlock(common.hardfork()) ?? // Use current hardfork block number OR
+          BIGINT_0, // Use chainstart,
+        timestamp:
+          config.chain?.headers.latest?.timestamp ??
+          BigInt(Math.floor(Date.now() / 1000)),
+      })
       return [
         bytesToBigInt(reqId),
         txs.map((txData) => {
-          return createTxFromBlockBodyData(txData, { common })
+          // Blob transactions are deserialized with network wrapper
+          if (txData[0] === TransactionType.BlobEIP4844) {
+            return createBlob4844TxFromSerializedNetworkWrapper(txData, {
+              common,
+            })
+          } else {
+            return createTxFromBlockBodyData(txData, { common })
+          }
         }),
       ]
     },

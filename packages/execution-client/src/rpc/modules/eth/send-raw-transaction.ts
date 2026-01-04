@@ -1,5 +1,8 @@
-import type { TypedTransaction } from '@ts-ethereum/tx'
-import { createTxFromRLP } from '@ts-ethereum/tx'
+import {
+  createBlob4844TxFromSerializedNetworkWrapper,
+  createTxFromRLP,
+  NetworkWrapperType,
+} from '@ts-ethereum/tx'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
@@ -27,17 +30,51 @@ export const sendRawTransaction = (node: ExecutionNode) => {
           ),
         )
       }
+      const common = node.config.chainCommon.copy()
+
       const chainHeight = node.chain.headers.height
       let txTargetHeight = syncTargetHeight ?? BIGINT_0
       if (txTargetHeight <= chainHeight) {
         txTargetHeight = chainHeight + BIGINT_1
       }
-      const common = node.config.chainCommon.copy()
 
-      let tx: TypedTransaction
+      common.setHardforkBy({
+        blockNumber: txTargetHeight,
+        timestamp: Math.floor(Date.now() / 1000),
+      })
+
+      let tx
       try {
         const txBuf = hexToBytes(serializedTx)
-        tx = createTxFromRLP(txBuf, { common })
+        if (txBuf[0] === 0x03) {
+          // Blob Transactions sent over RPC are expected to be in Network Wrapper format
+          tx = createBlob4844TxFromSerializedNetworkWrapper(txBuf, { common })
+          if (
+            common.isActivatedEIP(7594) &&
+            tx.networkWrapperVersion !== NetworkWrapperType.EIP7594
+          ) {
+            return safeError(
+              new Error(
+                `tx with networkWrapperVersion=${tx.networkWrapperVersion} sent for EIP-7594 activated hardfork=${common.hardfork()}`,
+              ),
+            )
+          }
+
+          const blobGasLimit = tx.common.param('maxBlobGasPerBlock')
+          const blobGasPerBlob = tx.common.param('blobGasPerBlob')
+
+          if (BigInt((tx.blobs ?? []).length) * blobGasPerBlob > blobGasLimit) {
+            return safeError(
+              new Error(
+                `tx blobs=${(tx.blobs ?? []).length} exceeds block limit=${
+                  blobGasLimit / blobGasPerBlob
+                }`,
+              ),
+            )
+          }
+        } else {
+          tx = createTxFromRLP(txBuf, { common })
+        }
       } catch (e: any) {
         return safeError(
           new Error(`serialized tx data could not be parsed (${e.message})`),
@@ -48,23 +85,23 @@ export const sendRawTransaction = (node: ExecutionNode) => {
         return safeError(new Error('tx needs to be signed'))
       }
 
-      const { txPool } = node
+      // Add the tx to own tx pool
+      const txPool = node.txPool
 
       try {
         await txPool.add(tx, true)
       } catch (error: any) {
-        return safeError(new Error(error.message ?? error.toString()))
+        return safeError(new Error(error.message))
       }
 
-      const network = node.network
+      const peerCount = node.network.core.getPeerCount()
       if (
-        network.core.getPeerCount() === 0 &&
+        peerCount === 0 &&
         !node.config.options.mine &&
         node.config.options.isSingleNode === false
       ) {
         return safeError(new Error('no peer connection available'))
       }
-
       txPool.broadcastTransactions([tx])
 
       return safeResult(bytesToHex(tx.hash()))

@@ -96,6 +96,8 @@ export class FullSynchronizer extends Synchronizer {
     const { height: number, td } = this.chain.blocks
     const hash = this.chain.blocks.latest!.hash()
     this.startingBlock = number
+    const timestamp = this.chain.blocks.latest?.header.timestamp
+    this.config.chainCommon.setHardforkBy({ blockNumber: number, timestamp })
 
     this.config.options.logger?.info(
       `Latest local block number=${Number(number)} td=${td} hash=${short(
@@ -321,6 +323,12 @@ export class FullSynchronizer extends Synchronizer {
     ) {
       // If new block is child of current chain tip, insert new block into chain
       await this.chain.putBlocks([block])
+      // Remove included txs from TxPool (was missing - caused pending count to not update on non-miners)
+      this.txPool.removeNewBlockTxs([block])
+      // Clear nonce cache for affected addresses and re-evaluate pool state
+      for (const tx of block.transactions) {
+        this.txPool.clearNonceCache(tx.getSenderAddress().toString().slice(2))
+      }
       // Check if new sync target height can be set
       const blockNumber = block.header.number
       if (

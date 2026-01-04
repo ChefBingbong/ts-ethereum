@@ -257,7 +257,7 @@ export class EVM implements EVMInterface {
 
   protected readonly _emit: (topic: string, data: any) => Promise<void>
 
-  private _bn254: EVMBN254Interface
+  protected _bn254: EVMBN254Interface
 
   /**
    *

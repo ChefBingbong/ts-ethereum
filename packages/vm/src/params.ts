@@ -45,6 +45,7 @@ export const paramsVM: ParamsDict = {
 .  */
   1559: {
     // gasConfig
+    baseFeeMaxChangeDenominator: 8, // Maximum base fee change denominator
     elasticityMultiplier: 2, // Maximum block gas target elasticity
     initialBaseFee: 1000000000, // Initial base fee on first EIP1559 block
   },
