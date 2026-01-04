@@ -1312,7 +1312,7 @@ export class TxPool {
    * @param tx The tx
    * @param baseFee Unused for legacy transactions
    */
-  private normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint) {
+  protected normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint) {
     return (tx as LegacyTx).gasPrice
   }
 

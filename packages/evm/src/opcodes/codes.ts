@@ -391,7 +391,7 @@ function createOpcodes(opcodes: OpcodeEntryFee): OpcodeList {
   const result: OpcodeList = new Map()
   for (const [key, value] of Object.entries(opcodes)) {
     const code = Number.parseInt(key, 10)
-    if (isNaN(value.fee)) value.fee = 0
+    if (Number.isNaN(value.fee)) value.fee = 0
     result.set(
       code,
       new Opcode({

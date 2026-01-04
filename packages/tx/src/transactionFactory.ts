@@ -62,7 +62,6 @@ export function createTx<T extends TransactionType>(
       )
     }
   }
-  return createLegacyTx(txData, txOptions) as Transaction[T]
 }
 
 /**

@@ -1,12 +1,12 @@
 import {
-  EthereumJSErrorWithoutCode,
-  TypeOutput,
   bytesToHex,
   concatBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   intToBytes,
-  toType,
   type PrefixedHexString,
+  TypeOutput,
+  toType,
 } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { ConsensusAlgorithm, ConsensusType } from '../chains'
