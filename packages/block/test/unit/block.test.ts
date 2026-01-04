@@ -2,6 +2,7 @@ import {
   GlobalConfig,
   Hardfork,
   mainnetSchema,
+  paramsBlock,
 } from '@ts-ethereum/chain-config'
 import { createLegacyTx } from '@ts-ethereum/tx'
 import { bytesToHex, equalsBytes, hexToBytes } from '@ts-ethereum/utils'
@@ -15,7 +16,6 @@ import {
   createBlockFromRPC,
   createEmptyBlock,
   genTransactionsTrieRoot,
-  paramsBlock,
 } from '../../src/index.ts'
 import { genesisHashesTestData } from './testdata/genesisHashesTest.ts'
 import { testdataFromRPCGoerliData } from './testdata/testdata-from-rpc-goerli.ts'
@@ -243,5 +243,77 @@ describe('[Block]: block functions', () => {
       undefined,
       'input length must be 3 or less',
     )
+  })
+
+  it('should throw on too many uncle headers (Zod validation)', () => {
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
+      hardfork: Hardfork.Chainstart,
+    })
+
+    // Create 3 mock uncle headers
+    const uncleHeaders = [
+      { number: 1n, parentHash: new Uint8Array(32) },
+      { number: 2n, parentHash: new Uint8Array(32) },
+      { number: 3n, parentHash: new Uint8Array(32) },
+    ]
+
+    assert.throws(
+      () => {
+        createBlock({ uncleHeaders }, { common })
+      },
+      /too many uncle headers/,
+      undefined,
+      'should throw on more than 2 uncle headers',
+    )
+  })
+
+  it('should throw on withdrawals before EIP-4895 (Zod validation)', () => {
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
+      hardfork: Hardfork.Chainstart, // Pre-Shanghai (no EIP-4895)
+    })
+
+    assert.throws(
+      () => {
+        createBlock({ withdrawals: [] }, { common })
+      },
+      /Cannot have a withdrawals field if EIP 4895 is not active/,
+      undefined,
+      'should throw when withdrawals are provided before EIP-4895',
+    )
+  })
+
+  it('should allow withdrawals after EIP-4895 (Zod validation)', () => {
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
+      hardfork: Hardfork.Shanghai, // EIP-4895 activated
+    })
+
+    assert.doesNotThrow(() => {
+      createBlock({ withdrawals: [] }, { common })
+    }, 'should allow empty withdrawals array when EIP-4895 is active')
+
+    // Verify default withdrawals are set when EIP-4895 is active
+    const block = createBlock({}, { common })
+    assert.isDefined(block.withdrawals, 'withdrawals should be defined')
+    assert.deepEqual(
+      block.withdrawals,
+      [],
+      'withdrawals should default to empty array',
+    )
+  })
+
+  it('should validate uncle headers correctly via validateUncles()', () => {
+    const common = GlobalConfig.fromSchema({
+      schema: mainnetSchema,
+      hardfork: Hardfork.Chainstart,
+    })
+
+    // Create a non-genesis block with no uncles
+    const block = createBlock({ header: { number: 1n } }, { common })
+    assert.doesNotThrow(() => {
+      block.validateUncles()
+    }, 'should pass validation with no uncles')
   })
 })

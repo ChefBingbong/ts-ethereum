@@ -25,7 +25,7 @@ export class CasperConsensus implements Consensus {
     // blockchain along adding new blocks or headers
     if (header.difficulty !== BIGINT_0) {
       const msg = 'invalid difficulty.  PoS blocks must have difficulty 0'
-      throw Error(`${msg} ${header.errorStr()}`)
+      throw Error(msg)
     }
   }
   public async newBlock(): Promise<void> {}

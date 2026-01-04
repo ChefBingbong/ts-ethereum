@@ -25,7 +25,7 @@ import {
   publicActions,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { paramsBlock } from '../packages/block/src'
+import { paramsBlock } from '../packages/chain-config/src'
 import {
   Config,
   createConfigOptions,
@@ -580,7 +580,6 @@ async function checkTransactionProcessing(): Promise<{
     details.push(`Tx sent: ${truncateHex(txHash)}`)
 
     // Mine blocks and allow state to flush
-    await node1.node.miner.assembleBlock()
     await sleep(500)
     await node1.node.miner.assembleBlock()
     await sleep(500)

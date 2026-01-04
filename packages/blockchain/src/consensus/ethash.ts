@@ -51,7 +51,7 @@ export class EthashConsensus implements Consensus {
     }
     const parentHeader = await this.blockchain['_getHeader'](header.parentHash)
     if (header.ethashCanonicalDifficulty(parentHeader) !== header.difficulty) {
-      throw new Error(`invalid difficulty ${header.errorStr()}`)
+      throw new Error(`invalid difficulty`)
     }
     this.DEBUG &&
       this._debug(

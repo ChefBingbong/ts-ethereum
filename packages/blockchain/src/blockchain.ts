@@ -560,11 +560,15 @@ export class Blockchain implements BlockchainInterface {
 
     const { number } = header
     if (number !== parentHeader.number + BIGINT_1) {
-      throw EthereumJSErrorWithoutCode(`invalid number ${header.errorStr()}`)
+      throw EthereumJSErrorWithoutCode(
+        `invalid number ${this.errorStr(header)}`,
+      )
     }
 
     if (header.timestamp <= parentHeader.timestamp) {
-      throw EthereumJSErrorWithoutCode(`invalid timestamp ${header.errorStr()}`)
+      throw EthereumJSErrorWithoutCode(
+        `invalid timestamp ${this.errorStr(header)}`,
+      )
     }
 
     if (!(header.common.consensusType() === 'pos'))
@@ -575,7 +579,7 @@ export class Blockchain implements BlockchainInterface {
       // Timestamp diff between blocks is lower than PERIOD (clique)
       if (parentHeader.timestamp + BigInt(period) > header.timestamp) {
         throw EthereumJSErrorWithoutCode(
-          `invalid timestamp diff (lower than period) ${header.errorStr()}`,
+          `invalid timestamp diff (lower than period) ${this.errorStr(header)}`,
         )
       }
     }
@@ -587,7 +591,7 @@ export class Blockchain implements BlockchainInterface {
 
       if (!(dif < BIGINT_8 && dif > BIGINT_1)) {
         throw EthereumJSErrorWithoutCode(
-          `uncle block has a parent that is too old or too young ${header.errorStr()}`,
+          `uncle block has a parent that is too old or too young ${this.errorStr(header)}`,
         )
       }
     }
@@ -606,7 +610,7 @@ export class Blockchain implements BlockchainInterface {
 
       if (header.baseFeePerGas! !== expectedBaseFee) {
         throw EthereumJSErrorWithoutCode(
-          `Invalid block: base fee not correct ${header.errorStr()}`,
+          `Invalid block: base fee not correct ${this.errorStr(header)}`,
         )
       }
     }
@@ -1442,5 +1446,29 @@ export class Blockchain implements BlockchainInterface {
       },
       { common },
     )
+  }
+
+  errorStr(header: BlockHeader): string {
+    let hash = ''
+    try {
+      hash = bytesToHex(header.hash())
+    } catch {
+      hash = 'error'
+    }
+    let hf = ''
+    try {
+      hf = this.common.hardfork()
+    } catch {
+      hf = 'error'
+    }
+    return `block number=${header.number} hash=${hash} hf=${hf} baseFeePerGas=${header.baseFeePerGas ?? 'none'}`
+  }
+
+  /**
+   * Internal helper function to create an annotated error message
+   * @hidden
+   */
+  protected _errorMsg(msg: string, header: BlockHeader): string {
+    return `${msg} (${this.errorStr(header)})`
   }
 }

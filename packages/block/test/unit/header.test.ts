@@ -199,7 +199,7 @@ describe('[Block]: Header functions', () => {
     })
     const genesis = createBlock({}, { common })
 
-    const number = 1
+    const number = 1n
     const parentHash = genesis.hash()
     const timestamp = Date.now()
     const { gasLimit } = genesis.header

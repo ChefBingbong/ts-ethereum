@@ -17,3 +17,21 @@ export const zBytes32 = (
     defaultValue: options.defaultValue ?? new Uint8Array(32),
     errorMessage: options.errorMessage,
   })
+
+export const zBytes = (
+  byteLength: number,
+  defaultValue: Uint8Array,
+  errorMessage?: string,
+) =>
+  zFlexibleType({
+    outputType: TypeOutput.Uint8Array,
+    byteLength,
+    defaultValue,
+    errorMessage,
+  })
+
+export const zBytesVar = (defaultValue: Uint8Array) =>
+  zFlexibleType({
+    outputType: TypeOutput.Uint8Array,
+    defaultValue,
+  })

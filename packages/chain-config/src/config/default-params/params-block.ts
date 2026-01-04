@@ -1,9 +1,5 @@
 import type { ParamsDict } from '@ts-ethereum/chain-config'
 
-/**
- * Block parameters for Frontier/Chainstart only.
- * This is a value-transfer-only blockchain - no EIP-specific params needed.
- */
 export const paramsBlock: ParamsDict = {
   /**
    * Frontier/Chainstart
