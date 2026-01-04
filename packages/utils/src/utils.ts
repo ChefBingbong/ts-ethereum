@@ -414,3 +414,23 @@ export function parseWithBigInt(jsonString: string): unknown {
     return value
   })
 }
+
+export function deepFreeze<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+
+  if (obj instanceof Map || obj instanceof Set) {
+    return Object.freeze(obj) as T
+  }
+
+  const propNames = Object.getOwnPropertyNames(obj)
+  for (const name of propNames) {
+    const value = (obj as Record<string, unknown>)[name]
+    if (value && typeof value === 'object') {
+      deepFreeze(value)
+    }
+  }
+
+  return Object.freeze(obj)
+}

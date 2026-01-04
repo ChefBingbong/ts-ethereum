@@ -456,8 +456,159 @@ export type EIPWithParams = keyof AllEIPParams
 
 export type EIPParamsFor<E extends EIPWithParams> = AllEIPParams[E]
 
-export type AllParamNames = {
-  [K in EIPWithParams]: keyof AllEIPParams[K]
-}[EIPWithParams]
+export type AllParamNames =
+  | {
+      [K in EIPWithParams]: keyof AllEIPParams[K]
+    }[EIPWithParams]
+  | keyof typeof EIP1_PARAMS
 
 export type ParamValue = bigint | number | string | null
+
+/**
+ * Helper type to find which EIP defines a param and return its type.
+ * Iterates through all EIPs to find where the param is defined.
+ */
+type FindParamInEIPs<P extends string> = {
+  [E in EIPWithParams]: P extends keyof AllEIPParams[E]
+    ? AllEIPParams[E][P]
+    : never
+}[EIPWithParams]
+
+/**
+ * Get the value type for a specific param name.
+ * Checks EIP1_PARAMS first, then searches through all EIP-specific params.
+ */
+export type ParamType<P extends AllParamNames> =
+  P extends keyof typeof EIP1_PARAMS
+    ? (typeof EIP1_PARAMS)[P]
+    : FindParamInEIPs<P> extends never
+      ? ParamValue
+      : FindParamInEIPs<P>
+
+// ============================================================================
+// Hardfork-based param aggregation types
+// ============================================================================
+
+/**
+ * Merge two object types where B's properties override A's.
+ * This is like `{ ...a, ...b }` in JavaScript - later properties win.
+ */
+type Merge<A, B> = Omit<A, keyof B> & B
+
+/**
+ * Get params for a single EIP number if it has params defined
+ */
+export type ParamsForEIP<E extends number> = E extends EIPWithParams
+  ? AllEIPParams[E]
+  : {}
+
+// ============================================================================
+// Hardfork param type aliases (built incrementally using Merge)
+// Later EIPs override earlier ones, just like runtime behavior.
+// ============================================================================
+
+type _Chainstart = typeof EIP1_PARAMS
+type _Homestead = Merge<_Chainstart, typeof EIP606_PARAMS>
+type _Dao = _Homestead
+type _TangerineWhistle = Merge<_Homestead, typeof EIP608_PARAMS>
+type _SpuriousDragon = Merge<_TangerineWhistle, typeof EIP607_PARAMS>
+type _Byzantium = Merge<_SpuriousDragon, typeof EIP609_PARAMS>
+type _Constantinople = Merge<_Byzantium, typeof EIP1013_PARAMS>
+type _Petersburg = Merge<_Constantinople, typeof EIP1716_PARAMS>
+type _Istanbul = Merge<_Petersburg, typeof EIP1679_PARAMS>
+type _MuirGlacier = Merge<_Istanbul, typeof EIP2384_PARAMS>
+
+// Berlin merges multiple EIPs
+type _BerlinBase = Merge<_MuirGlacier, typeof EIP2565_PARAMS>
+type _BerlinWith2929 = Merge<_BerlinBase, typeof EIP2929_PARAMS>
+type _Berlin = Merge<_BerlinWith2929, typeof EIP2930_PARAMS>
+
+// London merges multiple EIPs
+type _LondonBase = Merge<_Berlin, typeof EIP1559_PARAMS>
+type _LondonWith3198 = Merge<_LondonBase, typeof EIP3198_PARAMS>
+type _London = Merge<_LondonWith3198, typeof EIP3529_PARAMS>
+
+type _ArrowGlacier = Merge<_London, typeof EIP4345_PARAMS>
+type _GrayGlacier = Merge<_ArrowGlacier, typeof EIP5133_PARAMS>
+type _Paris = Merge<_GrayGlacier, typeof EIP4399_PARAMS>
+type _MergeNetsplitBlock = _Paris
+
+// Shanghai merges multiple EIPs
+type _ShanghaiBase = Merge<_Paris, typeof EIP3855_PARAMS>
+type _Shanghai = Merge<_ShanghaiBase, typeof EIP3860_PARAMS>
+
+// Cancun merges multiple EIPs
+type _CancunBase = Merge<_Shanghai, typeof EIP1153_PARAMS>
+type _CancunWith4788 = Merge<_CancunBase, typeof EIP4788_PARAMS>
+type _CancunWith4844 = Merge<_CancunWith4788, typeof EIP4844_PARAMS>
+type _CancunWith5656 = Merge<_CancunWith4844, typeof EIP5656_PARAMS>
+type _CancunWith7516 = Merge<_CancunWith5656, typeof EIP7516_PARAMS>
+type _Cancun = Merge<_CancunWith7516, typeof EIP7594_PARAMS>
+
+// Prague merges multiple EIPs
+type _PragueBase = Merge<_Cancun, typeof EIP2537_PARAMS>
+type _PragueWith2935 = Merge<_PragueBase, typeof EIP2935_PARAMS>
+type _PragueWith7002 = Merge<_PragueWith2935, typeof EIP7002_PARAMS>
+type _PragueWith7251 = Merge<_PragueWith7002, typeof EIP7251_PARAMS>
+type _PragueWith7623 = Merge<_PragueWith7251, typeof EIP7623_PARAMS>
+type _PragueWith7691 = Merge<_PragueWith7623, typeof EIP7691_PARAMS>
+type _PragueWith7702 = Merge<_PragueWith7691, typeof EIP7702_PARAMS>
+type _Prague = Merge<_PragueWith7702, typeof EIP7825_PARAMS>
+
+// Osaka merges multiple EIPs
+type _OsakaBase = Merge<_Prague, typeof EIP663_PARAMS>
+type _OsakaWith4200 = Merge<_OsakaBase, typeof EIP4200_PARAMS>
+type _OsakaWith4750 = Merge<_OsakaWith4200, typeof EIP4750_PARAMS>
+type _OsakaWith6206 = Merge<_OsakaWith4750, typeof EIP6206_PARAMS>
+type _OsakaWith7069 = Merge<_OsakaWith6206, typeof EIP7069_PARAMS>
+type _OsakaWith7480 = Merge<_OsakaWith7069, typeof EIP7480_PARAMS>
+type _OsakaWith7620 = Merge<_OsakaWith7480, typeof EIP7620_PARAMS>
+type _OsakaWith7934 = Merge<_OsakaWith7620, typeof EIP7934_PARAMS>
+type _Osaka = Merge<_OsakaWith7934, typeof EIP7939_PARAMS>
+
+/**
+ * Maps hardfork names to their aggregated param types.
+ * Each hardfork includes params from all prior hardforks plus its own EIPs.
+ * Uses Merge semantics so later EIPs properly override earlier ones.
+ */
+export type HardforkParamsMap = {
+  chainstart: _Chainstart
+  homestead: _Homestead
+  dao: _Dao
+  tangerineWhistle: _TangerineWhistle
+  spuriousDragon: _SpuriousDragon
+  byzantium: _Byzantium
+  constantinople: _Constantinople
+  petersburg: _Petersburg
+  istanbul: _Istanbul
+  muirGlacier: _MuirGlacier
+  berlin: _Berlin
+  london: _London
+  arrowGlacier: _ArrowGlacier
+  grayGlacier: _GrayGlacier
+  paris: _Paris
+  mergeNetsplitBlock: _MergeNetsplitBlock
+  shanghai: _Shanghai
+  cancun: _Cancun
+  prague: _Prague
+  osaka: _Osaka
+  // Future hardforks inherit from osaka
+  bpo1: _Osaka
+  bpo2: _Osaka
+  bpo3: _Osaka
+  bpo4: _Osaka
+  bpo5: _Osaka
+}
+
+/**
+ * Get the aggregated params type for a specific hardfork.
+ * Includes all params from genesis up to and including the specified hardfork.
+ */
+export type ParamsAtHardfork<H extends keyof HardforkParamsMap> =
+  HardforkParamsMap[H]
+
+/**
+ * Extract all param keys available at a specific hardfork
+ */
+export type ParamKeysAtHardfork<H extends keyof HardforkParamsMap> =
+  keyof HardforkParamsMap[H]
