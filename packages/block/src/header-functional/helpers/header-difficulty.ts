@@ -8,8 +8,8 @@ import {
   BIGINT_0,
   BIGINT_1,
   BIGINT_2,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   KECCAK256_RLP_ARRAY,
 } from '@ts-ethereum/utils'
 import type { FrozenBlockHeader, ParentHeaderData } from '../types'

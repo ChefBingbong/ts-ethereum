@@ -1,4 +1,4 @@
-import { type AllParamNames, type ParamType } from '@ts-ethereum/chain-config'
+import type { AllParamNames, ParamType } from '@ts-ethereum/chain-config'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 import type { BlockNumContext, FrozenBlockHeader } from '../types'
 

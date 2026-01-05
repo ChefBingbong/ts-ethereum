@@ -1,8 +1,8 @@
 import { Hardfork } from '@ts-ethereum/chain-config'
 import {
   bigIntToBytes,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
 } from '@ts-ethereum/utils'
 import { valuesArrayToHeaderData } from '../../helpers'
 import type { BlockHeaderBytes } from '../../types'

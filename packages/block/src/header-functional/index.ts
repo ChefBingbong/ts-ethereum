@@ -1,4 +1,49 @@
 // Types
+
+// Creator functions (lower-level, return FrozenBlockHeader)
+export {
+  fromBytesArray,
+  fromHeaderData,
+  fromRLP,
+  fromRPC,
+} from './creators'
+
+// Factory functions (manager pattern)
+export {
+  createBlockHeaderManager,
+  createBlockHeaderManagerFromBytes,
+  createBlockHeaderManagerFromRLP,
+  createBlockHeaderManagerFromRPC,
+} from './header-manager'
+// Pure helper functions (for direct use with FrozenBlockHeader)
+export {
+  // Gas calculations
+  calcDataFee,
+  calcNextBaseFee,
+  calcNextBlobGasPrice,
+  calcNextExcessBlobGas,
+  // Serialization
+  computeHash,
+  // Difficulty
+  ethashCanonicalDifficulty,
+  getBlobGasPrice,
+  // Accessors
+  getBlockNum,
+  getConsensusAlgorithm,
+  getConsensusType,
+  getHardfork,
+  getHash,
+  // EIP helpers
+  getParam,
+  getPrevRandao,
+  isEIPActive,
+  // Utility
+  isGenesis,
+  serialize,
+  toJSON,
+  toRaw,
+  validateGasLimit,
+} from './helpers'
 export type {
   BlockHeaderManager,
   BlockNumContext,
@@ -10,55 +55,3 @@ export type {
   ParentHeaderData,
   ValidatedHeaderData,
 } from './types'
-
-// Factory functions (manager pattern)
-export {
-  createBlockHeaderManager,
-  createBlockHeaderManagerFromBytes,
-  createBlockHeaderManagerFromRLP,
-  createBlockHeaderManagerFromRPC,
-} from './header-manager'
-
-// Creator functions (lower-level, return FrozenBlockHeader)
-export {
-  fromBytesArray,
-  fromHeaderData,
-  fromRLP,
-  fromRPC,
-} from './creators'
-
-// Pure helper functions (for direct use with FrozenBlockHeader)
-export {
-  // Accessors
-  getBlockNum,
-  getConsensusAlgorithm,
-  getConsensusType,
-  getHardfork,
-  getPrevRandao,
-
-  // EIP helpers
-  getParam,
-  isEIPActive,
-
-  // Gas calculations
-  calcDataFee,
-  calcNextBaseFee,
-  calcNextBlobGasPrice,
-  calcNextExcessBlobGas,
-  getBlobGasPrice,
-  validateGasLimit,
-
-  // Difficulty
-  ethashCanonicalDifficulty,
-
-  // Serialization
-  computeHash,
-  getHash,
-  serialize,
-  toJSON,
-  toRaw,
-
-  // Utility
-  isGenesis,
-} from './helpers'
-
