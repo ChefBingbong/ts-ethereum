@@ -1,5 +1,5 @@
 import type { Block, JSONRPCBlock } from '@ts-ethereum/block'
-import { Log } from '@ts-ethereum/evm'
+import type { Log } from '@ts-ethereum/evm'
 import type { TypedTransaction } from '@ts-ethereum/tx'
 import type { Address } from '@ts-ethereum/utils'
 import { bigIntToHex, bytesToHex, intToHex } from '@ts-ethereum/utils'

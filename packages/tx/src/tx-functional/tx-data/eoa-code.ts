@@ -1,13 +1,10 @@
 import { RLP } from '@ts-ethereum/rlp'
-import {
-  bigIntMin,
-  bigIntToUnpaddedBytes,
-} from '@ts-ethereum/utils'
-import { keccak256 } from 'ethereum-cryptography/keccak'
 import type {
   Address,
   EOACode7702AuthorizationListBytes,
 } from '@ts-ethereum/utils'
+import { bigIntMin, bigIntToUnpaddedBytes } from '@ts-ethereum/utils'
+import { keccak256 } from 'ethereum-cryptography/keccak'
 import type { AccessListBytes } from '../../types'
 import { TransactionType as TxType } from '../../types'
 import type { TxData } from '../types'
@@ -178,4 +175,3 @@ export class EOACodeTxData implements TxData {
     return keccak256(RLP.encode(typedMessage))
   }
 }
-

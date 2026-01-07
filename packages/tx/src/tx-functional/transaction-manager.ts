@@ -1,9 +1,4 @@
-import type {
-  Capability,
-  JSONTx,
-  TxValuesArray,
-} from '../types'
-import type { FrozenTransaction, TransactionManager } from './types'
+import type { Capability, JSONTx, TxValuesArray } from '../types'
 import {
   getChainId,
   getData,
@@ -16,12 +11,14 @@ import {
   getTxType,
   getValue,
 } from './helpers/accessors'
+import { isEIPActive, supports } from './helpers/capabilities'
 import {
-  getHash,
-  raw,
-  serialize,
-  toJSON,
-} from './helpers/serialization'
+  effectiveGasPrice,
+  getDataGas,
+  getIntrinsicGas,
+  getUpfrontCost,
+} from './helpers/gas'
+import { getHash, raw, serialize, toJSON } from './helpers/serialization'
 import {
   getHashedMessageToSign,
   getMessageToSign,
@@ -29,14 +26,8 @@ import {
   isSigned,
   verifySignature,
 } from './helpers/signature'
-import {
-  effectiveGasPrice,
-  getDataGas,
-  getIntrinsicGas,
-  getUpfrontCost,
-} from './helpers/gas'
 import { getValidationErrors, isValid } from './helpers/validation'
-import { isEIPActive, supports } from './helpers/capabilities'
+import type { FrozenTransaction, TransactionManager } from './types'
 
 /**
  * Creates a TransactionManager from a FrozenTransaction.
@@ -123,4 +114,3 @@ export function createTransactionManager(
     },
   })
 }
-

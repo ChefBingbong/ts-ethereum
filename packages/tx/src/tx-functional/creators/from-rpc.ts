@@ -1,5 +1,5 @@
-import { normalizeTxParams } from '../../util/general'
 import type { JSONRPCTx } from '../../types'
+import { normalizeTxParams } from '../../util/general'
 import type { CreateTxOptions, FrozenTransaction } from '../types'
 import { fromTxData } from './from-tx-data'
 
@@ -13,4 +13,3 @@ export function fromRPC(
   const normalized = normalizeTxParams(txData)
   return fromTxData(normalized, opts)
 }
-

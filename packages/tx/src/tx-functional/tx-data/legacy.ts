@@ -1,4 +1,5 @@
 import { RLP } from '@ts-ethereum/rlp'
+import type { Address } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
   BIGINT_2,
@@ -10,7 +11,6 @@ import {
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import type { Address } from '@ts-ethereum/utils'
 import type { TransactionType } from '../../types'
 import { TransactionType as TxType } from '../../types'
 import type { TxData } from '../types'
@@ -177,4 +177,3 @@ function deriveChainId(v: bigint | undefined): bigint | undefined {
   const numSub = (vNum - 35) % 2 === 0 ? 35 : 36
   return BigInt(vNum - numSub) / BIGINT_2
 }
-

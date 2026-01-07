@@ -7,8 +7,8 @@ import type {
 import type {
   AccessListBytes,
   Capability,
-  JSONTx,
   JSONRPCTx,
+  JSONTx,
   TransactionType,
   TxValuesArray,
   TypedTxData,
@@ -200,4 +200,3 @@ export type {
   TransactionType,
   Capability,
 }
-

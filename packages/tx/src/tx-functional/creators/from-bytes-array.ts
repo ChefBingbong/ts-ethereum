@@ -36,4 +36,3 @@ export function fromBytesArray(
     `Unsupported transaction format: expected 6 or 9 values, got ${values.length}`,
   )
 }
-

@@ -6,7 +6,10 @@ import { getTxType } from './accessors'
 /**
  * Checks if a transaction supports a specific capability.
  */
-export function supports(tx: FrozenTransaction, capability: Capability): boolean {
+export function supports(
+  tx: FrozenTransaction,
+  capability: Capability,
+): boolean {
   const txType = getTxType(tx)
   const chainId = tx.inner.chainId()
 
@@ -50,4 +53,3 @@ export function isEIPActive(tx: FrozenTransaction, eip: number): boolean {
   })
   return tx.hardforkManager.isEIPActiveAtHardfork(eip, hardfork)
 }
-

@@ -127,9 +127,7 @@ export function getBlobVersionedHashes(
 /**
  * Gets the authorization list (for EIP-7702 transactions).
  */
-export function getAuthorizationList(
-  tx: FrozenTransaction,
-): any[] | undefined {
+export function getAuthorizationList(tx: FrozenTransaction): any[] | undefined {
   const txType = getTxType(tx)
   if (txType === 4) {
     // EOA Code transaction
@@ -145,4 +143,3 @@ export function getAuthorizationList(
 export function getAccessList(tx: FrozenTransaction): any[] {
   return tx.inner.accessList()
 }
-

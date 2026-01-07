@@ -1,6 +1,6 @@
 import type { TypedTransaction } from '../types'
-import type { FrozenTransaction, CreateTxOptions } from './types'
 import { fromTxData } from './creators'
+import type { CreateTxOptions, FrozenTransaction } from './types'
 
 /**
  * Converts a TypedTransaction (class-based) to FrozenTransaction (functional).
@@ -57,4 +57,3 @@ export function toFrozenTransaction(
 
   return fromTxData(txData, opts)
 }
-

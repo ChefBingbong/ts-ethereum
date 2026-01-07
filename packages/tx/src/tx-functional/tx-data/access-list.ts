@@ -1,4 +1,5 @@
 import { RLP } from '@ts-ethereum/rlp'
+import type { Address } from '@ts-ethereum/utils'
 import {
   bigIntToUnpaddedBytes,
   EthereumJSErrorWithoutCode,
@@ -6,7 +7,6 @@ import {
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import type { Address } from '@ts-ethereum/utils'
 import type { AccessListBytes } from '../../types'
 import { TransactionType as TxType } from '../../types'
 import type { TxData } from '../types'
@@ -153,4 +153,3 @@ export class AccessListTxData implements TxData {
     return keccak256(RLP.encode(typedMessage))
   }
 }
-

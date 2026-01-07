@@ -123,8 +123,7 @@ export function toJSON(tx: FrozenTransaction): JSONTx {
     r: sig.r !== undefined ? bigIntToHex(sig.r) : undefined,
     s: sig.s !== undefined ? bigIntToHex(sig.s) : undefined,
     chainId: chainId !== undefined ? bigIntToHex(chainId) : undefined,
-    yParity:
-      sig.v === 0n || sig.v === 1n ? bigIntToHex(sig.v) : undefined,
+    yParity: sig.v === 0n || sig.v === 1n ? bigIntToHex(sig.v) : undefined,
   }
 
   // Add type-specific fields
@@ -148,7 +147,8 @@ export function toJSON(tx: FrozenTransaction): JSONTx {
 
     // For legacy compatibility, gasPrice defaults to maxFeePerGas for EIP-1559+
     if (txType !== TransactionType.AccessListEIP2930) {
-      base.gasPrice = maxFeePerGas !== undefined ? bigIntToHex(maxFeePerGas) : undefined
+      base.gasPrice =
+        maxFeePerGas !== undefined ? bigIntToHex(maxFeePerGas) : undefined
     } else {
       base.gasPrice = bigIntToHex(getGasPrice(tx))
     }
@@ -170,4 +170,3 @@ export function getHash(tx: FrozenTransaction): Uint8Array {
 export function raw(tx: FrozenTransaction): TxValuesArray {
   return raw_(tx)
 }
-

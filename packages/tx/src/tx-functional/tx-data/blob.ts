@@ -1,11 +1,7 @@
 import { RLP } from '@ts-ethereum/rlp'
-import {
-  bigIntMax,
-  bigIntMin,
-  bigIntToUnpaddedBytes,
-} from '@ts-ethereum/utils'
-import { keccak256 } from 'ethereum-cryptography/keccak'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
+import { bigIntMax, bigIntMin, bigIntToUnpaddedBytes } from '@ts-ethereum/utils'
+import { keccak256 } from 'ethereum-cryptography/keccak'
 import type { AccessListBytes } from '../../types'
 import { TransactionType as TxType } from '../../types'
 import type { TxData } from '../types'
@@ -194,4 +190,3 @@ export class BlobTxData implements TxData {
     return keccak256(RLP.encode(typedMessage))
   }
 }
-

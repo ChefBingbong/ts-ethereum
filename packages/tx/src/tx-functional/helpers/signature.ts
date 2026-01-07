@@ -1,3 +1,4 @@
+import { Hardfork } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   Address,
@@ -11,10 +12,9 @@ import {
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import { Hardfork } from '@ts-ethereum/chain-config'
+import { TransactionType } from '../../types'
 import type { FrozenTransaction } from '../types'
 import { getChainId, getTxType } from './accessors'
-import { TransactionType } from '../../types'
 
 /**
  * Gets the raw signature values (v, r, s).
@@ -32,9 +32,7 @@ export function getRawSignatureValues(tx: FrozenTransaction): {
  */
 export function isSigned(tx: FrozenTransaction): boolean {
   const sig = getRawSignatureValues(tx)
-  return (
-    sig.v !== undefined && sig.r !== undefined && sig.s !== undefined
-  )
+  return sig.v !== undefined && sig.r !== undefined && sig.s !== undefined
 }
 
 /**
@@ -52,9 +50,7 @@ export function getMessageToSign(
       bigIntToUnpaddedBytes(tx.inner.nonce()),
       bigIntToUnpaddedBytes(tx.inner.gasPrice()),
       bigIntToUnpaddedBytes(tx.inner.gas()),
-      tx.inner.to() !== undefined
-        ? tx.inner.to()!.bytes
-        : new Uint8Array(0),
+      tx.inner.to() !== undefined ? tx.inner.to()!.bytes : new Uint8Array(0),
       bigIntToUnpaddedBytes(tx.inner.value()),
       tx.inner.data(),
     ]
@@ -145,4 +141,3 @@ export function verifySignature(tx: FrozenTransaction): boolean {
     return false
   }
 }
-

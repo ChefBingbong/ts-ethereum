@@ -1,8 +1,8 @@
 import { RLP } from '@ts-ethereum/rlp'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
+import { TransactionType } from '../../types'
 import type { CreateTxOptions, FrozenTransaction } from '../types'
 import { fromTxData } from './from-tx-data'
-import { TransactionType } from '../../types'
 
 /**
  * Creates a FrozenTransaction from RLP-encoded transaction data.
@@ -107,17 +107,8 @@ export function fromRLP(
       )
     }
 
-    const [
-      nonce,
-      gasPrice,
-      gasLimit,
-      to,
-      value,
-      data_,
-      v,
-      r,
-      s,
-    ] = values as any[]
+    const [nonce, gasPrice, gasLimit, to, value, data_, v, r, s] =
+      values as any[]
 
     return fromTxData(
       {
@@ -135,4 +126,3 @@ export function fromRLP(
     )
   }
 }
-

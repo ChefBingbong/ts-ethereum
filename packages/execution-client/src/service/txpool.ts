@@ -694,7 +694,7 @@ export class TxPool {
     // If not, use the VM's current state root as a fallback
     let stateRoot = vmHeadBlock.header.stateRoot
     const hasStateRoot = await vmCopy.stateManager.hasStateRoot(stateRoot)
-    
+
     if (!hasStateRoot) {
       // Fallback to VM's current state root if VM head state root doesn't exist yet
       // This can happen during initial sync when blocks are imported faster than executed
