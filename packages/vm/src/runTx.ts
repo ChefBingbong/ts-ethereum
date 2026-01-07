@@ -6,7 +6,11 @@ import {
 } from '@ts-ethereum/block'
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
-import { BinaryTreeAccessWitness, type EVM } from '@ts-ethereum/evm'
+import {
+  BinaryTreeAccessWitness,
+  type EVM,
+  type EVMInterface,
+} from '@ts-ethereum/evm'
 import type {
   AccessList,
   AccessList2930Tx,
@@ -28,9 +32,9 @@ import {
   bytesToHex,
   bytesToUnprefixedHex,
   concatBytes,
-  EthereumJSErrorWithoutCode,
   eoaCode7702RecoverAuthority,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   KECCAK256_NULL,
   MAX_UINT64,
@@ -177,18 +181,21 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     throw EthereumJSErrorWithoutCode(msg)
   }
 
+  // Use block-scoped EVM if provided, otherwise fall back to vm.evm
+  const evm = opts.evm ?? vm.evm
+
   // Ensure we start with a clear warmed accounts Map
-  await vm.evm.journal.cleanup()
+  await evm.journal.cleanup()
 
   if (opts.reportAccessList === true) {
-    vm.evm.journal.startReportingAccessList()
+    evm.journal.startReportingAccessList()
   }
 
   if (opts.reportPreimages === true) {
-    vm.evm.journal.startReportingPreimages!()
+    evm.journal.startReportingPreimages!()
   }
 
-  await vm.evm.journal.checkpoint()
+  await evm.journal.checkpoint()
   if (vm.DEBUG) {
     debug('-'.repeat(100))
     debug(`tx checkpoint`)
@@ -201,7 +208,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   ) {
     // Is it an Access List transaction?
     if (!vm.hardforkManager.isEIPActiveAtHardfork(2930, blockHardfork)) {
-      await vm.evm.journal.revert()
+      await evm.journal.revert()
       const msg = _errorMsg(
         'Cannot run transaction: EIP 2930 is not activated.',
         vm,
@@ -214,7 +221,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       opts.tx.supports(Capability.EIP1559FeeMarket) &&
       !vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork)
     ) {
-      await vm.evm.journal.revert()
+      await evm.journal.revert()
       const msg = _errorMsg(
         'Cannot run transaction: EIP 1559 is not activated.',
         vm,
@@ -230,9 +237,9 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       const [addressBytes, slotBytesList] = accessListItem
       const address = bytesToUnprefixedHex(addressBytes)
       // Note: in here, the 0x is stripped, so immediately do this here
-      vm.evm.journal.addAlwaysWarmAddress(address, true)
+      evm.journal.addAlwaysWarmAddress(address, true)
       for (const storageKey of slotBytesList) {
-        vm.evm.journal.addAlwaysWarmSlot(
+        evm.journal.addAlwaysWarmSlot(
           address,
           bytesToUnprefixedHex(storageKey),
           true,
@@ -242,34 +249,34 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   }
 
   try {
-    const result = await _runTx(vm, opts, blockHardfork, blockContext)
-    await vm.evm.journal.commit()
+    const result = await _runTx(vm, opts, blockHardfork, blockContext, evm)
+    await evm.journal.commit()
     if (vm.DEBUG) {
       debug(`tx checkpoint committed`)
     }
     return result
   } catch (e: any) {
-    await vm.evm.journal.revert()
+    await evm.journal.revert()
     if (vm.DEBUG) {
       debug(`tx checkpoint reverted`)
     }
     throw e
   } finally {
     if (vm.hardforkManager.isEIPActiveAtHardfork(2929, blockHardfork)) {
-      vm.evm.journal.cleanJournal()
+      evm.journal.cleanJournal()
     }
-    vm.evm.stateManager.originalStorageCache.clear()
+    evm.stateManager.originalStorageCache.clear()
     if (enableProfiler) {
       // eslint-disable-next-line no-console
       console.timeEnd(entireTxLabel)
-      const logs = (vm.evm as EVM).getPerformanceLogs()
+      const logs = (evm as EVM).getPerformanceLogs()
       if (logs.precompiles.length === 0 && logs.opcodes.length === 0) {
         // eslint-disable-next-line no-console
         console.log('No precompile or opcode execution.')
       }
       emitEVMProfile(logs.precompiles, 'Precompile performance')
       emitEVMProfile(logs.opcodes, 'Opcodes performance')
-      ;(vm.evm as EVM).clearPerformanceLogs()
+      ;(evm as EVM).clearPerformanceLogs()
     }
   }
 }
@@ -279,6 +286,7 @@ async function _runTx(
   opts: RunTxOpts,
   blockHardfork: string,
   blockContext: BlockContext,
+  evm: EVMInterface,
 ): Promise<RunTxResult> {
   const state = vm.stateManager
 
@@ -286,7 +294,7 @@ async function _runTx(
   let txAccesses: BinaryTreeAccessWitness | undefined
 
   if (vm.hardforkManager.isEIPActiveAtHardfork(7864, blockHardfork)) {
-    if (vm.evm.binaryTreeAccessWitness === undefined) {
+    if (evm.binaryTreeAccessWitness === undefined) {
       throw Error(
         `Binary tree access witness needed for execution of binary tree blocks`,
       )
@@ -298,9 +306,9 @@ async function _runTx(
         `Binary tree State Manager needed for execution of binary tree blocks`,
       )
     }
-    stateAccesses = vm.evm.binaryTreeAccessWitness
+    stateAccesses = evm.binaryTreeAccessWitness
     txAccesses = new BinaryTreeAccessWitness({
-      hashFunction: vm.evm.binaryTreeAccessWitness.hashFunction,
+      hashFunction: evm.binaryTreeAccessWitness.hashFunction,
     })
   }
 
@@ -326,19 +334,19 @@ async function _runTx(
 
   if (vm.hardforkManager.isEIPActiveAtHardfork(2929, blockHardfork)) {
     // Add origin and precompiles to warm addresses
-    const activePrecompiles = vm.evm.precompiles
+    const activePrecompiles = evm.precompiles
     for (const [addressStr] of activePrecompiles.entries()) {
-      vm.evm.journal.addAlwaysWarmAddress(addressStr)
+      evm.journal.addAlwaysWarmAddress(addressStr)
     }
-    vm.evm.journal.addAlwaysWarmAddress(caller.toString())
+    evm.journal.addAlwaysWarmAddress(caller.toString())
     if (tx.to !== undefined) {
-      // Note: in case we create a contract, we do vm in EVMs `_executeCreate` (vm is also correct in inner calls, per the EIP)
-      vm.evm.journal.addAlwaysWarmAddress(bytesToUnprefixedHex(tx.to.bytes))
+      // Note: in case we create a contract, we do evm in EVMs `_executeCreate` (this is also correct in inner calls, per the EIP)
+      evm.journal.addAlwaysWarmAddress(bytesToUnprefixedHex(tx.to.bytes))
     }
     if (vm.hardforkManager.isEIPActiveAtHardfork(3651, blockHardfork)) {
       const coinbase =
         block?.header.coinbase.bytes ?? DEFAULT_HEADER.coinbase.bytes
-      vm.evm.journal.addAlwaysWarmAddress(bytesToUnprefixedHex(coinbase))
+      evm.journal.addAlwaysWarmAddress(bytesToUnprefixedHex(coinbase))
     }
   }
 
@@ -452,7 +460,7 @@ async function _runTx(
       if (tx.supports(Capability.EIP1559FeeMarket) === false) {
         // if skipBalance and not EIP1559 transaction, ensure caller balance is enough to run transaction
         fromAccount.balance = upFrontCost
-        await vm.evm.journal.putAccount(caller, fromAccount)
+        await evm.journal.putAccount(caller, fromAccount)
       }
     } else {
       const msg = _errorMsg(
@@ -512,7 +520,7 @@ async function _runTx(
     if (opts.skipBalance === true && fromAccount.balance < maxCost) {
       // if skipBalance, ensure caller balance is enough to run transaction
       fromAccount.balance = maxCost
-      await vm.evm.journal.putAccount(caller, fromAccount)
+      await evm.journal.putAccount(caller, fromAccount)
     } else {
       const msg = _errorMsg(
         `sender doesn't have enough funds to send tx. The max cost is: ${maxCost} and the sender's account (${caller}) only has: ${balance}`,
@@ -569,7 +577,7 @@ async function _runTx(
   if (opts.skipBalance === true && fromAccount.balance < BIGINT_0) {
     fromAccount.balance = BIGINT_0
   }
-  await vm.evm.journal.putAccount(caller, fromAccount)
+  await evm.journal.putAccount(caller, fromAccount)
 
   let gasRefund = BIGINT_0
 
@@ -622,7 +630,7 @@ async function _runTx(
       const account = accountMaybeUndefined ?? new Account()
 
       // Add authority address to warm addresses
-      vm.evm.journal.addAlwaysWarmAddress(authority.toString())
+      evm.journal.addAlwaysWarmAddress(authority.toString())
       if (account.isContract()) {
         const code = await vm.stateManager.getCode(authority)
         if (!equalsBytes(code.slice(0, 3), DELEGATION_7702_FLAG)) {
@@ -656,7 +664,7 @@ async function _runTx(
       }
 
       account.nonce++
-      await vm.evm.journal.putAccount(authority, account)
+      await evm.journal.putAccount(authority, account)
 
       if (equalsBytes(address, new Uint8Array(20))) {
         // Special case (see EIP PR: https://github.com/ethereum/EIPs/pull/8929)
@@ -694,7 +702,7 @@ async function _runTx(
     )
   }
 
-  const results = (await vm.evm.runCall({
+  const results = (await evm.runCall({
     block,
     blockContext: blockContext!, // Non-null assertion: blockContext is guaranteed to be defined here
     gasPrice,
@@ -808,7 +816,7 @@ async function _runTx(
   const actualTxCost = results.totalGasSpent * gasPrice
   const txCostDiff = txCost - actualTxCost
   fromAccount.balance += txCostDiff
-  await vm.evm.journal.putAccount(caller, fromAccount)
+  await evm.journal.putAccount(caller, fromAccount)
   if (vm.DEBUG) {
     debug(
       `Refunded txCostDiff (${txCostDiff}) to fromAccount (caller) balance (-> ${fromAccount.balance})`,
@@ -840,9 +848,9 @@ async function _runTx(
   minerAccount.balance += results.minerValue
 
   // Put the miner account into the state. If the balance of the miner account remains zero, note that
-  // the state.putAccount function puts vm into the "touched" accounts. This will thus be removed when
+  // the state.putAccount function puts this into the "touched" accounts. This will thus be removed when
   // we clean the touched accounts below in case we are in a fork >= SpuriousDragon
-  await vm.evm.journal.putAccount(miner, minerAccount)
+  await evm.journal.putAccount(miner, minerAccount)
   if (vm.DEBUG) {
     debug(
       `tx update miner account (${miner}) balance (-> ${minerAccount.balance})`,
@@ -868,7 +876,7 @@ async function _runTx(
           continue
         }
       }
-      await vm.evm.journal.deleteAccount(address)
+      await evm.journal.deleteAccount(address)
       if (vm.DEBUG) {
         debug(`tx selfdestruct on address=${address}`)
       }
@@ -888,7 +896,7 @@ async function _runTx(
   ) {
     // Convert the Map to the desired type
     const accessList: AccessList = []
-    for (const [address, set] of vm.evm.journal.accessList!) {
+    for (const [address, set] of evm.journal.accessList!) {
       const item: AccessListItem = {
         address: `0x${address}`,
         storageKeys: [],
@@ -909,11 +917,11 @@ async function _runTx(
     console.time(journalCacheCleanUpLabel)
   }
 
-  if (opts.reportPreimages === true && vm.evm.journal.preimages !== undefined) {
-    results.preimages = vm.evm.journal.preimages
+  if (opts.reportPreimages === true && evm.journal.preimages !== undefined) {
+    results.preimages = evm.journal.preimages
   }
 
-  await vm.evm.journal.cleanup()
+  await evm.journal.cleanup()
   state.originalStorageCache.clear()
 
   if (enableProfiler) {

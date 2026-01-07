@@ -9,6 +9,7 @@ import {
   genWithdrawalsTrieRoot,
 } from '@ts-ethereum/block'
 import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
+import { createEVM, type EVM, type EVMInterface } from '@ts-ethereum/evm'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import type { TypedTransaction } from '@ts-ethereum/tx'
@@ -28,9 +29,9 @@ import {
   EthereumJSErrorWithoutCode,
   GWEI_TO_WEI,
   KECCAK256_RLP,
-  TypeOutput,
   toBytes,
   toType,
+  TypeOutput,
 } from '@ts-ethereum/utils'
 import { Bloom } from './bloom/index'
 import { runTx } from './index'
@@ -85,6 +86,8 @@ export class BlockBuilder {
   private withdrawals?: Withdrawal[]
   private checkpointed = false
   private blockStatus: BlockStatus = { status: BuildStatus.Pending }
+  private blockEvm: EVMInterface | undefined
+  private blockHardfork: string
 
   get transactionReceipts() {
     return this.transactionResults.map((result) => result.receipt)
@@ -97,7 +100,7 @@ export class BlockBuilder {
   constructor(vm: VM, opts: BuildBlockOpts) {
     this.vm = vm
     // Determine hardfork for this block being built
-    const blockHardfork = vm.hardforkManager.getHardforkByBlock(
+    this.blockHardfork = vm.hardforkManager.getHardforkByBlock(
       toType(
         opts.headerData?.number ?? opts.parentBlock.header.number + BIGINT_1,
         TypeOutput.BigInt,
@@ -126,7 +129,7 @@ export class BlockBuilder {
 
     console.log(this.headerData.baseFeePerGas, 'baseFeePerGas', this.headerData)
     if (
-      this.vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork) &&
+      this.vm.hardforkManager.isEIPActiveAtHardfork(1559, this.blockHardfork) &&
       typeof this.headerData.baseFeePerGas === 'undefined'
     ) {
       const londonBlock = vm.hardforkManager.hardforkBlock(Hardfork.London)
@@ -134,7 +137,7 @@ export class BlockBuilder {
         this.headerData.baseFeePerGas = BigInt(
           vm.hardforkManager.getParamAtHardfork(
             'initialBaseFee',
-            blockHardfork,
+            this.blockHardfork,
           )!,
         )
       } else {
@@ -153,13 +156,13 @@ export class BlockBuilder {
     }
 
     if (
-      this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork) &&
+      this.vm.hardforkManager.isEIPActiveAtHardfork(4844, this.blockHardfork) &&
       typeof this.headerData.excessBlobGas === 'undefined'
     ) {
       this.headerData.excessBlobGas =
         opts.parentBlock.header.calcNextExcessBlobGas(
           // this.vm.hardforkManager,
-          blockHardfork,
+          this.blockHardfork,
         )
     }
   }
@@ -174,6 +177,31 @@ export class BlockBuilder {
     if (this.blockStatus.status === BuildStatus.Reverted) {
       throw EthereumJSErrorWithoutCode('State has already been reverted')
     }
+  }
+
+  /**
+   * Gets or creates the block-scoped EVM instance.
+   * Creates a fresh EVM on first access, ensuring opcodes and precompiles
+   * are correctly configured for this block's hardfork.
+   */
+  private async getBlockEvm(): Promise<EVMInterface> {
+    if (this.blockEvm === undefined) {
+      const vmEvmOpts = (this.vm.evm as EVM)['_optsCached']
+      this.blockEvm = await createEVM({
+        common: this.vm.hardforkManager,
+        hardfork: this.blockHardfork, // Lock to this block's hardfork
+        stateManager: this.vm.stateManager,
+        blockchain: this.vm.blockchain,
+        // Copy relevant options from VM's original EVM
+        allowUnlimitedContractSize: vmEvmOpts?.allowUnlimitedContractSize,
+        allowUnlimitedInitCodeSize: vmEvmOpts?.allowUnlimitedInitCodeSize,
+        customOpcodes: vmEvmOpts?.customOpcodes,
+        customPrecompiles: vmEvmOpts?.customPrecompiles,
+        customCrypto: vmEvmOpts?.customCrypto,
+        profiler: vmEvmOpts?.profiler,
+      })
+    }
+    return this.blockEvm
   }
 
   public getStatus(): BlockStatus {
@@ -232,25 +260,22 @@ export class BlockBuilder {
    * Adds the block miner reward to the coinbase account.
    */
   private async rewardMiner() {
-    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
-      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
-      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
-    )
     const minerReward = this.vm.hardforkManager.getParamAtHardfork(
       'minerReward',
-      blockHardfork,
+      this.blockHardfork,
     )!
     const reward = calculateMinerReward(BigInt(minerReward ?? 0), 0)
     const coinbase =
       this.headerData.coinbase !== undefined
         ? new Address(toBytes(this.headerData.coinbase))
         : createZeroAddress()
+    const blockEvm = await this.getBlockEvm()
     await rewardAccount(
-      this.vm.evm,
+      blockEvm,
       coinbase,
       reward,
       this.vm.hardforkManager,
-      blockHardfork,
+      this.blockHardfork,
     )
   }
 
@@ -258,10 +283,7 @@ export class BlockBuilder {
    * Adds the withdrawal amount to the withdrawal address
    */
   private async processWithdrawals() {
-    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
-      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
-      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
-    )
+    const blockEvm = await this.getBlockEvm()
     for (const withdrawal of this.withdrawals ?? []) {
       const { address, amount } = withdrawal
       // If there is no amount to add, skip touching the account
@@ -272,11 +294,11 @@ export class BlockBuilder {
       // Withdrawal amount is represented in Gwei so needs to be
       // converted to wei
       await rewardAccount(
-        this.vm.evm,
+        blockEvm,
         address,
         amount * GWEI_TO_WEI,
         this.vm.hardforkManager,
-        blockHardfork,
+        this.blockHardfork,
       )
     }
   }
@@ -296,24 +318,23 @@ export class BlockBuilder {
   ) {
     this.checkStatus()
 
+    const blockEvm = await this.getBlockEvm()
     if (!this.checkpointed) {
-      await this.vm.evm.journal.checkpoint()
+      await blockEvm.journal.checkpoint()
       this.checkpointed = true
     }
 
     // According to the Yellow Paper, a transaction's gas limit
     // cannot be greater than the remaining gas in the block
-    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
-      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
-      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
-    )
     let blobGasUsed
     let blobGasPerBlob
-    if (this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)) {
+    if (
+      this.vm.hardforkManager.isEIPActiveAtHardfork(4844, this.blockHardfork)
+    ) {
       const blockGasLimit = toType(this.headerData.gasLimit, TypeOutput.BigInt)
       const _blobGasPerBlob = this.vm.hardforkManager.getParamAtHardfork(
         'blobGasPerBlob',
-        blockHardfork,
+        this.blockHardfork,
       )!
 
       const blockGasRemaining = blockGasLimit - this.gasUsed
@@ -325,22 +346,31 @@ export class BlockBuilder {
       if (tx instanceof Blob4844Tx) {
         const blobGasLimit = this.vm.hardforkManager.getParamAtHardfork(
           'maxBlobGasPerBlock',
-          blockHardfork,
+          this.blockHardfork,
         )!
         if (
           tx.networkWrapperVersion === NetworkWrapperType.EIP4844 &&
-          this.vm.hardforkManager.isEIPActiveAtHardfork(7594, blockHardfork)
+          this.vm.hardforkManager.isEIPActiveAtHardfork(
+            7594,
+            this.blockHardfork,
+          )
         ) {
           throw Error('eip4844 blob transaction for eip7594 activated fork')
         } else if (
           tx.networkWrapperVersion === NetworkWrapperType.EIP7594 &&
-          !this.vm.hardforkManager.isEIPActiveAtHardfork(7594, blockHardfork)
+          !this.vm.hardforkManager.isEIPActiveAtHardfork(
+            7594,
+            this.blockHardfork,
+          )
         ) {
           throw Error('eip7594 blob transaction but eip not yet activated')
         }
 
         if (
-          !this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)
+          !this.vm.hardforkManager.isEIPActiveAtHardfork(
+            4844,
+            this.blockHardfork,
+          )
         ) {
           throw Error('eip4844 not activated yet for adding a blob transaction')
         }
@@ -396,6 +426,7 @@ export class BlockBuilder {
       blockContext,
       skipHardForkValidation,
       blockGasUsed: this.gasUsed,
+      evm: blockEvm, // Pass the block-scoped EVM
     })
 
     // If tx is a blob transaction, remove blobs/kzg commitments before adding to block per EIP-4844
@@ -419,8 +450,8 @@ export class BlockBuilder {
    * Reverts the checkpoint on the StateManager to reset the state from any transactions that have been run.
    */
   async revert() {
-    if (this.checkpointed) {
-      await this.vm.evm.journal.revert()
+    if (this.checkpointed && this.blockEvm !== undefined) {
+      await this.blockEvm.journal.revert()
       this.checkpointed = false
     }
     this.blockStatus = { status: BuildStatus.Reverted }
@@ -488,8 +519,8 @@ export class BlockBuilder {
 
     // Commit checkpoint before getting stateRoot to ensure all state changes are persisted
     // This matches the order in runBlock() where commit happens before getStateRoot()
-    if (this.checkpointed) {
-      await this.vm.evm.journal.commit()
+    if (this.checkpointed && this.blockEvm !== undefined) {
+      await this.blockEvm.journal.commit()
       this.checkpointed = false
     }
 
@@ -540,10 +571,8 @@ export class BlockBuilder {
   }
 
   async initState() {
-    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
-      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
-      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
-    )
+    const blockEvm = await this.getBlockEvm()
+    const blockHardfork = this.blockHardfork
 
     // Apply DAO hardfork if this is the DAO fork block
     const daoHardforkBlock = this.vm.hardforkManager.hardforkBlock(Hardfork.Dao)
@@ -554,11 +583,11 @@ export class BlockBuilder {
       toType(this.headerData.number, TypeOutput.BigInt) === daoHardforkBlock
     ) {
       if (!this.checkpointed) {
-        await this.vm.evm.journal.checkpoint()
+        await blockEvm.journal.checkpoint()
         this.checkpointed = true
       }
-      await _applyDAOHardfork(this.vm.evm)
-      await this.vm.evm.journal.commit()
+      await _applyDAOHardfork(blockEvm)
+      await blockEvm.journal.commit()
       // Reset checkpointed flag after committing DAO hardfork
       // The DAO hardfork changes are now persisted, and we'll create a new checkpoint
       // for the block building process if needed
@@ -567,7 +596,7 @@ export class BlockBuilder {
 
     if (this.vm.hardforkManager.isEIPActiveAtHardfork(4788, blockHardfork)) {
       if (!this.checkpointed) {
-        await this.vm.evm.journal.checkpoint()
+        await blockEvm.journal.checkpoint()
         this.checkpointed = true
       }
 
@@ -583,11 +612,12 @@ export class BlockBuilder {
         parentBeaconBlockRootBuf,
         timestampBigInt,
         blockHardfork,
+        blockEvm,
       )
     }
     if (this.vm.hardforkManager.isEIPActiveAtHardfork(2935, blockHardfork)) {
       if (!this.checkpointed) {
-        await this.vm.evm.journal.checkpoint()
+        await blockEvm.journal.checkpoint()
         this.checkpointed = true
       }
 
@@ -602,6 +632,7 @@ export class BlockBuilder {
         numberBigInt,
         parentHashSanitized,
         blockHardfork,
+        blockEvm,
       )
     }
   }
