@@ -22,7 +22,7 @@ import { EOACode7702Tx } from './tx'
  * - `chainId` will be set automatically if not provided
  * - All parameters are optional and have some basic default values
  */
-export function createEOACode7702Tx(txData: TxData, opts: TxOptions = {}) {
+export function createEOACode7702Tx(txData: TxData, opts: TxOptions) {
   return new EOACode7702Tx(txData, opts)
 }
 
@@ -34,7 +34,7 @@ export function createEOACode7702Tx(txData: TxData, opts: TxOptions = {}) {
  */
 export function createEOACode7702TxFromBytesArray(
   values: TxValuesArray,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   if (values.length !== 10 && values.length !== 13) {
     throw EthereumJSErrorWithoutCode(
@@ -98,7 +98,7 @@ export function createEOACode7702TxFromBytesArray(
  */
 export function createEOACode7702TxFromRLP(
   serialized: Uint8Array,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   if (
     equalsBytes(

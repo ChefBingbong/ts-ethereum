@@ -1,5 +1,5 @@
 import * as crypto from 'node:crypto'
-import type { CustomCrypto, GlobalConfig } from '@ts-ethereum/chain-config'
+import type { CustomCrypto, HardforkManager } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   assertEq,
@@ -96,7 +96,7 @@ export class ECIES {
     privateKey: Uint8Array,
     id: Uint8Array,
     remoteId: Uint8Array,
-    _common?: GlobalConfig,
+    _common?: HardforkManager,
   ) {
     this._privateKey = privateKey
     this._publicKey = id2pk(id)

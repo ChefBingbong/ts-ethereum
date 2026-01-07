@@ -22,13 +22,15 @@ const modulusBuffer = setLengthLeft(bigIntToBytes(BLS_MODULUS), 32)
 
 export async function precompile0a(opts: PrecompileInput): Promise<ExecResult> {
   const pName = getPrecompileName('0a')
-  if (opts.common.customCrypto?.kzg === undefined) {
+  const hardfork = opts._EVM.fork
+  if (opts.customCrypto?.kzg === undefined) {
     throw EthereumJSErrorWithoutCode('kzg not initialized')
   }
-  const gasUsed = opts.common.getParamByEIP(
-    4844,
+  const eip4844Hardfork = opts.common.getHardforkForEIP(4844) ?? hardfork
+  const gasUsed = opts.common.getParamAtHardfork(
     'kzgPointEvaluationPrecompileGas',
-  )
+    eip4844Hardfork,
+  )!
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }
@@ -41,12 +43,15 @@ export async function precompile0a(opts: PrecompileInput): Promise<ExecResult> {
   }
 
   const version = Number(
-    opts.common.getParamByEIP(4844, 'blobCommitmentVersionKzg'),
+    opts.common.getParamAtHardfork(
+      'blobCommitmentVersionKzg',
+      eip4844Hardfork,
+    )!,
   )
-  const fieldElementsPerBlob = opts.common.getParamByEIP(
-    4844,
+  const fieldElementsPerBlob = opts.common.getParamAtHardfork(
     'fieldElementsPerBlob',
-  )
+    eip4844Hardfork,
+  )!
   const versionedHash = bytesToHex(opts.data.subarray(0, 32))
   const z = bytesToHex(opts.data.subarray(32, 64))
   const y = bytesToHex(opts.data.subarray(64, 96))
@@ -71,12 +76,7 @@ export async function precompile0a(opts: PrecompileInput): Promise<ExecResult> {
     )
   }
   try {
-    const res = opts.common.customCrypto?.kzg?.verifyProof(
-      commitment,
-      z,
-      y,
-      kzgProof,
-    )
+    const res = opts.customCrypto?.kzg?.verifyProof(commitment, z, y, kzgProof)
     if (res === false) {
       return EVMErrorResult(
         new EVMError(EVMError.errorMessages.INVALID_PROOF),

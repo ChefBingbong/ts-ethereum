@@ -6,6 +6,12 @@
  * its own protocol negotiation mechanism.
  */
 
+import type {
+  IpcSocketConnectOpts,
+  Socket,
+  TcpSocketConnectOpts,
+} from 'node:net'
+import net from 'node:net'
 import os from 'node:os'
 import type { Listener, Logger, Transport } from '@libp2p/interface'
 import {
@@ -25,8 +31,6 @@ import {
 import debug from 'debug'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 import type { Components as Libp2pComponents } from 'libp2p/dist/src/components'
-import type { IpcSocketConnectOpts, Socket, TcpSocketConnectOpts } from 'net'
-import net from 'net'
 import { CustomProgressEvent } from 'progress-events'
 import { RLPxConnection } from './connection'
 import { RLPxConnectionAdapter } from './connection-adapter'

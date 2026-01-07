@@ -1,8 +1,8 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import {
-  GlobalConfig,
-  Hardfork,
-  mainnetSchema,
+  createHardforkManagerFromConfig,
+  type HardforkManager,
+  Mainnet,
 } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
@@ -72,7 +72,7 @@ export class MerkleStateManager implements StateManagerInterface {
   protected readonly _prefixCodeHashes: boolean
   protected readonly _prefixStorageTrieKeys: boolean
 
-  public readonly common: GlobalConfig
+  public readonly common: HardforkManager
 
   protected _checkpointCount: number
 
@@ -101,12 +101,7 @@ export class MerkleStateManager implements StateManagerInterface {
 
     this._debug = debugDefault('statemanager:merkle')
 
-    this.common =
-      opts.common ??
-      GlobalConfig.fromSchema({
-        schema: mainnetSchema,
-        hardfork: Hardfork.Prague,
-      })
+    this.common = opts.common ?? createHardforkManagerFromConfig(Mainnet)
 
     this._checkpointCount = 0
 
@@ -757,16 +752,13 @@ export class MerkleStateManager implements StateManagerInterface {
    * `downlevelCaches` setting.
    */
   shallowCopy(downlevelCaches = true): MerkleStateManager {
-    const common = this.common.copy()
-    common.setHardfork(this.common.hardfork())
-
     const cacheSize = !downlevelCaches ? this._trie['_opts']['cacheSize'] : 0
     const trie = this._trie.shallowCopy(false, { cacheSize })
     const prefixCodeHashes = this._prefixCodeHashes
     const prefixStorageTrieKeys = this._prefixStorageTrieKeys
 
     return new MerkleStateManager({
-      common,
+      common: this.common,
       trie,
       prefixStorageTrieKeys,
       prefixCodeHashes,

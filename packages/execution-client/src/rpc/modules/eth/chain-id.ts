@@ -5,7 +5,7 @@ import { chainIdSchema } from './schema'
 
 export const chainId = (node: ExecutionNode) => {
   return createRpcMethod(chainIdSchema, async (_params, _c) => {
-    const chainId = node.chain.config.chainCommon.chainId()
+    const chainId = node.chain.config.hardforkManager.chainId()
     return safeResult(bigIntToHex(chainId))
   })
 }

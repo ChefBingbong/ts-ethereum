@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -15,12 +15,12 @@ describe('Precompiles: hardfork availability', () => {
     const ECPAIR_Address = new Address(hexToBytes(`0x${ECPAIR_AddressStr}`))
 
     // ECPAIR was introduced in Byzantium; check if available from Byzantium.
-    const commonByzantium = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Byzantium,
-    })
+    const commonByzantium = createHardforkManagerFromConfig(Mainnet)
 
-    let BN254PAIRING =
-      getActivePrecompiles(commonByzantium).get(ECPAIR_AddressStr)
+    let BN254PAIRING = getActivePrecompiles(
+      commonByzantium,
+      Hardfork.Byzantium,
+    ).get(ECPAIR_AddressStr)
 
     if (!BN254PAIRING) {
       assert.fail(
@@ -32,6 +32,7 @@ describe('Precompiles: hardfork availability', () => {
 
     let evm = await createEVM({
       common: commonByzantium,
+      hardfork: Hardfork.Byzantium,
     })
     let result = await evm.runCall({
       caller: createZeroAddress(),
@@ -43,11 +44,11 @@ describe('Precompiles: hardfork availability', () => {
     assert.strictEqual(result.execResult.executionGasUsed, BigInt(100000)) // check that we are using gas (if address would contain no code we use 0 gas)
 
     // Check if ECPAIR is available in future hard forks.
-    const commonPetersburg = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Petersburg,
-    })
-    BN254PAIRING =
-      getActivePrecompiles(commonPetersburg).get(ECPAIR_AddressStr)!
+    const commonPetersburg = createHardforkManagerFromConfig(Mainnet)
+    BN254PAIRING = getActivePrecompiles(
+      commonPetersburg,
+      Hardfork.Petersburg,
+    ).get(ECPAIR_AddressStr)!
     if (BN254PAIRING === undefined) {
       assert.fail(
         'BN254PAIRING is not available in petersburg while it should be available',
@@ -58,6 +59,7 @@ describe('Precompiles: hardfork availability', () => {
 
     evm = await createEVM({
       common: commonPetersburg,
+      hardfork: Hardfork.Petersburg,
     })
     result = await evm.runCall({
       caller: createZeroAddress(),
@@ -69,10 +71,11 @@ describe('Precompiles: hardfork availability', () => {
     assert.strictEqual(result.execResult.executionGasUsed, BigInt(100000))
 
     // Check if ECPAIR is not available in Homestead.
-    const commonHomestead = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Homestead,
-    })
-    BN254PAIRING = getActivePrecompiles(commonHomestead).get(ECPAIR_AddressStr)!
+    const commonHomestead = createHardforkManagerFromConfig(Mainnet)
+    BN254PAIRING = getActivePrecompiles(
+      commonHomestead,
+      Hardfork.Homestead,
+    ).get(ECPAIR_AddressStr)!
 
     if (BN254PAIRING !== undefined) {
       assert.fail(
@@ -84,6 +87,7 @@ describe('Precompiles: hardfork availability', () => {
 
     evm = await createEVM({
       common: commonHomestead,
+      hardfork: Hardfork.Homestead,
     })
 
     result = await evm.runCall({

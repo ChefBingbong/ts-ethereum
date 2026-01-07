@@ -101,10 +101,7 @@ export class MerklePatriciaTrie {
         )
       }
       this._opts = { ...this._opts, ...opts }
-      this._opts.useKeyHashingFunction =
-        opts.common?.customCrypto.keccak256 ??
-        opts.useKeyHashingFunction ??
-        keccak_256
+      this._opts.useKeyHashingFunction = keccak_256
 
       valueEncoding =
         opts.db !== undefined

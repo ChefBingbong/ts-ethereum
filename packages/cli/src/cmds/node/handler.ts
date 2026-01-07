@@ -3,12 +3,11 @@ import path from 'node:path'
 import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
+  createHardforkManagerFromConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
-  Hardfork,
   initPrivateKey,
-  mainnetSchema,
+  Mainnet,
   readAccounts,
   writeAccounts,
 } from '@ts-ethereum/chain-config'
@@ -256,11 +255,8 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
 
   const account = accounts[0]
 
-  // Create GlobalConfig
-  const common = GlobalConfig.fromSchema({
-    schema: mainnetSchema,
-    hardfork: Hardfork.Prague,
-  })
+  // Create HardforkManager
+  const hardforkManager = createHardforkManagerFromConfig(Mainnet)
 
   // Setup bootnodes
   let bootnodes: any[] = []
@@ -283,7 +279,8 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
 
   // Create config with all options
   const configOptions = await createConfigOptions({
-    common,
+    hardforkManager,
+    common: hardforkManager,
     logger: nodeLogger,
     datadir: dataDir,
     key: privateKey,
@@ -350,6 +347,7 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
   const _bootnodes = configOptions.bootnodes ? [...configOptions.bootnodes] : []
   const _accounts = configOptions.accounts ? [...configOptions.accounts] : []
   const config = new Config({
+    hardforkManager,
     ...configOptions,
     bootnodes: _bootnodes,
     accounts: _accounts,
@@ -371,7 +369,7 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
   // Create blockchain
   const blockchain = await createBlockchain({
     db: new LevelDB(databases.chainDB),
-    common,
+    hardforkManager,
     hardforkByHeadBlockNumber: true,
     validateBlocks: true,
     validateConsensus: true,

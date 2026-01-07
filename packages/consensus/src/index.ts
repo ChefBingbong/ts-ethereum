@@ -101,12 +101,16 @@ export class Miner {
         const data = this.block.toJSON() as BlockData
         data.header!.mixHash = solution.mixHash
         data.header!.nonce = solution.nonce
-        return createBlock(data, { common: this.block.common })
+        return createBlock(data, {
+          hardforkManager: this.block.hardforkManager,
+        })
       } else {
         const data = this.blockHeader.toJSON() as HeaderData
         data.mixHash = solution.mixHash
         data.nonce = solution.nonce
-        return createBlockHeader(data, { common: this.blockHeader.common })
+        return createBlockHeader(data, {
+          hardforkManager: this.blockHeader.hardforkManager,
+        })
       }
     }
   }

@@ -1,5 +1,9 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import {
+  createHardforkManagerFromConfig,
+  type HardforkManager,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   Account,
@@ -36,14 +40,14 @@ export class SimpleStateManager implements StateManagerInterface {
     clear(): void
   }
 
-  public readonly common?: GlobalConfig
+  public readonly common?: HardforkManager
 
   constructor(opts: SimpleStateManagerOpts = {}) {
     this.checkpointSync()
     this.originalStorageCache = new OriginalStorageCache(
       this.getStorage.bind(this),
     )
-    this.common = opts.common
+    this.common = opts.common ?? createHardforkManagerFromConfig(Mainnet)
   }
 
   protected topAccountStack() {
@@ -106,7 +110,7 @@ export class SimpleStateManager implements StateManagerInterface {
       await this.putAccount(address, new Account())
     }
     await this.modifyAccountFields(address, {
-      codeHash: (this.common?.customCrypto.keccak256 ?? keccak_256)(value),
+      codeHash: keccak_256(value),
     })
   }
 

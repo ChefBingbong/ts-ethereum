@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { ConsensusAlgorithm } from '@ts-ethereum/chain-config'
 import type {
   BinaryTreeAccessWitnessInterface,
@@ -146,7 +146,8 @@ export class Interpreter {
   protected _vm: any
   protected _runState: RunState
   protected _stateManager: StateManagerInterface
-  protected common: GlobalConfig
+  protected common: HardforkManager
+  public fork: string
   public _evm: EVM
   public journal: Journal
   _env: Env
@@ -175,9 +176,11 @@ export class Interpreter {
     this._evm = evm
     this._stateManager = stateManager
     this.common = this._evm.common
+    // Use execution fork if available, otherwise use EVM's default fork
+    this.fork = (this._evm as any)._executionFork ?? this._evm.fork
 
     if (
-      this.common.consensusType() === 'poa' &&
+      this.common.config.spec.chain?.consensus?.type === 'poa' &&
       this._evm['_optsCached'].cliqueSigner === undefined
     )
       throw EthereumJSErrorWithoutCode(
@@ -218,10 +221,13 @@ export class Interpreter {
     code: Uint8Array,
     opts: InterpreterOpts = {},
   ): Promise<InterpreterResult> {
-    if (!this.common.isActivatedEIP(3540) || code[0] !== FORMAT) {
+    if (
+      !this.common.isEIPActiveAtHardfork(3540, this.fork) ||
+      code[0] !== FORMAT
+    ) {
       // EIP-3540 isn't active and first byte is not 0xEF - treat as legacy bytecode
       this._runState.code = code
-    } else if (this.common.isActivatedEIP(3540)) {
+    } else if (this.common.isEIPActiveAtHardfork(3540, this.fork)) {
       if (code[1] !== MAGIC) {
         // Bytecode contains invalid EOF magic byte
         return {
@@ -327,7 +333,7 @@ export class Interpreter {
       // chunk in the witness, and throw appropriate error to distinguish from an actual invalid opcode
       if (
         opCode === 0xfe &&
-        this.common.isActivatedEIP(7864) &&
+        this.common.isEIPActiveAtHardfork(7864, this.fork) &&
         // is this a code loaded from state using witnesses
         this._runState.env.chargeCodeAccesses === true
       ) {
@@ -417,8 +423,8 @@ export class Interpreter {
       }
 
       if (
-        (this.common.isActivatedEIP(6800) ||
-          this.common.isActivatedEIP(7864)) &&
+        (this.common.isEIPActiveAtHardfork(6800, this.fork) ||
+          this.common.isEIPActiveAtHardfork(7864, this.fork)) &&
         this._env.chargeCodeAccesses === true
       ) {
         const contract = this._runState.interpreter.getAddress()
@@ -896,7 +902,10 @@ export class Interpreter {
    */
   getBlockCoinbase(): bigint {
     let coinbase: Address
-    if (this.common.consensusAlgorithm() === ConsensusAlgorithm.Clique) {
+    if (
+      this.common.config.spec.chain?.consensus?.algorithm ===
+      ConsensusAlgorithm.Clique
+    ) {
       coinbase = this._evm['_optsCached'].cliqueSigner!(this._env.block.header)
     } else {
       coinbase = this._env.block.header.coinbase
@@ -1074,7 +1083,7 @@ export class Interpreter {
     // empty the return data Uint8Array
     this._runState.returnBytes = new Uint8Array(0)
     let createdAddresses: Set<PrefixedHexString>
-    if (this.common.isActivatedEIP(6780)) {
+    if (this.common.isEIPActiveAtHardfork(6780, this.fork)) {
       createdAddresses = new Set(this._result.createdAddresses)
       msg.createdAddresses = createdAddresses
     }
@@ -1084,7 +1093,8 @@ export class Interpreter {
 
     // Check if account has enough ether and max depth not exceeded
     if (
-      this._env.depth >= Number(this.common.param('stackLimit')) ||
+      this._env.depth >=
+        Number(this.common.getParamAtHardfork('stackLimit', this.fork)!) ||
       (msg.delegatecall !== true && this._env.contract.balance < msg.value)
     ) {
       return BIGINT_0
@@ -1116,7 +1126,7 @@ export class Interpreter {
       for (const addressToSelfdestructHex of selfdestruct) {
         this._result.selfdestruct.add(addressToSelfdestructHex)
       }
-      if (this.common.isActivatedEIP(6780)) {
+      if (this.common.isEIPActiveAtHardfork(6780, this.fork)) {
         // copy over the items to result via iterator
         for (const item of createdAddresses!) {
           this._result.createdAddresses!.add(item)
@@ -1153,7 +1163,8 @@ export class Interpreter {
 
     // Check if account has enough ether and max depth not exceeded
     if (
-      this._env.depth >= Number(this.common.param('stackLimit')) ||
+      this._env.depth >=
+        Number(this.common.getParamAtHardfork('stackLimit', this.fork)!) ||
       this._env.contract.balance < value
     ) {
       return BIGINT_0
@@ -1167,9 +1178,12 @@ export class Interpreter {
     this._env.contract.nonce += BIGINT_1
     await this.journal.putAccount(this._env.address, this._env.contract)
 
-    if (this.common.isActivatedEIP(3860)) {
+    if (this.common.isEIPActiveAtHardfork(3860, this.fork)) {
       if (
-        codeToRun.length > this.common.getParamByEIP(3860, 'maxInitCodeSize') &&
+        codeToRun.length >
+          Number(
+            this.common.getParamAtHardfork('maxInitCodeSize', this.fork)!,
+          ) &&
         this._evm.allowUnlimitedInitCodeSize === false
       ) {
         return BIGINT_0
@@ -1191,7 +1205,7 @@ export class Interpreter {
     })
 
     let createdAddresses: Set<PrefixedHexString>
-    if (this.common.isActivatedEIP(6780)) {
+    if (this.common.isEIPActiveAtHardfork(6780, this.fork)) {
       createdAddresses = new Set(this._result.createdAddresses)
       message.createdAddresses = createdAddresses
     }
@@ -1221,7 +1235,7 @@ export class Interpreter {
       for (const addressToSelfdestructHex of selfdestruct) {
         this._result.selfdestruct.add(addressToSelfdestructHex)
       }
-      if (this.common.isActivatedEIP(6780)) {
+      if (this.common.isEIPActiveAtHardfork(6780, this.fork)) {
         // copy over the items to result via iterator
         for (const item of createdAddresses!) {
           this._result.createdAddresses!.add(item)
@@ -1283,7 +1297,9 @@ export class Interpreter {
   async _selfDestruct(toAddress: Address): Promise<void> {
     // only add to refund if this is the first selfdestruct for the address
     if (!this._result.selfdestruct.has(bytesToHex(this._env.address.bytes))) {
-      this.refundGas(this.common.param('selfdestructRefundGas'))
+      this.refundGas(
+        this.common.getParamAtHardfork('selfdestructRefundGas', this.fork)!,
+      )
     }
 
     this._result.selfdestruct.add(bytesToHex(this._env.address.bytes))
@@ -1301,7 +1317,7 @@ export class Interpreter {
     }
 
     // Modify the account (set balance to 0) flag
-    let doModify = !this.common.isActivatedEIP(6780) // Always do this if 6780 is not active
+    let doModify = !this.common.isEIPActiveAtHardfork(6780, this.fork) // Always do this if 6780 is not active
 
     if (!doModify) {
       // If 6780 is active, check if current address is being created. If so

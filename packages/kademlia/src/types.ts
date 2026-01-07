@@ -1,7 +1,7 @@
 // src/kademlia/types.ts
 // Types for Ethereum-compatible Kademlia DHT discovery protocol
 
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
 
@@ -86,9 +86,9 @@ export interface KademliaTransportOptions {
    */
   createSocket?: Function
   /**
-   * GlobalConfig instance for crypto primitives.
+   * HardforkManager instance for crypto primitives.
    */
-  common?: GlobalConfig
+  common?: HardforkManager
 }
 
 export interface KademliaTransportEvent {
@@ -154,9 +154,9 @@ export interface KademliaConfig {
    */
   concurrency?: number
   /**
-   * GlobalConfig instance for crypto primitives.
+   * HardforkManager instance for crypto primitives.
    */
-  common?: GlobalConfig
+  common?: HardforkManager
 }
 
 export interface KademliaEvent {

@@ -97,12 +97,12 @@ export class FullSynchronizer extends Synchronizer {
     const hash = this.chain.blocks.latest!.hash()
     this.startingBlock = number
     const timestamp = this.chain.blocks.latest?.header.timestamp
-    this.config.chainCommon.setHardforkBy({ blockNumber: number, timestamp })
+    // this.config.chainCommon.setHardforkBy({ blockNumber: number, timestamp })
 
     this.config.options.logger?.info(
       `Latest local block number=${Number(number)} td=${td} hash=${short(
         hash,
-      )} hardfork=${this.config.chainCommon.hardfork()}`,
+      )} hardfork=${this.config.hardforkManager.getHardforkByBlock(number)}`,
     )
   }
 
@@ -231,7 +231,7 @@ export class FullSynchronizer extends Synchronizer {
     this.config.options.logger?.info(
       `Imported blocks count=${
         blocks.length
-      } first=${first} last=${last} hash=${hash} hardfork=${this.config.chainCommon.hardfork()} peers=${this.pool.getPeerCount()}`,
+      } first=${first} last=${last} hash=${hash} hardfork=${this.config.hardforkManager.getHardforkByBlock(first)} peers=${this.pool.getPeerCount()}`,
     )
 
     this.txPool.removeNewBlockTxs(blocks)

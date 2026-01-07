@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { devp2pDebug } from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debugDefault from 'debug'
@@ -11,7 +11,7 @@ type MessageCodes = { [key: number | string]: number | string }
  * Protocol connection interface - provides what protocols need from connection/peer
  */
 export interface ProtocolConnection {
-  common: GlobalConfig
+  common: HardforkManager
   _socket: { remoteAddress?: string; remotePort?: number }
   _hello: { protocolVersion: number } | null
   sendSubprotocolMessage?(code: number, data: Uint8Array): boolean

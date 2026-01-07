@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -12,10 +12,8 @@ describe('EVM -> getActiveOpcodes()', () => {
   const CHAINID = 0x46 //istanbul opcode
 
   it('should not expose opcodes from a follow-up HF (istanbul -> petersburg)', async () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Petersburg,
-    })
-    const evm = await createEVM({ common })
+    const common = createHardforkManagerFromConfig(Mainnet)
+    const evm = await createEVM({ common, hardfork: Hardfork.Petersburg })
     assert.strictEqual(
       evm.getActiveOpcodes().get(CHAINID),
       undefined,
@@ -24,20 +22,15 @@ describe('EVM -> getActiveOpcodes()', () => {
   })
 
   it('should expose opcodes when HF is active (>= istanbul)', async () => {
-    let common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Istanbul,
-    })
-    let evm = await createEVM({ common })
+    const common = createHardforkManagerFromConfig(Mainnet)
+    let evm = await createEVM({ common, hardfork: Hardfork.Istanbul })
     assert.strictEqual(
       evm.getActiveOpcodes().get(CHAINID)!.name,
       'CHAINID',
       'istanbul opcode exposed (HF: istanbul)',
     )
 
-    common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.MuirGlacier,
-    })
-    evm = await createEVM({ common })
+    evm = await createEVM({ common, hardfork: Hardfork.MuirGlacier })
     assert.strictEqual(
       evm.getActiveOpcodes().get(CHAINID)!.name,
       'CHAINID',
@@ -46,18 +39,15 @@ describe('EVM -> getActiveOpcodes()', () => {
   })
 
   it('should switch DIFFICULTY opcode name to PREVRANDAO when >= Merge HF', async () => {
-    let common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Istanbul,
-    })
-    let evm = await createEVM({ common })
+    const common = createHardforkManagerFromConfig(Mainnet)
+    let evm = await createEVM({ common, hardfork: Hardfork.Istanbul })
     assert.strictEqual(
       evm.getActiveOpcodes().get(DIFFICULTY_PREVRANDAO)!.name,
       'DIFFICULTY',
       'Opcode x44 named DIFFICULTY pre-Merge',
     )
 
-    common = createCustomCommon({}, Mainnet, { hardfork: Hardfork.Paris })
-    evm = await createEVM({ common })
+    evm = await createEVM({ common, hardfork: Hardfork.Paris })
     assert.strictEqual(
       evm.getActiveOpcodes().get(DIFFICULTY_PREVRANDAO)!.name,
       'PREVRANDAO',
@@ -66,19 +56,17 @@ describe('EVM -> getActiveOpcodes()', () => {
   })
 
   it('should update opcodes on a hardfork change', async () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
-    const evm = await createEVM({ common })
+    const common = createHardforkManagerFromConfig(Mainnet)
+    let evm = await createEVM({ common, hardfork: Hardfork.Chainstart })
 
-    common.setHardfork(Hardfork.Byzantium)
+    evm = await createEVM({ common, hardfork: Hardfork.Byzantium })
     assert.strictEqual(
       evm.getActiveOpcodes().get(CHAINID),
       undefined,
       'opcode not exposed after HF change (-> < istanbul)',
     )
 
-    common.setHardfork(Hardfork.Istanbul)
+    evm = await createEVM({ common, hardfork: Hardfork.Istanbul })
     assert.strictEqual(
       evm.getActiveOpcodes().get(CHAINID)!.name,
       'CHAINID',

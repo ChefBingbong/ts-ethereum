@@ -40,7 +40,7 @@ import { normalizeTxParams } from './util/general'
  */
 export function createTx<T extends TransactionType>(
   txData: TypedTxData,
-  txOptions: TxOptions = {},
+  txOptions: TxOptions,
 ): Transaction[T] {
   if (!('type' in txData) || txData.type === undefined) {
     // Assume legacy transaction
@@ -72,7 +72,7 @@ export function createTx<T extends TransactionType>(
  */
 export function createTxFromRLP<T extends TransactionType>(
   data: Uint8Array,
-  txOptions: TxOptions = {},
+  txOptions: TxOptions,
 ): Transaction[T] {
   if (data[0] <= 0x7f) {
     // Determine the type.
@@ -106,7 +106,7 @@ export function createTxFromRLP<T extends TransactionType>(
  */
 export function createTxFromBlockBodyData(
   data: Uint8Array | Uint8Array[],
-  txOptions: TxOptions = {},
+  txOptions: TxOptions,
 ) {
   if (data instanceof Uint8Array) {
     return createTxFromRLP(data, txOptions)
@@ -129,7 +129,7 @@ export function createTxFromBlockBodyData(
  */
 export async function createTxFromRPC<T extends TransactionType>(
   txData: TxData[T],
-  txOptions: TxOptions = {},
+  txOptions: TxOptions,
 ): Promise<Transaction[T]> {
   return createTx(normalizeTxParams(txData), txOptions)
 }
@@ -153,6 +153,9 @@ export async function createTxFromJSONRPCProvider(
   })
   if (txData === null) {
     throw EthereumJSErrorWithoutCode('No data returned from provider')
+  }
+  if (!txOptions) {
+    throw EthereumJSErrorWithoutCode('txOptions is required')
   }
   return createTxFromRPC(txData, txOptions)
 }

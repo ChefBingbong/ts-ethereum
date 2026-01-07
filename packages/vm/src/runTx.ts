@@ -1,6 +1,10 @@
 import type { Block } from '@ts-ethereum/block'
-import { cliqueSigner, createBlockHeader } from '@ts-ethereum/block'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import {
+  cliqueSigner,
+  createBlockContext,
+  getHardforkFromBlockContext,
+} from '@ts-ethereum/block'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
 import { BinaryTreeAccessWitness, type EVM } from '@ts-ethereum/evm'
 import type {
@@ -13,6 +17,7 @@ import type {
   TypedTransaction,
 } from '@ts-ethereum/tx'
 import { Capability, isBlob4844Tx } from '@ts-ethereum/tx'
+import type { BlockContext } from '@ts-ethereum/utils'
 import {
   Account,
   Address,
@@ -50,7 +55,14 @@ import type { VM } from './vm'
 const debug = debugDefault('vm:tx')
 const debugGas = debugDefault('vm:tx:gas')
 
-const DEFAULT_HEADER = createBlockHeader()
+// Default header values - will be replaced with actual block header when available
+const DEFAULT_HEADER = {
+  gasLimit: BigInt(0),
+  gasUsed: BigInt(0),
+  baseFeePerGas: BigInt(0),
+  getBlobGasPrice: () => BigInt(0),
+  coinbase: { bytes: new Uint8Array(20) },
+} as any
 
 let enableProfiler = false
 const initLabel = 'EVM journal init, address/slot warming, fee validation'
@@ -84,24 +96,74 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     console.time(entireTxLabel)
   }
 
-  if (opts.skipHardForkValidation !== true && opts.block !== undefined) {
-    // If block and tx don't have a same hardfork, set tx hardfork to block
-    if (opts.tx.common.hardfork() !== opts.block.common.hardfork()) {
-      opts.tx.common.setHardfork(opts.block.common.hardfork())
-    }
-    if (opts.block.common.hardfork() !== vm.common.hardfork()) {
-      // Block and VM's hardfork should match as well
-      const msg = _errorMsg(
-        'block has a different hardfork than the vm',
-        vm,
-        opts.block,
-        opts.tx,
+  // Determine BlockContext and hardfork for this transaction execution
+  let blockContext: BlockContext
+  let blockHardfork: string
+
+  if (opts.blockContext !== undefined) {
+    // Use provided BlockContext
+    blockContext = opts.blockContext
+    blockHardfork = getHardforkFromBlockContext(
+      blockContext,
+      vm.hardforkManager,
+    )
+  } else if (opts.block !== undefined) {
+    // Create BlockContext from block header
+    blockContext = createBlockContext(
+      opts.block.header,
+      vm.hardforkManager,
+      (blockNumber: bigint) => {
+        // For BLOCKHASH opcode, we can only access blocks that are already in the blockchain
+        // This is a synchronous operation - if the block isn't available, return undefined
+        // The EVM will handle this by returning zero hash
+        return undefined // Will be handled by EVM's getBlockHash implementation
+      },
+    )
+    blockHardfork = getHardforkFromBlockContext(
+      blockContext,
+      vm.hardforkManager,
+    )
+
+    if (opts.skipHardForkValidation !== true) {
+      // Validate that block and tx are using compatible chain IDs
+      const blockChainId = opts.block.hardforkManager.chainId()
+      const vmChainId = vm.hardforkManager.chainId()
+      if (blockChainId !== vmChainId) {
+        const msg = _errorMsg(
+          'block and vm have different chain IDs',
+          vm,
+          opts.block,
+          opts.tx,
+        )
+        throw EthereumJSErrorWithoutCode(msg)
+      }
+      // Validate that block hardfork is compatible with VM's hardfork manager
+      const blockHardforkFromVM = vm.hardforkManager.getHardforkByBlock(
+        opts.block.header.number,
+        opts.block.header.timestamp,
       )
-      throw EthereumJSErrorWithoutCode(msg)
+      if (blockHardfork !== blockHardforkFromVM) {
+        const msg = _errorMsg(
+          'block hardfork does not match VM hardfork manager',
+          vm,
+          opts.block,
+          opts.tx,
+        )
+        throw EthereumJSErrorWithoutCode(msg)
+      }
     }
+  } else {
+    // For standalone transaction execution without block context
+    // This should be rare and only for testing/debugging
+    throw EthereumJSErrorWithoutCode(
+      'BlockContext or block is required for transaction execution. Provide either opts.block or opts.blockContext.',
+    )
   }
 
-  const gasLimit = opts.block?.header.gasLimit ?? DEFAULT_HEADER.gasLimit
+  // At this point, blockContext is guaranteed to be defined (either from opts.blockContext or created from opts.block)
+  // TypeScript doesn't recognize this due to control flow analysis limitations
+
+  const gasLimit = blockContext.gasLimit
   if (
     opts.skipBlockGasLimitValidation !== true &&
     gasLimit < opts.tx.gasLimit
@@ -135,10 +197,10 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   // Typed transaction specific setup tasks
   if (
     opts.tx.supports(Capability.EIP2718TypedTransaction) &&
-    vm.common.isActivatedEIP(2718)
+    vm.hardforkManager.isEIPActiveAtHardfork(2718, blockHardfork)
   ) {
     // Is it an Access List transaction?
-    if (!vm.common.isActivatedEIP(2930)) {
+    if (!vm.hardforkManager.isEIPActiveAtHardfork(2930, blockHardfork)) {
       await vm.evm.journal.revert()
       const msg = _errorMsg(
         'Cannot run transaction: EIP 2930 is not activated.',
@@ -150,7 +212,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     }
     if (
       opts.tx.supports(Capability.EIP1559FeeMarket) &&
-      !vm.common.isActivatedEIP(1559)
+      !vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork)
     ) {
       await vm.evm.journal.revert()
       const msg = _errorMsg(
@@ -180,7 +242,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   }
 
   try {
-    const result = await _runTx(vm, opts)
+    const result = await _runTx(vm, opts, blockHardfork, blockContext)
     await vm.evm.journal.commit()
     if (vm.DEBUG) {
       debug(`tx checkpoint committed`)
@@ -193,7 +255,7 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     }
     throw e
   } finally {
-    if (vm.common.isActivatedEIP(2929)) {
+    if (vm.hardforkManager.isEIPActiveAtHardfork(2929, blockHardfork)) {
       vm.evm.journal.cleanJournal()
     }
     vm.evm.stateManager.originalStorageCache.clear()
@@ -212,13 +274,18 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   }
 }
 
-async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
+async function _runTx(
+  vm: VM,
+  opts: RunTxOpts,
+  blockHardfork: string,
+  blockContext: BlockContext,
+): Promise<RunTxResult> {
   const state = vm.stateManager
 
   let stateAccesses: BinaryTreeAccessWitness | undefined
   let txAccesses: BinaryTreeAccessWitness | undefined
 
-  if (vm.common.isActivatedEIP(7864)) {
+  if (vm.hardforkManager.isEIPActiveAtHardfork(7864, blockHardfork)) {
     if (vm.evm.binaryTreeAccessWitness === undefined) {
       throw Error(
         `Binary tree access witness needed for execution of binary tree blocks`,
@@ -257,7 +324,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     )
   }
 
-  if (vm.common.isActivatedEIP(2929)) {
+  if (vm.hardforkManager.isEIPActiveAtHardfork(2929, blockHardfork)) {
     // Add origin and precompiles to warm addresses
     const activePrecompiles = vm.evm.precompiles
     for (const [addressStr] of activePrecompiles.entries()) {
@@ -268,7 +335,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       // Note: in case we create a contract, we do vm in EVMs `_executeCreate` (vm is also correct in inner calls, per the EIP)
       vm.evm.journal.addAlwaysWarmAddress(bytesToUnprefixedHex(tx.to.bytes))
     }
-    if (vm.common.isActivatedEIP(3651)) {
+    if (vm.hardforkManager.isEIPActiveAtHardfork(3651, blockHardfork)) {
       const coinbase =
         block?.header.coinbase.bytes ?? DEFAULT_HEADER.coinbase.bytes
       vm.evm.journal.addAlwaysWarmAddress(bytesToUnprefixedHex(coinbase))
@@ -279,15 +346,20 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   const intrinsicGas = tx.getIntrinsicGas()
   let floorCost = BIGINT_0
 
-  if (vm.common.isActivatedEIP(7623)) {
+  if (vm.hardforkManager.isEIPActiveAtHardfork(7623, blockHardfork)) {
     // Tx should at least cover the floor price for tx data
     let tokens = 0
     for (let i = 0; i < tx.data.length; i++) {
       tokens += tx.data[i] === 0 ? 1 : 4
     }
+    const txHardfork = blockHardfork
     floorCost =
-      tx.common.param('txGas')! +
-      tx.common.getParamByEIP(7623, 'totalCostFloorPerToken') * BigInt(tokens)
+      vm.hardforkManager.getParamAtHardfork('txGas', txHardfork)! +
+      vm.hardforkManager.getParamAtHardfork(
+        'totalCostFloorPerToken',
+        txHardfork,
+      )! *
+        BigInt(tokens)
   }
 
   let gasLimit = tx.gasLimit
@@ -310,7 +382,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     )
   }
 
-  if (vm.common.isActivatedEIP(1559)) {
+  if (vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork)) {
     // EIP-1559 spec:
     // Ensure that the user was willing to at least pay the base fee
     // assert transaction.max_fee_per_gas >= block.base_fee_per_gas
@@ -347,7 +419,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   }
   // EIP-3607: Reject transactions from senders with deployed code
   if (!equalsBytes(fromAccount.codeHash, KECCAK256_NULL)) {
-    const isActive7702 = vm.common.isActivatedEIP(7702)
+    const isActive7702 = vm.hardforkManager.isEIPActiveAtHardfork(
+      7702,
+      blockHardfork,
+    )
     switch (isActive7702) {
       case true: {
         const code = await state.getCode(caller)
@@ -402,7 +477,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   }
 
   if (isBlob4844Tx(tx)) {
-    if (!vm.common.isActivatedEIP(4844)) {
+    if (!vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)) {
       const msg = _errorMsg(
         'blob transactions are only valid with EIP4844 active',
         vm,
@@ -415,7 +490,8 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     // the signer must be able to afford the transaction
     // assert signer(tx).balance >= tx.message.gas * tx.message.max_fee_per_gas + get_total_data_gas(tx) * tx.message.max_fee_per_data_gas
     totalblobGas =
-      vm.common.getParamByEIP(4844, 'blobGasPerBlob') * BigInt(tx.numBlobs())
+      vm.hardforkManager.getParamAtHardfork('blobGasPerBlob', blockHardfork)! *
+      BigInt(tx.numBlobs())
     maxCost += totalblobGas * tx.maxFeePerBlobGas
 
     // 4844 minimum blobGas price check
@@ -472,7 +548,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   } else {
     // Have to cast as legacy tx since EIP1559 tx does not have gas price
     gasPrice = (tx as LegacyTx).gasPrice
-    if (vm.common.isActivatedEIP(1559)) {
+    if (vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork)) {
       const baseFee =
         block?.header.baseFeePerGas ?? DEFAULT_HEADER.baseFeePerGas!
       inclusionFeePerGas = (tx as LegacyTx).gasPrice - baseFee
@@ -505,7 +581,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       const data = authorizationList[i]
       const chainId = data[0]
       const chainIdBN = bytesToBigInt(chainId)
-      if (chainIdBN !== BIGINT_0 && chainIdBN !== vm.common.chainId()) {
+      if (
+        chainIdBN !== BIGINT_0 &&
+        chainIdBN !== vm.hardforkManager.chainId()
+      ) {
         // Chain id does not match, continue
         continue
       }
@@ -566,9 +645,13 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       }
 
       if (accountExists) {
+        const txHardfork = blockHardfork
         const refund =
-          tx.common.getParamByEIP(7702, 'perEmptyAccountCost') -
-          tx.common.getParamByEIP(7702, 'perAuthBaseGas')
+          vm.hardforkManager.getParamAtHardfork(
+            'perEmptyAccountCost',
+            txHardfork,
+          )! -
+          vm.hardforkManager.getParamAtHardfork('perAuthBaseGas', txHardfork)!
         gasRefund += refund
       }
 
@@ -613,6 +696,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
 
   const results = (await vm.evm.runCall({
     block,
+    blockContext: blockContext!, // Non-null assertion: blockContext is guaranteed to be defined here
     gasPrice,
     caller,
     gasLimit,
@@ -623,7 +707,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     accessWitness: txAccesses,
   })) as RunTxResult
 
-  if (vm.common.isActivatedEIP(7864)) {
+  if (vm.hardforkManager.isEIPActiveAtHardfork(7864, blockHardfork)) {
     ;(stateAccesses as BinaryTreeAccessWitness)?.merge(
       txAccesses! as BinaryTreeAccessWitness,
     )
@@ -658,7 +742,11 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
    * Parse results
    */
   // Generate the bloom for the tx
-  results.bloom = txLogsBloom(results.execResult.logs, vm.common)
+  results.bloom = txLogsBloom(
+    results.execResult.logs,
+    vm.hardforkManager,
+    blockHardfork,
+  )
   if (vm.DEBUG) {
     debug(`Generated tx bloom with logs=${results.execResult.logs?.length}`)
   }
@@ -679,7 +767,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   // Process any gas refund
   gasRefund += results.execResult.gasRefund ?? BIGINT_0
   results.gasRefund = gasRefund // TODO: this field could now be incorrect with the introduction of 7623
-  const maxRefundQuotient = vm.common.param('maxRefundQuotient')
+  const maxRefundQuotient = vm.hardforkManager.getParamAtHardfork(
+    'maxRefundQuotient',
+    blockHardfork,
+  )!
   if (gasRefund !== BIGINT_0) {
     const maxRefund = results.totalGasSpent / maxRefundQuotient
     gasRefund = gasRefund < maxRefund ? gasRefund : maxRefund
@@ -695,7 +786,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     }
   }
 
-  if (vm.common.isActivatedEIP(7623)) {
+  if (vm.hardforkManager.isEIPActiveAtHardfork(7623, blockHardfork)) {
     if (results.totalGasSpent < floorCost) {
       if (vm.DEBUG) {
         debugGas(
@@ -726,7 +817,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
 
   // Update miner's balance
   let miner
-  if (vm.common.consensusType() === ConsensusType.ProofOfAuthority) {
+  if (
+    vm.hardforkManager.config.spec.chain.consensus.type ===
+    ConsensusType.ProofOfAuthority
+  ) {
     miner = cliqueSigner(block?.header ?? DEFAULT_HEADER)
   } else {
     miner = block?.header.coinbase ?? DEFAULT_HEADER.coinbase
@@ -737,7 +831,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     minerAccount = new Account()
   }
   // add the amount spent on gas to the miner's account
-  results.minerValue = vm.common.isActivatedEIP(1559)
+  results.minerValue = vm.hardforkManager.isEIPActiveAtHardfork(
+    1559,
+    blockHardfork,
+  )
     ? results.totalGasSpent * inclusionFeePerGas!
     : results.amountSpent
   minerAccount.balance += results.minerValue
@@ -765,7 +862,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
   if (results.execResult.selfdestruct !== undefined) {
     for (const addressToSelfdestructHex of results.execResult.selfdestruct) {
       const address = new Address(hexToBytes(addressToSelfdestructHex))
-      if (vm.common.isActivatedEIP(6780)) {
+      if (vm.hardforkManager.isEIPActiveAtHardfork(6780, blockHardfork)) {
         // skip cleanup of addresses not in createdAddresses
         if (!results.execResult.createdAddresses!.has(address.toString())) {
           continue
@@ -785,7 +882,10 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     console.time(accessListLabel)
   }
 
-  if (opts.reportAccessList === true && vm.common.isActivatedEIP(2930)) {
+  if (
+    opts.reportAccessList === true &&
+    vm.hardforkManager.isEIPActiveAtHardfork(2930, blockHardfork)
+  ) {
     // Convert the Map to the desired type
     const accessList: AccessList = []
     for (const [address, set] of vm.evm.journal.accessList!) {
@@ -832,6 +932,7 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
     tx,
     results,
     cumulativeGasUsed,
+    blockHardfork,
     totalblobGas,
     blobGasPrice,
   )
@@ -865,8 +966,12 @@ async function _runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
  * @method txLogsBloom
  * @private
  */
-function txLogsBloom(logs?: any[], common?: GlobalConfig): Bloom {
-  const bloom = new Bloom(undefined, common)
+function txLogsBloom(
+  logs?: any[],
+  hardforkManager?: HardforkManager,
+  hardfork?: string,
+): Bloom {
+  const bloom = new Bloom(undefined, hardforkManager, hardfork)
   if (logs) {
     for (let i = 0; i < logs.length; i++) {
       const log = logs[i]
@@ -896,6 +1001,7 @@ export async function generateTxReceipt(
   tx: TypedTransaction,
   txResult: RunTxResult,
   cumulativeGasUsed: bigint,
+  blockHardfork: string,
   blobGasUsed?: bigint,
   blobGasPrice?: bigint,
 ): Promise<TxReceipt> {
@@ -918,7 +1024,8 @@ export async function generateTxReceipt(
 
   if (!tx.supports(Capability.EIP2718TypedTransaction)) {
     // Legacy transaction
-    if (vm.common.gteHardfork(Hardfork.Byzantium)) {
+    const receiptHardfork = blockHardfork
+    if (vm.hardforkManager.hardforkGte(receiptHardfork, Hardfork.Byzantium)) {
       // Post-Byzantium
       receipt = {
         status: txResult.execResult.exceptionError !== undefined ? 0 : 1, // Receipts have a 0 as status on error

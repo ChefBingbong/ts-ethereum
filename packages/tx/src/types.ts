@@ -1,6 +1,6 @@
 import type {
-  GlobalConfig,
   Hardfork,
+  HardforkManager,
   ParamsDict,
 } from '@ts-ethereum/chain-config'
 import type {
@@ -18,6 +18,7 @@ import type { AccessList2930Tx } from './2930/tx'
 import type { Blob4844Tx } from './4844/tx'
 import type { EOACode7702Tx } from './7702/tx'
 import type { LegacyTx } from './legacy/tx'
+
 export type Capability = (typeof Capability)[keyof typeof Capability]
 
 /**
@@ -61,16 +62,14 @@ export const Capability = {
  */
 export interface TxOptions {
   /**
-   * A {@link GlobalConfig} object defining the chain and hardfork for the transaction.
+   * A {@link HardforkManager} object defining the chain and hardfork for the transaction.
    *
    * Object will be internally copied so that tx behavior don't incidentally
    * change on future HF changes.
    *
-   * Default: {@link GlobalConfig} object set to `mainnet` and the default hardfork as defined in the {@link GlobalConfig} class.
-   *
-   * Current default hardfork: `istanbul`
+   * Required: Must be provided when creating a transaction.
    */
-  common?: GlobalConfig
+  common: HardforkManager
   /**
    * Tx parameters sorted by EIP can be found in the exported `paramsTx` dictionary,
    * which is internally passed to the associated `@ethereumjs/common` instance which
@@ -106,6 +105,29 @@ export interface TxOptions {
    * Gas cost for initcode size analysis will still be charged. Use with caution.
    */
   allowUnlimitedInitCodeSize?: boolean
+
+  /**
+   * Hardfork context for the transaction. Can be:
+   * - Hardfork identifier (string): uses that specific hardfork
+   * - Block context ({ blockNumber, timestamp? }): determines hardfork from block context
+   * - undefined: uses latest/most permissive hardfork (like geth's LatestSigner pattern)
+   *
+   * If not provided, uses the latest hardfork from the chain config.
+   * This allows transactions to be created without knowing which block they'll be included in.
+   */
+  hardfork?: string | { blockNumber: bigint; timestamp?: bigint }
+
+  /**
+   * @deprecated Use `hardfork` option instead. This will be removed in a future version.
+   * The block number that this transaction depends on or is valid for.
+   */
+  blockNumber?: bigint
+
+  /**
+   * @deprecated Use `hardfork` option instead. This will be removed in a future version.
+   * The timestamp that this transaction depends on or is valid for.
+   */
+  timestamp?: bigint
 }
 
 /**
@@ -221,7 +243,7 @@ export function isEOACode7702Tx(tx: TypedTransaction): tx is EOACode7702Tx {
 export interface TransactionInterface<
   T extends TransactionType = TransactionType,
 > {
-  readonly common: GlobalConfig
+  readonly common: HardforkManager
   readonly nonce: bigint
   readonly gasLimit: bigint
   readonly to?: Address
@@ -231,6 +253,10 @@ export interface TransactionInterface<
   readonly r?: bigint
   readonly s?: bigint
   readonly cache: TransactionCache
+  /**
+   * The resolved hardfork for this transaction, determined from hardfork context.
+   */
+  readonly fork: string
   supports(capability: Capability): boolean
   type: TransactionType
   txOptions: TxOptions

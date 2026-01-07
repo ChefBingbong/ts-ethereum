@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
   bigIntToHex,
@@ -62,11 +62,12 @@ export class AccessList2930Tx
 
   // End of Tx data part
 
-  public readonly common!: GlobalConfig
+  public readonly common!: HardforkManager
 
   readonly txOptions!: TxOptions
 
   readonly cache: TransactionCache = {}
+  readonly fork!: string
 
   /**
    * List of tx type defining EIPs,
@@ -82,7 +83,7 @@ export class AccessList2930Tx
    * the static factory methods to assist in creating a Transaction object from
    * varying data types.
    */
-  public constructor(txData: TxData, opts: TxOptions = {}) {
+  public constructor(txData: TxData, opts: TxOptions) {
     sharedConstructor(
       this,
       { ...txData, type: TransactionType.AccessListEIP2930 },
@@ -96,14 +97,16 @@ export class AccessList2930Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `HardforkManager chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
-    // EIP-2718 check is done in GlobalConfig
-    if (!this.common.isActivatedEIP(2930)) {
-      throw EthereumJSErrorWithoutCode('EIP-2930 not enabled on GlobalConfig')
+    // EIP-2718 check is done in HardforkManager
+    if (!this.common.isEIPActiveAtHardfork(2930, this.fork)) {
+      throw EthereumJSErrorWithoutCode(
+        'EIP-2930 not enabled on HardforkManager',
+      )
     }
     this.activeCapabilities = this.activeCapabilities.concat([2718, 2930])
 

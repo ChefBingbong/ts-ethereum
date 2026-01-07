@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -18,19 +18,24 @@ import {
   createLegacyTxFromBytesArray,
   createLegacyTxFromRLP,
   LegacyTx,
-  paramsTx,
   TransactionType,
 } from '../../src/index'
 import { txsData } from './testData/txs'
 
 describe('[BaseTransaction]', () => {
-  const common = createCustomCommon({}, Mainnet, {
-    hardfork: Hardfork.Chainstart,
-  })
+  const common = createHardforkManagerFromConfig(Mainnet)
+  const blockNumber = 0n
+  const timestamp = 0n
 
   const legacyTxs: LegacyTx[] = []
   for (const tx of txsData.slice(0, 4)) {
-    legacyTxs.push(createLegacyTx(tx.data as LegacyTxData, { common }))
+    legacyTxs.push(
+      createLegacyTx(tx.data as LegacyTxData, {
+        common,
+        blockNumber,
+        timestamp,
+      }),
+    )
   }
 
   const zero = new Uint8Array(0)
@@ -53,45 +58,50 @@ describe('[BaseTransaction]', () => {
 
   it('Initialization', () => {
     for (const txType of txTypes) {
-      let tx = txType.create.txData({}, { common })
+      let tx = txType.create.txData({}, { common, blockNumber, timestamp })
       assert.strictEqual(
-        tx.common.hardfork(),
-        'chainstart',
+        tx.common.getHardforkByBlock(blockNumber, timestamp),
+        Hardfork.Chainstart,
         `${txType.name}: should initialize with correct HF provided`,
       )
       assert.isFrozen(tx, `${txType.name}: tx should be frozen by default`)
 
-      const initCommon = createCustomCommon({}, Mainnet, {
-        hardfork: Hardfork.Chainstart,
-      })
-      tx = txType.create.txData({}, { common: initCommon })
+      const initCommon = createHardforkManagerFromConfig(Mainnet)
+      tx = txType.create.txData(
+        {},
+        { common: initCommon, blockNumber, timestamp },
+      )
       assert.strictEqual(
-        tx.common.hardfork(),
-        'chainstart',
+        tx.common.getHardforkByBlock(blockNumber, timestamp),
+        Hardfork.Chainstart,
         `${txType.name}: should initialize with correct HF provided`,
       )
 
-      tx = txType.create.txData({}, { common, freeze: false })
+      tx = txType.create.txData(
+        {},
+        { common, blockNumber, timestamp, freeze: false },
+      )
       assert.isNotFrozen(
         tx,
         `${txType.name}: tx should not be frozen when freeze deactivated in options`,
       )
 
-      const params = structuredClone(paramsTx)
-      params['1']['txGas'] = 21000n // 21000
-      tx = txType.create.txData({}, { common, params })
+      tx = txType.create.txData({}, { common, blockNumber, timestamp })
       assert.strictEqual(
-        tx.common.param('txGas'),
+        tx.common.getParamAtHardfork('txGas', Hardfork.Chainstart),
         BigInt(21000),
-        'should use custom parameters provided',
+        'should use default parameters',
       )
 
       // Perform the same test as above, but now using a different construction method. This also implies that passing on the
       // options object works as expected.
-      tx = txType.create.txData({}, { common, freeze: false })
+      tx = txType.create.txData(
+        {},
+        { common, blockNumber, timestamp, freeze: false },
+      )
       const rlpData = tx.serialize()
 
-      tx = txType.create.rlp(rlpData, { common })
+      tx = txType.create.rlp(rlpData, { common, blockNumber, timestamp })
       assert.strictEqual(
         tx.type,
         txType.type,
@@ -100,17 +110,28 @@ describe('[BaseTransaction]', () => {
 
       assert.isFrozen(tx, `${txType.name}: tx should be frozen by default`)
 
-      tx = txType.create.rlp(rlpData, { common, freeze: false })
+      tx = txType.create.rlp(rlpData, {
+        common,
+        blockNumber,
+        timestamp,
+        freeze: false,
+      })
       assert.isNotFrozen(
         tx,
         `${txType.name}: tx should not be frozen when freeze deactivated in options`,
       )
 
-      tx = txType.create.bytesArray(txType.values as any, { common })
+      tx = txType.create.bytesArray(txType.values as any, {
+        common,
+        blockNumber,
+        timestamp,
+      })
       assert.isFrozen(tx, `${txType.name}: tx should be frozen by default`)
 
       tx = txType.create.bytesArray(txType.values as any, {
         common,
+        blockNumber,
+        timestamp,
         freeze: false,
       })
       assert.isNotFrozen(
@@ -124,7 +145,11 @@ describe('[BaseTransaction]', () => {
     const rlpData: any = legacyTxs[0].raw()
     rlpData[0] = hexToBytes('0x0')
     try {
-      createLegacyTxFromBytesArray(rlpData)
+      createLegacyTxFromBytesArray(rlpData, {
+        common,
+        blockNumber,
+        timestamp,
+      })
       assert.fail('should have thrown when nonce has leading zeroes')
     } catch (err: any) {
       assert.isTrue(
@@ -135,7 +160,11 @@ describe('[BaseTransaction]', () => {
     rlpData[0] = hexToBytes('0x')
     rlpData[6] = hexToBytes('0x0')
     try {
-      createLegacyTxFromBytesArray(rlpData)
+      createLegacyTxFromBytesArray(rlpData, {
+        common,
+        blockNumber,
+        timestamp,
+      })
       assert.fail('should have thrown when v has leading zeroes')
     } catch (err: any) {
       assert.isTrue(
@@ -149,11 +178,19 @@ describe('[BaseTransaction]', () => {
     for (const txType of txTypes) {
       for (const tx of txType.txs) {
         assert.isDefined(
-          txType.create.rlp(tx.serialize(), { common }),
+          txType.create.rlp(tx.serialize(), {
+            common,
+            blockNumber,
+            timestamp,
+          }),
           `${txType.name}: should do roundtrip serialize() -> fromSerializedTx()`,
         )
         assert.isDefined(
-          txType.create.rlp(tx.serialize(), { common }),
+          txType.create.rlp(tx.serialize(), {
+            common,
+            blockNumber,
+            timestamp,
+          }),
           `${txType.name}: should do roundtrip serialize() -> fromSerializedTx()`,
         )
       }
@@ -177,7 +214,11 @@ describe('[BaseTransaction]', () => {
     for (const txType of txTypes) {
       for (const tx of txType.txs) {
         assert.isDefined(
-          txType.create.bytesArray(tx.raw() as any, { common }),
+          txType.create.bytesArray(tx.raw() as any, {
+            common,
+            blockNumber,
+            timestamp,
+          }),
           `${txType.name}: should do roundtrip raw() -> createWithdrawalFromBytesArray()`,
         )
       }
@@ -201,7 +242,11 @@ describe('[BaseTransaction]', () => {
       for (const txFixture of txType.fixtures.slice(0, 4)) {
         // set `s` to a single zero
         txFixture.data.s = '0x' + '0'
-        const tx = txType.create.txData((txFixture as any).data, { common })
+        const tx = txType.create.txData((txFixture as any).data, {
+          common,
+          blockNumber,
+          timestamp,
+        })
         assert.strictEqual(
           tx.verifySignature(),
           false,
@@ -248,12 +293,15 @@ describe('[BaseTransaction]', () => {
         ...txType.txs,
         // add unsigned variants
         ...txType.txs.map((tx) =>
-          txType.create.txData({
-            ...tx,
-            v: undefined,
-            r: undefined,
-            s: undefined,
-          }),
+          txType.create.txData(
+            {
+              ...tx,
+              v: undefined,
+              r: undefined,
+              s: undefined,
+            },
+            { common, blockNumber, timestamp },
+          ),
         ),
       ]
       for (const tx of txs) {
@@ -339,17 +387,20 @@ describe('[BaseTransaction]', () => {
 
   it('initialization with defaults', () => {
     const bufferZero = hexToBytes('0x')
-    const tx = createLegacyTx({
-      nonce: undefined,
-      gasLimit: undefined,
-      gasPrice: undefined,
-      to: undefined,
-      value: undefined,
-      data: undefined,
-      v: undefined,
-      r: undefined,
-      s: undefined,
-    })
+    const tx = createLegacyTx(
+      {
+        nonce: undefined,
+        gasLimit: undefined,
+        gasPrice: undefined,
+        to: undefined,
+        value: undefined,
+        data: undefined,
+        v: undefined,
+        r: undefined,
+        s: undefined,
+      },
+      { common, blockNumber, timestamp },
+    )
     assert.strictEqual(tx.v, undefined)
     assert.strictEqual(tx.r, undefined)
     assert.strictEqual(tx.s, undefined)

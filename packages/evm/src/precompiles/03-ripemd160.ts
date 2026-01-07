@@ -9,11 +9,13 @@ import { gasLimitCheck } from './util'
 
 export function precompile03(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('03')
+  const hardfork = opts._EVM.fork
   const data = opts.data
+  const eip1Hardfork = opts.common.getHardforkForEIP(1) ?? hardfork
 
-  let gasUsed = opts.common.getParamByEIP(1, 'ripemd160Gas')
+  let gasUsed = opts.common.getParamAtHardfork('ripemd160Gas', eip1Hardfork)!
   gasUsed +=
-    opts.common.getParamByEIP(1, 'ripemd160WordGas') *
+    opts.common.getParamAtHardfork('ripemd160WordGas', eip1Hardfork)! *
     BigInt(Math.ceil(data.length / 32))
 
   if (!gasLimitCheck(opts, gasUsed, pName)) {

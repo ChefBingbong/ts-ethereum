@@ -22,7 +22,7 @@ import { AccessList2930Tx } from './tx'
  * - `chainId` will be set automatically if not provided
  * - All parameters are optional and have some basic default values
  */
-export function createAccessList2930Tx(txData: TxData, opts: TxOptions = {}) {
+export function createAccessList2930Tx(txData: TxData, opts: TxOptions) {
   return new AccessList2930Tx(txData, opts)
 }
 
@@ -34,7 +34,7 @@ export function createAccessList2930Tx(txData: TxData, opts: TxOptions = {}) {
  */
 export function createAccessList2930TxFromBytesArray(
   values: TxValuesArray,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   if (values.length !== 8 && values.length !== 11) {
     throw EthereumJSErrorWithoutCode(
@@ -87,7 +87,7 @@ export function createAccessList2930TxFromBytesArray(
  */
 export function createAccessList2930TxFromRLP(
   serialized: Uint8Array,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   if (
     equalsBytes(

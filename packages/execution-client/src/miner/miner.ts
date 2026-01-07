@@ -252,21 +252,41 @@ export class Miner {
     const minerGasPrice = this.config.options.minerGasPrice
     const minerPriorityAddresses = this.config.options.minerPriorityAddresses
 
-    let baseFeePerGas
-    const londonHardforkBlock = this.config.chainCommon.hardforkBlock(
+    // Calculate timestamp for the new block (must be >= parent timestamp)
+    // Use current time, but ensure it's at least parent timestamp + 1
+    const currentTimestamp = BigInt(Math.round(Date.now() / 1000))
+    const timestamp =
+      currentTimestamp > parentBlock.header.timestamp
+        ? currentTimestamp
+        : parentBlock.header.timestamp + BIGINT_1
+
+    // Determine hardfork using the NEW block's timestamp (not parent's)
+    const blockHardfork = this.config.hardforkManager.getHardforkByBlock(
+      number,
+      timestamp,
+    )
+    const londonHardforkBlock = this.config.hardforkManager.hardforkBlock(
       Hardfork.London,
     )
+    let baseFeePerGas
     if (
-      typeof londonHardforkBlock === 'bigint' &&
+      londonHardforkBlock !== null &&
       londonHardforkBlock !== BIGINT_0 &&
       number === londonHardforkBlock
     ) {
-      // Get baseFeePerGas from `paramByEIP` since 1559 not currently active on common
+      // Get baseFeePerGas from param since 1559 not currently active
       baseFeePerGas =
-        BigInt(vmCopy.common.param('initialBaseFee') ?? '0') ?? BIGINT_0
+        BigInt(
+          this.config.hardforkManager.getParamAtHardfork(
+            'initialBaseFee',
+            blockHardfork,
+          ) ?? '0',
+        ) ?? BIGINT_0
       // Set initial EIP1559 block gas limit to 2x parent gas limit per logic in `block.validateGasLimit`
       gasLimit = gasLimit * BIGINT_2
-    } else if (this.config.chainCommon.isActivatedEIP(1559)) {
+    } else if (
+      this.config.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork)
+    ) {
       baseFeePerGas = parentBlock.header.calcNextBaseFee()
     }
 
@@ -274,12 +294,14 @@ export class Miner {
       parentBlock,
       headerData: {
         number,
+        timestamp,
         gasLimit,
         baseFeePerGas,
         coinbase,
         extraData: minerExtraData,
       },
       blockOpts: {
+        hardforkManager: this.config.hardforkManager,
         setHardfork: true,
         calcDifficultyFromHeader,
         putBlockIntoBlockchain: false,
@@ -413,7 +435,7 @@ export class Miner {
     sealedBlockData.header!.nonce = bytesToHex(solution.nonce)
     sealedBlockData.header!.mixHash = bytesToHex(solution.mixHash)
     const block = createBlock(sealedBlockData, {
-      common: unsealedBlock.common,
+      hardforkManager: unsealedBlock.hardforkManager,
     })
 
     if (this.config.options.saveReceipts) {

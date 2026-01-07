@@ -53,6 +53,7 @@ function multiplicationComplexity(x: bigint): bigint {
 function getAdjustedExponentLength(
   data: Uint8Array,
   opts: PrecompileInput,
+  hardfork: string,
 ): bigint {
   let expBytesStart
   try {
@@ -83,7 +84,9 @@ function getAdjustedExponentLength(
   }
   let adjustedExpLen =
     expLenMinus32OrZero *
-    (opts.common.isActivatedEIP(7883) === true ? BIGINT_16 : BIGINT_8)
+    (opts.common.isEIPActiveAtHardfork(7883, hardfork) === true
+      ? BIGINT_16
+      : BIGINT_8)
   if (bitLen > 0) {
     adjustedExpLen += BigInt(bitLen)
   }
@@ -105,9 +108,10 @@ export function expMod(a: bigint, power: bigint, modulo: bigint) {
 
 export function precompile05(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('05')
+  const hardfork = opts._EVM.fork
   const data = opts.data.length < 96 ? setLengthRight(opts.data, 96) : opts.data
 
-  let adjustedELen = getAdjustedExponentLength(data, opts)
+  let adjustedELen = getAdjustedExponentLength(data, opts, hardfork)
   if (adjustedELen < BIGINT_1) {
     adjustedELen = BIGINT_1
   }
@@ -120,7 +124,11 @@ export function precompile05(opts: PrecompileInput): ExecResult {
   if (maxLen < mLen) {
     maxLen = mLen
   }
-  const Gquaddivisor = opts.common.getParamByEIP(2565, 'modexpGquaddivisorGas')
+  const eip2565Hardfork = opts.common.getHardforkForEIP(2565) ?? hardfork
+  const Gquaddivisor = opts.common.getParamAtHardfork(
+    'modexpGquaddivisorGas',
+    eip2565Hardfork,
+  )!
   let gasUsed
 
   const bStart = BIGINT_96
@@ -130,9 +138,9 @@ export function precompile05(opts: PrecompileInput): ExecResult {
   const mStart = eEnd
   const mEnd = mStart + mLen
 
-  if (opts.common.isActivatedEIP(2565)) {
+  if (opts.common.isEIPActiveAtHardfork(2565, hardfork)) {
     const words = (maxLen + BIGINT_7) / BIGINT_8
-    if (opts.common.isActivatedEIP(7883)) {
+    if (opts.common.isEIPActiveAtHardfork(7883, hardfork)) {
       gasUsed =
         adjustedELen *
         (maxLen > BIGINT_32 ? BIGINT_2 * words * words : BIGINT_16)
@@ -155,7 +163,7 @@ export function precompile05(opts: PrecompileInput): ExecResult {
 
   // Upper bounds by EIP-7823 (Osaka and upwards) or otherwise
   // @ethereumjs/util setLengthRight limitation
-  const maxSize = opts.common.isActivatedEIP(7823)
+  const maxSize = opts.common.isEIPActiveAtHardfork(7823, hardfork)
     ? BIGINT_1024
     : BIGINT_2147483647
 
@@ -170,7 +178,7 @@ export function precompile05(opts: PrecompileInput): ExecResult {
 
   // Optimization: do not compute for b and m being 0 but return early
   if (
-    !opts.common.isActivatedEIP(7823) &&
+    !opts.common.isEIPActiveAtHardfork(7823, hardfork) &&
     bLen === BIGINT_0 &&
     mLen === BIGINT_0
   ) {

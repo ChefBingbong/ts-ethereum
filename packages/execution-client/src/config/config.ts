@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { createMetrics, type Metrics } from '@ts-ethereum/metrics'
 import { BIGINT_0, genPrivateKey, safeTry } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
@@ -24,8 +24,6 @@ export interface SynchronizedState {
 export class Config {
   public readonly events: EventEmitter<EventParams>
   public readonly options: ResolvedConfigOptions
-  public readonly chainCommon: GlobalConfig
-  public readonly execCommon: GlobalConfig
 
   public synchronized: boolean
   public lastSynchronized: boolean
@@ -34,6 +32,7 @@ export class Config {
   public lastSyncDate: number
   public metrics?: Metrics
   protected startTime: number
+  public hardforkManager: HardforkManager
 
   public shutdown: boolean
 
@@ -42,8 +41,8 @@ export class Config {
   constructor(options: ConfigOptions) {
     this.events = new EventEmitter<EventParams>()
     this.options = createConfigOptions(options)
-    this.chainCommon = this.options.common.copy()
-    this.execCommon = this.options.common.copy()
+    // Use hardforkManager if provided, otherwise use common
+    this.hardforkManager = options.hardforkManager ?? options.common!
     this.logger = this.options.logger ?? new Logger()
 
     this.shutdown = false
@@ -76,7 +75,7 @@ export class Config {
     if (latest) {
       this.metrics.chain.blockHeight.set(Number(latest.number))
       this.metrics.chain.totalDifficulty.set(Number(chain.blocks.td))
-      this.metrics.chain.chainId.set(Number(chain.config.chainCommon.chainId()))
+      this.metrics.chain.chainId.set(Number(this.hardforkManager.chainId()))
       this.metrics.chain.blocksImported.inc()
       this.metrics.chain.blockHash.set(
         { hash: latest.hash.toString() },
@@ -150,7 +149,7 @@ export class Config {
   }
 
   getNetworkDirectory(): string {
-    const networkDirName = this.chainCommon.chain?.name
+    const networkDirName = this.hardforkManager.chainName()
     return `${this.options.datadir}/${networkDirName}`
   }
 
@@ -176,7 +175,7 @@ export class Config {
     return new Level<string | Uint8Array, Uint8Array>(`${networkDir}/config`)
   }
 
-  static async getClientKey(datadir: string, common: GlobalConfig) {
+  static async getClientKey(datadir: string, common: HardforkManager) {
     const db = Config.getConfigDB(`${datadir}/${common.chainName()}`)
     const dbKey = 'config:client_key'
 

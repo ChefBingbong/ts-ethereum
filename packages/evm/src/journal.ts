@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import type { Account, PrefixedHexString } from '@ts-ethereum/utils'
@@ -38,7 +38,8 @@ type JournalHeight = number
 
 export class Journal {
   private stateManager: StateManagerInterface
-  private common: GlobalConfig
+  private common: HardforkManager
+  private fork: string
   private DEBUG: boolean
   private _debug: Debugger
 
@@ -52,7 +53,11 @@ export class Journal {
   public accessList?: Map<AddressString, Set<SlotString>>
   public preimages?: Map<PrefixedHexString, Uint8Array>
 
-  constructor(stateManager: StateManagerInterface, common: GlobalConfig) {
+  constructor(
+    stateManager: StateManagerInterface,
+    common: HardforkManager,
+    fork: string,
+  ) {
     // Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
     // Additional window check is to prevent vite browser bundling (and potentially other) to break
     this.DEBUG =
@@ -68,6 +73,7 @@ export class Journal {
 
     this.stateManager = stateManager
     this.common = common
+    this.fork = fork
   }
 
   /**
@@ -204,7 +210,7 @@ export class Journal {
    * Also cleanups any other internal fields
    */
   async cleanup(): Promise<void> {
-    if (this.common.gteHardfork(Hardfork.SpuriousDragon)) {
+    if (this.common.hardforkGte(this.fork, Hardfork.SpuriousDragon)) {
       for (const addressHex of this.touched) {
         const address = new Address(hexToBytes(`0x${addressHex}`))
         const account = await this.stateManager.getAccount(address)

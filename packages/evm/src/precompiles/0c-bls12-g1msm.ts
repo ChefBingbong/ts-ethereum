@@ -32,8 +32,13 @@ export async function precompile0c(opts: PrecompileInput): Promise<ExecResult> {
   // TODO: Double-check respectively confirm that this order is really correct that the gas check
   // on this eventually to be "floored" pair number should happen before the input length modulo
   // validation (same for g2msm)
+  const hardfork = opts._EVM.fork
+  const eip2537Hardfork = opts.common.getHardforkForEIP(2537) ?? hardfork
   const numPairs = Math.floor(inputData.length / 160)
-  const gasUsedPerPair = opts.common.getParamByEIP(2537, 'bls12381G1MulGas')
+  const gasUsedPerPair = opts.common.getParamAtHardfork(
+    'bls12381G1MulGas',
+    eip2537Hardfork,
+  )!
   const gasUsed = msmGasUsed(
     numPairs,
     gasUsedPerPair,

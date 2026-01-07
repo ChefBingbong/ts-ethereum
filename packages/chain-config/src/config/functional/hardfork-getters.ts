@@ -14,35 +14,34 @@ export function hardforkTimestamp(config: FrozenChainConfig, hardfork: string) {
 
 export function getHardforkByBlock(
   config: FrozenChainConfig,
-  blockNumber: bigint,
+  blockNumber?: bigint,
   timestamp?: bigint,
 ) {
   const { hardforks } = config.spec
-  let result = hardforks[0].name
+  let result: string | undefined
 
-  for (const hf of hardforks) {
-    if (hf.block !== null && blockNumber >= hf.block) {
-      if (hf.timestamp !== undefined && timestamp !== undefined) {
-        const hfTimestamp = BigInt(hf.timestamp)
-        if (timestamp >= hfTimestamp) {
-          result = hf.name
-        }
-      } else if (hf.timestamp === undefined) {
+  if (blockNumber !== undefined) {
+    // Find the LAST hardfork where blockNumber >= hf.block (most recent applicable hardfork)
+    // We need to iterate backwards to find the most recent one
+    for (let i = hardforks.length - 1; i >= 0; i--) {
+      const hf = hardforks[i]
+      if (hf.block !== null && blockNumber >= hf.block) {
         result = hf.name
+        break
       }
-    } else if (
-      hf.block === null &&
-      hf.timestamp !== undefined &&
-      timestamp !== undefined
-    ) {
-      const hfTimestamp = BigInt(hf.timestamp)
-      if (timestamp >= hfTimestamp) {
+    }
+  } else if (timestamp !== undefined) {
+    // Find the LAST hardfork where timestamp >= hf.timestamp (most recent applicable hardfork)
+    for (let i = hardforks.length - 1; i >= 0; i--) {
+      const hf = hardforks[i]
+      if (hf.timestamp !== undefined && timestamp >= BigInt(hf.timestamp)) {
         result = hf.name
+        break
       }
     }
   }
 
-  return result
+  return result ?? hardforks[hardforks.length - 1].name
 }
 
 export function isHardforkAfter(

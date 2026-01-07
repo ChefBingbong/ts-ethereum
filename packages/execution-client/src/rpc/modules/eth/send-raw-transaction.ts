@@ -30,7 +30,7 @@ export const sendRawTransaction = (node: ExecutionNode) => {
           ),
         )
       }
-      const common = node.config.chainCommon.copy()
+      const common = node.config.hardforkManager
 
       const chainHeight = node.chain.headers.height
       let txTargetHeight = syncTargetHeight ?? BIGINT_0
@@ -38,11 +38,12 @@ export const sendRawTransaction = (node: ExecutionNode) => {
         txTargetHeight = chainHeight + BIGINT_1
       }
 
-      common.setHardforkBy({
-        blockNumber: txTargetHeight,
-        timestamp: Math.floor(Date.now() / 1000),
-      })
+      // common.setHardforkBy({
+      //   blockNumber: txTargetHeight,
+      //   timestamp: Math.floor(Date.now() / 1000),
+      // })
 
+      const hardfork = common.getHardforkByBlock(txTargetHeight)
       let tx
       try {
         const txBuf = hexToBytes(serializedTx)
@@ -50,18 +51,24 @@ export const sendRawTransaction = (node: ExecutionNode) => {
           // Blob Transactions sent over RPC are expected to be in Network Wrapper format
           tx = createBlob4844TxFromSerializedNetworkWrapper(txBuf, { common })
           if (
-            common.isActivatedEIP(7594) &&
+            common.isEIPActiveAtHardfork(7594, hardfork) &&
             tx.networkWrapperVersion !== NetworkWrapperType.EIP7594
           ) {
             return safeError(
               new Error(
-                `tx with networkWrapperVersion=${tx.networkWrapperVersion} sent for EIP-7594 activated hardfork=${common.hardfork()}`,
+                `tx with networkWrapperVersion=${tx.networkWrapperVersion} sent for EIP-7594 activated hardfork=${common.getHardforkByBlock(txTargetHeight)}`,
               ),
             )
           }
 
-          const blobGasLimit = tx.common.param('maxBlobGasPerBlock')
-          const blobGasPerBlob = tx.common.param('blobGasPerBlob')
+          const blobGasLimit = common.getParamAtHardfork(
+            'maxBlobGasPerBlock',
+            hardfork,
+          )!
+          const blobGasPerBlob = common.getParamAtHardfork(
+            'blobGasPerBlob',
+            hardfork,
+          )!
 
           if (BigInt((tx.blobs ?? []).length) * blobGasPerBlob > blobGasLimit) {
             return safeError(

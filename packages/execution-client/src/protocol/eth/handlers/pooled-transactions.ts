@@ -24,7 +24,7 @@ export function handlePooledTransactions(
     const decoded = ETH_MESSAGES[EthMessageCode.POOLED_TRANSACTIONS].decode(
       payload as any,
       {
-        chainCommon: handler.config.chainCommon,
+        chainCommon: handler.config.hardforkManager,
         chain: { headers: { latest: handler.chain.blocks.latest?.header } },
         syncTargetHeight: handler.config.syncTargetHeight,
       },

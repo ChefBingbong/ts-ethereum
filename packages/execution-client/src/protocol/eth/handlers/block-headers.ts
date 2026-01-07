@@ -24,7 +24,7 @@ export function handleBlockHeaders(
     const decoded = ETH_MESSAGES[EthMessageCode.BLOCK_HEADERS].decode(
       payload as any,
       {
-        chainCommon: handler.config.chainCommon,
+        chainCommon: handler.config.hardforkManager,
       },
     ) as [bigint, unknown[]]
     const reqId = decoded[0] as bigint

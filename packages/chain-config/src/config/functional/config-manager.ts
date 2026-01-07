@@ -26,6 +26,25 @@ import type { ChainSpec, FrozenChainConfig, HardforkManager } from './types'
 export function createHardforkManager(spec: ChainSpec): HardforkManager {
   const config = _validateAndSetChainSchema(spec)
 
+  // Get the latest hardfork from the spec (most permissive, like geth's LatestSigner)
+  // For post-merge hardforks that use timestamp, we need to use a very large timestamp
+  // to ensure we get the latest hardfork that's actually active
+  const getLatestHardfork = (): string => {
+    const latestHf = spec.hardforks[spec.hardforks.length - 1]
+    if (!latestHf) return 'chainstart'
+
+    // If the latest hardfork uses timestamp-based activation, we need to check
+    // with a very large timestamp to get the actual latest active hardfork
+    if (latestHf.block === null && latestHf.timestamp !== undefined) {
+      // Use MAX_UINT64 as timestamp to ensure we get the latest hardfork
+      const maxTimestamp = BigInt('18446744073709551615') // 2^64 - 1
+      return getHardforkByBlock(config, undefined, maxTimestamp)
+    }
+
+    // For block-based hardforks, just return the name
+    return latestHf.name
+  }
+
   return Object.freeze({
     config,
 
@@ -34,14 +53,58 @@ export function createHardforkManager(spec: ChainSpec): HardforkManager {
     hardforks: () => config.spec.hardforks,
     genesis: () => config.spec.chain?.genesis,
 
-    getHardforkByBlock: (blockNumber: bigint, timestamp?: bigint) =>
-      getHardforkByBlock(config, blockNumber, timestamp),
+    getLatestHardfork,
+
+    getHardforkByBlock: (blockNumber?: bigint, timestamp?: bigint) => {
+      if (blockNumber !== undefined || timestamp !== undefined) {
+        return getHardforkByBlock(config, blockNumber, timestamp)
+      }
+      return getLatestHardfork()
+    },
+
+    getHardforkFromContext: (
+      context?: string | { blockNumber: bigint; timestamp?: bigint },
+    ) => {
+      if (context === undefined) {
+        // No context provided - use latest hardfork (most permissive)
+        return getLatestHardfork()
+      } else if (typeof context === 'string') {
+        // Hardfork identifier provided
+        return context
+      } else {
+        // Block context provided - determine hardfork from block
+        return getHardforkByBlock(
+          config,
+          context.blockNumber,
+          context.timestamp,
+        )
+      }
+    },
 
     isEIPActiveAtHardfork: (eip: number, hardfork: string) =>
       isEIPActiveAtHardfork(config, eip, hardfork),
 
-    getParamAtHardfork: <P extends AllParamNames>(param: P, hardfork: string) =>
-      getParamAtHardfork(config, param, hardfork),
+    getParamAtHardfork: <P extends AllParamNames>(
+      param: P,
+      context?: string | { blockNumber: bigint; timestamp?: bigint },
+    ) => {
+      let hardfork: string
+      if (context === undefined) {
+        // No context provided - use latest hardfork (most permissive)
+        hardfork = getLatestHardfork()
+      } else if (typeof context === 'string') {
+        // Hardfork identifier provided
+        hardfork = context
+      } else {
+        // Block context provided - determine hardfork from block
+        hardfork = getHardforkByBlock(
+          config,
+          context.blockNumber,
+          context.timestamp,
+        )
+      }
+      return getParamAtHardfork(config, param, hardfork)
+    },
 
     getParamsAtHardfork: <H extends keyof HardforkParamsMap>(hardfork: H) =>
       getParamsAtHardfork(config, hardfork) as ParamsAtHardfork<H>,
@@ -55,6 +118,16 @@ export function createHardforkManager(spec: ChainSpec): HardforkManager {
       hardforkTimestamp(config, hardfork),
 
     getActiveEips: (hardfork: string) => getActiveEips(config, hardfork),
+
+    isEIPActiveAtBlock: (
+      eip: number,
+      blockNum?: { blockNumber: bigint; timestamp?: bigint },
+    ) => {
+      const hardfork = blockNum
+        ? getHardforkByBlock(config, blockNum.blockNumber, blockNum.timestamp)
+        : getLatestHardfork()
+      return hardfork ? isEIPActiveAtHardfork(config, eip, hardfork) : false
+    },
 
     getHardforkForEIP: (eip: number) => getHardforkForEIP(config, eip),
   })

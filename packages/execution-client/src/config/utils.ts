@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import {
   defaultMetricsOptions,
@@ -52,7 +52,7 @@ export interface ResolvedConfigOptions {
   readonly savePreimages: boolean
   readonly metrics?: MetricsOptions
   readonly rateLimit?: import('../rpc/rate-limit/types').RateLimitOptions
-  readonly common: GlobalConfig
+  readonly common: HardforkManager
   readonly logger?: Logger
 }
 
@@ -60,7 +60,7 @@ export interface ResolvedConfigOptions {
  * Create config options with all defaults applied
  */
 export function createConfigFromDefaults(
-  common: GlobalConfig,
+  common: HardforkManager,
 ): ResolvedConfigOptions {
   return {
     syncmode: constants.SYNCMODE_DEFAULT,
@@ -101,7 +101,7 @@ export function createConfigFromDefaults(
 export function createConfigOptions(
   options: ConfigOptions,
 ): ResolvedConfigOptions {
-  const defaults = createConfigFromDefaults(options.common)
+  const defaults = createConfigFromDefaults(options.hardforkManager)
 
   return {
     syncmode: options.syncmode ?? defaults.syncmode,
@@ -154,7 +154,7 @@ export function createConfigOptions(
     savePreimages: options.savePreimages ?? defaults.savePreimages,
     metrics: options.metrics ?? defaultMetricsOptions,
     rateLimit: options.rateLimit,
-    common: options.common ?? defaults.common,
+    common: options.hardforkManager ?? defaults.common,
     logger: options.logger ?? defaults.logger,
   }
 }

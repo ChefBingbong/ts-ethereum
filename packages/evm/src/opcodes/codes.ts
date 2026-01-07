@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 import { type CustomOpcode, isAddOpcode } from '../types'
@@ -424,12 +424,14 @@ export type OpcodeMap = OpcodeMapEntry[]
 /**
  * Get suitable opcodes for the required hardfork.
  *
- * @param common {GlobalConfig} Ethereumjs GlobalConfig metadata object.
+ * @param common {HardforkManager} HardforkManager metadata object.
+ * @param hardfork Hardfork identifier to use for opcode selection.
  * @param customOpcodes List with custom opcodes (see EVM `customOpcodes` option description).
  * @returns {OpcodeList} Opcodes dictionary object.
  */
 export function getOpcodesForHF(
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
   customOpcodes?: CustomOpcode[],
 ): OpcodeContext {
   let opcodeBuilder: any = { ...opcodes }
@@ -438,19 +440,22 @@ export function getOpcodesForHF(
   const dynamicGasHandlersCopy = new Map(dynamicGasHandlers)
 
   for (let fork = 0; fork < hardforkOpcodes.length; fork++) {
-    if (common.gteHardfork(hardforkOpcodes[fork].hardfork)) {
+    if (common.hardforkGte(hardfork, hardforkOpcodes[fork].hardfork)) {
       opcodeBuilder = { ...opcodeBuilder, ...hardforkOpcodes[fork].opcodes }
     }
   }
   for (const eipOps of eipOpcodes) {
-    if (common.isActivatedEIP(eipOps.eip)) {
+    if (common.isEIPActiveAtHardfork(eipOps.eip, hardfork)) {
       opcodeBuilder = { ...opcodeBuilder, ...eipOps.opcodes }
     }
   }
 
   for (const key in opcodeBuilder) {
     const baseFee = Number(
-      common.param(`${opcodeBuilder[key].name.toLowerCase()}Gas` as any),
+      common.getParamAtHardfork(
+        `${opcodeBuilder[key].name.toLowerCase()}Gas` as any,
+        hardfork,
+      ),
     )
     // explicitly verify that we have defined a base fee
     if (baseFee === undefined) {

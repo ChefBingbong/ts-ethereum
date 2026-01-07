@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -18,14 +18,15 @@ describe('Precompiles: RIPEMD160', () => {
   it('RIPEMD160', async () => {
     // Test reference: https://github.com/ethereum/go-ethereum/blob/e206d3f8975bd98cc86d14055dca40f996bacc60/core/vm/contracts_test.go#L217
 
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Petersburg,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
     const evm = await createEVM({
       common,
+      hardfork: Hardfork.Petersburg,
     })
     const addressStr = '0000000000000000000000000000000000000003'
-    const RIPEMD160 = getActivePrecompiles(common).get(addressStr)!
+    const RIPEMD160 = getActivePrecompiles(common, Hardfork.Petersburg).get(
+      addressStr,
+    )!
 
     const data = hexToBytes(`0x${input}`)
     let result = await RIPEMD160({

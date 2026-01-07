@@ -1,4 +1,8 @@
-import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
+import type {
+  GlobalConfig,
+  HardforkManager,
+  ParamsDict,
+} from '@ts-ethereum/chain-config'
 import type {
   JSONRPCTx,
   JSONTx,
@@ -33,7 +37,7 @@ export interface BlockOptions {
    *
    * Current default hardfork: `merge`
    */
-  common?: GlobalConfig
+  hardforkManager: HardforkManager
   /**
    * Set the hardfork either by timestamp (for HFs from Shanghai onwards) or by block number
    * for older Hfs.

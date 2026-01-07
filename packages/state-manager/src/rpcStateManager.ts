@@ -1,8 +1,8 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import {
-  GlobalConfig,
-  Hardfork,
-  mainnetSchema,
+  createHardforkManagerFromConfig,
+  type HardforkManager,
+  Mainnet,
 } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
@@ -42,7 +42,7 @@ export class RPCStateManager implements StateManagerInterface {
   protected _debug: Debugger
   protected DEBUG: boolean
   private keccakFunction: Function
-  public readonly common: GlobalConfig
+  public readonly common: HardforkManager
 
   constructor(opts: RPCStateManagerOpts) {
     // Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
@@ -72,13 +72,9 @@ export class RPCStateManager implements StateManagerInterface {
     this.originalStorageCache = new OriginalStorageCache(
       this.getStorage.bind(this),
     )
-    this.common =
-      opts.common?.copy() ??
-      GlobalConfig.fromSchema({
-        schema: mainnetSchema,
-        hardfork: Hardfork.Prague,
-      })
-    this.keccakFunction = opts.common?.customCrypto.keccak256 ?? keccak_256
+    this.common = opts.common ?? createHardforkManagerFromConfig(Mainnet)
+
+    this.keccakFunction = keccak_256
   }
 
   /**

@@ -26,7 +26,7 @@ export async function handleNewBlock(
     const decoded = ETH_MESSAGES[EthMessageCode.NEW_BLOCK].decode(
       payload as any,
       {
-        chainCommon: handler.config.chainCommon,
+        chainCommon: handler.config.hardforkManager,
       },
     )
     const block = decoded[0] as Block

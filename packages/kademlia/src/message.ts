@@ -1,7 +1,7 @@
 // src/kademlia/message.ts
 // RLP-encoded, secp256k1-signed message encoding for Ethereum-compatible discovery protocol
 
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   bigIntToBytes,
@@ -355,7 +355,7 @@ export function encode<T>(
   typename: MessageTypeName,
   data: T,
   privateKey: Uint8Array,
-  common?: GlobalConfig,
+  common?: HardforkManager,
 ): Uint8Array {
   const type = MessageTypes.byName[typename]
   if (type === undefined) throw new Error(`Invalid typename: ${typename}`)
@@ -363,8 +363,8 @@ export function encode<T>(
   const encodedMsg = messages[typename].encode(data)
   const typedata = concatBytes(Uint8Array.from([type]), RLP.encode(encodedMsg))
 
-  const keccakFn = common?.customCrypto?.keccak256 ?? keccak256
-  const signFn = common?.customCrypto?.ecsign ?? secp256k1.sign
+  const keccakFn = keccak256
+  const signFn = secp256k1.sign
 
   const sighash = keccakFn(typedata)
   const sig = signFn(sighash, privateKey)
@@ -387,10 +387,10 @@ export interface DecodedMessage {
 
 export function decode(
   bytes: Uint8Array,
-  common?: GlobalConfig,
+  common?: HardforkManager,
 ): DecodedMessage {
-  const keccakFn = common?.customCrypto?.keccak256 ?? keccak256
-  const recoverFn = common?.customCrypto?.ecdsaRecover ?? ecdsaRecover
+  const keccakFn = keccak256
+  const recoverFn = ecdsaRecover
 
   const hash = keccakFn(bytes.subarray(32))
   assertEq(bytes.subarray(0, 32), hash, 'Hash verification failed', debug)

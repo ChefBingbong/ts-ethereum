@@ -22,7 +22,7 @@ import { FeeMarket1559Tx } from './tx'
  * - `chainId` will be set automatically if not provided
  * - All parameters are optional and have some basic default values
  */
-export function createFeeMarket1559Tx(txData: TxData, opts: TxOptions = {}) {
+export function createFeeMarket1559Tx(txData: TxData, opts: TxOptions) {
   return new FeeMarket1559Tx(txData, opts)
 }
 
@@ -34,7 +34,7 @@ export function createFeeMarket1559Tx(txData: TxData, opts: TxOptions = {}) {
  */
 export function create1559FeeMarketTxFromBytesArray(
   values: TxValuesArray,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   if (values.length !== 9 && values.length !== 12) {
     throw EthereumJSErrorWithoutCode(
@@ -96,7 +96,7 @@ export function create1559FeeMarketTxFromBytesArray(
  */
 export function createFeeMarket1559TxFromRLP(
   serialized: Uint8Array,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   if (
     equalsBytes(

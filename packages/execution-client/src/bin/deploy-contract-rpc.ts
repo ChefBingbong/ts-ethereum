@@ -224,6 +224,7 @@ async function deployContract(
     hash,
     confirmations: 3,
   })
+  console.log('receipt', receipt)
 
   if (!receipt.contractAddress) {
     throw new Error(
@@ -269,8 +270,19 @@ async function setGreeting(
   console.log(`Transaction hash: ${hash}`)
   console.log('Waiting for transaction...')
 
-  await publicClient.waitForTransactionReceipt({ hash })
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash,
+    confirmations: 3,
+  })
+  console.log('receipt', receipt)
   console.log('✅ Greeting updated!')
+  console.log('Block number:', receipt.blockNumber)
+  console.log('Gas used:', receipt.gasUsed.toString())
+  console.log('Status:', receipt.status)
+  console.log('Contract address:', receipt.contractAddress)
+  console.log('Transaction hash:', hash)
+  console.log('Transaction index:', receipt.transactionIndex)
+  console.log('Transaction receipt:', receipt)
 }
 
 async function getGreeting(

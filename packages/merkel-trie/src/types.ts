@@ -1,3 +1,4 @@
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { DB, ValueEncoding } from '@ts-ethereum/utils'
 import { utf8ToBytes } from '@ts-ethereum/utils'
 import type { BranchMPTNode, ExtensionMPTNode, LeafMPTNode } from './node/index'
@@ -110,7 +111,7 @@ export interface MPTOpts {
   /**
    * @ethereumjs/common `GlobalConfig` instance (an alternative to passing in a `customHashingFunction`)
    */
-  common?: CommonInterface
+  common?: HardforkManager
 }
 
 export type MPTOptsWithDefaults = MPTOpts & {

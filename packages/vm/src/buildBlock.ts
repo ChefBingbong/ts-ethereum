@@ -2,6 +2,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import type { Block, HeaderData } from '@ts-ethereum/block'
 import {
   createBlock,
+  createBlockContext,
   createSealedCliqueBlock,
   genRequestsRoot,
   genTransactionsTrieRoot,
@@ -35,6 +36,7 @@ import { Bloom } from './bloom/index'
 import { runTx } from './index'
 import { accumulateRequests } from './requests'
 import {
+  _applyDAOHardfork,
   accumulateParentBeaconBlockRoot,
   accumulateParentBlockHash,
   calculateMinerReward,
@@ -94,10 +96,22 @@ export class BlockBuilder {
 
   constructor(vm: VM, opts: BuildBlockOpts) {
     this.vm = vm
+    // Determine hardfork for this block being built
+    const blockHardfork = vm.hardforkManager.getHardforkByBlock(
+      toType(
+        opts.headerData?.number ?? opts.parentBlock.header.number + BIGINT_1,
+        TypeOutput.BigInt,
+      ),
+      toType(
+        opts.headerData?.timestamp ?? Math.round(Date.now() / 1000),
+        TypeOutput.BigInt,
+      ),
+    )
+
     this.blockOpts = {
       putBlockIntoBlockchain: true,
       ...opts.blockOpts,
-      common: this.vm.common,
+      hardforkManager: this.vm.hardforkManager,
     }
 
     this.headerData = {
@@ -112,12 +126,16 @@ export class BlockBuilder {
 
     console.log(this.headerData.baseFeePerGas, 'baseFeePerGas', this.headerData)
     if (
-      this.vm.common.isActivatedEIP(1559) &&
+      this.vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork) &&
       typeof this.headerData.baseFeePerGas === 'undefined'
     ) {
-      if (this.headerData.number === vm.common.hardforkBlock(Hardfork.London)) {
+      const londonBlock = vm.hardforkManager.hardforkBlock(Hardfork.London)
+      if (londonBlock !== null && this.headerData.number === londonBlock) {
         this.headerData.baseFeePerGas = BigInt(
-          vm.common.getParamByEIP(1559, 'initialBaseFee'),
+          vm.hardforkManager.getParamAtHardfork(
+            'initialBaseFee',
+            blockHardfork,
+          )!,
         )
       } else {
         this.headerData.baseFeePerGas =
@@ -126,7 +144,8 @@ export class BlockBuilder {
     }
 
     if (typeof this.headerData.gasLimit === 'undefined') {
-      if (this.headerData.number === vm.common.hardforkBlock(Hardfork.London)) {
+      const londonBlock = vm.hardforkManager.hardforkBlock(Hardfork.London)
+      if (londonBlock !== null && this.headerData.number === londonBlock) {
         this.headerData.gasLimit = opts.parentBlock.header.gasLimit * BIGINT_2
       } else {
         this.headerData.gasLimit = opts.parentBlock.header.gasLimit
@@ -134,11 +153,14 @@ export class BlockBuilder {
     }
 
     if (
-      this.vm.common.isActivatedEIP(4844) &&
+      this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork) &&
       typeof this.headerData.excessBlobGas === 'undefined'
     ) {
       this.headerData.excessBlobGas =
-        opts.parentBlock.header.calcNextExcessBlobGas(this.vm.common)
+        opts.parentBlock.header.calcNextExcessBlobGas(
+          // this.vm.hardforkManager,
+          blockHardfork,
+        )
     }
   }
 
@@ -162,9 +184,13 @@ export class BlockBuilder {
    * Calculates and returns the transactionsTrie for the block.
    */
   public async transactionsTrie() {
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
     return genTransactionsTrieRoot(
       this.transactions,
-      new MerklePatriciaTrie({ common: this.vm.common }),
+      new MerklePatriciaTrie({ common: this.vm.hardforkManager }),
     )
   }
 
@@ -172,7 +198,11 @@ export class BlockBuilder {
    * Calculates and returns the logs bloom for the block.
    */
   public logsBloom() {
-    const bloom = new Bloom(undefined, this.vm.common)
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
+    const bloom = new Bloom(undefined, this.vm.hardforkManager, blockHardfork)
     for (const txResult of this.transactionResults) {
       // Combine blooms via bitwise OR
       bloom.or(txResult.bloom)
@@ -187,7 +217,9 @@ export class BlockBuilder {
     if (this.transactionResults.length === 0) {
       return KECCAK256_RLP
     }
-    const receiptTrie = new MerklePatriciaTrie({ common: this.vm.common })
+    const receiptTrie = new MerklePatriciaTrie({
+      common: this.vm.hardforkManager,
+    })
     for (const [i, txResult] of this.transactionResults.entries()) {
       const tx = this.transactions[i]
       const encodedReceipt = encodeReceipt(txResult.receipt, tx.type)
@@ -200,19 +232,36 @@ export class BlockBuilder {
    * Adds the block miner reward to the coinbase account.
    */
   private async rewardMiner() {
-    const minerReward = this.vm.common.param('minerReward')
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
+    const minerReward = this.vm.hardforkManager.getParamAtHardfork(
+      'minerReward',
+      blockHardfork,
+    )!
     const reward = calculateMinerReward(BigInt(minerReward ?? 0), 0)
     const coinbase =
       this.headerData.coinbase !== undefined
         ? new Address(toBytes(this.headerData.coinbase))
         : createZeroAddress()
-    await rewardAccount(this.vm.evm, coinbase, reward, this.vm.common)
+    await rewardAccount(
+      this.vm.evm,
+      coinbase,
+      reward,
+      this.vm.hardforkManager,
+      blockHardfork,
+    )
   }
 
   /**
    * Adds the withdrawal amount to the withdrawal address
    */
   private async processWithdrawals() {
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
     for (const withdrawal of this.withdrawals ?? []) {
       const { address, amount } = withdrawal
       // If there is no amount to add, skip touching the account
@@ -226,7 +275,8 @@ export class BlockBuilder {
         this.vm.evm,
         address,
         amount * GWEI_TO_WEI,
-        this.vm.common,
+        this.vm.hardforkManager,
+        blockHardfork,
       )
     }
   }
@@ -253,14 +303,18 @@ export class BlockBuilder {
 
     // According to the Yellow Paper, a transaction's gas limit
     // cannot be greater than the remaining gas in the block
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
     let blobGasUsed
     let blobGasPerBlob
-    if (this.vm.common.isActivatedEIP(4844)) {
+    if (this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)) {
       const blockGasLimit = toType(this.headerData.gasLimit, TypeOutput.BigInt)
-      const _blobGasPerBlob = this.vm.common.getParamByEIP(
-        4844,
+      const _blobGasPerBlob = this.vm.hardforkManager.getParamAtHardfork(
         'blobGasPerBlob',
-      )
+        blockHardfork,
+      )!
 
       const blockGasRemaining = blockGasLimit - this.gasUsed
       if (tx.gasLimit > blockGasRemaining) {
@@ -269,21 +323,25 @@ export class BlockBuilder {
         )
       }
       if (tx instanceof Blob4844Tx) {
-        const { maxBlobGasPerBlock: blobGasLimit } =
-          this.vm.common.getBlobGasSchedule()
+        const blobGasLimit = this.vm.hardforkManager.getParamAtHardfork(
+          'maxBlobGasPerBlock',
+          blockHardfork,
+        )!
         if (
           tx.networkWrapperVersion === NetworkWrapperType.EIP4844 &&
-          this.vm.common.isActivatedEIP(7594)
+          this.vm.hardforkManager.isEIPActiveAtHardfork(7594, blockHardfork)
         ) {
           throw Error('eip4844 blob transaction for eip7594 activated fork')
         } else if (
           tx.networkWrapperVersion === NetworkWrapperType.EIP7594 &&
-          !this.vm.common.isActivatedEIP(7594)
+          !this.vm.hardforkManager.isEIPActiveAtHardfork(7594, blockHardfork)
         ) {
           throw Error('eip7594 blob transaction but eip not yet activated')
         }
 
-        if (this.blockOpts.common?.isActivatedEIP(4844) === false) {
+        if (
+          !this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)
+        ) {
           throw Error('eip4844 not activated yet for adding a blob transaction')
         }
         const blobTx = tx as Blob4844Tx
@@ -319,7 +377,26 @@ export class BlockBuilder {
     const blockData = { header, transactions: this.transactions }
     const block = createBlock(blockData, this.blockOpts)
 
-    const result = await runTx(this.vm, { tx, block, skipHardForkValidation })
+    // Create BlockContext to ensure consistent execution context
+    // This matches what runBlock does in applyTransactions
+    const blockContext = createBlockContext(
+      block.header,
+      this.vm.hardforkManager,
+      (blockNumber: bigint) => {
+        // For BLOCKHASH opcode, we can only access blocks that are already in the blockchain
+        // This is a synchronous operation - if the block isn't available, return undefined
+        // The EVM will handle this by returning zero hash
+        return undefined // Will be handled by EVM's getBlockHash implementation
+      },
+    )
+
+    const result = await runTx(this.vm, {
+      tx,
+      block,
+      blockContext,
+      skipHardForkValidation,
+      blockGasUsed: this.gasUsed,
+    })
 
     // If tx is a blob transaction, remove blobs/kzg commitments before adding to block per EIP-4844
     if (tx instanceof Blob4844Tx && blobGasPerBlob !== undefined) {
@@ -327,7 +404,7 @@ export class BlockBuilder {
       this.blobGasUsed +=
         BigInt(txData.blobVersionedHashes.length) * blobGasPerBlob
       tx = createMinimal4844TxFromNetworkWrapper(txData, {
-        common: this.blockOpts.common,
+        common: this.blockOpts.hardforkManager,
       })
     }
     this.transactions.push(tx)
@@ -366,7 +443,12 @@ export class BlockBuilder {
   async build(sealOpts?: SealBlockOpts) {
     this.checkStatus()
     const blockOpts = this.blockOpts
-    const consensusType = this.vm.common.consensusType()
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
+    const consensusType =
+      this.vm.hardforkManager.config.spec.chain.consensus.type
 
     if (consensusType === ConsensusType.ProofOfWork) {
       await this.rewardMiner()
@@ -377,7 +459,7 @@ export class BlockBuilder {
     const withdrawalsRoot = this.withdrawals
       ? await genWithdrawalsTrieRoot(
           this.withdrawals,
-          new MerklePatriciaTrie({ common: this.vm.common }),
+          new MerklePatriciaTrie({ common: this.vm.hardforkManager }),
         )
       : undefined
     const receiptTrie = await this.receiptTrie()
@@ -387,15 +469,20 @@ export class BlockBuilder {
     const timestamp = this.headerData.timestamp ?? BIGINT_0
 
     let blobGasUsed
-    if (this.vm.common.isActivatedEIP(4844)) {
+    if (this.vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)) {
       blobGasUsed = this.blobGasUsed
     }
 
     let requests
     let requestsHash
-    if (this.vm.common.isActivatedEIP(7685)) {
-      const sha256Function = this.vm.common.customCrypto.sha256 ?? sha256
-      requests = await accumulateRequests(this.vm, this.transactionResults)
+    if (this.vm.hardforkManager.isEIPActiveAtHardfork(7685, blockHardfork)) {
+      // Note: HardforkManager doesn't expose customCrypto, use default sha256
+      const sha256Function = sha256
+      requests = await accumulateRequests(
+        this.vm,
+        this.transactionResults,
+        blockHardfork,
+      )
       requestsHash = genRequestsRoot(requests, sha256Function)
     }
 
@@ -448,7 +535,32 @@ export class BlockBuilder {
   }
 
   async initState() {
-    if (this.vm.common.isActivatedEIP(4788)) {
+    const blockHardfork = this.vm.hardforkManager.getHardforkByBlock(
+      toType(this.headerData.number ?? 0, TypeOutput.BigInt),
+      toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
+    )
+
+    // Apply DAO hardfork if this is the DAO fork block
+    const daoHardforkBlock = this.vm.hardforkManager.hardforkBlock(Hardfork.Dao)
+    if (
+      daoHardforkBlock !== null &&
+      this.headerData.number !== undefined &&
+      toType(this.headerData.number, TypeOutput.BigInt) >= daoHardforkBlock &&
+      toType(this.headerData.number, TypeOutput.BigInt) === daoHardforkBlock
+    ) {
+      if (!this.checkpointed) {
+        await this.vm.evm.journal.checkpoint()
+        this.checkpointed = true
+      }
+      await _applyDAOHardfork(this.vm.evm)
+      await this.vm.evm.journal.commit()
+      // Reset checkpointed flag after committing DAO hardfork
+      // The DAO hardfork changes are now persisted, and we'll create a new checkpoint
+      // for the block building process if needed
+      this.checkpointed = false
+    }
+
+    if (this.vm.hardforkManager.isEIPActiveAtHardfork(4788, blockHardfork)) {
       if (!this.checkpointed) {
         await this.vm.evm.journal.checkpoint()
         this.checkpointed = true
@@ -465,9 +577,10 @@ export class BlockBuilder {
         this.vm,
         parentBeaconBlockRootBuf,
         timestampBigInt,
+        blockHardfork,
       )
     }
-    if (this.vm.common.isActivatedEIP(2935)) {
+    if (this.vm.hardforkManager.isEIPActiveAtHardfork(2935, blockHardfork)) {
       if (!this.checkpointed) {
         await this.vm.evm.journal.checkpoint()
         this.checkpointed = true
@@ -483,6 +596,7 @@ export class BlockBuilder {
         this.vm,
         numberBigInt,
         parentHashSanitized,
+        blockHardfork,
       )
     }
   }

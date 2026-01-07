@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import type { BinaryTree } from './binary-tree/binaryTree'
@@ -11,7 +11,7 @@ interface BaseStateManagerOpts {
   /**
    * The common to use
    */
-  common?: GlobalConfig
+  common?: HardforkManager
 }
 
 /**
@@ -68,7 +68,7 @@ export interface MerkleStateManagerOpts extends BaseStateManagerOpts {
  * Options dictionary.
  */
 export interface StatelessVerkleStateManagerOpts extends BaseStateManagerOpts {
-  common: GlobalConfig // GlobalConfig required since it provides verkleCrypto through customCrypto
+  common: HardforkManager // HardforkManager required since it provides verkleCrypto through customCrypto
   caches?: Caches
 }
 

@@ -55,9 +55,7 @@ export class ExecutionNode {
     const chain = await Chain.create(options)
 
     // Create P2P node first (needed for NetworkService)
-    const bootnodes =
-      options.config.options.bootnodes ??
-      options.config.chainCommon.bootstrapNodes()
+    const bootnodes = options.config.options.bootnodes ?? []
 
     const p2pNode = createP2PNodeFromConfig({
       ...options.config.options,

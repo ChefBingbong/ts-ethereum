@@ -1,6 +1,10 @@
 import type { BlockData } from '@ts-ethereum/block'
 import { createBlock } from '@ts-ethereum/block'
-import type { Chain } from '@ts-ethereum/chain-config'
+import {
+  type Chain,
+  createHardforkManagerFromConfig,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import {
   BIGINT_0,
   bytesToHex,
@@ -24,7 +28,11 @@ const DEBUG =
     : false
 const debug = debugDefault('blockchain:#')
 
-export async function createBlockchain(opts: BlockchainOptions = {}) {
+export async function createBlockchain(
+  opts: BlockchainOptions = {
+    hardforkManager: createHardforkManagerFromConfig(Mainnet),
+  },
+) {
   const blockchain = new Blockchain(opts)
 
   await blockchain.consensus?.setup({ blockchain })
@@ -34,12 +42,12 @@ export async function createBlockchain(opts: BlockchainOptions = {}) {
     if (blockchain['_customGenesisState'] !== undefined) {
       stateRoot = await genGenesisStateRoot(
         blockchain['_customGenesisState'],
-        blockchain.common,
+        blockchain.hardforkManager,
       )
     } else {
       stateRoot = await getGenesisStateRoot(
-        Number(blockchain.common.chainId()) as Chain,
-        blockchain.common,
+        Number(blockchain.hardforkManager.chainId()) as Chain,
+        blockchain.hardforkManager,
       )
     }
   }
@@ -120,12 +128,14 @@ export async function createBlockchain(opts: BlockchainOptions = {}) {
  */
 export async function createBlockchainFromBlocksData(
   blocksData: BlockData[],
-  opts: BlockchainOptions = {},
+  opts: BlockchainOptions = {
+    hardforkManager: createHardforkManagerFromConfig(Mainnet),
+  },
 ) {
   const blockchain = await createBlockchain(opts)
   for (const blockData of blocksData) {
     const block = createBlock(blockData, {
-      common: blockchain.common,
+      hardforkManager: blockchain.hardforkManager,
       setHardfork: true,
     })
     await blockchain.putBlock(block)

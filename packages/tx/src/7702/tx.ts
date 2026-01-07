@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type {
   Address,
   EOACode7702AuthorizationListBytes,
@@ -74,11 +74,12 @@ export class EOACode7702Tx
 
   // End of Tx data part
 
-  public readonly common!: GlobalConfig
+  public readonly common!: HardforkManager
 
   readonly txOptions!: TxOptions
 
   readonly cache: TransactionCache = {}
+  readonly fork!: string
 
   /**
    * List of tx type defining EIPs,
@@ -94,7 +95,7 @@ export class EOACode7702Tx
    * the static factory methods to assist in creating a Transaction object from
    * varying data types.
    */
-  public constructor(txData: TxData, opts: TxOptions = {}) {
+  public constructor(txData: TxData, opts: TxOptions) {
     sharedConstructor(
       this,
       { ...txData, type: TransactionType.EOACodeEIP7702 },
@@ -115,13 +116,15 @@ export class EOACode7702Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `HardforkManager chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
-    if (!this.common.isActivatedEIP(7702)) {
-      throw EthereumJSErrorWithoutCode('EIP-7702 not enabled on GlobalConfig')
+    if (!this.common.isEIPActiveAtHardfork(7702, this.fork)) {
+      throw EthereumJSErrorWithoutCode(
+        'EIP-7702 not enabled on HardforkManager',
+      )
     }
     this.activeCapabilities = this.activeCapabilities.concat([
       1559, 2718, 2930, 7702,

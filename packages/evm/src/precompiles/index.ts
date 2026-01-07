@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { type Address, bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import { precompile0a } from './0a-kzg-point-evaluation'
@@ -256,7 +256,8 @@ type AddPrecompile = {
 type CustomPrecompile = AddPrecompile | DeletePrecompile
 
 function getActivePrecompiles(
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
   customPrecompiles?: CustomPrecompile[],
 ): Map<string, PrecompileFunc> {
   const precompileMap = new Map()
@@ -276,9 +277,9 @@ function getActivePrecompiles(
 
     if (
       (type === PrecompileAvailabilityCheck.Hardfork &&
-        common.gteHardfork(entry.check.param)) ||
+        common.hardforkGte(hardfork, entry.check.param)) ||
       (entry.check.type === PrecompileAvailabilityCheck.EIP &&
-        common.isActivatedEIP(entry.check.param))
+        common.isEIPActiveAtHardfork(entry.check.param, hardfork))
     ) {
       precompileMap.set(entry.address, entry.precompile)
     }

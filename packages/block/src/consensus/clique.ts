@@ -26,7 +26,7 @@ export const CLIQUE_EXTRA_SEAL = 65
 
 // This function is not exported in the index file to keep it internal
 export function requireClique(header: BlockHeader, name: string) {
-  if (header.common.consensusAlgorithm() !== ConsensusAlgorithm.Clique) {
+  if (header.consensusAlgorithm !== ConsensusAlgorithm.Clique) {
     const msg = `BlockHeader.${name}() call only supported for clique PoA networks`
 
     throw EthereumJSErrorWithoutCode(msg)
@@ -52,7 +52,10 @@ export function cliqueSigHash(header: BlockHeader) {
  */
 export function cliqueIsEpochTransition(header: BlockHeader): boolean {
   requireClique(header, 'cliqueIsEpochTransition')
-  const epoch = BigInt((header.common.consensusConfig() as CliqueConfig).epoch)
+  // Get clique config from chain config
+  const cliqueConfig = header.hardforkManager.config.spec.chain?.consensus
+    ?.clique as CliqueConfig | undefined
+  const epoch = BigInt(cliqueConfig?.epoch ?? 30000)
   // Epoch transition block if the block number has no
   // remainder on the division by the epoch length
   return header.number % epoch === BIGINT_0
@@ -166,8 +169,8 @@ export function generateCliqueBlockExtraData(
 
   const msgHash = cliqueSigHash(header)
 
-  // Use custom ecsign if provided, otherwise use secp256k1.sign
-  const ecSignFunction = header.common.customCrypto?.ecsign ?? secp256k1.sign
+  // Use secp256k1.sign for signing
+  const ecSignFunction = secp256k1.sign
 
   // Use noble/curves secp256k1.sign with recovered format (returns 65-byte Uint8Array)
   // sigBytes format: [recovery (1 byte) | r (32 bytes) | s (32 bytes)]

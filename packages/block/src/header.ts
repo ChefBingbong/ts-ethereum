@@ -1,10 +1,11 @@
 import {
+  type AllParamNames,
   ConsensusAlgorithm,
   ConsensusType,
-  GlobalConfig,
   Hardfork,
-  mainnetSchema,
-  paramsBlock,
+  type HardforkManager,
+  type HardforkParamsMap,
+  type ParamType,
 } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -33,7 +34,7 @@ import type {
   JSONHeader,
   JSONRPCBlock,
 } from './types'
-import { validateBlockHeader, zCoreHeaderSchema } from './validation'
+import { validateBlockHeader } from './validation'
 
 interface HeaderCache {
   hash: Uint8Array | undefined
@@ -66,13 +67,54 @@ export class BlockHeader {
   public readonly parentBeaconBlockRoot?: Uint8Array
   public readonly requestsHash?: Uint8Array
 
-  public readonly common: GlobalConfig
+  public readonly hardforkManager: HardforkManager
+
+  get blockNum() {
+    return { blockNumber: this.number, timestamp: this.timestamp }
+  }
+
+  /**
+   * Gets the hardfork active at this block's number/timestamp
+   */
+  get hardfork(): string {
+    return this.hardforkManager.getHardforkByBlock(this.number, this.timestamp)
+  }
+
+  /**
+   * Helper to check if an EIP is active at this block
+   */
+  isEIPActive(eip: number): boolean {
+    return this.hardforkManager.isEIPActiveAtBlock(eip, this.blockNum)
+  }
+
+  /**
+   * Helper to get a param value at this block's hardfork
+   */
+  param<P extends AllParamNames>(name: P): ParamType<P> | undefined {
+    return this.hardforkManager.getParamAtHardfork(name, this.hardfork)
+  }
+
+  /**
+   * Returns the consensus type from chain config
+   */
+  get consensusType(): string {
+    return this.hardforkManager.config.spec.chain?.consensus?.type ?? 'pow'
+  }
+
+  /**
+   * Returns the consensus algorithm from chain config
+   */
+  get consensusAlgorithm(): string {
+    return (
+      this.hardforkManager.config.spec.chain?.consensus?.algorithm ?? 'ethash'
+    )
+  }
 
   protected keccakFunction: (msg: Uint8Array) => Uint8Array
   protected cache: HeaderCache = { hash: undefined }
 
   get prevRandao(): Uint8Array {
-    if (!this.common.isActivatedEIP(4399)) {
+    if (!this.hardforkManager.isEIPActiveAtBlock(4399, this.blockNum)) {
       throw EthereumJSErrorWithoutCode(
         'prevRandao can only be accessed when EIP-4399 is activated',
       )
@@ -80,25 +122,14 @@ export class BlockHeader {
     return this.mixHash
   }
 
-  constructor(headerData: HeaderData, opts: BlockOptions = {}) {
-    if (opts.common) this.common = opts.common.copy()
-    else {
-      this.common = GlobalConfig.fromSchema({
-        schema: mainnetSchema,
-        hardfork: Hardfork.Prague,
-      })
-    }
-    this.common.updateBatchParams(opts.params ?? paramsBlock)
-    this.keccakFunction = this.common.customCrypto.keccak256 ?? keccak256
-
-    if (opts.setHardfork === true) {
-      const { number, timestamp } = zCoreHeaderSchema.parse(headerData)
-      this.common.setHardforkBy({ blockNumber: number, timestamp })
-    }
+  constructor(headerData: HeaderData, opts: BlockOptions) {
+    // this.common.updatebatchparams // to do
+    this.hardforkManager = opts.hardforkManager
+    this.keccakFunction = keccak256
 
     const validatedHeader = validateBlockHeader({
       header: headerData,
-      common: this.common,
+      hardforkManager: opts.hardforkManager,
       validateConsensus: !opts.skipConsensusFormatValidation,
     })
 
@@ -115,8 +146,8 @@ export class BlockHeader {
    * Static factory method to create a block header from a header data dictionary
    */
   static fromHeaderData(
-    headerData: HeaderData = {},
-    opts: BlockOptions = {},
+    headerData: HeaderData,
+    opts: BlockOptions,
   ): BlockHeader {
     return new BlockHeader(headerData, opts)
   }
@@ -126,7 +157,7 @@ export class BlockHeader {
    */
   static fromBytesArray(
     values: BlockHeaderBytes,
-    opts: BlockOptions = {},
+    opts: BlockOptions,
   ): BlockHeader {
     const headerData = valuesArrayToHeaderData(values)
     const {
@@ -138,9 +169,12 @@ export class BlockHeader {
       requestsHash,
     } = headerData
     const header = new BlockHeader(headerData, opts)
-    if (header.common.isActivatedEIP(1559) && baseFeePerGas === undefined) {
+    if (
+      header.hardforkManager.isEIPActiveAtBlock(1559, header.blockNum) &&
+      baseFeePerGas === undefined
+    ) {
       const eip1559ActivationBlock = bigIntToBytes(
-        header.common.eipBlock(1559)!,
+        header.hardforkManager.hardforkBlock(Hardfork.London)!,
       )
       if (
         eip1559ActivationBlock !== undefined &&
@@ -151,7 +185,7 @@ export class BlockHeader {
         )
       }
     }
-    if (header.common.isActivatedEIP(4844)) {
+    if (header.hardforkManager.isEIPActiveAtBlock(4844, header.blockNum)) {
       if (excessBlobGas === undefined) {
         throw EthereumJSErrorWithoutCode(
           'invalid header. excessBlobGas should be provided',
@@ -163,14 +197,17 @@ export class BlockHeader {
       }
     }
     if (
-      header.common.isActivatedEIP(4788) &&
+      header.hardforkManager.isEIPActiveAtBlock(4788, header.blockNum) &&
       parentBeaconBlockRoot === undefined
     ) {
       throw EthereumJSErrorWithoutCode(
         'invalid header. parentBeaconBlockRoot should be provided',
       )
     }
-    if (header.common.isActivatedEIP(7685) && requestsHash === undefined) {
+    if (
+      header.hardforkManager.isEIPActiveAtBlock(7685, header.blockNum) &&
+      requestsHash === undefined
+    ) {
       throw EthereumJSErrorWithoutCode(
         'invalid header. requestsHash should be provided',
       )
@@ -183,7 +220,7 @@ export class BlockHeader {
    */
   static fromRLP(
     serializedHeaderData: Uint8Array,
-    opts: BlockOptions = {},
+    opts: BlockOptions,
   ): BlockHeader {
     const values = RLP.decode(serializedHeaderData)
     if (!Array.isArray(values)) {
@@ -199,7 +236,7 @@ export class BlockHeader {
    */
   static fromRPC(
     blockParams: JSONRPCBlock,
-    options?: BlockOptions,
+    options: BlockOptions,
   ): BlockHeader {
     const {
       parentHash,
@@ -255,14 +292,14 @@ export class BlockHeader {
 
   validateGasLimit(parentBlockHeader: { gasLimit: bigint }): void {
     let parentGasLimit = parentBlockHeader.gasLimit
-    const londonHfBlock = this.common.hardforkBlock(Hardfork.London)
+    const londonHfBlock = this.hardforkManager.hardforkBlock(Hardfork.London)
 
     if (
       typeof londonHfBlock === 'bigint' &&
       londonHfBlock !== BIGINT_0 &&
       this.number === londonHfBlock
     ) {
-      const elasticity = this.common.param('elasticityMultiplier')
+      const elasticity = this.param('elasticityMultiplier')
       if (elasticity !== undefined) {
         parentGasLimit = parentGasLimit * BigInt(elasticity)
       }
@@ -270,8 +307,7 @@ export class BlockHeader {
 
     const gasLimit = this.gasLimit
 
-    const a =
-      parentGasLimit / BigInt(this.common.param('gasLimitBoundDivisor') ?? 0n)
+    const a = parentGasLimit / BigInt(this.param('gasLimitBoundDivisor') ?? 0n)
     const maxGasLimit = parentGasLimit + a
     const minGasLimit = parentGasLimit - a
 
@@ -280,36 +316,33 @@ export class BlockHeader {
         `gas limit increased too much: ${gasLimit} >= ${maxGasLimit}`,
       )
     }
-    // if (gasLimit <= minGasLimit) {
-    //   throw EthereumJSErrorWithoutCode(
-    //     `gas limit decreased too much: ${gasLimit} <= ${minGasLimit}`,
-    //   )
-    // }
-    if (gasLimit < this.common.param('minGasLimit')) {
+    if (gasLimit <= minGasLimit) {
       throw EthereumJSErrorWithoutCode(
-        `gas limit below minimum: ${gasLimit} < ${this.common.param('minGasLimit')}`,
+        `gas limit decreased too much: ${gasLimit} <= ${minGasLimit}`,
+      )
+    }
+    if (gasLimit < minGasLimit) {
+      throw EthereumJSErrorWithoutCode(
+        `gas limit below minimum: ${gasLimit} < ${minGasLimit}`,
       )
     }
   }
 
   calcNextBaseFee(): bigint {
-    if (!this.common.isActivatedEIP(1559)) {
+    if (!this.isEIPActive(1559)) {
       throw EthereumJSErrorWithoutCode(
         'calcNextBaseFee() requires EIP1559 activation',
       )
     }
 
-    const elasticity = BigInt(this.common.param('elasticityMultiplier') ?? 0n)
+    const elasticity = BigInt(this.param('elasticityMultiplier') ?? 0n)
     const parentGasTarget = this.gasLimit / elasticity
 
     if (parentGasTarget === this.gasUsed) {
       return this.baseFeePerGas!
     }
 
-    const denominator = this.common.getParamByEIP(
-      1559,
-      'baseFeeMaxChangeDenominator',
-    )
+    const denominator = this.param('baseFeeMaxChangeDenominator') ?? 8n
 
     if (this.gasUsed > parentGasTarget) {
       const delta = this.gasUsed - parentGasTarget
@@ -327,27 +360,48 @@ export class BlockHeader {
     if (this.excessBlobGas === undefined) {
       throw EthereumJSErrorWithoutCode('excessBlobGas field not populated')
     }
-    return computeBlobGasPrice(this.excessBlobGas, this.common)
+    return computeBlobGasPrice(
+      this.excessBlobGas,
+      this.hardforkManager,
+      this.hardfork,
+    )
   }
 
   calcDataFee(numBlobs: number): bigint {
-    const blobGasPerBlob = this.common.getParamByEIP(4844, 'blobGasPerBlob')
+    const blobGasPerBlob = this.param('blobGasPerBlob') ?? 0n
     return blobGasPerBlob * BigInt(numBlobs) * this.getBlobGasPrice()
   }
 
-  calcNextExcessBlobGas(childCommon: GlobalConfig): bigint {
+  calcNextExcessBlobGas(childHardfork: string): bigint {
     const excessBlobGas = this.excessBlobGas ?? BIGINT_0
     const blobGasUsed = this.blobGasUsed ?? BIGINT_0
-    const { targetBlobGasPerBlock, maxBlobGasPerBlock } =
-      childCommon.getBlobGasSchedule()
+
+    const targetBlobGasPerBlock =
+      this.hardforkManager.getParamAtHardfork(
+        'targetBlobGasPerBlock',
+        childHardfork,
+      ) ?? BIGINT_0
+    const maxBlobGasPerBlock =
+      this.hardforkManager.getParamAtHardfork(
+        'maxBlobGasPerBlock',
+        childHardfork,
+      ) ?? BIGINT_0
 
     if (excessBlobGas + blobGasUsed < targetBlobGasPerBlock) {
       return BIGINT_0
     }
 
-    if (childCommon.isActivatedEIP(7918)) {
-      const blobBaseCost = childCommon.param('blobBaseCost')!
-      const gasPerBlob = childCommon.getParamByEIP(4844, 'blobGasPerBlob')
+    if (this.hardforkManager.isEIPActiveAtHardfork(7918, childHardfork)) {
+      const blobBaseCost =
+        this.hardforkManager.getParamAtHardfork(
+          'blobBaseCost',
+          childHardfork,
+        ) ?? BIGINT_0
+      const gasPerBlob =
+        this.hardforkManager.getParamAtHardfork(
+          'blobGasPerBlob',
+          childHardfork,
+        ) ?? 0n
       const baseFee = this.baseFeePerGas ?? BIGINT_0
       const blobFee = this.getBlobGasPrice()
 
@@ -362,10 +416,11 @@ export class BlockHeader {
     return excessBlobGas + blobGasUsed - targetBlobGasPerBlock
   }
 
-  calcNextBlobGasPrice(childCommon: GlobalConfig): bigint {
+  calcNextBlobGasPrice(childHardfork: string): bigint {
     return computeBlobGasPrice(
-      this.calcNextExcessBlobGas(childCommon),
-      childCommon,
+      this.calcNextExcessBlobGas(childHardfork),
+      this.hardforkManager,
+      childHardfork,
     )
   }
 
@@ -388,20 +443,20 @@ export class BlockHeader {
       this.nonce,
     ]
 
-    if (this.common.isActivatedEIP(1559)) {
+    if (this.isEIPActive(1559)) {
       rawItems.push(bigIntToUnpaddedBytes(this.baseFeePerGas!))
     }
-    if (this.common.isActivatedEIP(4895)) {
+    if (this.isEIPActive(4895)) {
       rawItems.push(this.withdrawalsRoot!)
     }
-    if (this.common.isActivatedEIP(4844)) {
+    if (this.isEIPActive(4844)) {
       rawItems.push(bigIntToUnpaddedBytes(this.blobGasUsed!))
       rawItems.push(bigIntToUnpaddedBytes(this.excessBlobGas!))
     }
-    if (this.common.isActivatedEIP(4788)) {
+    if (this.isEIPActive(4788)) {
       rawItems.push(this.parentBeaconBlockRoot!)
     }
-    if (this.common.isActivatedEIP(7685)) {
+    if (this.isEIPActive(7685)) {
       rawItems.push(this.requestsHash!)
     }
 
@@ -431,16 +486,16 @@ export class BlockHeader {
   ): bigint {
     if (
       !parentBlockHeader ||
-      this.common.consensusAlgorithm() !== ConsensusAlgorithm.Ethash
+      this.consensusAlgorithm !== ConsensusAlgorithm.Ethash
     ) {
       return this.difficulty
     }
-    if (this.common.consensusType() !== ConsensusType.ProofOfWork) {
+    if (this.consensusType !== ConsensusType.ProofOfWork) {
       throw EthereumJSErrorWithoutCode(
         'difficulty calculation only supported on PoW chains',
       )
     }
-    if (this.common.consensusAlgorithm() !== ConsensusAlgorithm.Ethash) {
+    if (this.consensusAlgorithm !== ConsensusAlgorithm.Ethash) {
       throw EthereumJSErrorWithoutCode(
         'difficulty calculation only supports ethash algorithm',
       )
@@ -449,15 +504,18 @@ export class BlockHeader {
     const { timestamp: parentTs, difficulty: parentDif } = parentBlockHeader
     const blockTs = this.timestamp
 
-    console.log(parentTs, blockTs, parentDif)
-    const manager = this.common._hardforkParams.getEIPParams(1)
-    const minimumDifficulty = manager['minimumDifficulty']
-    const offset = parentDif / manager['difficultyBoundDivisor']
+    // Get EIP-1 params (base difficulty params) at current hardfork
+    const params = this.hardforkManager.getParamsAtHardfork(
+      this.hardfork as keyof HardforkParamsMap,
+    )
+    const minimumDifficulty = params.minimumDifficulty ?? 0n
+    const difficultyBoundDivisor = params.difficultyBoundDivisor ?? 0n
+    const offset = parentDif / difficultyBoundDivisor
 
     let num = this.number
     let dif!: bigint
 
-    if (this.common.gteHardfork(Hardfork.Byzantium)) {
+    if (this.hardforkManager.hardforkGte(this.hardfork, Hardfork.Byzantium)) {
       const uncleAddend = equalsBytes(
         parentBlockHeader.uncleHash,
         KECCAK256_RLP_ARRAY,
@@ -467,15 +525,19 @@ export class BlockHeader {
       let a = BigInt(uncleAddend) - (blockTs - parentTs) / BigInt(9)
       if (BigInt(-99) > a) a = BigInt(-99)
       dif = parentDif + offset * a
-      num = num - manager['difficultyBombDelay']
+      const difficultyBombDelay = params.difficultyBombDelay ?? BIGINT_0
+      num = num - difficultyBombDelay
       if (num < BIGINT_0) num = BIGINT_0
-    } else if (this.common.gteHardfork(Hardfork.Homestead)) {
+    } else if (
+      this.hardforkManager.hardforkGte(this.hardfork, Hardfork.Homestead)
+    ) {
       let a = BIGINT_1 - (blockTs - parentTs) / BigInt(10)
       if (BigInt(-99) > a) a = BigInt(-99)
       dif = parentDif + offset * a
     } else {
+      const durationLimit = params.durationLimit ?? 13n
       dif =
-        parentTs + manager['durationLimit'] > blockTs
+        parentTs + durationLimit > blockTs
           ? offset + parentDif
           : parentDif - offset
     }
@@ -513,17 +575,17 @@ export class BlockHeader {
       mixHash: bytesToHex(this.mixHash),
       nonce: bytesToHex(this.nonce),
     }
-    if (this.common.isActivatedEIP(1559)) {
+    if (this.isEIPActive(1559)) {
       JSONDict.baseFeePerGas = bigIntToHex(this.baseFeePerGas!)
     }
-    if (this.common.isActivatedEIP(4844)) {
+    if (this.isEIPActive(4844)) {
       JSONDict.blobGasUsed = bigIntToHex(this.blobGasUsed!)
       JSONDict.excessBlobGas = bigIntToHex(this.excessBlobGas!)
     }
-    if (this.common.isActivatedEIP(4788)) {
+    if (this.isEIPActive(4788)) {
       JSONDict.parentBeaconBlockRoot = bytesToHex(this.parentBeaconBlockRoot!)
     }
-    if (this.common.isActivatedEIP(7685)) {
+    if (this.isEIPActive(7685)) {
       JSONDict.requestsHash = bytesToHex(this.requestsHash!)
     }
     return JSONDict
@@ -532,7 +594,7 @@ export class BlockHeader {
   protected _consensusFormatValidation(): void {
     validateBlockHeader({
       header: this,
-      common: this.common,
+      hardforkManager: this.hardforkManager,
       validateConsensus: true,
     })
   }

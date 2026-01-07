@@ -32,7 +32,7 @@ const ACCOUNT_SEEDS = [
 export const customChainConfig: ChainConfig = {
   name: 'testnet',
   chainId: 12345n,
-  defaultHardfork: 'london',
+  defaultHardfork: 'chainstart',
   consensus: {
     type: 'pow',
     algorithm: 'ethash',
@@ -46,9 +46,9 @@ export const customChainConfig: ChainConfig = {
   },
   hardforks: [
     { name: 'chainstart', block: 0n },
-    { name: 'homestead', block: 0n },
-    { name: 'dao', block: 0n },
-    { name: 'tangerineWhistle', block: 0n },
+    { name: 'homestead', block: 2n },
+    { name: 'dao', block: 3n },
+    { name: 'tangerineWhistle', block: 4n },
     { name: 'spuriousDragon', block: 5n },
     { name: 'byzantium', block: 6n },
     { name: 'constantinople', block: 7n },
@@ -121,13 +121,13 @@ async function startClient() {
 
   const blockchain = await createBlockchain({
     db: new LevelDB(databases.chainDB),
-    common: clientConfig.common,
+    hardforkManager: clientConfig.common,
     hardforkByHeadBlockNumber: true,
     validateBlocks: true,
     validateConsensus: true,
     genesisState: genesisState as any,
   })
-  clientConfig.common.setForkHashes(blockchain.genesisBlock.hash())
+  // clientConfig.common.setForkHashes(blockchain.genesisBlock.hash())
 
   const node = await ExecutionNode.init({
     config,

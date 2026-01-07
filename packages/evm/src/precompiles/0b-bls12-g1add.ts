@@ -13,8 +13,13 @@ export async function precompile0b(opts: PrecompileInput): Promise<ExecResult> {
   const pName = getPrecompileName('0b')
   const bls = (opts._EVM as EVM)['_bls']!
 
+  const hardfork = opts._EVM.fork
+  const eip2537Hardfork = opts.common.getHardforkForEIP(2537) ?? hardfork
   // note: the gas used is constant; even if the input is incorrect.
-  const gasUsed = opts.common.getParamByEIP(2537, 'bls12381G1AddGas')
+  const gasUsed = opts.common.getParamAtHardfork(
+    'bls12381G1AddGas',
+    eip2537Hardfork,
+  )!
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }

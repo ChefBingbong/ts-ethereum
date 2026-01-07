@@ -1,4 +1,9 @@
-import { createCustomCommon, Hardfork } from '@ts-ethereum/chain-config'
+import {
+  type ChainConfig,
+  createHardforkManager,
+  type HardforkEntry,
+  type HardforkManager,
+} from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
   bytesToHex,
@@ -17,8 +22,34 @@ import {
   createBlockHeaderFromBytesArray,
   createBlockHeaderFromRLP,
 } from '../../src/index.ts'
-import { goerliChainConfig, Mainnet } from './testdata/chainConfigs'
+import {
+  customChainConfig,
+  goerliChainConfig,
+  Mainnet,
+} from './testdata/chainConfigs'
 import { mainnetBlocks } from './testdata/mainnetBlocks.ts'
+
+/**
+ * Helper to create a HardforkManager from a ChainConfig
+ */
+function createHardforkManagerFromConfig(
+  chainConfig: ChainConfig,
+): HardforkManager {
+  return createHardforkManager({
+    hardforks: chainConfig.hardforks.map(
+      (hf) =>
+        ({
+          block: hf.block,
+          timestamp: hf.timestamp,
+          forkHash: hf.forkHash,
+          optional: hf.optional,
+          name: hf.name,
+        }) as HardforkEntry,
+    ),
+    chainId: BigInt(chainConfig.chainId),
+    chain: chainConfig,
+  })
+}
 
 describe('[Block]: Header functions', () => {
   it('should create with default constructor', () => {
@@ -40,29 +71,49 @@ describe('[Block]: Header functions', () => {
       assert.isTrue(equalsBytes(header.nonce, new Uint8Array(8)))
     }
 
-    const header = createBlockHeader()
+    const chainConfig = customChainConfig
+    const hardforkManager = createHardforkManager({
+      hardforks: chainConfig.hardforks.map(
+        (hf) =>
+          ({
+            block: hf.block,
+            timestamp: hf.timestamp,
+            forkHash: hf.forkHash,
+            optional: hf.optional,
+            name: hf.name,
+          }) as HardforkEntry,
+      ),
+      chainId: BigInt(chainConfig.chainId),
+      chain: chainConfig,
+    })
+    const header = createBlockHeader(
+      {},
+      {
+        hardforkManager: hardforkManager,
+      },
+    )
     compareDefaultHeader(header)
 
-    const block = new Block()
+    const block = new Block(header, [], [], undefined, { hardforkManager })
     compareDefaultHeader(block.header)
   })
 
   it('Initialization -> fromHeaderData()', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
-    let header = createBlockHeader(undefined, { common })
+    // Use customChainConfig to avoid DAO fork validation requirements
+    const hardforkManager = createHardforkManagerFromConfig(customChainConfig)
+
+    let header = createBlockHeader({}, { hardforkManager })
     assert.isDefined(
       bytesToHex(header.hash()),
       'genesis block should initialize',
     )
     assert.strictEqual(
-      header.common.hardfork(),
+      header.hardfork,
       'chainstart',
-      'should initialize with correct HF provided',
+      'should initialize with chainstart HF at block 0',
     )
 
-    header = createBlockHeader({}, { common })
+    header = createBlockHeader({}, { hardforkManager })
     assert.isDefined(
       bytesToHex(header.hash()),
       'default block should initialize',
@@ -70,10 +121,10 @@ describe('[Block]: Header functions', () => {
 
     // test default freeze values
     // also test if the options are carried over to the constructor
-    header = createBlockHeader({})
+    header = createBlockHeader({}, { hardforkManager })
     assert.isFrozen(header, 'block should be frozen by default')
 
-    header = createBlockHeader({}, { freeze: false })
+    header = createBlockHeader({}, { hardforkManager, freeze: false })
     assert.isNotFrozen(
       header,
       'block should not be frozen when freeze deactivated in options',
@@ -81,19 +132,19 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> fromRLPSerializedHeader()', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
-    let header = createBlockHeader({}, { common, freeze: false })
+    // Use customChainConfig to avoid DAO fork validation requirements
+    const hardforkManager = createHardforkManagerFromConfig(customChainConfig)
+
+    let header = createBlockHeader({}, { hardforkManager, freeze: false })
 
     const rlpHeader = header.serialize()
     header = createBlockHeaderFromRLP(rlpHeader, {
-      common,
+      hardforkManager,
     })
     assert.isFrozen(header, 'block should be frozen by default')
 
     header = createBlockHeaderFromRLP(rlpHeader, {
-      common,
+      hardforkManager,
       freeze: false,
     })
     assert.isNotFrozen(
@@ -103,8 +154,9 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> fromRLPSerializedHeader() -> error cases', () => {
+    const hardforkManager = createHardforkManagerFromConfig(Mainnet)
     try {
-      createBlockHeaderFromRLP(RLP.encode('a'))
+      createBlockHeaderFromRLP(RLP.encode('a'), { hardforkManager })
     } catch (e: any) {
       const expectedError = 'Invalid serialized header input. Must be array'
       assert.isTrue(
@@ -115,9 +167,9 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> createWithdrawalFromBytesArray()', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
+    // Use customChainConfig to avoid DAO fork validation requirements
+    const hardforkManager = createHardforkManagerFromConfig(customChainConfig)
+
     const zero = new Uint8Array(0)
     const headerArray: Uint8Array[] = []
     for (let item = 0; item < 15; item++) {
@@ -133,11 +185,13 @@ describe('[Block]: Header functions', () => {
     headerArray[13] = new Uint8Array(32) // mixHash
     headerArray[14] = new Uint8Array(8) // nonce
 
-    let header = createBlockHeaderFromBytesArray(headerArray, { common })
+    let header = createBlockHeaderFromBytesArray(headerArray, {
+      hardforkManager,
+    })
     assert.isFrozen(header, 'block should be frozen by default')
 
     header = createBlockHeaderFromBytesArray(headerArray, {
-      common,
+      hardforkManager,
       freeze: false,
     })
     assert.isNotFrozen(
@@ -147,6 +201,7 @@ describe('[Block]: Header functions', () => {
   })
 
   it('Initialization -> createWithdrawalFromBytesArray() -> error cases', () => {
+    const hardforkManager = createHardforkManagerFromConfig(Mainnet)
     const headerArray = Array(22).fill(new Uint8Array(0))
 
     // mock header data (if set to new Uint8Array() header throws)
@@ -160,12 +215,14 @@ describe('[Block]: Header functions', () => {
     headerArray[15] = new Uint8Array(4) // bad data
 
     assert.throw(
-      () => createBlockHeaderFromBytesArray(headerArray),
+      () => createBlockHeaderFromBytesArray(headerArray, { hardforkManager }),
       'invalid header. More values than expected were received',
     )
 
     try {
-      createBlockHeaderFromBytesArray(headerArray.slice(0, 5))
+      createBlockHeaderFromBytesArray(headerArray.slice(0, 5), {
+        hardforkManager,
+      })
     } catch (e: any) {
       const expectedError =
         'invalid header. Less values than expected were received'
@@ -179,12 +236,10 @@ describe('[Block]: Header functions', () => {
   // TODO: Re-enable once Clique/PoA consensus validation is properly configured
   // Current chain config doesn't properly handle PoA extraData requirements
   it.skip('Initialization -> Clique Blocks', () => {
-    const common = createCustomCommon({}, goerliChainConfig, {
-      hardfork: Hardfork.Chainstart,
-    })
+    const hardforkManager = createHardforkManagerFromConfig(goerliChainConfig)
     const header = createBlockHeader(
       { extraData: new Uint8Array(97) },
-      { common },
+      { hardforkManager },
     )
     assert.isDefined(
       bytesToHex(header.hash()),
@@ -193,18 +248,16 @@ describe('[Block]: Header functions', () => {
   })
 
   it('should validate extraData', () => {
-    // PoW
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
-    const genesis = createBlock({}, { common })
+    // PoW - Use customChainConfig to avoid DAO fork validation requirements
+    const hardforkManager = createHardforkManagerFromConfig(customChainConfig)
+    const genesis = createBlock({}, { hardforkManager })
 
     const number = 1n
     const parentHash = genesis.hash()
     const timestamp = Date.now()
     const { gasLimit } = genesis.header
     const data = { number, parentHash, timestamp, gasLimit }
-    const opts = { common, calcDifficultyFromHeader: genesis.header }
+    const opts = { hardforkManager, calcDifficultyFromHeader: genesis.header }
 
     // valid extraData: at limit
     assert.doesNotThrow(
@@ -232,12 +285,10 @@ describe('[Block]: Header functions', () => {
 
     // TODO: Re-enable PoA tests once Clique consensus validation is properly configured
     // PoA
-    // common = createCustomCommon({}, goerliChainConfig, {
-    //   hardfork: Hardfork.Chainstart,
-    // })
+    // hardforkManager = createHardforkManagerFromConfig(goerliChainConfig)
     // genesis = createBlock(
     //   { header: { extraData: new Uint8Array(97) } },
-    //   { common },
+    //   { hardforkManager },
     // )
 
     // parentHash = genesis.hash()
@@ -249,7 +300,7 @@ describe('[Block]: Header functions', () => {
     //   gasLimit,
     //   difficulty: BigInt(1),
     // } as any
-    // opts = { common } as any
+    // opts = { hardforkManager } as any
 
     // // valid extraData (32 byte vanity + 65 byte seal)
     // assert.doesNotThrow(
@@ -270,15 +321,13 @@ describe('[Block]: Header functions', () => {
   })
 
   it('should skip consensusFormatValidation if flag is set to false', () => {
-    const common = createCustomCommon({}, goerliChainConfig, {
-      hardfork: Hardfork.Chainstart,
-    })
+    const hardforkManager = createHardforkManagerFromConfig(goerliChainConfig)
 
     assert.doesNotThrow(
       () =>
         createBlockHeader(
           { extraData: concatBytes(new Uint8Array(1)) },
-          { common, skipConsensusFormatValidation: true },
+          { hardforkManager, skipConsensusFormatValidation: true },
         ),
       undefined,
       undefined,
@@ -287,29 +336,32 @@ describe('[Block]: Header functions', () => {
   })
 
   it('_genericFormatValidation checks', () => {
+    const hardforkManager = createHardforkManagerFromConfig(Mainnet)
     const badHash = new Uint8Array(31)
 
     assert.throws(
-      () => createBlockHeader({ parentHash: badHash }),
+      () => createBlockHeader({ parentHash: badHash }, { hardforkManager }),
       'parentHash must be 32 bytes',
       undefined,
       'throws on invalid parent hash length',
     )
     assert.throws(
-      () => createBlockHeader({ stateRoot: badHash }),
+      () => createBlockHeader({ stateRoot: badHash }, { hardforkManager }),
       'stateRoot must be 32 bytes',
       undefined,
       'throws on invalid state root hash length',
     )
     assert.throws(
-      () => createBlockHeader({ transactionsTrie: badHash }),
+      () =>
+        createBlockHeader({ transactionsTrie: badHash }, { hardforkManager }),
       'transactionsTrie must be 32 bytes',
       undefined,
       'throws on invalid transactionsTrie root hash length',
     )
 
     assert.throws(
-      () => createBlockHeader({ nonce: new Uint8Array(5) }),
+      () =>
+        createBlockHeader({ nonce: new Uint8Array(5) }, { hardforkManager }),
       'nonce must be 8 bytes',
       undefined,
       'contains nonce length error message',
@@ -320,11 +372,11 @@ describe('[Block]: Header functions', () => {
   it('header validation -> poa checks',  () => {
     const headerData = testDataPreLondon.blocks[0].blockHeader
 
-    const common = new GlobalConfig({ chain: goerliChainConfig, hardfork: Hardfork.Istanbul })
+    const hardforkManager = createHardforkManagerFromConfig(goerliChainConfig)
     const blockchain = new Mockchain()
 
     const genesisRlp = hexToBytes(testDataPreLondon.genesisRLP)
-    const block = createBlockFromRLP(genesisRlp, { common })
+    const block = createBlockFromRLP(genesisRlp, { hardforkManager })
     await blockchain.putBlock(block)
 
     headerData.number = 1
@@ -334,7 +386,7 @@ describe('[Block]: Header functions', () => {
     headerData.difficulty = BigInt(2)
 
     let testCase = 'should throw on lower than period timestamp diffs'
-    let header = createBlockHeader(headerData, { common })
+    let header = createBlockHeader(headerData, { hardforkManager })
     try {
       await header.validate(blockchain)
       assert.fail(testCase)
@@ -344,7 +396,7 @@ describe('[Block]: Header functions', () => {
 
     testCase = 'should not throw on timestamp diff equal to period'
     headerData.timestamp = BigInt(1422494864)
-    header = createBlockHeader(headerData, { common })
+    header = createBlockHeader(headerData, { hardforkManager })
     try {
       await header.validate(blockchain)
       assert.isTrue(true, testCase)
@@ -353,9 +405,9 @@ describe('[Block]: Header functions', () => {
     }
 
     testCase = 'should throw on non-zero beneficiary (coinbase) for epoch transition block'
-    headerData.number = common.consensusConfig().epoch
+    headerData.number = hardforkManager.consensusConfig().epoch
     headerData.coinbase = createAddressFromString('0x091dcd914fCEB1d47423e532955d1E62d1b2dAEf')
-    header = createBlockHeader(headerData, { common })
+    header = createBlockHeader(headerData, { hardforkManager })
     try {
       await header.validate(blockchain)
       assert.fail('should throw')
@@ -371,7 +423,7 @@ describe('[Block]: Header functions', () => {
 
     testCase = 'should throw on non-zero mixHash'
     headerData.mixHash = new Uint8Array(32).fill(1)
-    header = createBlockHeader(headerData, { common })
+    header = createBlockHeader(headerData, { hardforkManager })
     try {
       await header.validate(blockchain)
       assert.fail('should throw')
@@ -386,7 +438,7 @@ describe('[Block]: Header functions', () => {
 
     testCase = 'should throw on invalid clique difficulty'
     headerData.difficulty = BigInt(3)
-    header = createBlockHeader(headerData, { common })
+    header = createBlockHeader(headerData, { hardforkManager })
     try {
       header.validateCliqueDifficulty(blockchain)
       assert.fail(testCase)
@@ -404,10 +456,10 @@ describe('[Block]: Header functions', () => {
     const cliqueSigner = hexToBytes(
       '64bf9cc30328b0e42387b3c82c614e6386259136235e20c1357bd11cdee86993'
     )
-    const poaBlock = createBlockFromRLP(genesisRlp, { common, cliqueSigner })
+    const poaBlock = createBlockFromRLP(genesisRlp, { hardforkManager, cliqueSigner })
     await poaBlockchain.putBlock(poaBlock)
 
-    header = createBlockHeader(headerData, { common, cliqueSigner })
+    header = createBlockHeader(headerData, { hardforkManager, cliqueSigner })
     try {
       const res = header.validateCliqueDifficulty(poaBlockchain)
       assert.strictEqual(res, true, testCase)
@@ -418,7 +470,7 @@ describe('[Block]: Header functions', () => {
     testCase =
       'validateCliqueDifficulty() should return false with INTURN difficulty and one signer'
     headerData.difficulty = BigInt(1)
-    header = createBlockHeader(headerData, { common, cliqueSigner })
+    header = createBlockHeader(headerData, { hardforkManager, cliqueSigner })
     try {
       const res = header.validateCliqueDifficulty(poaBlockchain)
       assert.strictEqual(res, false, testCase)
@@ -429,18 +481,20 @@ describe('[Block]: Header functions', () => {
 */
 
   it('should test isGenesis()', () => {
-    const header1 = createBlockHeader({ number: 1 })
+    // Use customChainConfig to avoid DAO fork validation requirements
+    const hardforkManager = createHardforkManagerFromConfig(customChainConfig)
+    const header1 = createBlockHeader({ number: 1 }, { hardforkManager })
     assert.strictEqual(header1.isGenesis(), false)
 
-    const header2 = createBlockHeader()
+    const header2 = createBlockHeader({}, { hardforkManager })
     assert.strictEqual(header2.isGenesis(), true)
   })
 
   it('should test hash() function', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
+    const hardforkManager = createHardforkManagerFromConfig(Mainnet)
+    const header = createBlockHeader(mainnetBlocks[0]['header'], {
+      hardforkManager,
     })
-    const header = createBlockHeader(mainnetBlocks[0]['header'], { common })
     assert.strictEqual(
       bytesToHex(header.hash()),
       '0x88e96d4537bea4d9c05d12549907b32561d3bf31f45aae734cdc119f13406cb6',
@@ -448,10 +502,8 @@ describe('[Block]: Header functions', () => {
     )
 
     // TODO: Re-enable once Clique/PoA consensus validation is properly configured
-    // common = createCustomCommon({}, goerliChainConfig, {
-    //   hardfork: Hardfork.Chainstart,
-    // })
-    // header = createBlockHeader(goerliBlocks[0]['header'], { common })
+    // const goerliHardforkManager = createHardforkManagerFromConfig(goerliChainConfig)
+    // header = createBlockHeader(goerliBlocks[0]['header'], { hardforkManager: goerliHardforkManager })
     // assert.strictEqual(
     //   bytesToHex(header.hash()),
     //   '0x8f5bab218b6bb34476f51ca588e9f4553a3a7ce5e13a66c660a5283e97e9a85a',

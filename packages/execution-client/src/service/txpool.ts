@@ -685,11 +685,27 @@ export class TxPool {
    * Called after chain reorgs or when account state changes.
    */
   async demoteUnexecutables(): Promise<void> {
-    const block = await this.chain.getCanonicalHeadHeader()
+    // Use VM head (last executed block) instead of canonical head (last imported block)
+    // to avoid race conditions where blocks are imported but not yet executed
+    const vmHeadBlock = await this.chain.getCanonicalVmHead()
     const vmCopy = await this.execution.vm.shallowCopy()
 
+    // Check if the VM head's state root exists in the state trie
+    // If not, use the VM's current state root as a fallback
+    let stateRoot = vmHeadBlock.header.stateRoot
+    const hasStateRoot = await vmCopy.stateManager.hasStateRoot(stateRoot)
+
+    if (!hasStateRoot) {
+      // Fallback to VM's current state root if VM head state root doesn't exist yet
+      // This can happen during initial sync when blocks are imported faster than executed
+      stateRoot = await vmCopy.stateManager.getStateRoot()
+      this.config.options.logger?.debug(
+        `VM head state root not found, using VM current state root for demoteUnexecutables`,
+      )
+    }
+
     try {
-      await vmCopy.stateManager.setStateRoot(block.stateRoot)
+      await vmCopy.stateManager.setStateRoot(stateRoot)
     } catch (error) {
       console.log(error)
       this.config.options.logger?.error(`Error setting state root: ${error}`)

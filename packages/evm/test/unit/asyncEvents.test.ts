@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -17,11 +17,10 @@ describe('async events', () => {
     const caller = new Address(
       hexToBytes('0x00000000000000000000000000000000000000ee'),
     )
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Constantinople,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
     const evm = await createEVM({
       common,
+      hardfork: Hardfork.Constantinople,
     })
     const to = createAddressFromBigInt(BigInt(123456))
     await evm.stateManager.putCode(to, hexToBytes('0x6001'))

@@ -15,10 +15,7 @@ import {
 } from './index'
 
 export async function createMPT(opts?: MPTOpts) {
-  const keccakFunction =
-    opts?.common?.customCrypto.keccak256 ??
-    opts?.useKeyHashingFunction ??
-    keccak_256
+  const keccakFunction = keccak_256
   let key = ROOT_DB_KEY
 
   const encoding =

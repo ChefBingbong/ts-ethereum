@@ -1,3 +1,4 @@
+import { Hardfork } from '@ts-ethereum/chain-config'
 import {
   Address,
   BIGINT_0,
@@ -44,12 +45,16 @@ export function isSigned(tx: LegacyTxInterface): boolean {
  * The amount of gas paid for the data in this tx
  */
 export function getDataGas(tx: LegacyTxInterface): bigint {
-  if (tx.cache.dataFee && tx.cache.dataFee.hardfork === tx.common.hardfork()) {
+  // Use transaction's resolved hardfork
+  const hardfork = tx.fork
+  if (tx.cache.dataFee && tx.cache.dataFee.hardfork === hardfork) {
     return tx.cache.dataFee.value
   }
-
-  const txDataZero = tx.common.param('txDataZeroGas')
-  const txDataNonZero = tx.common.param('txDataNonZeroGas')
+  const txDataZero = tx.common.getParamAtHardfork('txDataZeroGas', hardfork)!
+  const txDataNonZero = tx.common.getParamAtHardfork(
+    'txDataNonZeroGas',
+    hardfork,
+  )!
 
   let cost = BIGINT_0
   for (let i = 0; i < tx.data.length; i++) {
@@ -58,18 +63,18 @@ export function getDataGas(tx: LegacyTxInterface): bigint {
 
   if (
     (tx.to === undefined || tx.to === null) &&
-    tx.common.isActivatedEIP(3860)
+    tx.common.isEIPActiveAtHardfork(3860, hardfork)
   ) {
     const dataLength = BigInt(Math.ceil(tx.data.length / 32))
     const initCodeCost =
-      tx.common.getParamByEIP(3860, 'initCodeWordGas') * dataLength
+      tx.common.getParamAtHardfork('initCodeWordGas', hardfork)! * dataLength
     cost += initCodeCost
   }
 
   if (Object.isFrozen(tx)) {
     tx.cache.dataFee = {
       value: cost,
-      hardfork: tx.common.hardfork(),
+      hardfork: hardfork,
     }
   }
 
@@ -83,7 +88,8 @@ export function getDataGas(tx: LegacyTxInterface): bigint {
  * to be paid for access lists (EIP-2930) and authority lists (EIP-7702).
  */
 export function getIntrinsicGas(tx: LegacyTxInterface): bigint {
-  const txFee = tx.common.param('txGas')
+  const hardfork = tx.fork
+  const txFee = tx.common.getParamAtHardfork('txGas', hardfork)!
   let fee = tx.getDataGas()
   if (txFee) fee += txFee
   let isContractCreation = false
@@ -92,8 +98,14 @@ export function getIntrinsicGas(tx: LegacyTxInterface): bigint {
   } catch {
     isContractCreation = false
   }
-  if (tx.common.gteHardfork('homestead') && isContractCreation) {
-    const txCreationFee = tx.common.param('txCreationGas')
+  if (
+    tx.common.hardforkGte(Hardfork.Homestead, hardfork) &&
+    isContractCreation
+  ) {
+    const txCreationFee = tx.common.getParamAtHardfork(
+      'txCreationGas',
+      hardfork,
+    )!
     if (txCreationFee) fee += txCreationFee
   }
   return fee
@@ -123,11 +135,11 @@ export function hash(tx: LegacyTxInterface): Uint8Array {
     throw EthereumJSErrorWithoutCode(msg)
   }
 
-  const keccakFunction = tx.common.customCrypto?.keccak256 ?? keccak256
+  const keccakFunction = keccak256
 
   if (Object.isFrozen(tx)) {
     tx.cache.hash ??= keccakFunction(tx.serialize())
-    return tx.cache.hash
+    return tx.cache.hash!
   }
 
   return keccakFunction(tx.serialize())
@@ -138,9 +150,10 @@ export function hash(tx: LegacyTxInterface): Uint8Array {
  * Reasoning: https://ethereum.stackexchange.com/a/55728
  */
 export function validateHighS(tx: LegacyTxInterface): void {
+  const hardfork = tx.fork
   const { s } = tx
   if (
-    tx.common.gteHardfork('homestead') &&
+    tx.common.hardforkGte(Hardfork.Homestead, hardfork) &&
     s !== undefined &&
     s > SECP256K1_ORDER_DIV_2
   ) {
@@ -170,7 +183,7 @@ export function getSenderPublicKey(tx: LegacyTxInterface): Uint8Array {
   validateHighS(tx)
 
   try {
-    const ecrecoverFunction = tx.common.customCrypto?.ecrecover ?? ecrecover
+    const ecrecoverFunction = ecrecover
     const sender = ecrecoverFunction(
       msgHash,
       v!,
@@ -219,19 +232,21 @@ export function getEffectivePriorityFee(
 export function getValidationErrors(tx: LegacyTxInterface): string[] {
   const errors = []
 
+  const hardfork = tx.fork
   if (tx.isSigned() && !tx.verifySignature()) {
     errors.push('Invalid Signature')
   }
 
   let intrinsicGas = tx.getIntrinsicGas()
-  if (tx.common.isActivatedEIP(7623)) {
+  if (tx.common.isEIPActiveAtHardfork(7623, hardfork)) {
     let tokens = 0
     for (let i = 0; i < tx.data.length; i++) {
       tokens += tx.data[i] === 0 ? 1 : 4
     }
     const floorCost =
-      tx.common.param('txGas')! +
-      tx.common.getParamByEIP(7623, 'totalCostFloorPerToken') * BigInt(tokens)
+      tx.common.getParamAtHardfork('txGas', hardfork)! +
+      tx.common.getParamAtHardfork('totalCostFloorPerToken', hardfork)! *
+        BigInt(tokens)
     intrinsicGas = bigIntMax(intrinsicGas, floorCost)
   }
   if (intrinsicGas > tx.gasLimit) {
@@ -292,7 +307,7 @@ export function sign(
     const msg = errorMsg(tx, 'Private key must be 32 bytes in length.')
     throw EthereumJSErrorWithoutCode(msg)
   }
-
+  const hardfork = tx.fork
   // TODO (Jochem, 05 nov 2024): figure out what this hack does and clean it up
 
   // Hack for the constellation that we have got a legacy tx after spuriousDragon with a non-EIP155 conforming signature
@@ -302,7 +317,7 @@ export function sign(
   let hackApplied = false
   if (
     tx.type === TransactionType.Legacy &&
-    tx.common.gteHardfork('spuriousDragon') &&
+    tx.common.hardforkGte(Hardfork.SpuriousDragon, hardfork) &&
     !tx.supports(Capability.EIP155ReplayProtection)
   ) {
     ;(tx as LegacyTx)['activeCapabilities'].push(
@@ -312,7 +327,7 @@ export function sign(
   }
 
   const msgHash = tx.getHashedMessageToSign()
-  const ecSignFunction = tx.common.customCrypto?.ecsign ?? secp256k1.sign
+  const ecSignFunction = secp256k1.sign
   const { recovery, r, s } = ecSignFunction(msgHash, privateKey, {
     extraEntropy,
   })
@@ -355,7 +370,7 @@ export function getSharedErrorPostfix(tx: LegacyTxInterface) {
   }
   let hf = ''
   try {
-    hf = tx.common.hardfork()
+    hf = tx.fork
   } catch {
     hf = 'error'
   }

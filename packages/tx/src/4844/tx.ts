@@ -1,4 +1,8 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import {
+  createHardforkManagerFromConfig,
+  type HardforkManager,
+  Mainnet,
+} from '@ts-ethereum/chain-config'
 import type { Address, PrefixedHexString } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
@@ -32,7 +36,6 @@ import { isAccessList, TransactionType } from '../types'
 import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
 import {
   getBaseJSON,
-  getCommon,
   sharedConstructor,
   validateNotArray,
   valueOverflowCheck,
@@ -98,11 +101,12 @@ export class Blob4844Tx
   kzgCommitments?: PrefixedHexString[] // EIP-4844 + EIP-7594
   kzgProofs?: PrefixedHexString[] // EIP-4844: per-Blob proofs, EIP-7594: per-Cell proofs
 
-  public readonly common!: GlobalConfig
+  public readonly common!: HardforkManager
 
   readonly txOptions!: TxOptions
 
   readonly cache: TransactionCache = {}
+  readonly fork!: string
 
   /**
    * List of tx type defining EIPs,
@@ -118,10 +122,10 @@ export class Blob4844Tx
    * the static constructors or factory methods to assist in creating a Transaction object from
    * varying data types.
    */
-  constructor(txData: TxData, opts: TxOptions = {}) {
+  constructor(txData: TxData, opts: TxOptions) {
     // Check networkWrapperVersion early, before sharedConstructor, to ensure proper error ordering
     // This validation needs to happen before EIP-7825 gas limit checks
-    const common = getCommon(opts.common)
+    const common = opts.common ?? createHardforkManagerFromConfig(Mainnet)
     const networkWrapperVersion =
       txData.networkWrapperVersion !== undefined
         ? (bytesToInt(
@@ -130,19 +134,21 @@ export class Blob4844Tx
         : undefined
 
     if (networkWrapperVersion !== undefined) {
+      const checkHardfork = common.getHardforkFromContext(opts.hardfork)
+
       switch (networkWrapperVersion) {
         case NetworkWrapperType.EIP7594:
-          if (!common.isActivatedEIP(7594)) {
+          if (!common.isEIPActiveAtHardfork(7594, checkHardfork)) {
             throw EthereumJSErrorWithoutCode(
-              'EIP-7594 not enabled on GlobalConfig for EIP-7594 network wrapper version',
+              'EIP-7594 not enabled on HardforkManager for EIP-7594 network wrapper version',
             )
           }
           break
 
         case NetworkWrapperType.EIP4844:
-          if (common.isActivatedEIP(7594)) {
+          if (common.isEIPActiveAtHardfork(7594, checkHardfork)) {
             throw EthereumJSErrorWithoutCode(
-              'EIP-7594 is active on GlobalConfig for EIP-4844 network wrapper version',
+              'EIP-7594 is active on HardforkManager for EIP-4844 network wrapper version',
             )
           }
           break
@@ -173,17 +179,22 @@ export class Blob4844Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `HardforkManager chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
-    if (!this.common.isActivatedEIP(1559)) {
-      throw EthereumJSErrorWithoutCode('EIP-1559 not enabled on GlobalConfig')
+    // Check EIPs using transaction's resolved hardfork
+    if (!this.common.isEIPActiveAtHardfork(1559, this.fork)) {
+      throw EthereumJSErrorWithoutCode(
+        'EIP-1559 not enabled on HardforkManager',
+      )
     }
 
-    if (!this.common.isActivatedEIP(4844)) {
-      throw EthereumJSErrorWithoutCode('EIP-4844 not enabled on GlobalConfig')
+    if (!this.common.isEIPActiveAtHardfork(4844, this.fork)) {
+      throw EthereumJSErrorWithoutCode(
+        'EIP-4844 not enabled on HardforkManager',
+      )
     }
     this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930])
 
@@ -238,7 +249,7 @@ export class Blob4844Tx
       }
       if (
         Number.parseInt(hash.slice(2, 4)) !==
-        this.common.getParamByEIP(4844, 'blobCommitmentVersionKzg')
+        this.common.getParamAtHardfork('blobCommitmentVersionKzg', this.fork)
       ) {
         // We check the first "byte" of the hash (starts at position 2 since hash is a PrefixedHexString)
         const msg = Legacy.errorMsg(
@@ -250,9 +261,15 @@ export class Blob4844Tx
     }
 
     // EIP-7594 PeerDAS: Limit of 6 blobs per transaction
-    if (this.common.isActivatedEIP(7594)) {
-      const maxBlobsPerTx = this.common.getParamByEIP(7594, 'maxBlobsPerTx')
-      if (this.blobVersionedHashes.length > maxBlobsPerTx) {
+    if (this.common.isEIPActiveAtHardfork(7594, this.fork)) {
+      const maxBlobsPerTx = this.common.getParamAtHardfork(
+        'maxBlobsPerTx',
+        this.fork,
+      )
+      if (
+        maxBlobsPerTx !== undefined &&
+        this.blobVersionedHashes.length > maxBlobsPerTx
+      ) {
         const msg = Legacy.errorMsg(
           this,
           `tx can contain at most ${maxBlobsPerTx} blobs (EIP-7594)`,
@@ -263,8 +280,8 @@ export class Blob4844Tx
 
     // "Old" limit (superseded by EIP-7594 starting with Osaka)
     const limitBlobsPerTx =
-      this.common.getParamByEIP(4844, 'maxBlobGasPerBlock') /
-      this.common.getParamByEIP(4844, 'blobGasPerBlob')
+      this.common.getParamAtHardfork('maxBlobGasPerBlock', this.fork)! /
+      this.common.getParamAtHardfork('blobGasPerBlob', this.fork)!
     if (this.blobVersionedHashes.length > limitBlobsPerTx) {
       const msg = Legacy.errorMsg(
         this,
@@ -297,7 +314,7 @@ export class Blob4844Tx
     )
 
     if (this.networkWrapperVersion === undefined && this.blobs !== undefined) {
-      if (this.common.isActivatedEIP(7594)) {
+      if (this.common.isEIPActiveAtHardfork(7594, this.fork)) {
         this.networkWrapperVersion = 1
       } else {
         this.networkWrapperVersion = 0

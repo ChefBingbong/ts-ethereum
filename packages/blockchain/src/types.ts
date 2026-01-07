@@ -2,7 +2,7 @@ import type { Block, BlockHeader } from '@ts-ethereum/block'
 import type {
   ConsensusAlgorithm,
   GenesisState,
-  GlobalConfig,
+  HardforkManager,
 } from '@ts-ethereum/chain-config'
 import type { DB, DBObject } from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
@@ -18,6 +18,7 @@ export type BlockchainEvent = {
 }
 
 export interface BlockchainInterface {
+  hardforkManager: HardforkManager
   consensus: Consensus | undefined
   /**
    * Adds a block to the blockchain.
@@ -109,7 +110,7 @@ export interface GenesisOptions {
   genesisBlock?: Block
 
   /**
-   * If you are using a custom chain {@link GlobalConfig}, pass the genesis state.
+   * If you are using a custom chain {@link HardforkManager}, pass the genesis state.
    *
    * Pattern 1 (with genesis state see {@link GenesisState} for format):
    *
@@ -149,12 +150,18 @@ export type ConsensusDict = {
  */
 export interface BlockchainOptions extends GenesisOptions {
   /**
-   * Specify the chain and hardfork by passing a {@link GlobalConfig} instance.
+   * Specify the chain and hardfork by passing a {@link HardforkManager} instance.
    *
    * If not provided this defaults to chain `mainnet` and hardfork `chainstart`
    *
    */
-  common?: GlobalConfig
+  hardforkManager: HardforkManager
+
+  /**
+   * Optional hardfork identifier or block context to determine the initial fork.
+   * If not provided, defaults to the latest hardfork from the HardforkManager.
+   */
+  hardfork?: string | { blockNumber: bigint; timestamp?: bigint }
 
   /**
    * Set the HF to the fork determined by the head block and update on head updates.
@@ -163,7 +170,7 @@ export interface BlockchainOptions extends GenesisOptions {
    * threshold (merge HF) the calculated TD is additionally taken into account
    * for HF determination.
    *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
+   * Default: `false` (HF is set to whatever default HF is set by the {@link HardforkManager} instance)
    */
   hardforkByHeadBlockNumber?: boolean
 
@@ -212,7 +219,7 @@ export interface BlockchainOptions extends GenesisOptions {
    * ```
    *
    * Additionally it is possible to provide a fully custom consensus implementation.
-   * Note that this needs a custom `GlobalConfig` object passed to the blockchain where
+   * Note that this needs a custom `HardforkManager` object passed to the blockchain where
    * the `ConsensusAlgorithm` string matches the string used here.
    */
   consensusDict?: ConsensusDict

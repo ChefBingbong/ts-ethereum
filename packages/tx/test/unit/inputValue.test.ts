@@ -1,6 +1,5 @@
 import {
-  createCustomCommon,
-  Hardfork,
+  createHardforkManagerFromConfig,
   Mainnet,
 } from '@ts-ethereum/chain-config'
 import type {
@@ -112,16 +111,20 @@ const legacyTxValues = {
 
 describe('[Transaction Input Values]', () => {
   it('Legacy Transaction Values', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
+    const blockNumber = 0n
+    const timestamp = 0n
     const options = { ...baseTxValues, ...legacyTxValues, type: '0' }
     const legacyTxData = generateCombinations({
       options,
     })
     const randomSample = getRandomSubarray(legacyTxData, 100)
     for (const txData of randomSample) {
-      const tx = createLegacyTx(txData, { common })
+      const tx = createLegacyTx(txData, {
+        common,
+        blockNumber,
+        timestamp,
+      })
       assert.throws(
         () => tx.hash(),
         undefined,
@@ -134,10 +137,13 @@ describe('[Transaction Input Values]', () => {
 
 describe('[Invalid Array Input values]', () => {
   it('should work', () => {
+    const common = createHardforkManagerFromConfig(Mainnet)
+    const blockNumber = 0n
+    const timestamp = 0n
     const txTypes = [TransactionType.Legacy]
     for (const signed of [false, true]) {
       for (const txType of txTypes) {
-        let tx = createTx({ type: txType })
+        let tx = createTx({ type: txType }, { common, blockNumber, timestamp })
         if (signed) {
           tx = tx.sign(hexToBytes(`0x${'42'.repeat(32)}`))
         }
@@ -150,6 +156,7 @@ describe('[Invalid Array Input values]', () => {
               assert.throws(() =>
                 createLegacyTxFromBytesArray(
                   rawValues as TxValuesArray[typeof TransactionType.Legacy],
+                  { common, blockNumber, timestamp },
                 ),
               )
               break

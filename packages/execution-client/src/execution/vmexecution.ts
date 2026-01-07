@@ -69,7 +69,6 @@ export class VMExecution extends Execution {
 
   public vm!: VM
   public merkleVM: VM | undefined
-  public hardfork = ''
   /* Whether canonical chain execution has stayed valid or ran into an invalid block */
   public chainStatus: ChainStatus | null = null
 
@@ -169,7 +168,7 @@ export class VMExecution extends Execution {
     const trie = await createMPT({
       db: new LevelDB(this.stateDB),
       useKeyHashing: true,
-      common: this.config.chainCommon,
+      common: this.config.hardforkManager,
       cacheSize: this.config.options.trieCache,
       valueEncoding: this.config.options.useStringValueTrieDB
         ? ValueEncoding.String
@@ -207,18 +206,19 @@ export class VMExecution extends Execution {
           size: this.config.options.codeCache,
         },
       }),
-      common: this.config.chainCommon,
+      common: this.config.hardforkManager,
     })
 
     await mcl.init(mcl.BLS12_381)
     const rustBN = await initRustBN()
     this.merkleVM = await createVM({
-      common: this.config.execCommon,
+      hardforkManager: this.config.hardforkManager,
       blockchain: this.chain.blockchain,
       stateManager,
       profilerOpts: this.config.options.vmProfilerOpts,
       activatePrecompiles: true,
       evmOpts: {
+        common: this.config.hardforkManager,
         bn254: new RustBN254(rustBN),
       },
     })
@@ -255,14 +255,13 @@ export class VMExecution extends Execution {
           'cannot get iterator head: blockchain has no getTotalDifficulty function',
         )
       }
-      this.config.execCommon.setHardforkBy({
+      const headHardfork = this.config.hardforkManager.getHardforkFromContext({
         blockNumber: number,
         timestamp: headBlock.header.timestamp,
       })
-      this.hardfork = this.config.execCommon.hardfork()
 
       this.config.options.logger?.info(
-        `Initializing VM merkle statemanager genesis hardfork=${this.hardfork}`,
+        `Initializing VM merkle statemanager genesis hardfork=${headHardfork}`,
       )
       await this.setupMerkleVM()
       this.vm = this.merkleVM!
@@ -306,10 +305,7 @@ export class VMExecution extends Execution {
 
     // there could to be checks here that the resetted head is a parent of the chainStatus
     // but we can skip it for now trusting the chain reset has been correctly performed
-    this.hardfork = this.config.execCommon.setHardforkBy({
-      blockNumber: number,
-      timestamp: headBlock.header.timestamp,
-    })
+    // Hardfork is now determined dynamically from BlockContext during execution
 
     await this.setupMerkleVM()
     this.vm = this.merkleVM!
@@ -633,6 +629,15 @@ export class VMExecution extends Execution {
                   )
                   parentState = headBlock.header.stateRoot
 
+                  // Check if parent block's stateRoot exists in state manager
+                  const hasParentState =
+                    await this.vm.stateManager.hasStateRoot(parentState)
+                  if (!hasParentState) {
+                    this.config.options.logger?.warn(
+                      `Parent block ${headBlock.header.number} stateRoot ${bytesToHex(parentState)} not found in state manager. Block ${block.header.number} execution may fail.`,
+                    )
+                  }
+
                   if (reorg) {
                     clearCache = true
                     this.config.options.logger?.info(
@@ -642,6 +647,11 @@ export class VMExecution extends Execution {
                     const prevVMStateRoot =
                       await this.vm.stateManager.getStateRoot()
                     clearCache = !equalsBytes(prevVMStateRoot, parentState)
+                    if (clearCache) {
+                      this.config.options.logger?.debug(
+                        `VM state root mismatch: prevVM=${bytesToHex(prevVMStateRoot)} parent=${bytesToHex(parentState)}. Clearing cache.`,
+                      )
+                    }
                   }
                 } else {
                   // Continuation of last vm run, no need to clearCache
@@ -650,22 +660,8 @@ export class VMExecution extends Execution {
 
                 // run block, update head if valid
                 try {
-                  const { number, timestamp } = block.header
-
-                  const hardfork = this.config.execCommon.getHardforkBy({
-                    blockNumber: number,
-                    timestamp,
-                  })
-                  if (hardfork !== this.hardfork) {
-                    const hash = short(block.hash())
-                    this.config.options.logger?.info(
-                      `Execution hardfork switch on block number=${number} hash=${hash} old=${this.hardfork} new=${hardfork}`,
-                    )
-                    this.hardfork = this.config.execCommon.setHardforkBy({
-                      blockNumber: number,
-                      timestamp,
-                    })
-                  }
+                  // Hardfork is now determined dynamically from BlockContext in runBlock
+                  // No need to track hardfork separately
 
                   const skipBlockValidation = false
 
@@ -677,6 +673,17 @@ export class VMExecution extends Execution {
 
                   this._statsVM = this.vm
                   const beforeTS = Date.now()
+
+                  // Debug logging for stateRoot mismatch issues
+                  const blockHardfork =
+                    this.config.hardforkManager.getHardforkByBlock(
+                      block.header.number,
+                      block.header.timestamp,
+                    )
+                  this.config.options.logger?.debug(
+                    `Executing block number=${block.header.number} hash=${bytesToHex(block.hash())} parentState=${bytesToHex(parentState!)} expectedStateRoot=${bytesToHex(block.header.stateRoot)} hardfork=${blockHardfork} timestamp=${block.header.timestamp}`,
+                  )
+
                   const result = await runBlock(this.vm, {
                     block,
                     root: parentState,
@@ -753,8 +760,15 @@ export class VMExecution extends Execution {
             .catch(async (error) => {
               // Track error
               console.error(error)
+              // Determine hardfork from errorBlock if available, otherwise use a default
+              const errorHardfork = errorBlock
+                ? this.config.hardforkManager.getHardforkFromContext({
+                    blockNumber: errorBlock.header.number,
+                    timestamp: errorBlock.header.timestamp,
+                  })
+                : 'unknown'
               const context = createErrorContext('VMExecution', 'run', {
-                hardfork: this.hardfork,
+                hardfork: errorHardfork,
               })
               const clientError = classifyError(error, context)
               this.config.trackError(clientError)
@@ -762,7 +776,12 @@ export class VMExecution extends Execution {
               if (errorBlock !== undefined) {
                 const { number } = errorBlock.header
                 const hash = short(errorBlock.hash())
-                const errorMsg = `Execution of block number=${number} hash=${hash} hardfork=${this.hardfork} failed`
+                const blockHardfork =
+                  this.config.hardforkManager.getHardforkFromContext({
+                    blockNumber: number,
+                    timestamp: errorBlock.header.timestamp,
+                  })
+                const errorMsg = `Execution of block number=${number} hash=${hash} hardfork=${blockHardfork} failed`
 
                 // check if the vmHead 's backstepping can resolve this issue, headBlock is parent of the
                 // current block which is trying to be executed and should equal current vmHead
@@ -861,7 +880,12 @@ export class VMExecution extends Execution {
               const lastHash = short(endHeadBlock.hash())
               const tdAdd = `td=${this.chain.blocks.td} `
 
-              const msg = `Executed blocks count=${numExecuted} first=${firstNumber} hash=${firstHash} ${tdAdd}hardfork=${this.hardfork} last=${lastNumber} hash=${lastHash} txs=${txCounter}`
+              const lastBlockHardfork =
+                this.config.hardforkManager.getHardforkFromContext({
+                  blockNumber: lastNumber,
+                  timestamp: endHeadBlock.header.timestamp,
+                })
+              const msg = `Executed blocks count=${numExecuted} first=${firstNumber} hash=${firstHash} ${tdAdd}hardfork=${lastBlockHardfork} last=${lastNumber} hash=${lastHash} txs=${txCounter}`
               this.config.options.logger?.info(msg)
 
               await this.chain.update(false)
@@ -900,9 +924,13 @@ export class VMExecution extends Execution {
     const vmHeadBlock = await this.chain.blockchain.getIteratorHead()
     const canonicalHead = await this.chain.blockchain.getCanonicalHeadBlock()
 
+    const vmHeadHardfork = this.config.hardforkManager.getHardforkFromContext({
+      blockNumber: vmHeadBlock.header.number,
+      timestamp: vmHeadBlock.header.timestamp,
+    })
     const infoStr = `vmHead=${vmHeadBlock.header.number} canonicalHead=${
       canonicalHead.header.number
-    } hardfork=${this.config.execCommon.hardfork()} execution=${this.config.options.execution}`
+    } hardfork=${vmHeadHardfork} execution=${this.config.options.execution}`
     if (
       this.config.options.execution &&
       vmHeadBlock.header.number < canonicalHead.header.number

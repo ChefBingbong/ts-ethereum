@@ -122,7 +122,7 @@ export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
       const values: BlockBytes = [headers[i].raw(), txsData, unclesData]
       // Supply the common from the corresponding block header already set on correct fork
       const block = createBlockFromBytesArray(values, {
-        common: headers[i].common,
+        hardforkManager: headers[i].hardforkManager,
       })
       // Only validate the data integrity
       // Upon putting blocks into blockchain, `validateData` is called again

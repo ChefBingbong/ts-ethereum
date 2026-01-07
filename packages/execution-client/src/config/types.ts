@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { MetricsOptions } from '@ts-ethereum/metrics'
 import type { P2PNode } from '@ts-ethereum/p2p'
 import type { Address } from '@ts-ethereum/utils'
@@ -23,11 +23,11 @@ export const SyncMode = {
 } as const
 
 export interface ConfigOptions {
+  hardforkManager: HardforkManager
   /**
-   * Specify the chain by providing a {@link GlobalConfig} instance,
-   * the common instance will not be modified by client
+   * @deprecated Use hardforkManager instead. This property is kept for backward compatibility.
    */
-  common: GlobalConfig
+  common?: HardforkManager
 
   /**
    * Synchronization mode ('full', 'none')

@@ -178,7 +178,7 @@ export class Chain {
       options.blockchain ??
       (await createBlockchain({
         db: new LevelDB(options.chainDB),
-        common: options.config.chainCommon,
+        hardforkManager: options.config.hardforkManager,
         validateBlocks: true,
         validateConsensus: false,
         consensusDict,
@@ -242,7 +242,7 @@ export class Chain {
    * Chain ID
    */
   get chainId(): bigint {
-    return this.config.chainCommon.chainId()
+    return this.config.hardforkManager.chainId()
   }
 
   /**
@@ -343,10 +343,10 @@ export class Chain {
     this._headers = headers
     this._blocks = blocks
 
-    this.config.chainCommon.setHardforkBy({
-      blockNumber: headers.latest.number,
-      timestamp: headers.latest.timestamp,
-    })
+    // this.config.chainCommon.setHardforkBy({
+    //   blockNumber: headers.latest.number,
+    //   timestamp: headers.latest.timestamp,
+    // })
 
     if (emit) {
       this.config.events.emit(Event.CHAIN_UPDATED)
@@ -422,7 +422,7 @@ export class Chain {
       }
 
       const block = createBlockFromBytesArray(b.raw(), {
-        common: this.config.chainCommon,
+        hardforkManager: this.config.hardforkManager,
         setHardfork: true,
       })
 
@@ -466,7 +466,7 @@ export class Chain {
     for (const h of headers) {
       // Frontier/Chainstart only - PoW
       const header = createBlockHeaderFromBytesArray(h.raw(), {
-        common: this.config.chainCommon,
+        hardforkManager: this.config.hardforkManager,
         setHardfork: true,
       })
       await this.blockchain.putHeader(header)

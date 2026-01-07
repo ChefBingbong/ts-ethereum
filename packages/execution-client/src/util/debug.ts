@@ -20,7 +20,7 @@ export async function debugCodeReplayBlock(
  * https://github.com/ethereumjs/ethereumjs-monorepo repository.
  *
  * Block: ${block.header.number}
- * Hardfork: ${execution.hardfork}
+ * Hardfork: ${execution.config.hardforkManager.getHardforkByBlock(block.header.number, block.header.timestamp)}
  *
  * Run with: DEBUG=ethjs,vm:*:*,vm:*,-vm:ops:* tsx [SCRIPT_NAME].ts
  *
@@ -35,9 +35,8 @@ import { MerkleStateManager } from './src/state'
 import { Blockchain } from '../../blockchain'
 
 const main = async () => {
-  const common = new GlobalConfig({ chain: '${execution.config.execCommon.chainName()}', hardfork: '${
-    execution.hardfork
-  }' })
+  const blockHardfork = execution.config.hardforkManager.getHardforkByBlock(${block.header.number}, ${block.header.timestamp})
+  const common = createHardforkManagerFromConfig({ chain: '${execution.config.hardforkManager.chainName()}', hardfork: blockHardfork })
   const block = createBlockFromRLP(hexToBytes('${bytesToHex(block.serialize())}'), { common })
 
   const stateDB = new Level('${execution.config.getDataDirectory(DataDirectory.State)}')
