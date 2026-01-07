@@ -29,9 +29,9 @@ import {
   EthereumJSErrorWithoutCode,
   GWEI_TO_WEI,
   KECCAK256_RLP,
+  TypeOutput,
   toBytes,
   toType,
-  TypeOutput,
 } from '@ts-ethereum/utils'
 import { Bloom } from './bloom/index'
 import { runTx } from './index'
