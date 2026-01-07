@@ -1,12 +1,12 @@
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
-import { TypedTransaction } from '@ts-ethereum/tx'
+import type { TypedTransaction } from '@ts-ethereum/tx'
 import {
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   KECCAK256_RLP,
   KECCAK256_RLP_ARRAY,
-  Withdrawal,
+  type Withdrawal,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import { createBlockHeaderManagerFromHeader } from '../../header-functional'
