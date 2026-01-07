@@ -1,4 +1,4 @@
-import type { Blockchain } from '@ts-ethereum/blockchain'
+import type { BlockchainManager } from '@ts-ethereum/blockchain'
 import type { GenesisState } from '@ts-ethereum/chain-config'
 import type { P2PNode } from '@ts-ethereum/p2p'
 import type { AbstractLevel } from 'abstract-level'
@@ -17,7 +17,7 @@ export interface ExecutionNodeInitOptions {
   config: Config
 
   /** Custom blockchain (optional) */
-  blockchain?: Blockchain
+  blockchain?: BlockchainManager
 
   /**
    * Database to store blocks and metadata.

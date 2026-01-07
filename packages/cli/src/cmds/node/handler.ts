@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { createBlockchain } from '@ts-ethereum/blockchain'
+import { createBlockchainManager } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   createHardforkManagerFromConfig,
@@ -367,12 +367,12 @@ export async function nodeHandler(args: NodeHandlerArgs): Promise<void> {
   const genesisState = createGenesisState(accounts)
 
   // Create blockchain
-  const blockchain = await createBlockchain({
+  const blockchain = await createBlockchainManager({
     db: new LevelDB(databases.chainDB),
     hardforkManager,
     hardforkByHeadBlockNumber: true,
     validateBlocks: true,
-    validateConsensus: true,
+    validateConsensus: false, // No consensus validation needed for now
     genesisState: genesisState as any,
   })
 

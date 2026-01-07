@@ -135,7 +135,7 @@ export class VMExecution extends Execution {
         this.pendingReceipts = new Map()
         this.chain.blockchain.events.addListener(
           'deletedCanonicalBlocks',
-          async (blocks, resolve) => {
+          async (blocks: Block[], resolve?: (result?: any) => void) => {
             // Once a block gets deleted from the chain, delete the receipts also
             for (const block of blocks) {
               await this.receiptsManager?.deleteReceipts(block)
@@ -624,24 +624,25 @@ export class VMExecution extends Execution {
                 // determine starting state for block run
                 // if we are just starting or if a chain reorg has happened
                 if (headBlock === undefined || reorg) {
-                  headBlock = await this.chain.blockchain.getBlock(
+                  const parentBlock = await this.chain.blockchain.getBlock(
                     block.header.parentHash,
                   )
-                  parentState = headBlock.header.stateRoot
+                  headBlock = parentBlock
+                  parentState = parentBlock.header.stateRoot
 
                   // Check if parent block's stateRoot exists in state manager
                   const hasParentState =
                     await this.vm.stateManager.hasStateRoot(parentState)
                   if (!hasParentState) {
                     this.config.options.logger?.warn(
-                      `Parent block ${headBlock.header.number} stateRoot ${bytesToHex(parentState)} not found in state manager. Block ${block.header.number} execution may fail.`,
+                      `Parent block ${parentBlock.header.number} stateRoot ${bytesToHex(parentState)} not found in state manager. Block ${block.header.number} execution may fail.`,
                     )
                   }
 
                   if (reorg) {
                     clearCache = true
                     this.config.options.logger?.info(
-                      `VM run: Chain reorged, setting new head to block number=${headBlock.header.number} clearCache=${clearCache}.`,
+                      `VM run: Chain reorged, setting new head to block number=${parentBlock.header.number} clearCache=${clearCache}.`,
                     )
                   } else {
                     const prevVMStateRoot =
@@ -757,7 +758,7 @@ export class VMExecution extends Execution {
               true,
             )
             // Ensure to catch and not throw as this would lead to unCaughtException with process exit
-            .catch(async (error) => {
+            .catch(async (error: Error) => {
               // Track error
               console.error(error)
               // Determine hardfork from errorBlock if available, otherwise use a default

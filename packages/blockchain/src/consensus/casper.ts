@@ -1,7 +1,7 @@
 import type { BlockHeader } from '@ts-ethereum/block'
 import { ConsensusAlgorithm } from '@ts-ethereum/chain-config'
 import { BIGINT_0 } from '@ts-ethereum/utils'
-import type { Consensus } from '../types'
+import type { Consensus } from '../blockchain-functional/types'
 
 /**
  * This class encapsulates Casper-related consensus functionality when used with the Blockchain class.
