@@ -1,4 +1,3 @@
-import { deepFreeze } from '@ts-ethereum/utils'
 import type { HeaderData } from '../../types'
 import { validateBlockHeader } from '../../validation'
 import { computeHash, ethashCanonicalDifficulty } from '../helpers'
@@ -47,5 +46,5 @@ export function fromHeaderData(
     _cache: { hash },
   }
 
-  return shouldFreeze ? deepFreeze(finalHeader) : finalHeader
+  return finalHeader
 }

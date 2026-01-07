@@ -1,5 +1,9 @@
-import type { HeaderData } from '@ts-ethereum/block'
-import { Block, BlockHeader, createBlock } from '@ts-ethereum/block'
+import type { Block, BlockHeader, HeaderData } from '@ts-ethereum/block'
+import {
+  createBlock,
+  createBlockManagerCreateEmpty,
+  isBlock,
+} from '@ts-ethereum/block'
 import type { GenesisState, HardforkManager } from '@ts-ethereum/chain-config'
 import {
   ConsensusAlgorithm,
@@ -20,6 +24,7 @@ import {
   equalsBytes,
   hexToBigInt,
   KECCAK256_RLP,
+  KECCAK256_RLP_ARRAY,
   Lock,
   MapDB,
   SHA256_NULL,
@@ -402,17 +407,45 @@ export class Blockchain implements BlockchainInterface {
       const oldHeadHeaderHash = this._headHeaderHash
       const oldHeadBlockHash = this._headBlockHash
       try {
-        const block =
-          item instanceof BlockHeader
-            ? new Block(item, [], [], undefined, {
-                hardforkManager: item.hardforkManager,
-              })
-            : item
-        const isGenesis = block.isGenesis()
+        let blockToProcess: Block
+        let itemToStore: Block | BlockHeader = item
+        if (isBlock(item)) {
+          blockToProcess = item
+        } else {
+          // item is BlockHeader (BlockHeaderManager)
+          const header = item as BlockHeader
+
+          // Check if header indicates transactions/uncles exist
+          const hasTransactions = !equalsBytes(
+            header.transactionsTrie,
+            KECCAK256_RLP,
+          )
+          const hasUncles = !equalsBytes(header.uncleHash, KECCAK256_RLP_ARRAY)
+
+          if (hasTransactions || hasUncles) {
+            // Header indicates transactions/uncles exist
+            // Store just the header (not a block) so body won't be stored
+            // This prevents storing an empty body when transactions exist
+            itemToStore = header
+            // Still create block for internal processing
+            blockToProcess = createBlockManagerCreateEmpty(header, {
+              hardforkManager: header.hardforkManager,
+            })
+          } else {
+            // Header indicates empty block - safe to create empty block
+            blockToProcess = createBlockManagerCreateEmpty(header, {
+              hardforkManager: header.hardforkManager,
+            })
+            // Store the block so empty body is stored (which is correct for empty blocks)
+            itemToStore = blockToProcess
+          }
+        }
+
+        const isGenesis = blockToProcess.isGenesis()
 
         // we cannot overwrite the Genesis block after initializing the Blockchain
         if (isGenesis) {
-          if (equalsBytes(this.genesisBlock.hash(), block.hash())) {
+          if (equalsBytes(this.genesisBlock.hash(), blockToProcess.hash())) {
             // Try to re-put the existing genesis block, accept this
             return
           }
@@ -421,7 +454,7 @@ export class Blockchain implements BlockchainInterface {
           )
         }
 
-        const { header } = block
+        const { header } = blockToProcess
         const blockHash = header.hash()
         const blockNumber = header.number
         let td = header.difficulty
@@ -429,20 +462,21 @@ export class Blockchain implements BlockchainInterface {
         let dbOps: DBOp[] = []
 
         if (
-          block.hardforkManager.chainId() !== this.hardforkManager.chainId()
+          blockToProcess.hardforkManager.chainId() !==
+          this.hardforkManager.chainId()
         ) {
           throw EthereumJSErrorWithoutCode(
-            `Chain mismatch while trying to put block or header. Chain ID of block: ${block.hardforkManager.chainId()}, chain ID of blockchain : ${this.hardforkManager.chainId()}`,
+            `Chain mismatch while trying to put block or header. Chain ID of block: ${blockToProcess.hardforkManager.chainId()}, chain ID of blockchain : ${this.hardforkManager.chainId()}`,
           )
         }
 
-        if (this._validateBlocks && !isGenesis && item instanceof Block) {
+        if (this._validateBlocks && !isGenesis && isBlock(item)) {
           // this calls into `getBlock`, which is why we cannot lock yet
-          await this.validateBlock(block)
+          await this.validateBlock(blockToProcess)
         }
 
         if (this._validateConsensus) {
-          await this.consensus!.validateConsensus(block)
+          await this.consensus!.validateConsensus(blockToProcess)
         }
 
         // set total difficulty in the current context scope
@@ -455,7 +489,7 @@ export class Blockchain implements BlockchainInterface {
 
         // calculate the total difficulty of the new block
         const parentTd = await this.getParentTD(header)
-        if (!block.isGenesis()) {
+        if (!blockToProcess.isGenesis()) {
           td += parentTd
         }
 
@@ -463,15 +497,15 @@ export class Blockchain implements BlockchainInterface {
         dbOps = dbOps.concat(DBSetTD(td, blockNumber, blockHash))
 
         // save header/block to the database, but save the input not our wrapper block
-        dbOps = dbOps.concat(DBSetBlockOrHeader(item))
+        dbOps = dbOps.concat(DBSetBlockOrHeader(itemToStore))
 
         let commonAncestor: undefined | BlockHeader
         let ancestorHeaders: undefined | BlockHeader[]
         // if total difficulty is higher than current, add it to canonical chain
         if (
-          block.isGenesis() ||
+          blockToProcess.isGenesis() ||
           td > currentTd.header ||
-          block.hardforkManager.config.spec.chain.consensus.type ===
+          blockToProcess.hardforkManager.config.spec.chain.consensus.type ===
             ConsensusType.ProofOfStake
         ) {
           const foundCommon = await this.findCommonAncestor(header)
@@ -479,7 +513,7 @@ export class Blockchain implements BlockchainInterface {
           ancestorHeaders = foundCommon.ancestorHeaders
 
           this._headHeaderHash = blockHash
-          if (item instanceof Block) {
+          if (isBlock(item)) {
             this._headBlockHash = blockHash
           }
           if (this._hardforkByHeadBlockNumber) {
@@ -503,7 +537,7 @@ export class Blockchain implements BlockchainInterface {
         } else {
           // the TD is lower than the current highest TD so we will add the block
           // to the DB, but will not mark it as the canonical chain.
-          if (td > currentTd.block && item instanceof Block) {
+          if (td > currentTd.block && isBlock(item)) {
             this._headBlockHash = blockHash
           }
           // save hash to number lookup info even if rebuild not needed
@@ -513,10 +547,14 @@ export class Blockchain implements BlockchainInterface {
         const ops = dbOps.concat(this._saveHeadOps())
         await this.dbManager.batch(ops)
 
-        await this.consensus?.newBlock(block, commonAncestor, ancestorHeaders)
+        await this.consensus?.newBlock(
+          blockToProcess,
+          commonAncestor,
+          ancestorHeaders,
+        )
         this.DEBUG &&
           this._debug(
-            `put block number=${block.header.number} hash=${bytesToHex(blockHash)}`,
+            `put block number=${blockToProcess.header.number} hash=${bytesToHex(blockHash)}`,
           )
       } catch (e) {
         // restore head to the previously sane state
@@ -585,7 +623,7 @@ export class Blockchain implements BlockchainInterface {
     //   }
     // }
 
-    header.validateGasLimit(parentHeader)
+    header.validateGasLimit(parentHeader.gasLimit)
 
     if (height !== undefined) {
       const dif = height - parentHeader.number

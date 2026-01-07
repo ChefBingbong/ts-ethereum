@@ -1,5 +1,0 @@
-export { AccessListTxData } from './access-list'
-export { BlobTxData } from './blob'
-export { DynamicFeeTxData } from './dynamic-fee'
-export { EOACodeTxData } from './eoa-code'
-export { LegacyTxData } from './legacy'

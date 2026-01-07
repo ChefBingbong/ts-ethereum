@@ -31,7 +31,7 @@
     }
   },
   "editor.codeActionsOnSave": {
-    "source.organizeImports": "always"
+    "source.organizeImports.biome": "explicit"
   },
   "editor.formatOnSave": true,
   "[github-actions-workflow]": {

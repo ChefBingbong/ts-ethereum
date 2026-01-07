@@ -1,8 +1,13 @@
-import type { Block } from '..'
+import type { BlockManager } from '../block-functional'
 
 export function ethashCanonicalDifficulty(
-  block: Block,
-  parentBlock: Block,
+  block: BlockManager,
+  parentBlock: BlockManager,
 ): bigint {
-  return block.header.ethashCanonicalDifficulty(parentBlock.header)
+  return block.header.ethashCanonicalDifficulty({
+    timestamp: parentBlock.header.header.data.timestamp,
+    difficulty: parentBlock.header.header.data.difficulty,
+    uncleHash: parentBlock.header.header.data.uncleHash,
+    gasLimit: parentBlock.header.header.data.gasLimit,
+  })
 }

@@ -1,10 +1,10 @@
-import type { BlockData, HeaderData } from '@ts-ethereum/block'
-import {
+import type {
   Block,
+  BlockData,
   BlockHeader,
-  createBlock,
-  createBlockHeader,
+  HeaderData,
 } from '@ts-ethereum/block'
+import { createBlock, createBlockHeader, isBlock } from '@ts-ethereum/block'
 import { RLP } from '@ts-ethereum/rlp'
 import type { DB, DBObject, PrefixedHexString } from '@ts-ethereum/utils'
 import {
@@ -67,13 +67,11 @@ export class Miner {
    */
 
   constructor(mineObject: BlockHeader | Block, ethash: Ethash) {
-    if (mineObject instanceof BlockHeader) {
-      this.blockHeader = mineObject
-    } else if (mineObject instanceof Block) {
-      this.block = mineObject
-      this.blockHeader = mineObject.header
+    if (isBlock(mineObject)) {
+      this.block = mineObject as Block
+      this.blockHeader = (mineObject as Block).header
     } else {
-      throw new Error('unsupported mineObject')
+      this.blockHeader = mineObject as BlockHeader
     }
     this.currentNonce = BIGINT_0
     this.ethash = ethash

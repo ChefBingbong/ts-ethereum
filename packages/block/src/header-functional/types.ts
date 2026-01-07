@@ -123,16 +123,39 @@ export interface JSONRPCHeaderInput {
 /**
  * Immutable block header manager interface.
  * Provides a purely functional API for working with block headers.
+ * Also includes convenience properties for backward compatibility with the old BlockHeader class.
  */
 export interface BlockHeaderManager {
   readonly header: FrozenBlockHeader
 
-  // Accessors
-  blockNum(): BlockNumContext
-  hardfork(): string
-  prevRandao(): Uint8Array
-  consensusType(): string
-  consensusAlgorithm(): string
+  // Backward compatibility properties (matching old BlockHeader class)
+  readonly parentHash: Uint8Array
+  readonly uncleHash: Uint8Array
+  readonly coinbase: Address
+  readonly stateRoot: Uint8Array
+  readonly transactionsTrie: Uint8Array
+  readonly receiptTrie: Uint8Array
+  readonly logsBloom: Uint8Array
+  readonly difficulty: bigint
+  readonly number: bigint
+  readonly gasLimit: bigint
+  readonly gasUsed: bigint
+  readonly timestamp: bigint
+  readonly extraData: Uint8Array
+  readonly mixHash: Uint8Array
+  readonly nonce: Uint8Array
+  readonly baseFeePerGas?: bigint
+  readonly withdrawalsRoot?: Uint8Array
+  readonly blobGasUsed?: bigint
+  readonly excessBlobGas?: bigint
+  readonly parentBeaconBlockRoot?: Uint8Array
+  readonly requestsHash?: Uint8Array
+  readonly hardforkManager: HardforkManager
+  readonly blockNum: BlockNumContext
+  readonly hardfork: string
+  readonly consensusType: string
+  readonly consensusAlgorithm: string
+  readonly prevRandao: Uint8Array
 
   // EIP helpers
   isEIPActive(eip: number): boolean

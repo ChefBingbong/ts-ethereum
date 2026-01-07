@@ -486,7 +486,14 @@ export class BlockBuilder {
       requestsHash = genRequestsRoot(requests, sha256Function)
     }
 
-    // get stateRoot after all the accumulateRequests etc have been done
+    // Commit checkpoint before getting stateRoot to ensure all state changes are persisted
+    // This matches the order in runBlock() where commit happens before getStateRoot()
+    if (this.checkpointed) {
+      await this.vm.evm.journal.commit()
+      this.checkpointed = false
+    }
+
+    // get stateRoot after all operations including commit are done
     const stateRoot = await this.vm.stateManager.getStateRoot()
     const headerData = {
       ...this.headerData,
@@ -526,10 +533,8 @@ export class BlockBuilder {
     }
 
     this.blockStatus = { status: BuildStatus.Build, block }
-    if (this.checkpointed) {
-      await this.vm.evm.journal.commit()
-      this.checkpointed = false
-    }
+    // Note: checkpoint is already committed above before getting stateRoot
+    // This ensures the stateRoot in the block header matches what runBlock() will produce
 
     return { block, requests }
   }

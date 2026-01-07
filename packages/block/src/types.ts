@@ -19,7 +19,14 @@ import type {
   WithdrawalBytes,
   WithdrawalData,
 } from '@ts-ethereum/utils'
-import type { BlockHeader } from './index'
+import type { BlockHeaderManager } from './header-functional'
+
+/**
+ * Backward compatibility type alias for BlockHeaderManager.
+ * Existing code using BlockHeader will continue to work.
+ */
+export type BlockHeader = BlockHeaderManager
+
 /**
  * An object to set to which blockchain the blocks and their headers belong. This could be specified
  * using a {@link GlobalConfig} object, or `chain` and `hardfork`. Defaults to mainnet without specifying a
@@ -63,14 +70,14 @@ export interface BlockOptions {
    */
   params?: ParamsDict
   /**
-   * If a preceding {@link BlockHeader} (usually the parent header) is given the preceding
+   * If a preceding {@link BlockHeaderManager} (usually the parent header) is given the preceding
    * header will be used to calculate the difficulty for this block and the calculated
    * difficulty takes precedence over a provided static `difficulty` value.
    *
    * Note that this option has no effect on networks other than PoW/Ethash networks
    * (respectively also deactivates on the Merge HF switching to PoS/Casper).
    */
-  calcDifficultyFromHeader?: BlockHeader
+  calcDifficultyFromHeader?: BlockHeaderManager
   /**
    * A block object by default gets frozen along initialization. This gives you
    * strong additional security guarantees on the consistency of the block parameters.

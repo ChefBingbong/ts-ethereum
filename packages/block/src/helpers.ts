@@ -18,7 +18,7 @@ import {
   TypeOutput,
   toType,
 } from '@ts-ethereum/utils'
-import type { BlockHeader } from './header'
+import type { BlockHeaderManager } from './header-functional'
 import type { BlockHeaderBytes, HeaderData } from './types'
 
 /**
@@ -255,36 +255,38 @@ export function genRequestsRoot(
  * @returns BlockContext with all block-related information
  */
 export function createBlockContext(
-  header: BlockHeader,
+  header: BlockHeaderManager,
   hardforkManager: HardforkManager,
   getBlockHash: (blockNumber: bigint) => Uint8Array | undefined,
 ): BlockContext {
+  const headerData = header.header.data
   // Determine hardfork for this block to compute blob gas price if needed
   const blockHardfork = hardforkManager.getHardforkByBlock(
-    header.number,
-    header.timestamp,
+    headerData.number,
+    headerData.timestamp,
   )
 
   // Compute blob base fee if excessBlobGas is present (post-Cancun)
   let blobBaseFeePerGas: bigint | undefined
-  if (header.excessBlobGas !== undefined) {
+  if (headerData.excessBlobGas !== undefined) {
     blobBaseFeePerGas = computeBlobGasPrice(
-      header.excessBlobGas,
+      headerData.excessBlobGas,
       hardforkManager,
       blockHardfork,
     )
   }
 
   // Random value (PREVRANDAO) is mixHash when difficulty is 0 (post-merge)
-  const random = header.difficulty === BIGINT_0 ? header.mixHash : undefined
+  const random =
+    headerData.difficulty === BIGINT_0 ? headerData.mixHash : undefined
 
   return {
-    blockNumber: header.number,
-    timestamp: header.timestamp,
-    coinbase: header.coinbase,
-    gasLimit: header.gasLimit,
-    difficulty: header.difficulty,
-    baseFeePerGas: header.baseFeePerGas,
+    blockNumber: headerData.number,
+    timestamp: headerData.timestamp,
+    coinbase: headerData.coinbase,
+    gasLimit: headerData.gasLimit,
+    difficulty: headerData.difficulty,
+    baseFeePerGas: headerData.baseFeePerGas,
     blobBaseFeePerGas,
     random,
     getBlockHash,

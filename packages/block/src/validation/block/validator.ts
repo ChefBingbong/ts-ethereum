@@ -5,7 +5,7 @@ import {
   EthereumJSErrorWithoutCode,
   type Withdrawal,
 } from '@ts-ethereum/utils'
-import type { BlockHeader } from '../../header'
+import type { BlockHeaderManager } from '../../header-functional'
 import {
   type BlockConstructorInput,
   MAX_UNCLE_HEADERS,
@@ -126,7 +126,9 @@ export function validateBlockConstructor(
  * @returns true if valid
  * @throws EthereumJSErrorWithoutCode if validation fails
  */
-export function validateUncleHeaders(uncleHeaders: BlockHeader[]): boolean {
+export function validateUncleHeaders(
+  uncleHeaders: BlockHeaderManager[],
+): boolean {
   // Check max uncle count
   if (uncleHeaders.length > MAX_UNCLE_HEADERS) {
     throw EthereumJSErrorWithoutCode('too many uncle headers')
