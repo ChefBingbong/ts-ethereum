@@ -183,3 +183,57 @@ export function isEOACode7702AuthorizationList(
 ): input is EOACode7702AuthorizationList {
   return !isEOACode7702AuthorizationListBytes(input) // This is exactly the same method, except the output is negated.
 }
+
+/**
+ * BlockContext provides block-related information for EVM execution.
+ * Similar to go-ethereum's vm.BlockContext.
+ *
+ * The hardfork is determined dynamically from blockNumber and timestamp
+ * using HardforkManager.getHardforkByBlock().
+ */
+export interface BlockContext {
+  /**
+   * Block number (NUMBER opcode)
+   */
+  blockNumber: bigint
+
+  /**
+   * Block timestamp (TIME opcode)
+   */
+  timestamp: bigint
+
+  /**
+   * Coinbase address (COINBASE opcode)
+   */
+  coinbase: Address
+
+  /**
+   * Gas limit for the block (GASLIMIT opcode)
+   */
+  gasLimit: bigint
+
+  /**
+   * Block difficulty (DIFFICULTY opcode)
+   */
+  difficulty: bigint
+
+  /**
+   * Base fee per gas (BASEFEE opcode, post-London)
+   */
+  baseFeePerGas?: bigint
+
+  /**
+   * Blob base fee per gas (BLOBBASEFEE opcode, post-Cancun)
+   */
+  blobBaseFeePerGas?: bigint
+
+  /**
+   * Random value (PREVRANDAO opcode, post-merge)
+   */
+  random?: Uint8Array
+
+  /**
+   * Function to get block hash by number (BLOCKHASH opcode)
+   */
+  getBlockHash: (blockNumber: bigint) => Uint8Array | undefined
+}

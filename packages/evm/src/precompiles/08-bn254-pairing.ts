@@ -17,10 +17,13 @@ export function precompile08(opts: PrecompileInput): ExecResult {
     )
   }
 
+  const hardfork = opts._EVM.fork
+  const eip609Hardfork = opts.common.getHardforkForEIP(609) ?? hardfork
   const inputDataSize = BigInt(Math.floor(opts.data.length / 192))
   const gasUsed =
-    opts.common.getParamByEIP(609, 'bn254PairingGas') +
-    inputDataSize * opts.common.getParamByEIP(609, 'bn254PairingWordGas')
+    opts.common.getParamAtHardfork('bn254PairingGas', eip609Hardfork)! +
+    inputDataSize *
+      opts.common.getParamAtHardfork('bn254PairingWordGas', eip609Hardfork)!
 
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)

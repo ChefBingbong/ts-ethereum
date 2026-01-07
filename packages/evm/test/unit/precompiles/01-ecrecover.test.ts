@@ -1,6 +1,6 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -28,14 +28,15 @@ describe('Precompiles: ECRECOVER', () => {
   it('ECRECOVER', async () => {
     // Test reference: https://github.com/ethereum/go-ethereum/issues/3731#issuecomment-293866868
 
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Petersburg,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
     const evm = await createEVM({
       common,
+      hardfork: Hardfork.Petersburg,
     })
     const addressStr = '0000000000000000000000000000000000000001'
-    const ECRECOVER = getActivePrecompiles(common).get(addressStr)!
+    const ECRECOVER = getActivePrecompiles(common, Hardfork.Petersburg).get(
+      addressStr,
+    )!
 
     const prefixedMessage = bytesToUnprefixedHex(
       keccak_256(hexToBytes(`0x${prefix}${_hash}`)),

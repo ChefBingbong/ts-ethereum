@@ -4,6 +4,7 @@ import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import { Blob4844Tx, type TypedTransaction } from '@ts-ethereum/tx'
 import type {
+  BlockContext,
   CLRequest,
   CLRequestType,
   PrefixedHexString,
@@ -17,6 +18,7 @@ import {
   TypeOutput,
   toType,
 } from '@ts-ethereum/utils'
+import type { BlockHeader } from './header'
 import type { BlockHeaderBytes, HeaderData } from './types'
 
 /**
@@ -241,4 +243,67 @@ export function genRequestsRoot(
   }
 
   return sha256Function(flatRequests)
+}
+
+/**
+ * Creates a BlockContext from a block header.
+ * Similar to go-ethereum's NewEVMBlockContext.
+ *
+ * @param header - The block header to create context from
+ * @param hardforkManager - HardforkManager instance for computing blob gas price
+ * @param getBlockHash - Function to retrieve block hash by number (for BLOCKHASH opcode)
+ * @returns BlockContext with all block-related information
+ */
+export function createBlockContext(
+  header: BlockHeader,
+  hardforkManager: HardforkManager,
+  getBlockHash: (blockNumber: bigint) => Uint8Array | undefined,
+): BlockContext {
+  // Determine hardfork for this block to compute blob gas price if needed
+  const blockHardfork = hardforkManager.getHardforkByBlock(
+    header.number,
+    header.timestamp,
+  )
+
+  // Compute blob base fee if excessBlobGas is present (post-Cancun)
+  let blobBaseFeePerGas: bigint | undefined
+  if (header.excessBlobGas !== undefined) {
+    blobBaseFeePerGas = computeBlobGasPrice(
+      header.excessBlobGas,
+      hardforkManager,
+      blockHardfork,
+    )
+  }
+
+  // Random value (PREVRANDAO) is mixHash when difficulty is 0 (post-merge)
+  const random = header.difficulty === BIGINT_0 ? header.mixHash : undefined
+
+  return {
+    blockNumber: header.number,
+    timestamp: header.timestamp,
+    coinbase: header.coinbase,
+    gasLimit: header.gasLimit,
+    difficulty: header.difficulty,
+    baseFeePerGas: header.baseFeePerGas,
+    blobBaseFeePerGas,
+    random,
+    getBlockHash,
+  }
+}
+
+/**
+ * Gets the hardfork for a BlockContext using HardforkManager.
+ *
+ * @param context - The BlockContext to get hardfork for
+ * @param hardforkManager - HardforkManager instance
+ * @returns The hardfork identifier string
+ */
+export function getHardforkFromBlockContext(
+  context: BlockContext,
+  hardforkManager: HardforkManager,
+): string {
+  return hardforkManager.getHardforkByBlock(
+    context.blockNumber,
+    context.timestamp,
+  )
 }

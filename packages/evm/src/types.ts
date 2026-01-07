@@ -1,9 +1,18 @@
-import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
+import type {
+  CustomCrypto,
+  HardforkManager,
+  ParamsDict,
+} from '@ts-ethereum/chain-config'
 import type {
   BinaryTreeAccessWitnessInterface,
   StateManagerInterface,
 } from '@ts-ethereum/state-manager/src/interfaces'
-import type { Account, Address, PrefixedHexString } from '@ts-ethereum/utils'
+import type {
+  Account,
+  Address,
+  BlockContext,
+  PrefixedHexString,
+} from '@ts-ethereum/utils'
 import type { EventEmitter } from 'eventemitter3'
 import type { BinaryTreeAccessWitness } from './binaryTreeAccessWitness'
 import type { EOFContainer } from './eof/container'
@@ -114,6 +123,11 @@ export interface EVMRunCodeOpts extends EVMRunOpts {
  */
 export interface EVMRunCallOpts extends EVMRunOpts {
   /**
+   * Optional BlockContext. If provided, will be used to determine hardfork dynamically.
+   * If not provided and block is present, BlockContext will be created from block header.
+   */
+  blockContext?: BlockContext
+  /**
    * If the code location is a precompile.
    */
   isCompiled?: boolean
@@ -163,7 +177,8 @@ export type EVMEvent = {
 }
 
 export interface EVMInterface {
-  common: GlobalConfig
+  readonly common: HardforkManager
+  readonly fork: string
   journal: {
     commit(): Promise<void>
     revert(): Promise<void>
@@ -202,7 +217,8 @@ export type EVMProfilerOpts = {
  */
 export interface EVMOpts {
   /**
-   * Use a {@link GlobalConfig} instance for EVM instantiation.
+   * Use a {@link HardforkManager} instance for EVM instantiation.
+   * Required: Must be provided when creating an EVM instance.
    *
    * ### Supported EIPs
    *
@@ -248,7 +264,17 @@ export interface EVMOpts {
    *
    * - `experimental`: behaviour can change on patch versions
    */
-  common?: GlobalConfig
+  common: HardforkManager
+
+  /**
+   * Hardfork context for the EVM. Can be:
+   * - Hardfork identifier (string): uses that specific hardfork
+   * - Block context ({ blockNumber, timestamp? }): determines hardfork from block context
+   * - undefined: uses latest/most permissive hardfork (like geth's LatestSigner pattern)
+   *
+   * If not provided, uses the latest hardfork from the chain config.
+   */
+  hardfork?: string | { blockNumber: bigint; timestamp?: bigint }
 
   /**
    * Allows unlimited contract sizes while debugging. By setting this to `true`, the check for
@@ -296,7 +322,7 @@ export interface EVMOpts {
    *    // The base fee of the opcode
    *    baseFee: number
    *    // If the opcode charges dynamic gas, add this here. To charge the gas, use the `i` methods of the BN, to update the charged gas
-   *    gasFunction?: function(runState: RunState, gas: BN, common: GlobalConfig)
+   *    gasFunction?: function(runState: RunState, gas: BN, common: HardforkManager)
    *    // The logic of the opcode which holds the logic of changing the current state
    *    logicFunction: function(runState: RunState)
    * }
@@ -388,6 +414,12 @@ export interface EVMOpts {
    * `Interpreter.getBlockCoinbase` method is called.
    */
   cliqueSigner?: (header: Block['header']) => Address
+
+  /**
+   * Custom crypto implementations for precompiles (e.g., keccak256, sha256, ecrecover, kzg).
+   * If not provided, default implementations from @ts-ethereum/utils and @noble/hashes are used.
+   */
+  customCrypto?: CustomCrypto
 }
 
 /**

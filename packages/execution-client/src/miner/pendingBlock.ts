@@ -136,16 +136,21 @@ export class PendingBlock {
 
     let { gasLimit } = parentBlock.header
 
-    vm.common.setHardforkBy({
-      blockNumber: number,
-      timestamp,
-    })
+    // vm.common.setHardforkBy({
+    //   blockNumber: number,
+    //   timestamp,
+    // })
 
-    const baseFeePerGas = parentBlock.header.common.isActivatedEIP(1559)
+    const baseFeePerGas = vm.hardforkManager.isEIPActiveAtHardfork(
+      1559,
+      vm.hardforkManager.getHardforkFromContext({
+        blockNumber: number,
+      }),
+    )
       ? parentBlock.header.calcNextBaseFee()
       : undefined
 
-    if (number === vm.common.hardforkBlock(Hardfork.London)) {
+    if (number === vm.hardforkManager.hardforkBlock(Hardfork.London)) {
       gasLimit = gasLimit * BIGINT_2
     }
 
@@ -205,6 +210,7 @@ export class PendingBlock {
       blockOpts: {
         putBlockIntoBlockchain: false,
         setHardfork: true,
+        hardforkManager: vm.hardforkManager,
       },
     })
 

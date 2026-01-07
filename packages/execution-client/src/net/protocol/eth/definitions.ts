@@ -21,7 +21,6 @@ import {
   type TypedTransaction,
 } from '@ts-ethereum/tx'
 import {
-  BIGINT_0,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
   bytesToHex,
@@ -202,17 +201,17 @@ export const ETH_MESSAGES = {
       },
     ) => {
       if (!config.synchronized) return
-      const common = config.chainCommon.copy()
-      common.setHardforkBy({
-        blockNumber:
-          config.chain?.headers.latest?.number ?? // Use latest header number if available OR
-          config.syncTargetHeight ?? // Use sync target height if available OR
-          common.hardforkBlock(common.hardfork()) ?? // Use current hardfork block number OR
-          BIGINT_0, // Use chainstart,
-        timestamp:
-          config.chain?.headers.latest?.timestamp ??
-          BigInt(Math.floor(Date.now() / 1000)),
-      })
+      const common = config.chainCommon
+      // common.setHardforkBy({
+      //   blockNumber:
+      //     config.chain?.headers.latest?.number ?? // Use latest header number if available OR
+      //     config.syncTargetHeight ?? // Use sync target height if available OR
+      //     common.hardforkBlock(common.hardfork()) ?? // Use current hardfork block number OR
+      //     BIGINT_0, // Use chainstart,
+      //   timestamp:
+      //     config.chain?.headers.latest?.timestamp ??
+      //     BigInt(Math.floor(Date.now() / 1000)),
+      // })
       return txs.map((txData) => createTxFromRLP(txData, { common }))
     },
   },
@@ -231,7 +230,7 @@ export const ETH_MESSAGES = {
       config: { chainCommon: any },
     ) => [
       createBlockFromBytesArray(block, {
-        common: config.chainCommon,
+        hardforkManager: config.chainCommon,
         setHardfork: true,
       }),
       td,
@@ -295,7 +294,7 @@ export const ETH_MESSAGES = {
       headers.map((h) => {
         const common = config.chainCommon
         const header = createBlockHeaderFromBytesArray(h, {
-          common,
+          hardforkManager: common,
           setHardfork: true,
         })
         return header
@@ -521,17 +520,17 @@ export const ETH_MESSAGES = {
         syncTargetHeight?: bigint
       },
     ) => {
-      const common = config.chainCommon.copy()
-      common.setHardforkBy({
-        blockNumber:
-          config.chain?.headers.latest?.number ?? // Use latest header number if available OR
-          config.syncTargetHeight ?? // Use sync target height if available OR
-          common.hardforkBlock(common.hardfork()) ?? // Use current hardfork block number OR
-          BIGINT_0, // Use chainstart,
-        timestamp:
-          config.chain?.headers.latest?.timestamp ??
-          BigInt(Math.floor(Date.now() / 1000)),
-      })
+      const common = config.chainCommon
+      // common.setHardforkBy({
+      //   blockNumber:
+      //     config.chain?.headers.latest?.number ?? // Use latest header number if available OR
+      //     config.syncTargetHeight ?? // Use sync target height if available OR
+      //     common.hardforkBlock(common.hardfork()) ?? // Use current hardfork block number OR
+      //     BIGINT_0, // Use chainstart,
+      //   timestamp:
+      //     config.chain?.headers.latest?.timestamp ??
+      //     BigInt(Math.floor(Date.now() / 1000)),
+      // })
       return [
         bytesToBigInt(reqId),
         txs.map((txData) => {

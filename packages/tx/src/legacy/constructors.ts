@@ -15,7 +15,7 @@ import { LegacyTx } from './tx'
  * Notes:
  * - All parameters are optional and have some basic default values
  */
-export function createLegacyTx(txData: TxData, opts: TxOptions = {}) {
+export function createLegacyTx(txData: TxData, opts: TxOptions) {
   return new LegacyTx(txData, opts)
 }
 
@@ -26,7 +26,7 @@ export function createLegacyTx(txData: TxData, opts: TxOptions = {}) {
  */
 export function createLegacyTxFromBytesArray(
   values: TxValuesArray,
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
   // If length is not 6, it has length 9. If v/r/s are empty Uint8Arrays, it is still an unsigned transaction
   // This happens if you get the RLP data from `raw()`
@@ -62,10 +62,7 @@ export function createLegacyTxFromBytesArray(
  * Format: `rlp([nonce, gasPrice, gasLimit, to, value, data,
  * signatureV, signatureR, signatureS])`
  */
-export function createLegacyTxFromRLP(
-  serialized: Uint8Array,
-  opts: TxOptions = {},
-) {
+export function createLegacyTxFromRLP(serialized: Uint8Array, opts: TxOptions) {
   const values = RLP.decode(serialized)
 
   if (!Array.isArray(values)) {

@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -33,7 +33,8 @@ const EXTCALL_TARGET_MAX = BigInt(2) ** BigInt(8 * 20) - BigInt(1)
 
 async function eip7702GasCost(
   runState: RunState,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
   address: Address,
   charge2929Gas: boolean,
 ) {
@@ -43,6 +44,7 @@ async function eip7702GasCost(
       runState,
       code.slice(3, 24),
       common,
+      hardfork,
       charge2929Gas,
     )
   }
@@ -61,13 +63,13 @@ async function eip7702GasCost(
 export type AsyncDynamicGasHandler = (
   runState: RunState,
   gas: bigint,
-  common: GlobalConfig,
+  common: HardforkManager,
 ) => Promise<bigint>
 
 export type SyncDynamicGasHandler = (
   runState: RunState,
   gas: bigint,
-  common: GlobalConfig,
+  common: HardforkManager,
 ) => bigint
 
 export const dynamicGasHandlers: Map<
@@ -89,7 +91,8 @@ export const dynamicGasHandlers: Map<
       if (byteLength < 1 || byteLength > 32) {
         trap(EVMError.errorMessages.OUT_OF_RANGE)
       }
-      const expPricePerByte = common.param('expByteGas')
+      const hardfork = runState.interpreter.fork
+      const expPricePerByte = common.getParamAtHardfork('expByteGas', hardfork)!
       gas += BigInt(byteLength) * expPricePerByte
       return gas
     },
@@ -99,8 +102,11 @@ export const dynamicGasHandlers: Map<
     0x20,
     async (runState, gas, common): Promise<bigint> => {
       const [offset, length] = runState.stack.peek(2)
-      gas += subMemUsage(runState, offset, length, common)
-      gas += common.param('keccak256WordGas') * divCeil(length, BIGINT_32)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, offset, length, common, hardfork)
+      gas +=
+        common.getParamAtHardfork('keccak256WordGas', hardfork)! *
+        divCeil(length, BIGINT_32)
       return gas
     },
   ],
@@ -108,9 +114,13 @@ export const dynamicGasHandlers: Map<
     /* BALANCE */
     0x31,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const address = createAddressFromStackBigInt(runState.stack.peek()[0])
       let charge2929Gas = true
-      if (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) {
+      if (
+        common.isEIPActiveAtHardfork(6800, hardfork) ||
+        common.isEIPActiveAtHardfork(7864, hardfork)
+      ) {
         const coldAccessGas =
           runState.env.accessWitness!.readAccountBasicData(address)
 
@@ -118,11 +128,12 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           address.bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
@@ -136,9 +147,12 @@ export const dynamicGasHandlers: Map<
     async (runState, gas, common): Promise<bigint> => {
       const [memOffset, _dataOffset, dataLength] = runState.stack.peek(3)
 
-      gas += subMemUsage(runState, memOffset, dataLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, memOffset, dataLength, common, hardfork)
       if (dataLength !== BIGINT_0) {
-        gas += common.param('copyGas') * divCeil(dataLength, BIGINT_32)
+        gas +=
+          common.getParamAtHardfork('copyGas', hardfork)! *
+          divCeil(dataLength, BIGINT_32)
       }
       return gas
     },
@@ -149,12 +163,16 @@ export const dynamicGasHandlers: Map<
     async (runState, gas, common): Promise<bigint> => {
       const [memOffset, _codeOffset, dataLength] = runState.stack.peek(3)
 
-      gas += subMemUsage(runState, memOffset, dataLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, memOffset, dataLength, common, hardfork)
       if (dataLength !== BIGINT_0) {
-        gas += common.param('copyGas') * divCeil(dataLength, BIGINT_32)
+        gas +=
+          common.getParamAtHardfork('copyGas', hardfork)! *
+          divCeil(dataLength, BIGINT_32)
 
         if (
-          (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+          (common.isEIPActiveAtHardfork(6800, hardfork) ||
+            common.isEIPActiveAtHardfork(7864, hardfork)) &&
           runState.env.chargeCodeAccesses === true
         ) {
           const contract = runState.interpreter.getAddress()
@@ -178,15 +196,20 @@ export const dynamicGasHandlers: Map<
     /* EXTCODESIZE */
     0x3b,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const address = createAddressFromStackBigInt(runState.stack.peek()[0])
 
       let charge2929Gas = true
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(address) === undefined &&
         !address.equals(
           createAddressFromStackBigInt(
-            common.getParamByEIP(7002, 'systemAddress'),
+            common.getParamAtHardfork(
+              'systemAddress',
+              common.getHardforkForEIP(7002) ?? hardfork,
+            )!,
           ),
         )
       ) {
@@ -199,11 +222,12 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           address.bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
@@ -219,15 +243,20 @@ export const dynamicGasHandlers: Map<
         runState.stack.peek(4)
       const address = createAddressFromStackBigInt(addressBigInt)
 
-      gas += subMemUsage(runState, memOffset, dataLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, memOffset, dataLength, common, hardfork)
 
       let charge2929Gas = true
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(address) === undefined &&
         !address.equals(
           createAddressFromStackBigInt(
-            common.getParamByEIP(7002, 'systemAddress'),
+            common.getParamAtHardfork(
+              'systemAddress',
+              common.getHardforkForEIP(7002) ?? hardfork,
+            )!,
           ),
         )
       ) {
@@ -240,19 +269,25 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           address.bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
 
       if (dataLength !== BIGINT_0) {
-        gas += common.param('copyGas') * divCeil(dataLength, BIGINT_32)
+        gas +=
+          common.getParamAtHardfork('copyGas', hardfork)! *
+          divCeil(dataLength, BIGINT_32)
 
-        if (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) {
+        if (
+          common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)
+        ) {
           let codeEnd = _codeOffset + dataLength
           const codeSize = BigInt(
             (await runState.stateManager.getCode(address)).length,
@@ -275,6 +310,7 @@ export const dynamicGasHandlers: Map<
     /* RETURNDATACOPY */
     0x3e,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const [memOffset, returnDataOffset, dataLength] = runState.stack.peek(3)
 
       if (
@@ -288,10 +324,12 @@ export const dynamicGasHandlers: Map<
         }
       }
 
-      gas += subMemUsage(runState, memOffset, dataLength, common)
+      gas += subMemUsage(runState, memOffset, dataLength, common, hardfork)
 
       if (dataLength !== BIGINT_0) {
-        gas += common.param('copyGas') * divCeil(dataLength, BIGINT_32)
+        gas +=
+          common.getParamAtHardfork('copyGas', hardfork)! *
+          divCeil(dataLength, BIGINT_32)
       }
       return gas
     },
@@ -300,15 +338,20 @@ export const dynamicGasHandlers: Map<
     /* EXTCODEHASH */
     0x3f,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const address = createAddressFromStackBigInt(runState.stack.peek()[0])
       let charge2929Gas = true
 
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(address) === undefined &&
         !address.equals(
           createAddressFromStackBigInt(
-            common.getParamByEIP(7002, 'systemAddress'),
+            common.getParamAtHardfork(
+              'systemAddress',
+              common.getHardforkForEIP(7002) ?? hardfork,
+            )!,
           ),
         )
       ) {
@@ -320,11 +363,12 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           address.bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
@@ -336,8 +380,9 @@ export const dynamicGasHandlers: Map<
     /* MLOAD */
     0x51,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const pos = runState.stack.peek()[0]
-      gas += subMemUsage(runState, pos, BIGINT_32, common)
+      gas += subMemUsage(runState, pos, BIGINT_32, common, hardfork)
       return gas
     },
   ],
@@ -345,8 +390,9 @@ export const dynamicGasHandlers: Map<
     /* MSTORE */
     0x52,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const offset = runState.stack.peek()[0]
-      gas += subMemUsage(runState, offset, BIGINT_32, common)
+      gas += subMemUsage(runState, offset, BIGINT_32, common, hardfork)
       return gas
     },
   ],
@@ -354,8 +400,9 @@ export const dynamicGasHandlers: Map<
     /* MSTORE8 */
     0x53,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const offset = runState.stack.peek()[0]
-      gas += subMemUsage(runState, offset, BIGINT_1, common)
+      gas += subMemUsage(runState, offset, BIGINT_1, common, hardfork)
       return gas
     },
   ],
@@ -363,11 +410,15 @@ export const dynamicGasHandlers: Map<
     /* SLOAD */
     0x54,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const key = runState.stack.peek()[0]
       const keyBuf = setLengthLeft(bigIntToBytes(key), 32)
 
       let charge2929Gas = true
-      if (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) {
+      if (
+        common.isEIPActiveAtHardfork(6800, hardfork) ||
+        common.isEIPActiveAtHardfork(7864, hardfork)
+      ) {
         const address = runState.interpreter.getAddress()
         const coldAccessGas = runState.env.accessWitness!.readAccountStorage(
           address,
@@ -378,12 +429,13 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessStorageEIP2929(
           runState,
           keyBuf,
           false,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
@@ -395,6 +447,7 @@ export const dynamicGasHandlers: Map<
     /* SSTORE */
     0x55,
     async (runState, gas, common): Promise<bigint> => {
+      // const hardfork = runState.interpreter.fork
       if (runState.interpreter.isStatic()) {
         trap(EVMError.errorMessages.STATIC_STATE_CHANGE)
       }
@@ -415,16 +468,21 @@ export const dynamicGasHandlers: Map<
       const originalStorage = setLengthLeftStorage(
         await runState.interpreter.storageLoad(keyBytes, true),
       )
-      if (common.hardfork() === Hardfork.Constantinople) {
+      const hardfork = runState.interpreter.fork
+      if (hardfork === Hardfork.Constantinople) {
         gas += updateSstoreGasEIP1283(
           runState,
           currentStorage,
           originalStorage,
           setLengthLeftStorage(value),
           common,
+          hardfork,
         )
-      } else if (common.gteHardfork(Hardfork.Istanbul)) {
-        if (!common.isActivatedEIP(6800) && !common.isActivatedEIP(7864)) {
+      } else if (common.hardforkGte(hardfork, Hardfork.Istanbul)) {
+        if (
+          !common.isEIPActiveAtHardfork(6800, hardfork) &&
+          !common.isEIPActiveAtHardfork(7864, hardfork)
+        ) {
           gas += updateSstoreGasEIP2200(
             runState,
             currentStorage,
@@ -432,6 +490,7 @@ export const dynamicGasHandlers: Map<
             setLengthLeftStorage(value),
             keyBytes,
             common,
+            hardfork,
           )
         }
       } else {
@@ -440,11 +499,15 @@ export const dynamicGasHandlers: Map<
           currentStorage,
           setLengthLeftStorage(value),
           common,
+          hardfork,
         )
       }
 
       let charge2929Gas = true
-      if (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) {
+      if (
+        common.isEIPActiveAtHardfork(6800, hardfork) ||
+        common.isEIPActiveAtHardfork(7864, hardfork)
+      ) {
         const contract = runState.interpreter.getAddress()
         const coldAccessGas = runState.env.accessWitness!.writeAccountStorage(
           contract,
@@ -455,7 +518,7 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         // We have to do this after the Istanbul (EIP2200) checks.
         // Otherwise, we might run out of gas, due to "sentry check" of 2300 gas,
         // if we deduct extra gas first.
@@ -464,6 +527,7 @@ export const dynamicGasHandlers: Map<
           keyBytes,
           true,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
@@ -475,11 +539,12 @@ export const dynamicGasHandlers: Map<
     /* MCOPY */
     0x5e,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const [dst, src, length] = runState.stack.peek(3)
       const wordsCopied = (length + BIGINT_31) / BIGINT_32
       gas += BIGINT_3 * wordsCopied
-      gas += subMemUsage(runState, src, length, common)
-      gas += subMemUsage(runState, dst, length, common)
+      gas += subMemUsage(runState, src, length, common, hardfork)
+      gas += subMemUsage(runState, dst, length, common, hardfork)
       return gas
     },
   ],
@@ -487,6 +552,7 @@ export const dynamicGasHandlers: Map<
     /* LOG */
     0xa0,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       if (runState.interpreter.isStatic()) {
         trap(EVMError.errorMessages.STATIC_STATE_CHANGE)
       }
@@ -499,10 +565,11 @@ export const dynamicGasHandlers: Map<
         trap(EVMError.errorMessages.OUT_OF_RANGE)
       }
 
-      gas += subMemUsage(runState, memOffset, memLength, common)
+      gas += subMemUsage(runState, memOffset, memLength, common, hardfork)
       gas +=
-        common.param('logTopicGas') * BigInt(topicsCount) +
-        memLength * common.param('logDataGas')
+        common.getParamAtHardfork('logTopicGas', hardfork)! *
+          BigInt(topicsCount) +
+        memLength * common.getParamAtHardfork('logDataGas', hardfork)!
       return gas
     },
   ],
@@ -516,9 +583,12 @@ export const dynamicGasHandlers: Map<
       }
       const [memOffset, _dataOffset, dataLength] = runState.stack.peek(3)
 
-      gas += subMemUsage(runState, memOffset, dataLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, memOffset, dataLength, common, hardfork)
       if (dataLength !== BIGINT_0) {
-        gas += common.param('copyGas') * divCeil(dataLength, BIGINT_32)
+        gas +=
+          common.getParamAtHardfork('copyGas', hardfork)! *
+          divCeil(dataLength, BIGINT_32)
       }
       return gas
     },
@@ -556,7 +626,8 @@ export const dynamicGasHandlers: Map<
         }*/
 
       // Expand memory
-      gas += subMemUsage(runState, inputOffset, inputSize, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, inputOffset, inputSize, common, hardfork)
 
       // Read container
       const container =
@@ -564,7 +635,7 @@ export const dynamicGasHandlers: Map<
 
       // Charge for hashing cost
       gas +=
-        common.param('keccak256WordGas') *
+        common.getParamAtHardfork('keccak256WordGas', hardfork)! *
         divCeil(BigInt(container.length), BIGINT_32)
 
       const gasLeft = runState.interpreter.getGasLeft() - gas
@@ -579,9 +650,9 @@ export const dynamicGasHandlers: Map<
     async (runState, gas, common): Promise<bigint> => {
       // Pop stack values
       const [auxDataOffset, auxDataSize] = runState.stack.peek(2)
-
+      const hardfork = runState.interpreter.fork
       // Expand memory
-      gas += subMemUsage(runState, auxDataOffset, auxDataSize, common)
+      gas += subMemUsage(runState, auxDataOffset, auxDataSize, common, hardfork)
 
       return gas
     },
@@ -595,22 +666,25 @@ export const dynamicGasHandlers: Map<
       }
       const [_value, offset, length] = runState.stack.peek(3)
 
-      if (common.isActivatedEIP(2929)) {
+      const hardfork = runState.interpreter.fork
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           runState.interpreter.getAddress().bytes,
           common,
+          hardfork,
           false,
         )
       }
 
-      if (common.isActivatedEIP(3860)) {
+      if (common.isEIPActiveAtHardfork(3860, hardfork)) {
+        const eip3860Hardfork = common.getHardforkForEIP(3860) ?? hardfork
         gas +=
           ((length + BIGINT_31) / BIGINT_32) *
-          common.getParamByEIP(3860, 'initCodeWordGas')
+          common.getParamAtHardfork('initCodeWordGas', eip3860Hardfork)!
       }
 
-      gas += subMemUsage(runState, offset, length, common)
+      gas += subMemUsage(runState, offset, length, common, hardfork)
 
       let gasLimit = BigInt(runState.interpreter.getGasLeft()) - gas
       gasLimit = maxCallGas(gasLimit, gasLimit, runState, common)
@@ -623,6 +697,7 @@ export const dynamicGasHandlers: Map<
     /* CALL */
     0xf1,
     async (runState, gas, common): Promise<bigint> => {
+      const hardfork = runState.interpreter.fork
       const [
         currentGasLimit,
         toAddr,
@@ -635,14 +710,15 @@ export const dynamicGasHandlers: Map<
       const toAddress = createAddressFromStackBigInt(toAddr)
 
       if (runState.interpreter.isStatic() && value !== BIGINT_0) {
-        trap(EVMError.errorMessages.STATIC_STATE_CHANGE)
+        trap(EVMError.errorMessages.OUT_OF_GAS)
       }
-      gas += subMemUsage(runState, inOffset, inLength, common)
-      gas += subMemUsage(runState, outOffset, outLength, common)
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
+      gas += subMemUsage(runState, outOffset, outLength, common, hardfork)
 
       let charge2929Gas = true
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(toAddress) === undefined
       ) {
         const coldAccessGas =
@@ -658,28 +734,35 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           toAddress.bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
 
-      if (common.isActivatedEIP(7702)) {
-        gas += await eip7702GasCost(runState, common, toAddress, charge2929Gas)
+      if (common.isEIPActiveAtHardfork(7702, hardfork)) {
+        gas += await eip7702GasCost(
+          runState,
+          common,
+          hardfork,
+          toAddress,
+          charge2929Gas,
+        )
       }
 
       if (
         value !== BIGINT_0 &&
-        !common.isActivatedEIP(6800) &&
-        !common.isActivatedEIP(7864)
+        !common.isEIPActiveAtHardfork(6800, hardfork) &&
+        !common.isEIPActiveAtHardfork(7864, hardfork)
       ) {
-        gas += common.param('callValueTransferGas')
+        gas += common.getParamAtHardfork('callValueTransferGas', hardfork)!
       }
 
-      if (common.gteHardfork(Hardfork.SpuriousDragon)) {
+      if (common.hardforkGte(hardfork, Hardfork.SpuriousDragon)) {
         // We are at or after Spurious Dragon
         // Call new account gas: account is DEAD and we transfer nonzero value
 
@@ -690,14 +773,14 @@ export const dynamicGasHandlers: Map<
         }
 
         if (deadAccount && !(value === BIGINT_0)) {
-          gas += common.param('callNewAccountGas')
+          gas += common.getParamAtHardfork('callNewAccountGas', hardfork)!
         }
       } else if (
         (await runState.stateManager.getAccount(toAddress)) === undefined
       ) {
         // We are before Spurious Dragon and the account does not exist.
         // Call new account gas: account does not exist (it is not in the state trie, not even as an "empty" account)
-        gas += common.param('callNewAccountGas')
+        gas += common.getParamAtHardfork('callNewAccountGas', hardfork)!
       }
 
       const gasLimit = maxCallGas(
@@ -735,12 +818,14 @@ export const dynamicGasHandlers: Map<
       ] = runState.stack.peek(7)
       const toAddress = createAddressFromStackBigInt(toAddr)
 
-      gas += subMemUsage(runState, inOffset, inLength, common)
-      gas += subMemUsage(runState, outOffset, outLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
+      gas += subMemUsage(runState, outOffset, outLength, common, hardfork)
 
       let charge2929Gas = true
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(toAddress) === undefined
       ) {
         const coldAccessGas =
@@ -750,21 +835,28 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           createAddressFromStackBigInt(toAddr).bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
 
-      if (common.isActivatedEIP(7702)) {
-        gas += await eip7702GasCost(runState, common, toAddress, charge2929Gas)
+      if (common.isEIPActiveAtHardfork(7702, hardfork)) {
+        gas += await eip7702GasCost(
+          runState,
+          common,
+          hardfork,
+          toAddress,
+          charge2929Gas,
+        )
       }
 
       if (value !== BIGINT_0) {
-        gas += common.param('callValueTransferGas')
+        gas += common.getParamAtHardfork('callValueTransferGas', hardfork)!
       }
 
       const gasLimit = maxCallGas(
@@ -788,7 +880,8 @@ export const dynamicGasHandlers: Map<
     0xf3,
     async (runState, gas, common): Promise<bigint> => {
       const [offset, length] = runState.stack.peek(2)
-      gas += subMemUsage(runState, offset, length, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, offset, length, common, hardfork)
       return gas
     },
   ],
@@ -806,12 +899,14 @@ export const dynamicGasHandlers: Map<
       ] = runState.stack.peek(6)
       const toAddress = createAddressFromStackBigInt(toAddr)
 
-      gas += subMemUsage(runState, inOffset, inLength, common)
-      gas += subMemUsage(runState, outOffset, outLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
+      gas += subMemUsage(runState, outOffset, outLength, common, hardfork)
 
       let charge2929Gas = true
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(toAddress) === undefined
       ) {
         const coldAccessGas =
@@ -821,17 +916,24 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           createAddressFromStackBigInt(toAddr).bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
 
-      if (common.isActivatedEIP(7702)) {
-        gas += await eip7702GasCost(runState, common, toAddress, charge2929Gas)
+      if (common.isEIPActiveAtHardfork(7702, hardfork)) {
+        gas += await eip7702GasCost(
+          runState,
+          common,
+          hardfork,
+          toAddress,
+          charge2929Gas,
+        )
       }
 
       const gasLimit = maxCallGas(
@@ -860,24 +962,28 @@ export const dynamicGasHandlers: Map<
 
       const [_value, offset, length, _salt] = runState.stack.peek(4)
 
-      gas += subMemUsage(runState, offset, length, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, offset, length, common, hardfork)
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           runState.interpreter.getAddress().bytes,
           common,
+          hardfork,
           false,
         )
       }
 
-      if (common.isActivatedEIP(3860)) {
+      if (common.isEIPActiveAtHardfork(3860, hardfork)) {
         gas +=
           ((length + BIGINT_31) / BIGINT_32) *
-          common.getParamByEIP(3860, 'initCodeWordGas')
+          common.getParamAtHardfork('initCodeWordGas', hardfork)!
       }
 
-      gas += common.param('keccak256WordGas') * divCeil(length, BIGINT_32)
+      gas +=
+        common.getParamAtHardfork('keccak256WordGas', hardfork)! *
+        divCeil(length, BIGINT_32)
       let gasLimit = runState.interpreter.getGasLeft() - gas
       gasLimit = maxCallGas(gasLimit, gasLimit, runState, common) // CREATE2 is only available after TangerineWhistle (Constantinople introduced this opcode)
       runState.messageGasLimit = gasLimit
@@ -901,10 +1007,10 @@ export const dynamicGasHandlers: Map<
       if (runState.interpreter.isStatic() && value !== BIGINT_0) {
         trap(EVMError.errorMessages.STATIC_STATE_CHANGE)
       }
-
+      const hardfork = runState.interpreter.fork
       // If value > 0, charge CALL_VALUE_COST
       if (value > BIGINT_0) {
-        gas += common.param('callValueTransferGas')
+        gas += common.getParamAtHardfork('callValueTransferGas', hardfork)!
       }
 
       // Check if the target address > 20 bytes
@@ -913,12 +1019,12 @@ export const dynamicGasHandlers: Map<
       }
 
       // Charge for memory expansion
-      gas += subMemUsage(runState, inOffset, inLength, common)
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
 
       const toAddress = createAddressFromStackBigInt(toAddr)
       // Charge to make address warm (2600 gas)
       // (in case if address is already warm, this charges the 100 gas)
-      gas += accessAddressEIP2929(runState, toAddress.bytes, common)
+      gas += accessAddressEIP2929(runState, toAddress.bytes, common, hardfork)
 
       // Charge account creation cost if value is nonzero
       if (value > BIGINT_0) {
@@ -926,12 +1032,19 @@ export const dynamicGasHandlers: Map<
         const deadAccount = account === undefined || account.isEmpty()
 
         if (deadAccount) {
-          gas += common.param('callNewAccountGas')
+          gas += common.getParamAtHardfork('callNewAccountGas', hardfork)!
         }
       }
 
-      const minRetainedGas = common.getParamByEIP(7069, 'minRetainedGas')
-      const minCalleeGas = common.getParamByEIP(7069, 'minCalleeGas')
+      const eip7069Hardfork = common.getHardforkForEIP(7069) ?? hardfork
+      const minRetainedGas = common.getParamAtHardfork(
+        'minRetainedGas',
+        eip7069Hardfork,
+      )!
+      const minCalleeGas = common.getParamAtHardfork(
+        'minCalleeGas',
+        eip7069Hardfork,
+      )!
 
       const currentGasAvailable = runState.interpreter.getGasLeft() - gas
       const reducedGas = currentGasAvailable / BIGINT_64
@@ -945,7 +1058,8 @@ export const dynamicGasHandlers: Map<
       }
 
       if (
-        runState.env.depth >= Number(common.param('stackLimit')) ||
+        runState.env.depth >=
+          Number(common.getParamAtHardfork('stackLimit', hardfork)!) ||
         runState.env.contract.balance < value ||
         gasLimit < minCalleeGas
       ) {
@@ -980,15 +1094,23 @@ export const dynamicGasHandlers: Map<
       }
 
       // Charge for memory expansion
-      gas += subMemUsage(runState, inOffset, inLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
 
       const toAddress = createAddressFromStackBigInt(toAddr)
       // Charge to make address warm (2600 gas)
       // (in case if address is already warm, this charges the 100 gas)
-      gas += accessAddressEIP2929(runState, toAddress.bytes, common)
+      gas += accessAddressEIP2929(runState, toAddress.bytes, common, hardfork)
 
-      const minRetainedGas = common.getParamByEIP(7069, 'minRetainedGas')
-      const minCalleeGas = common.getParamByEIP(7069, 'minCalleeGas')
+      const eip7069Hardfork = common.getHardforkForEIP(7069) ?? hardfork
+      const minRetainedGas = common.getParamAtHardfork(
+        'minRetainedGas',
+        eip7069Hardfork,
+      )!
+      const minCalleeGas = common.getParamAtHardfork(
+        'minCalleeGas',
+        eip7069Hardfork,
+      )!
 
       const currentGasAvailable = runState.interpreter.getGasLeft() - gas
       const reducedGas = currentGasAvailable / BIGINT_64
@@ -1002,7 +1124,8 @@ export const dynamicGasHandlers: Map<
       }
 
       if (
-        runState.env.depth >= Number(common.param('stackLimit')) ||
+        runState.env.depth >=
+          Number(common.getParamAtHardfork('stackLimit', hardfork)!) ||
         gasLimit < minCalleeGas
       ) {
         // Note: this is a hack, TODO: get around this hack and clean this up
@@ -1030,13 +1153,15 @@ export const dynamicGasHandlers: Map<
         outLength,
       ] = runState.stack.peek(6)
 
-      gas += subMemUsage(runState, inOffset, inLength, common)
-      gas += subMemUsage(runState, outOffset, outLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
+      gas += subMemUsage(runState, outOffset, outLength, common, hardfork)
 
       let charge2929Gas = true
       const toAddress = createAddressFromStackBigInt(toAddr)
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.interpreter._evm.getPrecompile(toAddress) === undefined
       ) {
         const coldAccessGas =
@@ -1046,19 +1171,21 @@ export const dynamicGasHandlers: Map<
         charge2929Gas = coldAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           createAddressFromStackBigInt(toAddr).bytes,
           common,
+          hardfork,
           charge2929Gas,
         )
       }
 
-      if (common.isActivatedEIP(7702)) {
+      if (common.isEIPActiveAtHardfork(7702, hardfork)) {
         gas += await eip7702GasCost(
           runState,
           common,
+          hardfork,
           createAddressFromStackBigInt(toAddr),
           charge2929Gas,
         )
@@ -1094,15 +1221,23 @@ export const dynamicGasHandlers: Map<
       }
 
       // Charge for memory expansion
-      gas += subMemUsage(runState, inOffset, inLength, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, inOffset, inLength, common, hardfork)
 
       const toAddress = createAddressFromStackBigInt(toAddr)
       // Charge to make address warm (2600 gas)
       // (in case if address is already warm, this charges the 100 gas)
-      gas += accessAddressEIP2929(runState, toAddress.bytes, common)
+      gas += accessAddressEIP2929(runState, toAddress.bytes, common, hardfork)
 
-      const minRetainedGas = common.getParamByEIP(7069, 'minRetainedGas')
-      const minCalleeGas = common.getParamByEIP(7069, 'minCalleeGas')
+      const eip7069Hardfork = common.getHardforkForEIP(7069) ?? hardfork
+      const minRetainedGas = common.getParamAtHardfork(
+        'minRetainedGas',
+        eip7069Hardfork,
+      )!
+      const minCalleeGas = common.getParamAtHardfork(
+        'minCalleeGas',
+        eip7069Hardfork,
+      )!
 
       const currentGasAvailable = runState.interpreter.getGasLeft() - gas
       const reducedGas = currentGasAvailable / BIGINT_64
@@ -1116,7 +1251,8 @@ export const dynamicGasHandlers: Map<
       }
 
       if (
-        runState.env.depth >= Number(common.param('stackLimit')) ||
+        runState.env.depth >=
+          Number(common.getParamAtHardfork('stackLimit', hardfork)!) ||
         gasLimit < minCalleeGas
       ) {
         // Note: this is a hack, TODO: get around this hack and clean this up
@@ -1136,7 +1272,8 @@ export const dynamicGasHandlers: Map<
     0xfd,
     async (runState, gas, common): Promise<bigint> => {
       const [offset, length] = runState.stack.peek(2)
-      gas += subMemUsage(runState, offset, length, common)
+      const hardfork = runState.interpreter.fork
+      gas += subMemUsage(runState, offset, length, common, hardfork)
       return gas
     },
   ],
@@ -1158,7 +1295,8 @@ export const dynamicGasHandlers: Map<
       const balance =
         await runState.interpreter.getExternalBalance(contractAddress)
 
-      if (common.gteHardfork(Hardfork.SpuriousDragon)) {
+      const hardfork = runState.interpreter.fork
+      if (common.hardforkGte(hardfork, Hardfork.SpuriousDragon)) {
         // EIP-161: State Trie Clearing
         if (balance > BIGINT_0) {
           // This technically checks if account is empty or non-existent
@@ -1169,7 +1307,7 @@ export const dynamicGasHandlers: Map<
             deductGas = true
           }
         }
-      } else if (common.gteHardfork(Hardfork.TangerineWhistle)) {
+      } else if (common.hardforkGte(hardfork, Hardfork.TangerineWhistle)) {
         // EIP-150 (Tangerine Whistle) gas semantics
         const exists =
           (await runState.stateManager.getAccount(selfdestructToAddress)) !==
@@ -1179,12 +1317,13 @@ export const dynamicGasHandlers: Map<
         }
       }
       if (deductGas) {
-        gas += common.param('callNewAccountGas')
+        gas += common.getParamAtHardfork('callNewAccountGas', hardfork)!
       }
 
       let selfDestructToCharge2929Gas = true
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.env.chargeCodeAccesses === true
       ) {
         gas += runState.env.accessWitness!.readAccountBasicData(contractAddress)
@@ -1208,11 +1347,12 @@ export const dynamicGasHandlers: Map<
         selfDestructToCharge2929Gas = selfDestructToColdAccessGas === BIGINT_0
       }
 
-      if (common.isActivatedEIP(2929)) {
+      if (common.isEIPActiveAtHardfork(2929, hardfork)) {
         gas += accessAddressEIP2929(
           runState,
           selfdestructToAddress.bytes,
           common,
+          hardfork,
           selfDestructToCharge2929Gas,
           true,
         )

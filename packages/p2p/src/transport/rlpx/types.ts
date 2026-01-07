@@ -2,6 +2,7 @@
  * Types and interfaces for the RLPx libp2p-style transport
  */
 
+import type { Socket } from 'node:net'
 import type {
   ComponentLogger,
   CounterGroup,
@@ -9,8 +10,7 @@ import type {
   Metrics,
   OutboundConnectionUpgradeEvents,
 } from '@libp2p/interface'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
-import type { Socket } from 'net'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { ProgressEvent } from 'progress-events'
 // import type { Capabilities } from '../../../client/net/dpt-1/types'
 // import type { Protocol } from '../../../client/net/protocol/protocol'
@@ -88,7 +88,7 @@ export interface RLPxTransportOptions extends RLPxSocketOptions {
   /**
    * Chain configuration for protocol compatibility
    */
-  common: GlobalConfig
+  common: HardforkManager
 
   /**
    * Connection timeout in milliseconds
@@ -218,7 +218,7 @@ export interface RLPxCreateListenerOptions extends RLPxSocketOptions {
   /**
    * Chain configuration
    */
-  common: GlobalConfig
+  common: HardforkManager
 
   /**
    * Connection timeout in milliseconds
@@ -333,7 +333,7 @@ export interface RLPxConnectionOptions {
   /**
    * Chain configuration
    */
-  common: GlobalConfig
+  common: HardforkManager
 
   /**
    * Connection timeout

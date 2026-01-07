@@ -23,7 +23,7 @@ export function encodeStatus(chain: Chain, config: Config): Uint8Array {
     throw new Error('No genesis block available for STATUS')
   }
 
-  const chainId = config.chainCommon.chainId()
+  const chainId = config.hardforkManager.chainId()
   const td = chain.headers.td
   const bestHash = header.hash()
   const genesisHash = genesis.hash()
@@ -38,8 +38,8 @@ export function encodeStatus(chain: Chain, config: Config): Uint8Array {
   ]
 
   // Add forkId for eth/64+
-  const common = config.chainCommon
-  if (common.hardfork() !== undefined) {
+  const common = config.hardforkManager
+  if (common.hardforks.length > 1) {
     // Simplified forkId for chainstart
     const forkHash = new Uint8Array(4) // 4 bytes
     const nextFork = new Uint8Array(8) // 8 bytes (bigint)

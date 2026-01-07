@@ -135,7 +135,10 @@ export class Block {
     const transactions = []
     for (const txData of txsData ?? []) {
       // TODO: Migrate tx package to use hardforkManager
-      const tx = createTx(txData, opts)
+      const tx = createTx(txData, {
+        ...opts,
+        common: opts.hardforkManager,
+      })
       transactions.push(tx)
     }
 
@@ -190,7 +193,12 @@ export class Block {
     const transactions = []
     for (const txData of txsData ?? []) {
       // TODO: Migrate tx package to use hardforkManager
-      transactions.push(createTxFromBlockBodyData(txData, opts))
+      transactions.push(
+        createTxFromBlockBodyData(txData, {
+          ...opts,
+          common: opts.hardforkManager,
+        }),
+      )
     }
 
     const uncleHeaders = []
@@ -251,7 +259,10 @@ export class Block {
     // TODO: Migrate tx package to use hardforkManager
     for (const _txParams of blockParams.transactions ?? []) {
       const txParams = normalizeTxParams(_txParams)
-      const tx = createTx(txParams, options)
+      const tx = createTx(txParams, {
+        ...options,
+        common: options.hardforkManager,
+      })
       transactions.push(tx)
     }
 
@@ -339,7 +350,10 @@ export class Block {
     for (const [index, serializedTx] of transactions.entries()) {
       try {
         // TODO: Migrate tx package to use hardforkManager
-        const tx = createTxFromRLP(hexToBytes(serializedTx), opts)
+        const tx = createTxFromRLP(hexToBytes(serializedTx), {
+          ...opts,
+          common: opts.hardforkManager,
+        })
         txs.push(tx)
       } catch (error) {
         const validationError = `Invalid tx at index ${index}: ${error}`

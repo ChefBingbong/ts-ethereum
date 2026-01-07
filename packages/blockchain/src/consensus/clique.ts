@@ -331,7 +331,10 @@ export class CliqueConsensus implements Consensus {
           header.number -
           (header.number %
             BigInt(
-              (this.blockchain!.common.consensusConfig() as CliqueConfig).epoch,
+              (
+                this.blockchain!.hardforkManager.config.spec.chain
+                  .consensus as unknown as CliqueConfig
+              ).epoch,
             ))
         const limit = this.cliqueSignerLimit(header.number)
         let activeSigners = [...this.cliqueActiveSigners(header.number)]
@@ -467,7 +470,10 @@ export class CliqueConsensus implements Consensus {
         lastBlockNumber -
         (lastBlockNumber %
           BigInt(
-            (this.blockchain!.common.consensusConfig() as CliqueConfig).epoch,
+            (
+              this.blockchain!.hardforkManager.config.spec.chain
+                .consensus as unknown as CliqueConfig
+            ).epoch,
           ))
       const blockLimit = lastEpochBlockNumber - BigInt(limit)
       this._cliqueLatestVotes = this._cliqueLatestVotes.filter(

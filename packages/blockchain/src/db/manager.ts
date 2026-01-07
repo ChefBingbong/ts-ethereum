@@ -8,7 +8,7 @@ import {
   createBlockFromBytesArray,
   createBlockHeaderFromBytesArray,
 } from '@ts-ethereum/block'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type {
   BatchDBOp,
@@ -48,15 +48,15 @@ export type CacheMap = { [key: string]: Cache<Uint8Array> }
  */
 export class DBManager {
   private _cache: CacheMap
-  public readonly common: GlobalConfig
+  public readonly common: HardforkManager
   private _db: DB<Uint8Array | string, Uint8Array | string | DBObject>
 
   constructor(
     db: DB<Uint8Array | string, Uint8Array | string | DBObject>,
-    common: GlobalConfig,
+    hardforkManager: HardforkManager,
   ) {
     this._db = db
-    this.common = common
+    this.common = hardforkManager
     this._cache = {
       td: new Cache({ max: 1024 }),
       header: new Cache({ max: 512 }),
@@ -155,7 +155,10 @@ export class DBManager {
     }
 
     const blockData = [header.raw(), ...body] as BlockBytes
-    const opts: BlockOptions = { common: this.common, setHardfork: true }
+    const opts: BlockOptions = {
+      hardforkManager: this.common,
+      setHardfork: true,
+    }
     return createBlockFromBytesArray(blockData, opts)
   }
 
@@ -180,7 +183,10 @@ export class DBManager {
     })
     const headerValues = RLP.decode(encodedHeader)
 
-    const opts: BlockOptions = { common: this.common, setHardfork: true }
+    const opts: BlockOptions = {
+      hardforkManager: this.common,
+      setHardfork: true,
+    }
     return createBlockHeaderFromBytesArray(headerValues as Uint8Array[], opts)
   }
 

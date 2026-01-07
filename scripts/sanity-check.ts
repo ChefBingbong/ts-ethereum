@@ -6,12 +6,9 @@ import { createBlockchain } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
   enodeToDPTPeerInfo,
-  GlobalConfig,
   getNodeId,
-  Hardfork,
   readAccounts,
   readPrivateKey,
-  schemaFromChainConfig,
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { BIGINT_0, bytesToHex } from '@ts-ethereum/utils'
@@ -25,7 +22,7 @@ import {
   publicActions,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { paramsBlock } from '../packages/chain-config/src'
+import { createHardforkManagerFromConfig } from '../packages/chain-config/src'
 import {
   Config,
   createConfigOptions,
@@ -151,11 +148,7 @@ async function bootNode(
   const account = accounts[accountIndex]
 
   // Create GlobalConfig
-  const common = GlobalConfig.fromSchema({
-    schema: schemaFromChainConfig(testChainConfig),
-    hardfork: Hardfork.Chainstart,
-    overrides: { ...paramsBlock[1] },
-  }) as GlobalConfig<Hardfork, Hardfork>
+  const common = createHardforkManagerFromConfig(testChainConfig)
 
   // Setup bootnodes
   let bootnodes: any[] = []
@@ -166,11 +159,9 @@ async function bootNode(
     }
   }
 
-  console.log('common', common._hardforkParams.getHardforkForEIP(1))
-  console.log('common', common._hardforkParams.getParam('minimumDifficulty'))
-  console.log('common', common._hardforkParams.getParam('durationLimit'))
   // Create config
   const configOptions = await createConfigOptions({
+    hardforkManager: common,
     common,
     logger: nodeLogger,
     datadir: runtimeDataDir,
@@ -213,7 +204,7 @@ async function bootNode(
   // Create blockchain
   const blockchain = await createBlockchain({
     db: new LevelDB(databases.chainDB),
-    common,
+    hardforkManager: common,
     hardforkByHeadBlockNumber: true,
     validateBlocks: true,
     validateConsensus: true,

@@ -1,6 +1,6 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { Socket } from 'node:net'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { NestedUint8Array } from '@ts-ethereum/rlp'
-import type { Socket } from 'net'
 import type { EthMessageCodes } from '../protocol/eth/eth'
 import type { Protocol } from '../protocol/protocol'
 import type { DPT } from './index'
@@ -134,9 +134,9 @@ export interface DPTOptions {
   onlyConfirmed?: boolean
 
   /**
-   * GlobalConfig instance to allow for crypto primitive (e.g. keccak) replacement
+   * HardforkManager instance to allow for crypto primitive (e.g. keccak) replacement
    */
-  common?: GlobalConfig
+  common?: HardforkManager
 }
 
 export interface DPTServerOptions {
@@ -162,9 +162,9 @@ export interface DPTServerOptions {
   createSocket?: Function
 
   /**
-   * GlobalConfig instance to allow for crypto primitive (e.g. keccak) replacement
+   * HardforkManager instance to allow for crypto primitive (e.g. keccak) replacement
    */
-  common?: GlobalConfig
+  common?: HardforkManager
 }
 
 export type ProtocolType = (typeof ProtocolType)[keyof typeof ProtocolType]
@@ -225,7 +225,7 @@ export interface Contact extends PeerInfo {
 export interface PeerOptions {
   clientId: Uint8Array
   capabilities?: Capabilities[]
-  common: GlobalConfig
+  common: HardforkManager
   port: number
   id: Uint8Array
   remoteClientIdFilter?: string[]
@@ -245,7 +245,7 @@ export interface RLPxOptions {
   maxPeers?: number
   remoteClientIdFilter?: string[]
   capabilities: Capabilities[]
-  common: GlobalConfig
+  common: HardforkManager
   listenPort?: number | null
 }
 

@@ -42,7 +42,7 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
       rlpx({
         privateKey: options.key as any,
         capabilities: [ETH.eth68],
-        common: options.common,
+        common: options.hardforkManager ?? options.common!,
         timeout: 10000,
         maxConnections: options.maxPeers,
       }),

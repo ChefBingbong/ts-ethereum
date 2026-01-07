@@ -5,6 +5,7 @@
  * connection-like interface compatible with libp2p patterns.
  */
 
+import type { Socket } from 'node:net'
 import type { Logger } from '@libp2p/interface'
 // import type { Capabilities } from '../../../client/net/dpt-1/types'
 // import {
@@ -25,7 +26,6 @@ import {
 } from '@ts-ethereum/utils'
 import debug from 'debug'
 import { EventEmitter } from 'eventemitter3'
-import type { Socket } from 'net'
 import * as snappy from 'snappyjs'
 // import type { Protocol } from '../../../client/net/protocol/protocol'
 import { ECIES } from '../../connection-encrypters/eccies/ecies'

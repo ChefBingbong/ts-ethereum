@@ -48,10 +48,13 @@ export const estimateGas = (node: ExecutionNode) => {
             timestamp: block.header.timestamp + BIGINT_1,
           },
         },
-        { common: vmCopy.common },
+        { hardforkManager: vmCopy.hardforkManager },
       )
 
-      const tx = createTx(txData, { common: vmCopy.common, freeze: false })
+      const tx = createTx(txData, {
+        common: vmCopy.hardforkManager,
+        freeze: false,
+      })
 
       const from =
         transaction.from !== undefined

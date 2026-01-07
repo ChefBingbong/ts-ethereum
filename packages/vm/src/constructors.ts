@@ -1,7 +1,6 @@
 import {
-  GlobalConfig,
-  Hardfork,
-  mainnetSchema,
+  createHardforkManagerFromConfig,
+  Mainnet,
 } from '@ts-ethereum/chain-config'
 import {
   createEVM,
@@ -28,17 +27,14 @@ export async function createVM(opts: VMOpts = {}): Promise<VM> {
   // Save if a `StateManager` was passed (for activatePrecompiles)
   const didPassStateManager = opts.stateManager !== undefined
 
-  // Add common, SM, blockchain, EVM here
-  if (opts.common === undefined) {
-    opts.common = GlobalConfig.fromSchema({
-      schema: mainnetSchema,
-      hardfork: Hardfork.Prague,
-    })
+  // Add hardforkManager, SM, blockchain, EVM here
+  if (opts.hardforkManager === undefined) {
+    opts.hardforkManager = createHardforkManagerFromConfig(Mainnet)
   }
 
   if (opts.stateManager === undefined) {
     opts.stateManager = new MerkleStateManager({
-      common: opts.common,
+      common: opts.hardforkManager,
     })
   }
 
@@ -74,7 +70,7 @@ export async function createVM(opts: VMOpts = {}): Promise<VM> {
     }
     const evmOpts = opts.evmOpts ?? {}
     opts.evm = await createEVM({
-      common: opts.common,
+      common: opts.hardforkManager,
       stateManager: opts.stateManager,
       blockchain: opts.blockchain,
       profiler: {
@@ -87,7 +83,13 @@ export async function createVM(opts: VMOpts = {}): Promise<VM> {
   if (opts.activatePrecompiles === true && !didPassStateManager) {
     await opts.evm.journal.checkpoint()
     // put 1 wei in each of the precompiles in order to make the accounts non-empty and thus not have them deduct `callNewAccount` gas.
-    for (const [addressStr] of getActivePrecompiles(opts.common)) {
+    // Determine hardfork for precompiles (use latest hardfork)
+    const precompileHardfork =
+      opts.hardforkManager.getHardforkFromContext(undefined)
+    for (const [addressStr] of getActivePrecompiles(
+      opts.hardforkManager,
+      precompileHardfork,
+    )) {
       const address = new Address(unprefixedHexToBytes(addressStr))
       let account = await opts.evm.stateManager.getAccount(address)
       // Only do this if it is not overridden in genesis

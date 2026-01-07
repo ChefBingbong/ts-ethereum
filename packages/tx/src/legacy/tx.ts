@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import { Hardfork, type HardforkManager } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -14,7 +14,6 @@ import {
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import * as Legacy from '../capabilities/legacy'
-import { paramsTx } from '../params'
 import type {
   TxData as AllTypesTxData,
   TxValuesArray as AllTypesTxValuesArray,
@@ -44,7 +43,7 @@ function meetsEIP155(_v: bigint, chainId: bigint) {
  * Validates tx's `v` value and extracts the chain id
  */
 function validateVAndExtractChainID(
-  common: GlobalConfig,
+  common: HardforkManager,
   _v?: bigint,
 ): bigint | undefined {
   let chainIdBigInt
@@ -60,6 +59,7 @@ function validateVAndExtractChainID(
     }
   }
 
+  const hf = Hardfork.Chainstart
   // Extract chainId from EIP-155 signed txs (v >= 37)
   // NOTE: We do this regardless of hardfork because:
   // 1. Modern wallets (like viem) always sign with EIP-155
@@ -67,10 +67,10 @@ function validateVAndExtractChainID(
   // 3. Even pre-spuriousDragon nodes should accept EIP-155 signed txs
   if (v !== undefined && v !== 0 && v !== 27 && v !== 28) {
     // Validate chainId matches if we're at spuriousDragon+
-    if (common.gteHardfork('spuriousDragon')) {
+    if (common.hardforkGte(hf, 'spuriousDragon')) {
       if (!meetsEIP155(BigInt(v), common.chainId())) {
         throw EthereumJSErrorWithoutCode(
-          `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the GlobalConfig parameter of the Transaction constructor to set the chain id.`,
+          `Incompatible EIP155-based V ${v} and chain id ${common.chainId()}. See the HardforkManager parameter of the Transaction constructor to set the chain id.`,
         )
       }
     }
@@ -81,7 +81,7 @@ function validateVAndExtractChainID(
     } else {
       numSub = 36
     }
-    // Use derived chain ID to create a proper GlobalConfig
+    // Use derived chain ID to create a proper HardforkManager
     chainIdBigInt = BigInt(v - numSub) / BIGINT_2
   }
   return chainIdBigInt
@@ -112,12 +112,13 @@ export class LegacyTx
   // End of Tx data part
 
   /* Other handy tx props */
-  public readonly common!: GlobalConfig
+  public readonly common!: HardforkManager
   private keccakFunction: (msg: Uint8Array) => Uint8Array
 
   readonly txOptions!: TxOptions
 
   readonly cache: TransactionCache = {}
+  readonly fork!: string
 
   /**
    * List of tx type defining EIPs,
@@ -133,19 +134,20 @@ export class LegacyTx
    * the static factory methods to assist in creating a Transaction object from
    * varying data types.
    */
-  public constructor(txData: TxData, opts: TxOptions = {}) {
+  public constructor(txData: TxData, opts: TxOptions) {
     sharedConstructor(this, txData, opts)
 
     this.gasPrice = bytesToBigInt(toBytes(txData.gasPrice))
     valueOverflowCheck({ gasPrice: this.gasPrice })
 
+    // TODO: this is not needed for legacy txs
     // Everything from BaseTransaction done here
-    this.common.updateBatchParams(opts.params ?? paramsTx) // TODO should this move higher?
+    // this.common.updateBatchParams(opts.params ?? paramsTx) // TODO should this move higher?
 
     const chainId = validateVAndExtractChainID(this.common, this.v)
     if (chainId !== undefined && chainId !== this.common.chainId()) {
       throw EthereumJSErrorWithoutCode(
-        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `HardforkManager chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
 
@@ -157,6 +159,7 @@ export class LegacyTx
       )
     }
 
+    const hf = Hardfork.Chainstart
     // EIP-155 replay protection capability
     // NOTE: We recognize EIP-155 signed txs regardless of hardfork because:
     // 1. Modern wallets always sign with EIP-155 (chainId in v)
@@ -164,7 +167,7 @@ export class LegacyTx
     // 3. Pre-spuriousDragon nodes should still verify EIP-155 signed txs correctly
     if (!this.isSigned()) {
       // For unsigned txs: only enable EIP-155 if hardfork supports it (for signing)
-      if (this.common.gteHardfork('spuriousDragon')) {
+      if (this.common.hardforkGte(hf, 'spuriousDragon')) {
         this.activeCapabilities.push(Capability.EIP155ReplayProtection)
       }
     } else {

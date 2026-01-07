@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { BIGINT_0 } from '@ts-ethereum/utils'
 import type { RunState } from '../interpreter'
 
@@ -15,11 +15,14 @@ import type { RunState } from '../interpreter'
 export function accessAddressEIP2929(
   runState: RunState,
   address: Uint8Array,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
   chargeGas = true,
   isSelfdestruct = false,
 ): bigint {
-  if (!common.isActivatedEIP(2929)) return BIGINT_0
+  if (!common.isEIPActiveAtHardfork(2929, hardfork)) return BIGINT_0
+
+  const eip2929Hardfork = common.getHardforkForEIP(2929) ?? hardfork
 
   // Cold
   if (!runState.interpreter.journal.isWarmedAddress(address)) {
@@ -28,16 +31,16 @@ export function accessAddressEIP2929(
     // CREATE, CREATE2 opcodes have the address warmed for free.
     // selfdestruct beneficiary address reads are charged an *additional* cold access
     // if binary tree not activated
-    if (chargeGas && !common.isActivatedEIP(7864)) {
-      return common.getParamByEIP(2929, 'coldaccountaccessGas')
-    } else if (chargeGas && common.isActivatedEIP(7864)) {
+    if (chargeGas && !common.isEIPActiveAtHardfork(7864, hardfork)) {
+      return common.getParamAtHardfork('coldaccountaccessGas', eip2929Hardfork)!
+    } else if (chargeGas && common.isEIPActiveAtHardfork(7864, hardfork)) {
       // If binary tree is active, then the warmstoragereadGas should still be charged
       // This is because otherwise opcodes will have cost 0 (this is thus the base fee)
-      return common.getParamByEIP(2929, 'warmstoragereadGas')
+      return common.getParamAtHardfork('warmstoragereadGas', eip2929Hardfork)!
     }
     // Warm: (selfdestruct beneficiary address reads are not charged when warm)
   } else if (chargeGas && !isSelfdestruct) {
-    return common.getParamByEIP(2929, 'warmstoragereadGas')
+    return common.getParamAtHardfork('warmstoragereadGas', eip2929Hardfork)!
   }
   return BIGINT_0
 }
@@ -54,11 +57,13 @@ export function accessStorageEIP2929(
   runState: RunState,
   key: Uint8Array,
   isSstore: boolean,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
   chargeGas = true,
 ): bigint {
-  if (!common.isActivatedEIP(2929)) return BIGINT_0
+  if (!common.isEIPActiveAtHardfork(2929, hardfork)) return BIGINT_0
 
+  const eip2929Hardfork = common.getHardforkForEIP(2929) ?? hardfork
   const address = runState.interpreter.getAddress().bytes
   const slotIsCold = !runState.interpreter.journal.isWarmedStorage(address, key)
 
@@ -67,15 +72,20 @@ export function accessStorageEIP2929(
     runState.interpreter.journal.addWarmedStorage(address, key)
     if (
       chargeGas &&
-      !(common.isActivatedEIP(6800) || common.isActivatedEIP(7864))
+      !(
+        common.isEIPActiveAtHardfork(6800, hardfork) ||
+        common.isEIPActiveAtHardfork(7864, hardfork)
+      )
     ) {
-      return common.getParamByEIP(2929, 'coldsloadGas')
+      return common.getParamAtHardfork('coldsloadGas', eip2929Hardfork)!
     }
   } else if (
     chargeGas &&
-    (!isSstore || common.isActivatedEIP(6800) || common.isActivatedEIP(7864))
+    (!isSstore ||
+      common.isEIPActiveAtHardfork(6800, hardfork) ||
+      common.isEIPActiveAtHardfork(7864, hardfork))
   ) {
-    return common.getParamByEIP(2929, 'warmstoragereadGas')
+    return common.getParamAtHardfork('warmstoragereadGas', eip2929Hardfork)!
   }
   return BIGINT_0
 }
@@ -95,22 +105,35 @@ export function adjustSstoreGasEIP2929(
   key: Uint8Array,
   defaultCost: bigint,
   costName: string,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
 ): bigint {
-  if (!common.isActivatedEIP(2929)) return defaultCost
+  if (!common.isEIPActiveAtHardfork(2929, hardfork)) return defaultCost
 
+  const eip2929Hardfork = common.getHardforkForEIP(2929) ?? hardfork
+  const eip2200Hardfork = common.getHardforkForEIP(2200) ?? hardfork
   const address = runState.interpreter.getAddress().bytes
-  const warmRead = common.getParamByEIP(2929, 'warmstoragereadGas')
-  const coldSload = common.getParamByEIP(2929, 'coldsloadGas')
+  const warmRead = common.getParamAtHardfork(
+    'warmstoragereadGas',
+    eip2929Hardfork,
+  )!
+  const coldSload = common.getParamAtHardfork('coldsloadGas', eip2929Hardfork)!
 
   if (runState.interpreter.journal.isWarmedStorage(address, key)) {
     switch (costName) {
       case 'noop':
         return warmRead
       case 'initRefund':
-        return common.getParamByEIP(1679, 'sstoreInitEIP2200Gas') - warmRead
+        return (
+          common.getParamAtHardfork('sstoreInitEIP2200Gas', eip2200Hardfork)! -
+          warmRead
+        )
       case 'cleanRefund':
-        return common.param('sstoreResetGas') - coldSload - warmRead
+        return (
+          common.getParamAtHardfork('sstoreResetGas', hardfork)! -
+          coldSload -
+          warmRead
+        )
     }
   }
 

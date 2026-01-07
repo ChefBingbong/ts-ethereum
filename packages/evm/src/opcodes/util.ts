@@ -1,5 +1,5 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -96,8 +96,7 @@ export function trap(err: string) {
  * Error message helper - generates location string
  */
 export function describeLocation(runState: RunState): string {
-  const keccakFunction =
-    runState.interpreter._evm.common.customCrypto.keccak256 ?? keccak_256
+  const keccakFunction = keccak_256
   const hash = bytesToHex(keccakFunction(runState.interpreter.getCode()))
   const address = runState.interpreter.getAddress().toString()
   const pc = runState.programCounter - 1
@@ -192,9 +191,10 @@ export function maxCallGas(
   gasLimit: bigint,
   gasLeft: bigint,
   runState: RunState,
-  common: GlobalConfig,
+  common: HardforkManager,
 ): bigint {
-  if (common.gteHardfork(Hardfork.TangerineWhistle)) {
+  const hardfork = runState.interpreter.fork
+  if (common.hardforkGte(hardfork, Hardfork.TangerineWhistle)) {
     const gasAllowed = gasLeft - gasLeft / BIGINT_64
     return gasLimit > gasAllowed ? gasAllowed : gasLimit
   } else {
@@ -209,7 +209,8 @@ export function subMemUsage(
   runState: RunState,
   offset: bigint,
   length: bigint,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
 ) {
   // YP (225): access with zero length will not extend the memory
   if (length === BIGINT_0) return BIGINT_0
@@ -218,8 +219,11 @@ export function subMemUsage(
   if (newMemoryWordCount <= runState.memoryWordCount) return BIGINT_0
 
   const words = newMemoryWordCount
-  const fee = common.param('memoryGas')
-  const quadCoefficient = common.param('quadCoefficientDivGas')
+  const fee = common.getParamAtHardfork('memoryGas', hardfork)!
+  const quadCoefficient = common.getParamAtHardfork(
+    'quadCoefficientDivGas',
+    hardfork,
+  )!
   // words * 3 + words ^2 / 512
   let cost = words * fee + (words * words) / quadCoefficient
 
@@ -262,18 +266,19 @@ export function updateSstoreGas(
   runState: RunState,
   currentStorage: Uint8Array,
   value: Uint8Array,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
 ): bigint {
   if (
     (value.length === 0 && currentStorage.length === 0) ||
     (value.length > 0 && currentStorage.length > 0)
   ) {
-    const gas = common.param('sstoreResetGas')
+    const gas = common.getParamAtHardfork('sstoreResetGas', hardfork)!
     return gas
   } else if (value.length === 0 && currentStorage.length > 0) {
-    const gas = common.param('sstoreResetGas')
+    const gas = common.getParamAtHardfork('sstoreResetGas', hardfork)!
     runState.interpreter.refundGas(
-      common.param('sstoreRefundGas'),
+      common.getParamAtHardfork('sstoreRefundGas', hardfork)!,
       'updateSstoreGas',
     )
     return gas
@@ -285,6 +290,6 @@ export function updateSstoreGas(
       -> Value is zero, but slot is nonzero
       Thus, the remaining case is where value is nonzero, but slot is zero, which is this clause
     */
-    return common.param('sstoreSetGas')
+    return common.getParamAtHardfork('sstoreSetGas', hardfork)!
   }
 }

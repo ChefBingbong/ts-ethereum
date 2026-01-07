@@ -1,7 +1,7 @@
 import {
-  GlobalConfig,
-  Hardfork,
-  mainnetSchema,
+  createHardforkManagerFromConfig,
+  type HardforkManager,
+  Mainnet,
 } from '@ts-ethereum/chain-config'
 import {
   Address,
@@ -23,18 +23,12 @@ import type {
 } from '../types'
 
 /**
- * Gets a GlobalConfig instance, creating a new one if none provided
- * @param common - Optional GlobalConfig instance
- * @returns GlobalConfig instance (copied if provided, new Mainnet instance if not)
+ * Gets a HardforkManager instance, creating a new one if none provided
+ * @param common - Optional HardforkManager instance
+ * @returns HardforkManager instance (copied if provided, new Mainnet instance if not)
  */
-export function getCommon(common?: GlobalConfig): GlobalConfig {
-  return (
-    common?.copy() ??
-    GlobalConfig.fromSchema({
-      schema: mainnetSchema,
-      hardfork: Hardfork.Prague,
-    })
-  )
+export function getCommon(common?: HardforkManager): HardforkManager {
+  return common ?? createHardforkManagerFromConfig(Mainnet)
 }
 
 /**
@@ -76,13 +70,15 @@ export function validateNotArray(values: { [key: string]: any }) {
   }
 }
 
-function checkMaxInitCodeSize(common: GlobalConfig, length: number) {
-  const maxInitCodeSize = common.param('maxInitCodeSize')
+function checkMaxInitCodeSize(
+  common: HardforkManager,
+  length: number,
+  hardfork: string,
+) {
+  const maxInitCodeSize = common.getParamAtHardfork('maxInitCodeSize', hardfork)
   if (maxInitCodeSize && BigInt(length) > maxInitCodeSize) {
     throw EthereumJSErrorWithoutCode(
-      `the initcode size of this transaction is too large: it is ${length} while the max is ${common.param(
-        'maxInitCodeSize',
-      )}`,
+      `the initcode size of this transaction is too large: it is ${length} while the max is ${maxInitCodeSize}`,
     )
   }
 }
@@ -152,17 +148,17 @@ type Mutable<T> = {
 export function sharedConstructor(
   tx: Mutable<TransactionInterface>,
   txData: TxData[TransactionType],
-  opts: TxOptions = {},
+  opts: TxOptions,
 ) {
-  // LOAD base tx super({ ...txData, type: TransactionType.Legacy }, opts)
-  tx.common = getCommon(opts.common)
-  tx.common.updateBatchParams(opts.params ?? {})
-
   validateNotArray(txData) // is this necessary?
 
   const { nonce, gasLimit, to, value, data, v, r, s } = txData
 
+  // Set common - required
+  tx.common = opts.common
+
   tx.txOptions = opts // TODO: freeze?
+  tx.fork = opts.common.getHardforkFromContext(opts.hardfork)
 
   // Set the tx properties
   const toB = toBytes(to === '' ? '0x' : to)
@@ -195,9 +191,12 @@ export function sharedConstructor(
   valueOverflowCheck({ nonce: tx.nonce }, 64, true)
 
   // EIP-7825: Transaction Gas Limit Cap
-  if (tx.common.isActivatedEIP(7825)) {
-    const maxGasLimit = tx.common.getParamByEIP(7825, 'maxTransactionGasLimit')
-    if (tx.gasLimit > maxGasLimit) {
+  if (tx.common.isEIPActiveAtHardfork(7825, tx.fork)) {
+    const maxGasLimit = tx.common.getParamAtHardfork(
+      'maxTransactionGasLimit',
+      tx.fork,
+    )
+    if (maxGasLimit !== undefined && tx.gasLimit > maxGasLimit) {
       throw EthereumJSErrorWithoutCode(
         `Transaction gas limit ${tx.gasLimit} exceeds the maximum allowed by EIP-7825 (${maxGasLimit})`,
       )
@@ -209,10 +208,10 @@ export function sharedConstructor(
 
   if (
     createContract &&
-    tx.common.isActivatedEIP(3860) &&
+    tx.common.isEIPActiveAtHardfork(3860, tx.fork) &&
     allowUnlimitedInitCodeSize === false
   ) {
-    checkMaxInitCodeSize(tx.common, tx.data.length)
+    checkMaxInitCodeSize(tx.common, tx.data.length, tx.fork)
   }
 }
 

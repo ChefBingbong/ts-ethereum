@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
@@ -66,11 +66,12 @@ export class FeeMarket1559Tx
 
   // End of Tx data part
 
-  public readonly common!: GlobalConfig
+  public readonly common!: HardforkManager
 
   readonly txOptions!: TxOptions
 
   readonly cache: TransactionCache = {}
+  readonly fork!: string
 
   /**
    * List of tx type defining EIPs,
@@ -86,7 +87,7 @@ export class FeeMarket1559Tx
    * the static factory methods to assist in creating a Transaction object from
    * varying data types.
    */
-  public constructor(txData: TxData, opts: TxOptions = {}) {
+  public constructor(txData: TxData, opts: TxOptions) {
     sharedConstructor(
       this,
       { ...txData, type: TransactionType.FeeMarketEIP1559 },
@@ -105,13 +106,16 @@ export class FeeMarket1559Tx
       bytesToBigInt(toBytes(chainId)) !== this.common.chainId()
     ) {
       throw EthereumJSErrorWithoutCode(
-        `GlobalConfig chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
+        `HardforkManager chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
       )
     }
     this.chainId = this.common.chainId()
 
-    if (!this.common.isActivatedEIP(1559)) {
-      throw EthereumJSErrorWithoutCode('EIP-1559 not enabled on GlobalConfig')
+    // first check if EIP-1559 is active on the block number
+    if (!this.common.isEIPActiveAtHardfork(1559, this.fork)) {
+      throw EthereumJSErrorWithoutCode(
+        'EIP-1559 not enabled on HardforkManager',
+      )
     }
     this.activeCapabilities = this.activeCapabilities.concat([1559, 2718, 2930])
 

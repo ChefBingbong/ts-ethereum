@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { equalsBytes } from '@ts-ethereum/utils'
 import { EVMError } from '../errors'
 import type { RunState } from '../interpreter'
@@ -20,47 +20,69 @@ export function updateSstoreGasEIP2200(
   originalStorage: Uint8Array,
   value: Uint8Array,
   key: Uint8Array,
-  common: GlobalConfig,
+  common: HardforkManager,
+  hardfork: string,
 ) {
+  const eip2200Hardfork = common.getHardforkForEIP(2200) ?? hardfork
+
   // Fail if not enough gas is left
   if (
     runState.interpreter.getGasLeft() <=
-    common.getParamByEIP(1679, 'sstoreSentryEIP2200Gas')
+    common.getParamAtHardfork('sstoreSentryEIP2200Gas', eip2200Hardfork)!
   ) {
     trap(EVMError.errorMessages.OUT_OF_GAS)
   }
 
   // Noop
   if (equalsBytes(currentStorage, value)) {
-    const sstoreNoopCost = common.getParamByEIP(1679, 'sstoreNoopEIP2200Gas')
-    return adjustSstoreGasEIP2929(runState, key, sstoreNoopCost, 'noop', common)
+    const sstoreNoopCost = common.getParamAtHardfork(
+      'sstoreNoopEIP2200Gas',
+      eip2200Hardfork,
+    )!
+    return adjustSstoreGasEIP2929(
+      runState,
+      key,
+      sstoreNoopCost,
+      'noop',
+      common,
+      hardfork,
+    )
   }
   if (equalsBytes(originalStorage, currentStorage)) {
     // Create slot
     if (originalStorage.length === 0) {
-      return common.getParamByEIP(1679, 'sstoreInitEIP2200Gas')
+      return common.getParamAtHardfork('sstoreInitEIP2200Gas', eip2200Hardfork)!
     }
     // Delete slot
     if (value.length === 0) {
       runState.interpreter.refundGas(
-        common.getParamByEIP(1679, 'sstoreClearRefundEIP2200Gas'),
+        common.getParamAtHardfork(
+          'sstoreClearRefundEIP2200Gas',
+          eip2200Hardfork,
+        )!,
         'EIP-2200 -> sstoreClearRefundEIP2200',
       )
     }
     // Write existing slot
-    return common.getParamByEIP(1679, 'sstoreCleanEIP2200Gas')
+    return common.getParamAtHardfork('sstoreCleanEIP2200Gas', eip2200Hardfork)!
   }
   if (originalStorage.length > 0) {
     if (currentStorage.length === 0) {
       // Recreate slot
       runState.interpreter.subRefund(
-        common.getParamByEIP(1679, 'sstoreClearRefundEIP2200Gas'),
+        common.getParamAtHardfork(
+          'sstoreClearRefundEIP2200Gas',
+          eip2200Hardfork,
+        )!,
         'EIP-2200 -> sstoreClearRefundEIP2200',
       )
     } else if (value.length === 0) {
       // Delete slot
       runState.interpreter.refundGas(
-        common.getParamByEIP(1679, 'sstoreClearRefundEIP2200Gas'),
+        common.getParamAtHardfork(
+          'sstoreClearRefundEIP2200Gas',
+          eip2200Hardfork,
+        )!,
         'EIP-2200 -> sstoreClearRefundEIP2200',
       )
     }
@@ -68,10 +90,10 @@ export function updateSstoreGasEIP2200(
   if (equalsBytes(originalStorage, value)) {
     if (originalStorage.length === 0) {
       // Reset to original non-existent slot
-      const sstoreInitRefund = common.getParamByEIP(
-        1679,
+      const sstoreInitRefund = common.getParamAtHardfork(
         'sstoreInitRefundEIP2200Gas',
-      )
+        eip2200Hardfork,
+      )!
       runState.interpreter.refundGas(
         adjustSstoreGasEIP2929(
           runState,
@@ -79,15 +101,16 @@ export function updateSstoreGasEIP2200(
           sstoreInitRefund,
           'initRefund',
           common,
+          hardfork,
         ),
         'EIP-2200 -> initRefund',
       )
     } else {
       // Reset to original existing slot
-      const sstoreCleanRefund = common.getParamByEIP(
-        1679,
+      const sstoreCleanRefund = common.getParamAtHardfork(
         'sstoreCleanRefundEIP2200Gas',
-      )
+        eip2200Hardfork,
+      )!
       runState.interpreter.refundGas(
         BigInt(
           adjustSstoreGasEIP2929(
@@ -96,6 +119,7 @@ export function updateSstoreGasEIP2200(
             sstoreCleanRefund,
             'cleanRefund',
             common,
+            hardfork,
           ),
         ),
         'EIP-2200 -> cleanRefund',
@@ -103,5 +127,5 @@ export function updateSstoreGasEIP2200(
     }
   }
   // Dirty update
-  return common.getParamByEIP(1679, 'sstoreDirtyEIP2200Gas')
+  return common.getParamAtHardfork('sstoreDirtyEIP2200Gas', eip2200Hardfork)!
 }

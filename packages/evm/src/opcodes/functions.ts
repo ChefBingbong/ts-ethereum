@@ -1,5 +1,5 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import {
   Address,
   BIGINT_0,
@@ -46,11 +46,14 @@ import {
   writeCallOutput,
 } from './util'
 
-export type SyncOpHandler = (runState: RunState, common: GlobalConfig) => void
+export type SyncOpHandler = (
+  runState: RunState,
+  common: HardforkManager,
+) => void
 
 export type AsyncOpHandler = (
   runState: RunState,
-  common: GlobalConfig,
+  common: HardforkManager,
 ) => Promise<void>
 
 export type OpHandler = SyncOpHandler | AsyncOpHandler
@@ -417,8 +420,9 @@ export const handlers: Map<number, OpHandler> = new Map([
       if (length !== BIGINT_0) {
         data = runState.memory.read(Number(offset), Number(length))
       }
+      const customCrypto = runState.interpreter._evm['_customCrypto']
       const r = BigInt(
-        bytesToHex((common.customCrypto.keccak256 ?? keccak_256)(data)),
+        bytesToHex((customCrypto?.keccak256 ?? keccak_256)(data)),
       )
       runState.stack.push(r)
     },
@@ -640,7 +644,8 @@ export const handlers: Map<number, OpHandler> = new Map([
     async (runState, common) => {
       const number = runState.stack.pop()
 
-      if (common.isActivatedEIP(7709)) {
+      const hardfork = runState.interpreter.fork
+      if (common.isEIPActiveAtHardfork(7709, hardfork)) {
         if (number >= runState.interpreter.getBlockNumber()) {
           runState.stack.push(BIGINT_0)
           return
@@ -654,21 +659,28 @@ export const handlers: Map<number, OpHandler> = new Map([
           return
         }
 
+        const eip2935Hardfork = common.getHardforkForEIP(2935) ?? hardfork
         const historyAddress = new Address(
           bigIntToAddressBytes(
-            common.getParamByEIP(2935, 'historyStorageAddress'),
+            common.getParamAtHardfork(
+              'historyStorageAddress',
+              eip2935Hardfork,
+            )!,
           ),
         )
-        const historyServeWindow = common.getParamByEIP(
-          2935,
+        const historyServeWindow = common.getParamAtHardfork(
           'historyServeWindow',
-        )
+          eip2935Hardfork,
+        )!
         const key = setLengthLeft(
           bigIntToBytes(number % historyServeWindow),
           32,
         )
 
-        if (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) {
+        if (
+          common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)
+        ) {
           // create witnesses and charge gas
           const statelessGas = runState.env.accessWitness!.readAccountStorage(
             historyAddress,
@@ -721,7 +733,8 @@ export const handlers: Map<number, OpHandler> = new Map([
   [
     0x44,
     (runState, common) => {
-      if (common.isActivatedEIP(4399)) {
+      const hardfork = runState.interpreter.fork
+      if (common.isEIPActiveAtHardfork(4399, hardfork)) {
         runState.stack.push(runState.interpreter.getBlockPrevRandao())
       } else {
         runState.stack.push(runState.interpreter.getBlockDifficulty())
@@ -975,9 +988,10 @@ export const handlers: Map<number, OpHandler> = new Map([
     0x60,
     (runState, common) => {
       const numToPush = runState.opCode - 0x5f
-
+      const hardfork = runState.interpreter.fork
       if (
-        (common.isActivatedEIP(6800) || common.isActivatedEIP(7864)) &&
+        (common.isEIPActiveAtHardfork(6800, hardfork) ||
+          common.isEIPActiveAtHardfork(7864, hardfork)) &&
         runState.env.chargeCodeAccesses === true
       ) {
         const contract = runState.interpreter.getAddress()
@@ -1460,9 +1474,16 @@ export const handlers: Map<number, OpHandler> = new Map([
     async (runState, common) => {
       const [value, offset, length] = runState.stack.popN(3)
 
+      const hardfork = runState.interpreter.fork
       if (
-        common.isActivatedEIP(3860) &&
-        length > Number(common.getParamByEIP(3860, 'maxInitCodeSize')) &&
+        common.isEIPActiveAtHardfork(3860, hardfork) &&
+        length >
+          Number(
+            common.getParamAtHardfork(
+              'maxInitCodeSize',
+              common.getHardforkForEIP(3860) ?? hardfork,
+            )!,
+          ) &&
         !runState.interpreter._evm.allowUnlimitedInitCodeSize
       ) {
         trap(EVMError.errorMessages.INITCODE_SIZE_VIOLATION)
@@ -1496,9 +1517,16 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       const [value, offset, length, salt] = runState.stack.popN(4)
 
+      const hardfork = runState.interpreter.fork
       if (
-        common.isActivatedEIP(3860) &&
-        length > Number(common.getParamByEIP(3860, 'maxInitCodeSize')) &&
+        common.isEIPActiveAtHardfork(3860, hardfork) &&
+        length >
+          Number(
+            common.getParamAtHardfork(
+              'maxInitCodeSize',
+              common.getHardforkForEIP(3860) ?? hardfork,
+            )!,
+          ) &&
         !runState.interpreter._evm.allowUnlimitedInitCodeSize
       ) {
         trap(EVMError.errorMessages.INITCODE_SIZE_VIOLATION)
@@ -1530,7 +1558,7 @@ export const handlers: Map<number, OpHandler> = new Map([
   // 0xf1: CALL
   [
     0xf1,
-    async (runState: RunState, common: GlobalConfig) => {
+    async (runState, common) => {
       const [
         _currentGasLimit,
         toAddr,
@@ -1549,7 +1577,11 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       let gasLimit = runState.messageGasLimit!
       if (value !== BIGINT_0) {
-        const callStipend = common.param('callStipendGas')
+        const hardfork = runState.interpreter.fork
+        const callStipend = common.getParamAtHardfork(
+          'callStipendGas',
+          hardfork,
+        )!
         runState.interpreter.addStipend(callStipend)
         gasLimit += callStipend
       }
@@ -1570,7 +1602,7 @@ export const handlers: Map<number, OpHandler> = new Map([
   // 0xf2: CALLCODE
   [
     0xf2,
-    async (runState: RunState, common: GlobalConfig) => {
+    async (runState: RunState, common: HardforkManager) => {
       const [
         _currentGasLimit,
         toAddr,
@@ -1584,7 +1616,11 @@ export const handlers: Map<number, OpHandler> = new Map([
 
       let gasLimit = runState.messageGasLimit!
       if (value !== BIGINT_0) {
-        const callStipend = common.param('callStipendGas')
+        const hardfork = runState.interpreter.fork
+        const callStipend = common.getParamAtHardfork(
+          'callStipendGas',
+          hardfork,
+        )!
         runState.interpreter.addStipend(callStipend)
         gasLimit += callStipend
       }

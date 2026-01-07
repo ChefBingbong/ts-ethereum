@@ -1,7 +1,6 @@
 import {
-  GlobalConfig,
-  Hardfork,
-  mainnetSchema,
+  createHardforkManagerFromConfig,
+  Mainnet,
 } from '@ts-ethereum/chain-config'
 import { MerkleStateManager } from '@ts-ethereum/state-manager'
 import type { EVMOpts } from './index'
@@ -16,16 +15,14 @@ import { EVMMockBlockchain } from './types'
  * @param createOpts The EVM options
  * @returns A new EVM
  */
-export async function createEVM(createOpts?: EVMOpts) {
+export async function createEVM(createOpts: EVMOpts) {
   const opts = createOpts ?? ({} as EVMOpts)
 
   opts.bn254 = new NobleBN254()
 
+  // common is now required, but we can provide a default if not given
   if (opts.common === undefined) {
-    opts.common = GlobalConfig.fromSchema({
-      schema: mainnetSchema,
-      hardfork: Hardfork.Prague,
-    })
+    opts.common = createHardforkManagerFromConfig(Mainnet)
   }
 
   if (opts.blockchain === undefined) {

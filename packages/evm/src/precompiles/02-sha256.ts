@@ -9,11 +9,13 @@ import { gasLimitCheck } from './util'
 
 export function precompile02(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('02')
+  const hardfork = opts._EVM.fork
   const data = opts.data
-  const sha256Function = opts.common.customCrypto.sha256 ?? sha256
-  let gasUsed = opts.common.getParamByEIP(1, 'sha256Gas')
+  const sha256Function = opts.customCrypto?.sha256 ?? sha256
+  const eip1Hardfork = opts.common.getHardforkForEIP(1) ?? hardfork
+  let gasUsed = opts.common.getParamAtHardfork('sha256Gas', eip1Hardfork)!
   gasUsed +=
-    opts.common.getParamByEIP(1, 'sha256WordGas') *
+    opts.common.getParamAtHardfork('sha256WordGas', eip1Hardfork)! *
     BigInt(Math.ceil(data.length / 32))
 
   if (!gasLimitCheck(opts, gasUsed, pName)) {

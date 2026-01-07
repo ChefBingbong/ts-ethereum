@@ -27,19 +27,55 @@ export interface FrozenChainConfig {
   readonly _cumulativeEips: ReadonlyMap<string, ReadonlySet<number>>
 }
 
+export type HardforkContext =
+  | string // Hardfork identifier
+  | { blockNumber: bigint; timestamp?: bigint } // Block context
+  | undefined // Use latest hardfork
+
 export interface HardforkManager {
   readonly config: FrozenChainConfig
   chainId(): bigint
   chainName(): string
-  getHardforkByBlock(blockNumber: bigint, timestamp?: bigint): string
+
+  /**
+   * Get the latest/most permissive hardfork configured in the chain.
+   * This is useful when blockNumber/timestamp aren't available (like geth's LatestSigner pattern).
+   */
+  getLatestHardfork(): string
+
+  /**
+   * Get hardfork by block number and optional timestamp.
+   * If blockNumber is not provided, returns the latest hardfork.
+   */
+  getHardforkByBlock(blockNumber?: bigint, timestamp?: bigint): string
+
+  /**
+   * Get hardfork from context. Accepts:
+   * - Hardfork identifier (string): returns that hardfork
+   * - Block context ({ blockNumber, timestamp? }): determines hardfork from block context
+   * - undefined: returns latest/most permissive hardfork
+   */
+  getHardforkFromContext(context?: HardforkContext): string
+
   isEIPActiveAtHardfork(eip: number, hardfork: string): boolean
+
+  /**
+   * Check if EIP is active at block context, or fallback to latest hardfork if not provided.
+   */
   isEIPActiveAtBlock(
     eip: number,
-    blockNum: { blockNumber: bigint; timestamp?: bigint },
+    blockNum?: { blockNumber: bigint; timestamp?: bigint },
   ): boolean
+
+  /**
+   * Get parameter at hardfork. Accepts:
+   * - Hardfork identifier (string): uses that specific hardfork
+   * - Block context ({ blockNumber, timestamp? }): determines hardfork from block context
+   * - undefined: uses latest/most permissive hardfork
+   */
   getParamAtHardfork<P extends AllParamNames>(
     param: P,
-    hardfork: string,
+    context?: HardforkContext,
   ): ParamType<P> | undefined
 
   /**

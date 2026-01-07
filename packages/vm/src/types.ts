@@ -1,5 +1,5 @@
 import type { Block, BlockOptions, HeaderData } from '@ts-ethereum/block'
-import type { GlobalConfig, ParamsDict } from '@ts-ethereum/chain-config'
+import type { HardforkManager, ParamsDict } from '@ts-ethereum/chain-config'
 import type {
   EVMInterface,
   EVMMockBlockchainInterface,
@@ -11,6 +11,7 @@ import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import type { AccessList, TypedTransaction } from '@ts-ethereum/tx'
 import type {
   BigIntLike,
+  BlockContext,
   CLRequest,
   CLRequestType,
   PrefixedHexString,
@@ -102,27 +103,31 @@ export type VMProfilerOpts = {
  */
 export interface VMOpts {
   /**
-   * Use a {@link GlobalConfig} instance
+   * Use a {@link HardforkManager} instance
    * if you want to change the chain setup.
    *
    * ### Possible Values
    *
-   * - `chain`: all chains supported by `GlobalConfig` or a custom chain
-   * - `hardfork`: `mainnet` hardforks up to the `Paris` hardfork
-   * - `eips`: `2537` (usage e.g. `eips: [ 2537, ]`)
+   * - `chain`: all chains supported by `HardforkManager` or a custom chain
+   * - `hardfork`: hardfork identifier or block context
    *
    * Note: check the associated `@ethereumjs/evm` instance options
    * documentation for supported EIPs.
    *
    * ### Default Setup
    *
-   * Default setup if no `GlobalConfig` instance is provided:
+   * Default setup if no `HardforkManager` instance is provided:
    *
    * - `chain`: `mainnet`
-   * - `hardfork`: `paris`
-   * - `eips`: `[]`
+   * - `hardfork`: latest hardfork
    */
-  common?: GlobalConfig
+  hardforkManager?: HardforkManager
+
+  /**
+   * Optional hardfork identifier or block context to determine the initial fork.
+   * If not provided, defaults to the latest hardfork from the HardforkManager.
+   */
+  hardfork?: string | { blockNumber: bigint; timestamp?: bigint }
   /**
    * A {@link StateManager} instance to use as the state store
    */
@@ -147,13 +152,8 @@ export interface VMOpts {
   activatePrecompiles?: boolean
 
   /**
-   * Set the hardfork either by timestamp (for HFs from Shanghai onwards) or by block number
-   * for older Hfs.
-   *
-   * Additionally it is possible to pass in a specific TD value to support live-Merge-HF
-   * transitions. Note that this should only be needed in very rare and specific scenarios.
-   *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
+   * @deprecated This option is no longer needed with stateless HardforkManager.
+   * Hardfork is determined from block context when needed.
    */
   setHardfork?: boolean | BigIntLike
   /**
@@ -305,13 +305,12 @@ export interface RunBlockOpts {
    * balance equal equal to the upfront cost (gas limit * gas price + transaction value)
    */
   skipBalance?: boolean
+
   /**
-   * Set the hardfork either by timestamp (for HFs from Shanghai onwards) or by block number
-   * for older Hfs.
-   *
-   * Default: `false` (HF is set to whatever default HF is set by the {@link GlobalConfig} instance)
+   * Optional BlockContext. If not provided, will be created from the block header.
+   * This allows passing a pre-computed context for performance or testing.
    */
-  setHardfork?: boolean
+  blockContext?: BlockContext
 
   /**
    * If true, adds a hashedKey -> preimages mapping of all touched accounts
@@ -390,9 +389,16 @@ export interface AfterBlockEvent extends RunBlockResult {
 export interface RunTxOpts {
   /**
    * The `@ethereumjs/block` the `tx` belongs to.
-   * If omitted, a default blank block will be used.
+   * Required when executing transactions in block context.
+   * If omitted, blockContext must be provided.
    */
   block?: Block
+  /**
+   * Optional BlockContext. If not provided and block is present,
+   * will be created from the block header.
+   * Required for standalone transaction execution without a block.
+   */
+  blockContext?: BlockContext
   /**
    * An `@ethereumjs/tx` to run
    */

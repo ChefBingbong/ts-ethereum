@@ -17,7 +17,7 @@ import { errorMsg } from './legacy'
  * @returns Hashed message to sign
  */
 export function getHashedMessageToSign(tx: EIP2718CompatibleTx): Uint8Array {
-  const keccakFunction = tx.common.customCrypto.keccak256 ?? keccak256
+  const keccakFunction = keccak256
   return keccakFunction(tx.getMessageToSign())
 }
 

@@ -1,9 +1,12 @@
 import type { PeerInfo } from '@ts-ethereum/kademlia'
 import type { Address as UtilsAddress } from '@ts-ethereum/utils'
 import { createAddressFromString } from '@ts-ethereum/utils'
-import { schemaFromChainConfig } from '../builder'
+import {
+  createHardforkManagerFromConfig,
+  schemaFromChainConfig,
+} from '../builder'
 import { GlobalConfig } from '../config'
-import { createHardforkManager, type HardforkEntry } from '../config/functional'
+import type { HardforkManager } from '../config/functional'
 import type { GenesisState } from '../genesis/types'
 import type { ChainConfig } from '../types'
 import {
@@ -34,7 +37,7 @@ export interface ClientInitArgs extends Partial<any> {
 }
 
 export interface ClientConfig {
-  common: GlobalConfig
+  common: HardforkManager
   datadir: string
   key: Uint8Array
   accounts: [address: UtilsAddress, privKey: Uint8Array][]
@@ -110,20 +113,7 @@ export async function initClientConfig(args: ClientInitArgs): Promise<any> {
     hardfork: chainConfig.defaultHardfork,
   })
 
-  const hardforkManager = createHardforkManager({
-    hardforks: chainConfig.hardforks.map(
-      (hf) =>
-        ({
-          block: hf.block,
-          timestamp: hf.timestamp,
-          forkHash: hf.forkHash,
-          optional: hf.optional,
-          name: hf.name,
-        }) as HardforkEntry,
-    ),
-    chainId: BigInt(chainConfig.chainId),
-    chain: chainConfig,
-  })
+  const hardforkManager = createHardforkManagerFromConfig(chainConfig)
 
   const nodeAccountAddress = createAddressFromString(nodeAccount[0])
 

@@ -216,7 +216,7 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
       this.ethProtocol.sendStatus(statusOpts)
 
       this._status = {
-        chainId: this.config.chainCommon.chainId(),
+        chainId: this.config.hardforkManager.chainId(),
         td: this.chain.headers.td,
         bestHash: header.hash(),
         genesisHash: genesis.hash(),
@@ -246,7 +246,7 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
 
       // Get local status
       const localStatus: EthStatus = {
-        chainId: this.config.chainCommon.chainId(),
+        chainId: this.config.hardforkManager.chainId(),
         td: this.chain.headers.td,
         bestHash: this.chain.headers.latest?.hash() ?? new Uint8Array(32),
         genesisHash: this.chain.genesis?.hash() ?? new Uint8Array(32),

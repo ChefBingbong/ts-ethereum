@@ -15,8 +15,14 @@ export function getDataGas(tx: EIP2930CompatibleTx): bigint {
  */
 function getAccessListDataGas(tx: EIP2930CompatibleTx): number {
   const { common, accessList } = tx
-  const accessListStorageKeyCost = common.param('accessListStorageKeyGas')
-  const accessListAddressCost = common.param('accessListAddressGas')
+  const accessListStorageKeyCost = common.getParamAtHardfork(
+    'accessListStorageKeyGas',
+    tx.fork,
+  )!
+  const accessListAddressCost = common.getParamAtHardfork(
+    'accessListAddressGas',
+    tx.fork,
+  )!
 
   const totalSlots = accessList.reduce((sum, item) => sum + item[1].length, 0)
   const addresses = accessList.length

@@ -1,4 +1,4 @@
-import type { GenesisState, GlobalConfig } from '@ts-ethereum/chain-config'
+import type { GenesisState, HardforkManager } from '@ts-ethereum/chain-config'
 import { genesisMPTStateRoot } from '@ts-ethereum/mpt'
 
 /**
@@ -11,18 +11,15 @@ import { genesisMPTStateRoot } from '@ts-ethereum/mpt'
 /**
  * Merkle genesis root
  * @param genesisState
- * @param common
+ * @param hardforkManager
  * @returns
  */
 export async function genGenesisStateRoot(
   genesisState: GenesisState,
-  common: GlobalConfig,
+  hardforkManager: HardforkManager,
 ): Promise<Uint8Array> {
-  const genCommon = common.copy()
-  genCommon.setHardforkBy({
-    blockNumber: 0,
-    timestamp: genCommon.genesis()?.timestamp ?? 0,
-  })
+  // HardforkManager is stateless, so no need to copy or set hardfork
+  // The hardfork is determined from block context when needed
   return genesisMPTStateRoot(genesisState)
 }
 
@@ -31,8 +28,8 @@ export async function genGenesisStateRoot(
  */
 export async function getGenesisStateRoot(
   chainId: any,
-  common: GlobalConfig,
+  hardforkManager: HardforkManager,
 ): Promise<Uint8Array> {
   // const chainGenesis = ChainGenesis[chainId]
-  return genGenesisStateRoot({}, common)
+  return genGenesisStateRoot({}, hardforkManager)
 }

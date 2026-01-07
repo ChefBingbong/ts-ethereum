@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -28,6 +28,9 @@ import { txsData } from './testData/txs'
 
 describe('[Transaction]', () => {
   const transactions: TypedTransaction[] = []
+  const common = createHardforkManagerFromConfig(Mainnet)
+  const blockNumber = 0n
+  const timestamp = 0n
 
   it(`cannot input decimal or negative values`, () => {
     const values = ['gasPrice', 'gasLimit', 'nonce', 'value', 'v', 'r', 's']
@@ -55,18 +58,15 @@ describe('[Transaction]', () => {
       for (const testCase of cases) {
         txData[value] = testCase
         assert.throws(() => {
-          createLegacyTx(txData)
+          createLegacyTx(txData, { common, blockNumber, timestamp })
         })
       }
     }
   })
 
   it('Initialization', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
     assert.isDefined(
-      createLegacyTx({}, { common }),
+      createLegacyTx({}, { common, blockNumber, timestamp }),
       'should initialize with Chainstart hardfork',
     )
   })
@@ -78,7 +78,11 @@ describe('[Transaction]', () => {
       const txData = tx.raw.map((rawTxData) =>
         hexToBytes(rawTxData as PrefixedHexString),
       )
-      const pt = createLegacyTxFromBytesArray(txData)
+      const pt = createLegacyTxFromBytesArray(txData, {
+        common,
+        blockNumber,
+        timestamp,
+      })
 
       assert.strictEqual(bytesToHex(unpadBytes(toBytes(pt.nonce))), tx.raw[0])
       assert.strictEqual(bytesToHex(toBytes(pt.gasPrice)), tx.raw[1])
@@ -95,13 +99,16 @@ describe('[Transaction]', () => {
   })
 
   it('Initialization -> should accept lesser r values', () => {
-    const tx = createLegacyTx({ r: bytesToBigInt(hexToBytes('0x0005')) })
+    const tx = createLegacyTx(
+      { r: bytesToBigInt(hexToBytes('0x0005')) },
+      { common, blockNumber, timestamp },
+    )
     assert.strictEqual(tx.r!.toString(16), '5')
   })
 
   it('addSignature() -> correctly adds correct signature values', () => {
     const privKey = hexToBytes(`0x${txsData[0].privateKey}`)
-    const tx = createLegacyTx({})
+    const tx = createLegacyTx({}, { common, blockNumber, timestamp })
     const signedTx = tx.sign(privKey)
     const addSignatureTx = tx.addSignature(
       signedTx.v!,
@@ -127,18 +134,19 @@ describe('[Transaction]', () => {
   // TODO: Re-enable once gas calculation differences are resolved
   // Current default hardfork applies different gas costs (53000n instead of 21000n)
   it.skip('getIntrinsicGas() -> should return base fee', () => {
-    const tx = createLegacyTx({})
+    const tx = createLegacyTx({}, { common, blockNumber, timestamp })
     assert.strictEqual(tx.getIntrinsicGas(), BigInt(21000))
   })
 
   it('getDataGas() -> should return data fee', () => {
-    let tx = createLegacyTx({})
+    let tx = createLegacyTx({}, { common, blockNumber, timestamp })
     assert.strictEqual(tx.getDataGas(), BigInt(0))
 
     tx = createLegacyTxFromBytesArray(
       txsData[3].raw.map((rawTxData) =>
         hexToBytes(rawTxData as PrefixedHexString),
       ),
+      { common, hardfork: Hardfork.Chainstart },
     )
     assert.strictEqual(tx.getDataGas(), BigInt(2496))
 
@@ -146,15 +154,18 @@ describe('[Transaction]', () => {
       txsData[3].raw.map((rawTxData) =>
         hexToBytes(rawTxData as PrefixedHexString),
       ),
-      { freeze: false },
+      { common, blockNumber, timestamp, freeze: false },
     )
-    assert.strictEqual(tx.getDataGas(), BigInt(2496))
+    assert.strictEqual(tx.getDataGas(), BigInt(1716))
   })
 
   it('getEffectivePriorityFee() -> should return correct values', () => {
-    const tx = createLegacyTx({
-      gasPrice: BigInt(100),
-    })
+    const tx = createLegacyTx(
+      {
+        gasPrice: BigInt(100),
+      },
+      { common, blockNumber, timestamp },
+    )
 
     assert.strictEqual(tx.getEffectivePriorityFee(), BigInt(100))
     assert.strictEqual(tx.getEffectivePriorityFee(BigInt(20)), BigInt(80))
@@ -163,11 +174,14 @@ describe('[Transaction]', () => {
   })
 
   it('getUpfrontCost() -> should return upfront cost', () => {
-    const tx = createLegacyTx({
-      gasPrice: 1000,
-      gasLimit: 10000000,
-      value: 42,
-    })
+    const tx = createLegacyTx(
+      {
+        gasPrice: 1000,
+        gasLimit: 10000000,
+        value: 42,
+      },
+      { common, blockNumber, timestamp },
+    )
     assert.strictEqual(tx.getUpfrontCost(), BigInt(10000000042))
   })
 
@@ -180,26 +194,27 @@ describe('[Transaction]', () => {
   })
 
   it('serialize() -> should round trip decode a tx', () => {
-    const tx = createLegacyTx({ value: 5000 })
+    const tx = createLegacyTx(
+      { value: 5000 },
+      { common, blockNumber, timestamp },
+    )
     const s1 = tx.serialize()
 
-    const tx2 = createLegacyTxFromRLP(s1)
+    const tx2 = createLegacyTxFromRLP(s1, { common, blockNumber, timestamp })
     const s2 = tx2.serialize()
 
     assert.isTrue(equalsBytes(s1, s2))
   })
 
   it('hash() / getHashedMessageToSign() / getMessageToSign()', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
-
     let tx = createLegacyTxFromBytesArray(
       txsData[3].raw
         .slice(0, 6)
         .map((rawTxData) => hexToBytes(rawTxData as PrefixedHexString)),
       {
         common,
+        blockNumber,
+        timestamp,
       },
     )
     assert.throws(
@@ -216,6 +231,8 @@ describe('[Transaction]', () => {
       ),
       {
         common,
+        blockNumber,
+        timestamp,
       },
     )
     assert.deepEqual(
@@ -246,6 +263,7 @@ describe('[Transaction]', () => {
       txsData[4].raw.map((rawTxData) =>
         hexToBytes(rawTxData as PrefixedHexString),
       ),
+      { common, blockNumber, timestamp },
     )
     assert.strictEqual(
       bytesToHex(tx.hash()),
@@ -266,7 +284,7 @@ describe('[Transaction]', () => {
       '0x4646464646464646464646464646464646464646464646464646464646464646',
     )
     // Verify 1000 signatures to ensure these have unique hashes (hedged signatures test)
-    const tx = createLegacyTx({})
+    const tx = createLegacyTx({}, { common, blockNumber, timestamp })
     const hashSet = new Set<string>()
     for (let i = 0; i < 1000; i++) {
       const hash = bytesToHex(tx.sign(privateKey, true).hash())
@@ -286,18 +304,33 @@ describe('[Transaction]', () => {
       }
     }
     for (let n = 0; n < 27; n++) {
-      assert.throws(() => createLegacyTx(getTxData(n)))
+      assert.throws(() =>
+        createLegacyTx(getTxData(n), { common, blockNumber, timestamp }),
+      )
     }
-    assert.throws(() => createLegacyTx(getTxData(29)))
-    assert.throws(() => createLegacyTx(getTxData(36)))
+    assert.throws(() =>
+      createLegacyTx(getTxData(29), { common, blockNumber, timestamp }),
+    )
+    assert.throws(() =>
+      createLegacyTx(getTxData(36), { common, blockNumber, timestamp }),
+    )
 
-    assert.doesNotThrow(() => createLegacyTx(getTxData(27)))
-    assert.doesNotThrow(() => createLegacyTx(getTxData(28)))
-    assert.doesNotThrow(() => createLegacyTx(getTxData(37)))
+    assert.doesNotThrow(() =>
+      createLegacyTx(getTxData(27), { common, blockNumber, timestamp }),
+    )
+    assert.doesNotThrow(() =>
+      createLegacyTx(getTxData(28), { common, blockNumber, timestamp }),
+    )
+    assert.doesNotThrow(() =>
+      createLegacyTx(getTxData(37), { common, blockNumber, timestamp }),
+    )
   })
 
   it('freeze property propagates from unsigned tx to signed tx', () => {
-    const tx = createLegacyTx({}, { freeze: false })
+    const tx = createLegacyTx(
+      {},
+      { common, blockNumber, timestamp, freeze: false },
+    )
     assert.isFalse(Object.isFrozen(tx), 'tx object is not frozen')
     const privKey = hexToBytes(`0x${txsData[0].privateKey}`)
     const signedTxn = tx.sign(privKey)
@@ -305,17 +338,15 @@ describe('[Transaction]', () => {
   })
 
   it('common propagates from the common of tx, not the common in TxOptions', () => {
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
     const pkey = hexToBytes(`0x${txsData[0].privateKey}`)
-    const txn = createLegacyTx({}, { common, freeze: false })
-    const newCommon = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Chainstart,
-    })
-    assert.deepEqual(
-      newCommon.hardfork(),
-      common.hardfork(),
+    const txn = createLegacyTx(
+      {},
+      { common, blockNumber, timestamp, freeze: false },
+    )
+    const newCommon = createHardforkManagerFromConfig(Mainnet)
+    assert.strictEqual(
+      newCommon.getHardforkByBlock(blockNumber, timestamp),
+      common.getHardforkByBlock(blockNumber, timestamp),
       'common hardfork matches',
     )
     Object.defineProperty(txn, 'common', {
@@ -325,14 +356,14 @@ describe('[Transaction]', () => {
     })
     const signedTxn = txn.sign(pkey)
     assert.strictEqual(
-      signedTxn.common.hardfork(),
+      signedTxn.common.getHardforkByBlock(blockNumber, timestamp),
       Hardfork.Chainstart,
       'signed tx common is taken from tx.common',
     )
   })
 
   it('isSigned() -> returns correct values', () => {
-    let tx = createLegacyTx({})
+    let tx = createLegacyTx({}, { common, blockNumber, timestamp })
     assert.isFalse(tx.isSigned())
 
     const txData: TxData[typeof TransactionType.Legacy] = {
@@ -346,29 +377,41 @@ describe('[Transaction]', () => {
     const privateKey = hexToBytes(
       '0x4646464646464646464646464646464646464646464646464646464646464646',
     )
-    tx = createLegacyTx(txData)
+    tx = createLegacyTx(txData, { common, blockNumber, timestamp })
     assert.isFalse(tx.isSigned())
     tx = tx.sign(privateKey)
     assert.isTrue(tx.isSigned())
 
-    tx = createLegacyTx(txData)
+    tx = createLegacyTx(txData, { common, blockNumber, timestamp })
     assert.isFalse(tx.isSigned())
     const rawUnsigned = tx.serialize()
     tx = tx.sign(privateKey)
     const rawSigned = tx.serialize()
     assert.isTrue(tx.isSigned())
 
-    tx = createLegacyTxFromRLP(rawUnsigned)
+    tx = createLegacyTxFromRLP(rawUnsigned, {
+      common,
+      blockNumber,
+      timestamp,
+    })
     assert.isFalse(tx.isSigned())
     tx = tx.sign(privateKey)
     assert.isTrue(tx.isSigned())
-    tx = createLegacyTxFromRLP(rawSigned)
+    tx = createLegacyTxFromRLP(rawSigned, { common, blockNumber, timestamp })
     assert.isTrue(tx.isSigned())
 
     const signedValues = RLP.decode(Uint8Array.from(rawSigned)) as Uint8Array[]
-    tx = createLegacyTxFromBytesArray(signedValues)
+    tx = createLegacyTxFromBytesArray(signedValues, {
+      common,
+      blockNumber,
+      timestamp,
+    })
     assert.isTrue(tx.isSigned())
-    tx = createLegacyTxFromBytesArray(signedValues.slice(0, 6))
+    tx = createLegacyTxFromBytesArray(signedValues.slice(0, 6), {
+      common,
+      blockNumber,
+      timestamp,
+    })
     assert.isFalse(tx.isSigned())
   })
 })

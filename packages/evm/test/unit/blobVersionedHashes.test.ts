@@ -1,5 +1,5 @@
 import {
-  createCustomCommon,
+  createHardforkManagerFromConfig,
   Hardfork,
   Mainnet,
 } from '@ts-ethereum/chain-config'
@@ -25,11 +25,10 @@ describe('BLOBHASH / access blobVersionedHashes in calldata', () => {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Cancun,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
     const evm = await createEVM({
       common,
+      hardfork: Hardfork.Cancun,
     })
 
     const getBlobHashIndex0Code = '0x60004960005260206000F3'
@@ -59,11 +58,10 @@ describe(`BLOBHASH: access blobVersionedHashes within contract calls`, () => {
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Cancun,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
     const evm = await createEVM({
       common,
+      hardfork: Hardfork.Cancun,
     })
 
     const getBlobHasIndexCode = '0x60004960005260206000F3'
@@ -123,11 +121,10 @@ describe(`BLOBHASH: access blobVersionedHashes in a CREATE/CREATE2 frame`, () =>
     //   chain: 'custom',
     //   hardfork: Hardfork.Cancun,
     // })
-    const common = createCustomCommon({}, Mainnet, {
-      hardfork: Hardfork.Cancun,
-    })
+    const common = createHardforkManagerFromConfig(Mainnet)
     const evm = await createEVM({
       common,
+      hardfork: Hardfork.Cancun,
     })
 
     let getBlobHashIndex0Code = '60004960005260206000F3'

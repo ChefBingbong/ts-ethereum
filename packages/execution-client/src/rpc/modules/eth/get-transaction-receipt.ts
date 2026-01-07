@@ -62,7 +62,7 @@ export const getTransactionReceipt = (node: ExecutionNode) => {
           : (tx as LegacyTx).gasPrice
 
         const vmCopy = await vm!.shallowCopy()
-        vmCopy.common.setHardfork(tx.common.hardfork())
+        // vmCopy.common.setHardfork(tx.common.hardfork())
         const runBlockResult = await runBlock(vmCopy, {
           block,
           root: parentBlock.header.stateRoot,

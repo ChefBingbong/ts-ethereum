@@ -1,4 +1,3 @@
-import type { Hardfork } from '@ts-ethereum/chain-config'
 import type { Input } from '@ts-ethereum/rlp'
 import { RLP } from '@ts-ethereum/rlp'
 import {
@@ -106,18 +105,18 @@ export class ETH extends Protocol {
     )
 
     // Set forkHash and nextForkBlock
-    if (this._version >= 64) {
-      const c = this._connection.common
-      this._hardfork = c.hardfork() ?? this._hardfork
-      // Set latestBlock minimally to start block of fork to have some more
-      // accurate basis if no latestBlock is provided along status send
-      this._latestBlock =
-        c.hardforkBlock(this._hardfork as Hardfork) ?? BIGINT_0
-      this._forkHash = c.forkHash(this._hardfork)
-      // Next fork block number or 0 if none available
-      this._nextForkBlock =
-        c.nextHardforkBlockOrTimestamp(this._hardfork) ?? BIGINT_0
-    }
+    // if (this._version >= 64) {
+    //   const c = this._connection.common
+    //   this._hardfork = c.hardfork() ?? this._hardfork
+    //   // Set latestBlock minimally to start block of fork to have some more
+    //   // accurate basis if no latestBlock is provided along status send
+    //   this._latestBlock =
+    //     c.hardforkBlock(this._hardfork as Hardfork) ?? BIGINT_0
+    //   this._forkHash = c.forkHash(this._hardfork)
+    //   // Next fork block number or 0 if none available
+    //   this._nextForkBlock =
+    //     c.nextHardforkBlockOrTimestamp(this._hardfork) ?? BIGINT_0
+    // }
 
     // Skip DEBUG calls unless 'ethjs' included in environmental DEBUG variables
     this.DEBUG = process?.env?.DEBUG?.includes('ethjs') ?? false

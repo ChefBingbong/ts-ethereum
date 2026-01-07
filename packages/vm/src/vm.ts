@@ -1,11 +1,10 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { EVMInterface, EVMMockBlockchainInterface } from '@ts-ethereum/evm'
 import { createEVM } from '@ts-ethereum/evm'
 import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import type { BigIntLike } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import { createVM } from './constructors'
-import { paramsVM } from './params'
 import type { VMEvent, VMOpts } from './types'
 
 /**
@@ -27,7 +26,7 @@ export class VM {
    */
   readonly blockchain: EVMMockBlockchainInterface
 
-  readonly common: GlobalConfig
+  readonly hardforkManager: HardforkManager
 
   readonly events: EventEmitter<VMEvent>
   /**
@@ -66,8 +65,15 @@ export class VM {
    * @param opts
    */
   constructor(opts: VMOpts = {}) {
-    this.common = opts.common!
-    this.common.updateBatchParams(opts.params ?? paramsVM)
+    if (opts.hardforkManager === undefined) {
+      throw new Error(
+        'hardforkManager is required. Use createVM() constructor for automatic initialization.',
+      )
+    }
+    this.hardforkManager = opts.hardforkManager
+    // Note: HardforkManager doesn't support updateBatchParams - params are immutable
+    // Custom params should be handled at the HardforkManager creation level
+    // Hardfork is determined dynamically from BlockContext when executing blocks/transactions
     this.stateManager = opts.stateManager!
     this.blockchain = opts.blockchain!
     this.evm = opts.evm!
@@ -112,13 +118,12 @@ export class VM {
    * @param downlevelCaches Downlevel (so: adopted for short-term usage) associated state caches (default: true)
    */
   async shallowCopy(downlevelCaches = true): Promise<VM> {
-    const common = this.common.copy()
-    common.setHardfork(this.common.hardfork())
+    // HardforkManager is immutable, so we can reuse it
     const blockchain = this.blockchain.shallowCopy()
     const stateManager = this.stateManager.shallowCopy(downlevelCaches)
     const evmOpts = {
       ...(this.evm as any)._optsCached,
-      common: common,
+      common: this.hardforkManager,
       blockchain: this._opts.evmOpts?.blockchain?.shallowCopy() ?? blockchain,
       stateManager:
         this._opts.evmOpts?.stateManager?.shallowCopy(downlevelCaches) ??
@@ -128,7 +133,7 @@ export class VM {
     return createVM({
       stateManager,
       blockchain: this.blockchain,
-      common,
+      hardforkManager: this.hardforkManager,
       evm: evmCopy,
       setHardfork: this._setHardfork,
       profilerOpts: this._opts.profilerOpts,
@@ -139,13 +144,6 @@ export class VM {
    * Return a compact error string representation of the object
    */
   errorStr() {
-    let hf = ''
-    try {
-      hf = this.common.hardfork()
-    } catch {
-      hf = 'error'
-    }
-    const errorStr = `vm hf=${hf}`
-    return errorStr
+    return `vm`
   }
 }

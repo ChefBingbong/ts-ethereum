@@ -1,5 +1,5 @@
 import { keccak_256 } from '@noble/hashes/sha3.js'
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 
 const BYTE_SIZE = 256
@@ -11,12 +11,15 @@ export class Bloom {
   /**
    * Represents a Bloom filter.
    */
-  constructor(bitvector?: Uint8Array, common?: GlobalConfig) {
-    if (common?.customCrypto.keccak256 !== undefined) {
-      this.keccakFunction = common.customCrypto.keccak256
-    } else {
-      this.keccakFunction = keccak_256
-    }
+  constructor(
+    bitvector?: Uint8Array,
+    hardforkManager?: HardforkManager,
+    hardfork?: string,
+  ) {
+    // Note: HardforkManager doesn't expose customCrypto directly
+    // For now, use default keccak256. If custom crypto is needed,
+    // it should be passed separately or accessed through a different mechanism
+    this.keccakFunction = keccak_256
     if (!bitvector) {
       this.bitvector = new Uint8Array(BYTE_SIZE)
     } else {

@@ -1,7 +1,7 @@
 // src/kademlia/kademlia.ts
 // Ethereum-compatible Kademlia DHT node for peer discovery
 
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import {
   bytesToInt,
   bytesToUnprefixedHex,
@@ -51,7 +51,7 @@ export class KademliaNode {
   protected _shouldFindNeighbours: boolean
   protected _onlyConfirmed: boolean
   protected _confirmedPeers: Set<string> = new Set()
-  protected _common?: GlobalConfig
+  protected _common?: HardforkManager
   protected _port: number
 
   constructor(privateKey: Uint8Array, options: KademliaNodeConfig = {}) {

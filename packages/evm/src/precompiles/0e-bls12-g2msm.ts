@@ -27,8 +27,13 @@ export async function precompile0e(opts: PrecompileInput): Promise<ExecResult> {
     ) // follow Geth's implementation
   }
 
+  const hardfork = opts._EVM.fork
+  const eip2537Hardfork = opts.common.getHardforkForEIP(2537) ?? hardfork
   const numPairs = Math.floor(opts.data.length / 288)
-  const gasUsedPerPair = opts.common.getParamByEIP(2537, 'bls12381G2MulGas')
+  const gasUsedPerPair = opts.common.getParamAtHardfork(
+    'bls12381G2MulGas',
+    eip2537Hardfork,
+  )!
   const gasUsed = msmGasUsed(
     numPairs,
     gasUsedPerPair,

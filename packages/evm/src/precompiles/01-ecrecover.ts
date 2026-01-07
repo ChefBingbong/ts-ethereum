@@ -17,8 +17,9 @@ import { gasLimitCheck } from './util'
 
 export function precompile01(opts: PrecompileInput): ExecResult {
   const pName = getPrecompileName('01')
-  const ecrecoverFunction = opts.common.customCrypto.ecrecover ?? ecrecover
-  const gasUsed = opts.common.param('ecRecoverGas')
+  const hardfork = opts._EVM.fork
+  const ecrecoverFunction = opts.customCrypto?.ecrecover ?? ecrecover
+  const gasUsed = opts.common.getParamAtHardfork('ecRecoverGas', hardfork)!
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
   }

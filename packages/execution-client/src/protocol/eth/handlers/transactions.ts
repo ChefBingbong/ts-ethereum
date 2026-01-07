@@ -26,7 +26,7 @@ export async function handleTransactions(
     const decoded = ETH_MESSAGES[EthMessageCode.TRANSACTIONS].decode(
       payload as any,
       {
-        chainCommon: handler.config.chainCommon,
+        chainCommon: handler.config.hardforkManager,
         synchronized: handler.isReady,
         chain: { headers: { latest: handler.chain.blocks.latest?.header } },
         syncTargetHeight: handler.config.syncTargetHeight,

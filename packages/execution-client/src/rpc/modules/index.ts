@@ -9,7 +9,7 @@ import { createTxPoolRpcMethods } from './txpool/txpool'
 import type { AllRpcMethods } from './types'
 import { createWeb3RpcMethods } from './web3/web3'
 
-export const list = ['Eth', 'Web3', 'Net', 'Admin', 'TxPool', 'Debug']
+export const list = ['Eth', 'Web3', 'node:net', 'Admin', 'TxPool', 'Debug']
 
 // New functional module exports
 export * from './admin/index'

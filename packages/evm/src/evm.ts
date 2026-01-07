@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { CustomCrypto, HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import type { StateManagerInterface } from '@ts-ethereum/state-manager'
 import {
@@ -201,7 +201,18 @@ export class EVM implements EVMInterface {
   }
   protected _block?: Block
 
-  public readonly common: GlobalConfig
+  public readonly common: HardforkManager
+  public readonly fork: string
+  // Temporary fork override for block-specific execution
+  protected _executionFork?: string
+
+  /**
+   * Gets the current fork for execution. Uses _executionFork if set (block-specific),
+   * otherwise falls back to this.fork (EVM's default fork).
+   */
+  protected getExecutionFork(): string {
+    return this._executionFork ?? this.fork
+  }
   public readonly events: EventEmitter<EVMEvent>
 
   public stateManager: StateManagerInterface
@@ -219,6 +230,7 @@ export class EVM implements EVMInterface {
 
   protected readonly _customOpcodes?: CustomOpcode[]
   protected readonly _customPrecompiles?: CustomPrecompile[]
+  protected readonly _customCrypto?: CustomCrypto
 
   protected _handlers!: Map<number, OpHandler>
 
@@ -271,11 +283,14 @@ export class EVM implements EVMInterface {
    * @param bn128 Initialized bn128 WASM object for precompile usage (internal)
    */
   constructor(opts: EVMOpts) {
-    this.common = opts.common!
+    this.common = opts.common
     this.blockchain = opts.blockchain!
     this.stateManager = opts.stateManager!
 
-    if (this.common.isActivatedEIP(7864)) {
+    // Resolve hardfork using helper method
+    this.fork = opts.common.getHardforkFromContext(opts.hardfork)
+
+    if (this.common.isEIPActiveAtHardfork(7864, this.getExecutionFork())) {
       const mandatory = ['checkChunkWitnessPresent']
       for (const m of mandatory) {
         if (!(m in this.stateManager)) {
@@ -306,39 +321,35 @@ export class EVM implements EVMInterface {
     //   }
     // }
 
-    if (!EVM.supportedHardforks.includes(this.common.hardfork() as Hardfork)) {
+    if (!EVM.supportedHardforks.includes(this.fork as Hardfork)) {
       throw EthereumJSErrorWithoutCode(
-        `Hardfork ${this.common.hardfork()} not set as supported in supportedHardforks`,
+        `Hardfork ${this.fork} not set as supported in supportedHardforks`,
       )
     }
 
-    this.common.updateBatchParams(opts.params ?? {})
+    // Note: HardforkManager doesn't support updateBatchParams - params are immutable
+    // Custom params should be handled at the HardforkManager creation level
 
     this.allowUnlimitedContractSize = opts.allowUnlimitedContractSize ?? false
     this.allowUnlimitedInitCodeSize = opts.allowUnlimitedInitCodeSize ?? false
     this._customOpcodes = opts.customOpcodes
     this._customPrecompiles = opts.customPrecompiles
+    this._customCrypto = opts.customCrypto
 
-    this.journal = new Journal(this.stateManager, this.common)
+    this.journal = new Journal(this.stateManager, this.common, this.fork)
     this.transientStorage = new TransientStorage()
 
-    this.common.events.on('hardforkChanged', () => {
-      this.getActiveOpcodes()
-      this._precompiles = getActivePrecompiles(
-        this.common,
-        this._customPrecompiles,
-      )
-    })
-
+    // Note: HardforkManager doesn't have events - hardfork is determined at construction time
     // Initialize the opcode data
     this.getActiveOpcodes()
     this._precompiles = getActivePrecompiles(
       this.common,
+      this.fork,
       this._customPrecompiles,
     )
 
     // Precompile crypto libraries
-    if (this.common.isActivatedEIP(2537)) {
+    if (this.common.isEIPActiveAtHardfork(2537, this.getExecutionFork())) {
       this._bls = opts.bls ?? new NobleBLS()
       this._bls.init?.()
     }
@@ -373,7 +384,7 @@ export class EVM implements EVMInterface {
    * available for EVM execution
    */
   getActiveOpcodes(): OpcodeList {
-    const data = getOpcodesForHF(this.common, this._customOpcodes)
+    const data = getOpcodesForHF(this.common, this.fork, this._customOpcodes)
     this._opcodes = data.opcodes
     this._dynamicGasHandlers = data.dynamicGasHandlers
     this._handlers = data.handlers
@@ -385,7 +396,7 @@ export class EVM implements EVMInterface {
     let gasLimit = message.gasLimit
     const fromAddress = message.caller
 
-    if (this.common.isActivatedEIP(7864)) {
+    if (this.common.isEIPActiveAtHardfork(7864, this.getExecutionFork())) {
       if (message.accessWitness === undefined) {
         throw EthereumJSErrorWithoutCode(
           'accessWitness is required for EIP-7864',
@@ -456,8 +467,8 @@ export class EVM implements EVMInterface {
     let toAccount = await this.stateManager.getAccount(message.to)
     if (!toAccount) {
       if (
-        this.common.isActivatedEIP(6800) ||
-        this.common.isActivatedEIP(7864)
+        this.common.isEIPActiveAtHardfork(6800, this.getExecutionFork()) ||
+        this.common.isEIPActiveAtHardfork(7864, this.getExecutionFork())
       ) {
         const absenceProofAccessGas = message.accessWitness!.readAccountHeader(
           message.to,
@@ -577,7 +588,10 @@ export class EVM implements EVMInterface {
     let gasLimit = message.gasLimit
     const fromAddress = message.caller
 
-    if (this.common.isActivatedEIP(6800) || this.common.isActivatedEIP(7864)) {
+    if (
+      this.common.isEIPActiveAtHardfork(6800, this.fork) ||
+      this.common.isEIPActiveAtHardfork(7864, this.fork)
+    ) {
       if (message.depth === 0) {
         const originAccessGas =
           message.accessWitness!.readAccountHeader(fromAddress)
@@ -594,10 +608,15 @@ export class EVM implements EVMInterface {
     // Reduce tx value from sender
     await this._reduceSenderBalance(account, message)
 
-    if (this.common.isActivatedEIP(3860)) {
+    if (this.common.isEIPActiveAtHardfork(3860, this.getExecutionFork())) {
       if (
         message.data.length >
-          Number(this.common.getParamByEIP(3860, 'maxInitCodeSize')) &&
+          Number(
+            this.common.getParamAtHardfork(
+              'maxInitCodeSize',
+              this.getExecutionFork(),
+            )!,
+          ) &&
         !this.allowUnlimitedInitCodeSize
       ) {
         return {
@@ -618,7 +637,7 @@ export class EVM implements EVMInterface {
     message.data = message.eofCallData ?? new Uint8Array()
     message.to = await this._generateAddress(message)
 
-    if (this.common.isActivatedEIP(6780)) {
+    if (this.common.isEIPActiveAtHardfork(6780, this.getExecutionFork())) {
       message.createdAddresses!.add(message.to.toString())
     }
 
@@ -630,7 +649,10 @@ export class EVM implements EVMInterface {
       toAccount = new Account()
     }
 
-    if (this.common.isActivatedEIP(6800) || this.common.isActivatedEIP(7864)) {
+    if (
+      this.common.isEIPActiveAtHardfork(6800, this.fork) ||
+      this.common.isEIPActiveAtHardfork(7864, this.fork)
+    ) {
       const contractCreateAccessGas =
         message.accessWitness!.writeAccountBasicData(message.to) +
         message.accessWitness!.readAccountCodeHash(message.to)
@@ -688,7 +710,9 @@ export class EVM implements EVMInterface {
       toAccount = new Account()
     }
     // EIP-161 on account creation and CREATE execution
-    if (this.common.gteHardfork(Hardfork.SpuriousDragon)) {
+    if (
+      this.common.hardforkGte(this.getExecutionFork(), Hardfork.SpuriousDragon)
+    ) {
       toAccount.nonce += BIGINT_1
     }
 
@@ -719,8 +743,8 @@ export class EVM implements EVMInterface {
 
     if (exit) {
       if (
-        this.common.isActivatedEIP(6800) ||
-        this.common.isActivatedEIP(7864)
+        this.common.isEIPActiveAtHardfork(6800, this.getExecutionFork()) ||
+        this.common.isEIPActiveAtHardfork(7864, this.getExecutionFork())
       ) {
         const createCompleteAccessGas =
           message.accessWitness!.writeAccountHeader(message.to)
@@ -769,10 +793,18 @@ export class EVM implements EVMInterface {
     // fee for size of the return value
     let totalGas = result.executionGasUsed
     let returnFee = BIGINT_0
-    if (!result.exceptionError && !this.common.isActivatedEIP(6800)) {
+    if (
+      !result.exceptionError &&
+      !this.common.isEIPActiveAtHardfork(6800, this.fork)
+    ) {
       returnFee =
         BigInt(result.returnValue.length) *
-        BigInt(this.common.param('createDataGas'))
+        BigInt(
+          this.common.getParamAtHardfork(
+            'createDataGas',
+            this.getExecutionFork(),
+          )!,
+        )
       totalGas = totalGas + returnFee
       if (this.DEBUG) {
         debugGas(
@@ -785,8 +817,14 @@ export class EVM implements EVMInterface {
     let allowedCodeSize = true
     if (
       !result.exceptionError &&
-      this.common.gteHardfork(Hardfork.SpuriousDragon) &&
-      result.returnValue.length > Number(this.common.param('maxCodeSize'))
+      this.common.hardforkGte(this.fork, Hardfork.SpuriousDragon) &&
+      result.returnValue.length >
+        Number(
+          this.common.getParamAtHardfork(
+            'maxCodeSize',
+            this.getExecutionFork(),
+          )!,
+        )
     ) {
       allowedCodeSize = false
     }
@@ -798,10 +836,10 @@ export class EVM implements EVMInterface {
       (this.allowUnlimitedContractSize || allowedCodeSize)
     ) {
       if (
-        this.common.isActivatedEIP(3541) &&
+        this.common.isEIPActiveAtHardfork(3541, this.getExecutionFork()) &&
         result.returnValue[0] === FORMAT
       ) {
-        if (!this.common.isActivatedEIP(3540)) {
+        if (!this.common.isEIPActiveAtHardfork(3540, this.getExecutionFork())) {
           result = { ...result, ...INVALID_BYTECODE_RESULT(message.gasLimit) }
         } else if (
           // TODO check if this is correct
@@ -821,7 +859,7 @@ export class EVM implements EVMInterface {
         result.executionGasUsed = totalGas
       }
     } else {
-      if (this.common.gteHardfork(Hardfork.Homestead)) {
+      if (this.common.hardforkGte(this.fork, Hardfork.Homestead)) {
         if (!allowedCodeSize) {
           if (this.DEBUG) {
             debug(`Code size exceeds maximum code size (>= SpuriousDragon)`)
@@ -861,7 +899,8 @@ export class EVM implements EVMInterface {
     gasLimit = message.gasLimit - result.executionGasUsed
     if (
       !result.exceptionError &&
-      (this.common.isActivatedEIP(6800) || this.common.isActivatedEIP(7864))
+      (this.common.isEIPActiveAtHardfork(6800, this.fork) ||
+        this.common.isEIPActiveAtHardfork(7864, this.fork))
     ) {
       const createCompleteAccessGas = message.accessWitness!.writeAccountHeader(
         message.to,
@@ -891,8 +930,8 @@ export class EVM implements EVMInterface {
     ) {
       // Add access charges for writing this code to the state
       if (
-        this.common.isActivatedEIP(6800) ||
-        this.common.isActivatedEIP(7864)
+        this.common.isEIPActiveAtHardfork(6800, this.getExecutionFork()) ||
+        this.common.isEIPActiveAtHardfork(7864, this.getExecutionFork())
       ) {
         const byteCodeWriteAccessfee =
           message.accessWitness!.writeAccountCodeChunks(
@@ -924,7 +963,7 @@ export class EVM implements EVMInterface {
       }
     } else if (CodestoreOOG) {
       // This only happens at Frontier. But, let's do a sanity check;
-      if (!this.common.gteHardfork(Hardfork.Homestead)) {
+      if (!this.common.hardforkGte(this.fork, Hardfork.Homestead)) {
         // Pre-Homestead behavior; put an empty contract.
         // This contract would be considered "DEAD" in later hard forks.
         // It is thus an unnecessary default item, which we have to save to disk
@@ -1050,6 +1089,21 @@ export class EVM implements EVMInterface {
     ) {
       timer = this.performanceLogger.startTimer('Initialization')
     }
+
+    // Determine hardfork from BlockContext if provided, otherwise use EVM's fork
+    let executionHardfork = this.fork
+    if (opts.blockContext) {
+      executionHardfork = this.common.getHardforkByBlock(
+        opts.blockContext.blockNumber,
+        opts.blockContext.timestamp,
+      )
+    } else if (opts.block) {
+      executionHardfork = this.common.getHardforkByBlock(
+        opts.block.header.number,
+        opts.block.header.timestamp,
+      )
+    }
+
     let message = opts.message
     let callerAccount
     if (!message) {
@@ -1107,7 +1161,10 @@ export class EVM implements EVMInterface {
 
     await this._emit('beforeMessage', message)
 
-    if (!message.to && this.common.isActivatedEIP(2929)) {
+    if (
+      !message.to &&
+      this.common.isEIPActiveAtHardfork(2929, executionHardfork)
+    ) {
       message.code = message.data
       this.journal.addWarmedAddress(
         (await this._generateAddress(message)).bytes,
@@ -1115,7 +1172,8 @@ export class EVM implements EVMInterface {
     }
 
     await this.journal.checkpoint()
-    if (this.common.isActivatedEIP(1153)) this.transientStorage.checkpoint()
+    if (this.common.isEIPActiveAtHardfork(1153, executionHardfork))
+      this.transientStorage.checkpoint()
     if (this.DEBUG) {
       debug('-'.repeat(100))
       debug(`message checkpoint`)
@@ -1130,16 +1188,23 @@ export class EVM implements EVMInterface {
         } value=${value} delegatecall=${delegatecall ? 'yes' : 'no'}`,
       )
     }
-    if (message.to) {
-      if (this.DEBUG) {
-        debug(`Message CALL execution (to: ${message.to})`)
+    // Store execution hardfork for use during this execution
+    this._executionFork = executionHardfork
+    try {
+      if (message.to) {
+        if (this.DEBUG) {
+          debug(`Message CALL execution (to: ${message.to})`)
+        }
+        result = await this._executeCall(message as MessageWithTo)
+      } else {
+        if (this.DEBUG) {
+          debug(`Message CREATE execution (to: undefined)`)
+        }
+        result = await this._executeCreate(message)
       }
-      result = await this._executeCall(message as MessageWithTo)
-    } else {
-      if (this.DEBUG) {
-        debug(`Message CREATE execution (to: undefined)`)
-      }
-      result = await this._executeCreate(message)
+    } finally {
+      // Clear execution fork
+      this._executionFork = undefined
     }
     if (this.DEBUG) {
       const { executionGasUsed, exceptionError, returnValue } =
@@ -1164,19 +1229,21 @@ export class EVM implements EVMInterface {
     if (
       err &&
       !(
-        this.common.hardfork() === Hardfork.Chainstart &&
+        this.fork === Hardfork.Chainstart &&
         err.error === EVMError.errorMessages.CODESTORE_OUT_OF_GAS
       )
     ) {
       result.execResult.logs = []
       await this.journal.revert()
-      if (this.common.isActivatedEIP(1153)) this.transientStorage.revert()
+      if (this.common.isEIPActiveAtHardfork(1153, this.fork))
+        this.transientStorage.revert()
       if (this.DEBUG) {
         debug(`message checkpoint reverted`)
       }
     } else {
       await this.journal.commit()
-      if (this.common.isActivatedEIP(1153)) this.transientStorage.commit()
+      if (this.common.isEIPActiveAtHardfork(1153, this.fork))
+        this.transientStorage.commit()
       if (this.DEBUG) {
         debug(`message checkpoint committed`)
       }
@@ -1243,6 +1310,7 @@ export class EVM implements EVMInterface {
       data,
       gasLimit,
       common: this.common,
+      customCrypto: this._customCrypto,
       _EVM: this,
       _debug: this.DEBUG ? debugPrecompiles : undefined,
       stateManager: this.stateManager,
@@ -1262,7 +1330,7 @@ export class EVM implements EVMInterface {
 
         // EIP-7702 delegation check
         if (
-          this.common.isActivatedEIP(7702) &&
+          this.common.isEIPActiveAtHardfork(7702, this.fork) &&
           equalsBytes(message.code.slice(0, 3), DELEGATION_7702_FLAG)
         ) {
           const address = new Address(message.code.slice(3, 24))
@@ -1334,7 +1402,8 @@ export class EVM implements EVMInterface {
    * Once the interpreter has finished depth 0, a post-message cleanup should be done
    */
   private postMessageCleanup() {
-    if (this.common.isActivatedEIP(1153)) this.transientStorage.clear()
+    if (this.common.isEIPActiveAtHardfork(1153, this.fork))
+      this.transientStorage.clear()
   }
 
   /**
@@ -1347,16 +1416,15 @@ export class EVM implements EVMInterface {
    * @returns EVM
    */
   public shallowCopy(): EVM {
-    const common = this.common.copy()
-    common.setHardfork(this.common.hardfork())
-
+    // HardforkManager is immutable, so we can reuse it
     const opts = {
       ...this._optsCached,
-      common,
+      common: this.common,
+      hardfork: this.fork,
       stateManager: this.stateManager.shallowCopy(),
     }
     // @ts-expect-error -- Assigning a StateManager property that is absent from the interface
-    opts.stateManager['common'] = common
+    opts.stateManager['common'] = this.common
     return new EVM(opts)
   }
 

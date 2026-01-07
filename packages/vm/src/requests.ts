@@ -39,11 +39,12 @@ const LOG_LAYOUT_MISMATCH = 'invalid deposit log: unsupported data layout'
 export const accumulateRequests = async (
   vm: VM,
   txResults: RunTxResult[],
+  blockHardfork: string,
 ): Promise<CLRequest<CLRequestType>[]> => {
   const requests: CLRequest<CLRequestType>[] = []
-  const common = vm.common
+  const hardforkManager = vm.hardforkManager
 
-  if (common.isActivatedEIP(6110)) {
+  if (hardforkManager.isEIPActiveAtHardfork(6110, blockHardfork)) {
     const depositContractAddress = Mainnet.depositContractAddress
     if (depositContractAddress === undefined)
       throw EthereumJSErrorWithoutCode(
@@ -56,13 +57,19 @@ export const accumulateRequests = async (
     requests.push(depositsRequest)
   }
 
-  if (common.isActivatedEIP(7002)) {
-    const withdrawalsRequest = await accumulateWithdrawalsRequest(vm)
+  if (hardforkManager.isEIPActiveAtHardfork(7002, blockHardfork)) {
+    const withdrawalsRequest = await accumulateWithdrawalsRequest(
+      vm,
+      blockHardfork,
+    )
     requests.push(withdrawalsRequest)
   }
 
-  if (common.isActivatedEIP(7251)) {
-    const consolidationsRequest = await accumulateConsolidationsRequest(vm)
+  if (hardforkManager.isEIPActiveAtHardfork(7251, blockHardfork)) {
+    const consolidationsRequest = await accumulateConsolidationsRequest(
+      vm,
+      blockHardfork,
+    )
     requests.push(consolidationsRequest)
   }
 
@@ -72,18 +79,22 @@ export const accumulateRequests = async (
 
 const accumulateWithdrawalsRequest = async (
   vm: VM,
+  blockHardfork: string,
 ): Promise<CLRequest<typeof CLRequestType.Withdrawal>> => {
   // Partial withdrawals logic
   const addressBytes = setLengthLeft(
     bigIntToBytes(
-      vm.common.getParamByEIP(7002, 'withdrawalRequestPredeployAddress'),
+      vm.hardforkManager.getParamAtHardfork(
+        'withdrawalRequestPredeployAddress',
+        blockHardfork,
+      )!,
     ),
     20,
   )
   const withdrawalsAddress = createAddressFromString(bytesToHex(addressBytes))
 
   const systemAddressBytes = bigIntToAddressBytes(
-    vm.common.getParamByEIP(7002, 'systemAddress'),
+    vm.hardforkManager.getParamAtHardfork('systemAddress', blockHardfork)!,
   )
   const systemAddress = createAddressFromString(bytesToHex(systemAddressBytes))
   const systemAccount = await vm.stateManager.getAccount(systemAddress)
@@ -112,11 +123,15 @@ const accumulateWithdrawalsRequest = async (
 
 const accumulateConsolidationsRequest = async (
   vm: VM,
+  blockHardfork: string,
 ): Promise<CLRequest<typeof CLRequestType.Consolidation>> => {
   // Partial withdrawals logic
   const addressBytes = setLengthLeft(
     bigIntToBytes(
-      vm.common.getParamByEIP(7251, 'consolidationRequestPredeployAddress'),
+      vm.hardforkManager.getParamAtHardfork(
+        'consolidationRequestPredeployAddress',
+        blockHardfork,
+      )!,
     ),
     20,
   )
@@ -125,7 +140,7 @@ const accumulateConsolidationsRequest = async (
   )
 
   const systemAddressBytes = bigIntToAddressBytes(
-    vm.common.getParamByEIP(7002, 'systemAddress'),
+    vm.hardforkManager.getParamAtHardfork('systemAddress', blockHardfork)!,
   )
   const systemAddress = createAddressFromString(bytesToHex(systemAddressBytes))
   const systemAccount = await vm.stateManager.getAccount(systemAddress)

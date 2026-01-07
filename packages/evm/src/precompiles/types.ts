@@ -1,4 +1,4 @@
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { CustomCrypto, HardforkManager } from '@ts-ethereum/chain-config'
 import type { EVMInterface, ExecResult } from '../types'
 
 export type PrecompileFunc = (
@@ -8,7 +8,8 @@ export type PrecompileFunc = (
 export interface PrecompileInput {
   data: Uint8Array
   gasLimit: bigint
-  common: GlobalConfig
+  common: HardforkManager
+  customCrypto?: CustomCrypto
   _EVM: EVMInterface
   _debug?: debug.Debugger
 }

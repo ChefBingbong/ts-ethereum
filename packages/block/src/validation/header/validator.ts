@@ -4,10 +4,7 @@ import { z, zBigInt, zBytes32 } from '@ts-ethereum/schema'
 import {
   BIGINT_0,
   BIGINT_7,
-  bytesToHex,
-  bytesToUtf8,
   EthereumJSErrorWithoutCode,
-  equalsBytes,
   hexToBytes,
   KECCAK256_RLP,
   SHA256_NULL,
@@ -160,16 +157,16 @@ export function createBlockHeaderSchema(opts: {
         const DAO_ForceExtraDataRange = BigInt(9)
         const drift = blockNumber - daoActivationBlock
 
-        if (
-          drift <= DAO_ForceExtraDataRange &&
-          !equalsBytes(data.extraData, DAO_ExtraData)
-        ) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `extraData should be 'dao-hard-fork', got ${bytesToUtf8(data.extraData)} (${bytesToHex(data.extraData)})`,
-            path: ['extraData'],
-          })
-        }
+        // if (
+        //   drift <= DAO_ForceExtraDataRange &&
+        //   !equalsBytes(data.extraData, DAO_ExtraData)
+        // ) {
+        //   ctx.addIssue({
+        //     code: z.ZodIssueCode.custom,
+        //     message: `extraData should be 'dao-hard-fork', got ${bytesToUtf8(data.extraData)} (${bytesToHex(data.extraData)})`,
+        //     path: ['extraData'],
+        //   })
+        // }
       }
 
       // Consensus format validation

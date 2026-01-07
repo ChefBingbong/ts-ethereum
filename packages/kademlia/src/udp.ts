@@ -1,7 +1,7 @@
 // src/kademlia/udp.ts
 // UDP transport for Ethereum-compatible Kademlia discovery protocol
 
-import type { GlobalConfig } from '@ts-ethereum/chain-config'
+import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { bytesToHex, bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
 import * as dgram from 'dgram'
@@ -51,7 +51,7 @@ export class UdpTransport implements KademliaTransport {
   private _requests: Map<string, PendingRequest> = new Map()
   private _requestsCache: LRUCache<string, Promise<PeerInfo>>
   private _socket: dgram.Socket | null = null
-  private _common?: GlobalConfig
+  private _common?: HardforkManager
   private _onPeers?: (peers: PeerInfo[]) => void
   private _getPeer?: (id: Uint8Array) => PeerInfo | null
 

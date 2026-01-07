@@ -206,7 +206,12 @@ export function precompile09(opts: PrecompileInput): ExecResult {
   // final
   const f = lastByte === 1
 
-  let gasUsed = opts.common.getParamByEIP(1679, 'blake2RoundGas')
+  const hardfork = opts._EVM.fork
+  const eip1679Hardfork = opts.common.getHardforkForEIP(1679) ?? hardfork
+  let gasUsed = opts.common.getParamAtHardfork(
+    'blake2RoundGas',
+    eip1679Hardfork,
+  )!
   gasUsed *= BigInt(rounds)
   if (!gasLimitCheck(opts, gasUsed, pName)) {
     return OOGResult(opts.gasLimit)
