@@ -259,7 +259,7 @@ export async function runBlock(
       ...block,
       header: { ...block.header, ...generatedFields },
     }
-    block = createBlock(blockData, {
+    block = createBlock(blockData as any, {
       hardforkManager: vm.hardforkManager,
     })
   } else {

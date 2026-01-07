@@ -11,6 +11,7 @@ export {
 // Factory functions (manager pattern)
 export {
   createBlockHeaderManagerFromBytes,
+  createBlockHeaderManagerFromHeader,
   createBlockHeaderManagerFromRLP,
   createBlockHeaderManagerFromRPC,
 } from './header-manager'

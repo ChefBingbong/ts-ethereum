@@ -1,6 +1,23 @@
 import type { EthersProvider } from '@ts-ethereum/utils'
-import { Block } from './block'
-import { BlockHeader } from './header'
+import {
+  type BlockManager,
+  createBlockManagerCreateEmpty,
+  createBlockManagerCreateSealedClique,
+  createBlockManagerFromBlockData,
+  createBlockManagerFromBytes,
+  createBlockManagerFromExecutionPayload,
+  createBlockManagerFromJSONRPCProvider,
+  createBlockManagerFromRLP,
+  createBlockManagerFromRPC,
+} from './block-functional'
+import {
+  type BlockHeaderManager,
+  createBlockHeaderManagerFromBytes,
+  createBlockHeaderManagerFromHeader,
+  createBlockHeaderManagerFromRLP,
+  createBlockHeaderManagerFromRPC,
+} from './header-functional'
+import { fromHeaderData } from './header-functional/creators'
 import type {
   BlockBytes,
   BlockData,
@@ -11,29 +28,32 @@ import type {
   JSONRPCBlock,
 } from './types'
 
+// Backward compatibility: Block is now BlockManager
+export type Block = BlockManager
+
 export function createBlock(blockData: BlockData, opts: BlockOptions): Block {
-  return Block.fromBlockData(blockData, opts)
+  return createBlockManagerFromBlockData(blockData, opts)
 }
 
 export function createEmptyBlock(
   headerData: HeaderData,
   opts: BlockOptions,
 ): Block {
-  return Block.createEmpty(headerData, opts)
+  return createBlockManagerCreateEmpty(headerData, opts)
 }
 
 export function createBlockFromBytesArray(
   values: BlockBytes,
   opts: BlockOptions,
 ): Block {
-  return Block.fromBytesArray(values, opts)
+  return createBlockManagerFromBytes(values, opts)
 }
 
 export function createBlockFromRLP(
   serialized: Uint8Array,
   opts: BlockOptions,
 ): Block {
-  return Block.fromRLP(serialized, opts)
+  return createBlockManagerFromRLP(serialized, opts)
 }
 
 export function createBlockFromRPC(
@@ -41,7 +61,7 @@ export function createBlockFromRPC(
   uncles: any[],
   options: BlockOptions,
 ): Block {
-  return Block.fromRPC(blockParams, uncles, options)
+  return createBlockManagerFromRPC(blockParams, uncles, options)
 }
 
 export const createBlockFromJSONRPCProvider = async (
@@ -49,14 +69,14 @@ export const createBlockFromJSONRPCProvider = async (
   blockTag: string | bigint,
   opts: BlockOptions,
 ): Promise<Block> => {
-  return Block.fromJSONRPCProvider(provider, blockTag, opts)
+  return createBlockManagerFromJSONRPCProvider(provider, blockTag, opts)
 }
 
 export async function createBlockFromExecutionPayload(
   payload: ExecutionPayload,
   opts: BlockOptions,
 ): Promise<Block> {
-  return Block.fromExecutionPayload(payload, opts)
+  return createBlockManagerFromExecutionPayload(payload, opts)
 }
 
 export function createSealedCliqueBlock(
@@ -64,33 +84,74 @@ export function createSealedCliqueBlock(
   blockData: BlockData,
   opts: BlockOptions,
 ): Block {
-  return Block.createSealedClique(cliqueSigner, blockData, opts)
+  return createBlockManagerCreateSealedClique(cliqueSigner, blockData, opts)
 }
 
 export function createBlockHeader(
   headerData: HeaderData,
   opts: BlockOptions,
-): BlockHeader {
-  return BlockHeader.fromHeaderData(headerData, opts)
+): BlockHeaderManager {
+  const frozenHeader = fromHeaderData(headerData, {
+    ...opts,
+    calcDifficultyFromHeader: opts.calcDifficultyFromHeader
+      ? {
+          timestamp: opts.calcDifficultyFromHeader.header.data.timestamp,
+          difficulty: opts.calcDifficultyFromHeader.header.data.difficulty,
+          uncleHash: opts.calcDifficultyFromHeader.header.data.uncleHash,
+          gasLimit: opts.calcDifficultyFromHeader.header.data.gasLimit,
+        }
+      : undefined,
+  })
+  return createBlockHeaderManagerFromHeader(frozenHeader)
 }
 
 export function createBlockHeaderFromBytesArray(
   values: BlockHeaderBytes,
   opts: BlockOptions,
-): BlockHeader {
-  return BlockHeader.fromBytesArray(values, opts)
+): BlockHeaderManager {
+  return createBlockHeaderManagerFromBytes(values, {
+    ...opts,
+    calcDifficultyFromHeader: opts.calcDifficultyFromHeader
+      ? {
+          timestamp: opts.calcDifficultyFromHeader.header.data.timestamp,
+          difficulty: opts.calcDifficultyFromHeader.header.data.difficulty,
+          uncleHash: opts.calcDifficultyFromHeader.header.data.uncleHash,
+          gasLimit: opts.calcDifficultyFromHeader.header.data.gasLimit,
+        }
+      : undefined,
+  })
 }
 
 export function createBlockHeaderFromRLP(
   serializedHeaderData: Uint8Array,
   opts: BlockOptions,
-): BlockHeader {
-  return BlockHeader.fromRLP(serializedHeaderData, opts)
+): BlockHeaderManager {
+  return createBlockHeaderManagerFromRLP(serializedHeaderData, {
+    ...opts,
+    calcDifficultyFromHeader: opts.calcDifficultyFromHeader
+      ? {
+          timestamp: opts.calcDifficultyFromHeader.header.data.timestamp,
+          difficulty: opts.calcDifficultyFromHeader.header.data.difficulty,
+          uncleHash: opts.calcDifficultyFromHeader.header.data.uncleHash,
+          gasLimit: opts.calcDifficultyFromHeader.header.data.gasLimit,
+        }
+      : undefined,
+  })
 }
 
 export function createBlockHeaderFromRPC(
   blockParams: JSONRPCBlock,
   options: BlockOptions,
-): BlockHeader {
-  return BlockHeader.fromRPC(blockParams, options)
+): BlockHeaderManager {
+  return createBlockHeaderManagerFromRPC(blockParams, {
+    ...options,
+    calcDifficultyFromHeader: options.calcDifficultyFromHeader
+      ? {
+          timestamp: options.calcDifficultyFromHeader.header.data.timestamp,
+          difficulty: options.calcDifficultyFromHeader.header.data.difficulty,
+          uncleHash: options.calcDifficultyFromHeader.header.data.uncleHash,
+          gasLimit: options.calcDifficultyFromHeader.header.data.gasLimit,
+        }
+      : undefined,
+  })
 }

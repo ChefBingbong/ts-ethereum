@@ -43,6 +43,8 @@ export function getHardfork(header: FrozenBlockHeader): string {
 
 export function getPrevRandao(header: FrozenBlockHeader): Uint8Array {
   const blockNum = getBlockNum(header)
+  console.log('blockNum', header.hardforkManager)
+
   if (!header.hardforkManager.isEIPActiveAtBlock(4399, blockNum)) {
     throw EthereumJSErrorWithoutCode(
       'prevRandao can only be accessed when EIP-4399 is activated',

@@ -1,5 +1,5 @@
 import type { BlockHeader } from '@ts-ethereum/block'
-import { Block } from '@ts-ethereum/block'
+import { type Block, isBlock } from '@ts-ethereum/block'
 import { RLP } from '@ts-ethereum/rlp'
 import { BIGINT_0 } from '@ts-ethereum/utils'
 import { bytesBE8 } from './constants'
@@ -25,8 +25,7 @@ function DBSetTD(TD: bigint, blockNumber: bigint, blockHash: Uint8Array): DBOp {
  * (if there is a header but no block saved the DB will implicitly assume the block to be empty)
  */
 function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
-  const header: BlockHeader =
-    blockBody instanceof Block ? blockBody.header : blockBody
+  const header: BlockHeader = isBlock(blockBody) ? blockBody.header : blockBody
   const dbOps = []
 
   const blockNumber = header.number
@@ -42,7 +41,7 @@ function DBSetBlockOrHeader(blockBody: Block | BlockHeader): DBOp[] {
 
   const isGenesis = header.number === BIGINT_0
 
-  if (isGenesis || blockBody instanceof Block) {
+  if (isGenesis || isBlock(blockBody)) {
     const bodyValue = RLP.encode(blockBody.raw().slice(1))
     dbOps.push(
       DBOp.set(DBTarget.Body, bodyValue, {

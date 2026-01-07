@@ -15,9 +15,10 @@ import {
   ecrecover,
   equalsBytes,
 } from '@ts-ethereum/utils'
+import { keccak256 } from 'ethereum-cryptography/keccak'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1.js'
 
-import type { BlockHeader } from '../index'
+import type { BlockHeaderManager } from '../header-functional'
 
 // Fixed number of extra-data prefix bytes reserved for signer vanity
 export const CLIQUE_EXTRA_VANITY = 32
@@ -25,7 +26,7 @@ export const CLIQUE_EXTRA_VANITY = 32
 export const CLIQUE_EXTRA_SEAL = 65
 
 // This function is not exported in the index file to keep it internal
-export function requireClique(header: BlockHeader, name: string) {
+export function requireClique(header: BlockHeaderManager, name: string) {
   if (header.consensusAlgorithm !== ConsensusAlgorithm.Clique) {
     const msg = `BlockHeader.${name}() call only supported for clique PoA networks`
 
@@ -36,47 +37,45 @@ export function requireClique(header: BlockHeader, name: string) {
 /**
  * PoA clique signature hash without the seal.
  */
-export function cliqueSigHash(header: BlockHeader) {
+export function cliqueSigHash(header: BlockHeaderManager) {
   requireClique(header, 'cliqueSigHash')
   const raw = header.raw()
-  raw[12] = header.extraData.subarray(
-    0,
-    header.extraData.length - CLIQUE_EXTRA_SEAL,
-  )
-  return header['keccakFunction'](RLP.encode(raw))
+  const extraData = header.header.data.extraData
+  raw[12] = extraData.subarray(0, extraData.length - CLIQUE_EXTRA_SEAL)
+  return keccak256(RLP.encode(raw))
 }
 
 /**
  * Checks if the block header is an epoch transition
  * header (only clique PoA, throws otherwise)
  */
-export function cliqueIsEpochTransition(header: BlockHeader): boolean {
+export function cliqueIsEpochTransition(header: BlockHeaderManager): boolean {
   requireClique(header, 'cliqueIsEpochTransition')
   // Get clique config from chain config
-  const cliqueConfig = header.hardforkManager.config.spec.chain?.consensus
-    ?.clique as CliqueConfig | undefined
+  const cliqueConfig = header.header.hardforkManager.config.spec.chain
+    ?.consensus?.clique as CliqueConfig | undefined
   const epoch = BigInt(cliqueConfig?.epoch ?? 30000)
   // Epoch transition block if the block number has no
   // remainder on the division by the epoch length
-  return header.number % epoch === BIGINT_0
+  return header.header.data.number % epoch === BIGINT_0
 }
 
 /**
  * Returns extra vanity data
  * (only clique PoA, throws otherwise)
  */
-export function cliqueExtraVanity(header: BlockHeader): Uint8Array {
+export function cliqueExtraVanity(header: BlockHeaderManager): Uint8Array {
   requireClique(header, 'cliqueExtraVanity')
-  return header.extraData.subarray(0, CLIQUE_EXTRA_VANITY)
+  return header.header.data.extraData.subarray(0, CLIQUE_EXTRA_VANITY)
 }
 
 /**
  * Returns extra seal data
  * (only clique PoA, throws otherwise)
  */
-export function cliqueExtraSeal(header: BlockHeader): Uint8Array {
+export function cliqueExtraSeal(header: BlockHeaderManager): Uint8Array {
   requireClique(header, 'cliqueExtraSeal')
-  return header.extraData.subarray(-CLIQUE_EXTRA_SEAL)
+  return header.header.data.extraData.subarray(-CLIQUE_EXTRA_SEAL)
 }
 
 /**
@@ -87,16 +86,19 @@ export function cliqueExtraSeal(header: BlockHeader): Uint8Array {
  * transition block and should therefore be used
  * in conjunction with {@link cliqueIsEpochTransition}
  */
-export function cliqueEpochTransitionSigners(header: BlockHeader): Address[] {
+export function cliqueEpochTransitionSigners(
+  header: BlockHeaderManager,
+): Address[] {
   requireClique(header, 'cliqueEpochTransitionSigners')
   if (!cliqueIsEpochTransition(header)) {
     const msg = 'Signers are only included in epoch transition blocks (clique)'
     throw EthereumJSErrorWithoutCode(msg)
   }
 
+  const extraData = header.header.data.extraData
   const start = CLIQUE_EXTRA_VANITY
-  const end = header.extraData.length - CLIQUE_EXTRA_SEAL
-  const signerBytes = header.extraData.subarray(start, end)
+  const end = extraData.length - CLIQUE_EXTRA_SEAL
+  const signerBytes = extraData.subarray(start, end)
 
   const signerList: Uint8Array[] = []
   const signerLength = 20
@@ -113,7 +115,7 @@ export function cliqueEpochTransitionSigners(header: BlockHeader): Address[] {
 /**
  * Returns the signer address
  */
-export function cliqueSigner(header: BlockHeader): Address {
+export function cliqueSigner(header: BlockHeaderManager): Address {
   requireClique(header, 'cliqueSigner')
   const extraSeal = cliqueExtraSeal(header)
   // Reasonable default for default blocks
@@ -134,7 +136,7 @@ export function cliqueSigner(header: BlockHeader): Address {
  *  Method throws if signature is invalid
  */
 export function cliqueVerifySignature(
-  header: BlockHeader,
+  header: BlockHeaderManager,
   signerList: Address[],
 ): boolean {
   requireClique(header, 'cliqueVerifySignature')
@@ -152,22 +154,24 @@ export function cliqueVerifySignature(
  * @returns clique seal (i.e. extradata) for the block
  */
 export function generateCliqueBlockExtraData(
-  header: BlockHeader,
+  header: BlockHeaderManager,
   cliqueSigner: Uint8Array,
 ): Uint8Array {
-  // Ensure extraData is at least length CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL
-  const minExtraDataLength = CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL
-  if (header.extraData.length < minExtraDataLength) {
-    const remainingLength = minExtraDataLength - header.extraData.length
-    ;(header.extraData as any) = concatBytes(
-      header.extraData,
-      new Uint8Array(remainingLength),
-    )
-  }
-
   requireClique(header, 'generateCliqueBlockExtraData')
 
-  const msgHash = cliqueSigHash(header)
+  // Ensure extraData is at least length CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL
+  const minExtraDataLength = CLIQUE_EXTRA_VANITY + CLIQUE_EXTRA_SEAL
+  let extraData = header.header.data.extraData
+  if (extraData.length < minExtraDataLength) {
+    const remainingLength = minExtraDataLength - extraData.length
+    extraData = concatBytes(extraData, new Uint8Array(remainingLength))
+  }
+
+  // Create a temporary header manager with updated extraData for signature hash calculation
+  // We need to create a modified raw array for the signature hash
+  const raw = header.raw()
+  raw[12] = extraData.subarray(0, extraData.length - CLIQUE_EXTRA_SEAL)
+  const msgHash = keccak256(RLP.encode(raw))
 
   // Use secp256k1.sign for signing
   const ecSignFunction = secp256k1.sign
@@ -184,10 +188,10 @@ export function generateCliqueBlockExtraData(
     sigBytes.subarray(0, 1),
   )
 
-  const extraDataWithoutSeal = header.extraData.subarray(
+  const extraDataWithoutSeal = extraData.subarray(
     0,
-    header.extraData.length - CLIQUE_EXTRA_SEAL,
+    extraData.length - CLIQUE_EXTRA_SEAL,
   )
-  const extraData = concatBytes(extraDataWithoutSeal, cliqueSignature)
-  return extraData
+  const finalExtraData = concatBytes(extraDataWithoutSeal, cliqueSignature)
+  return finalExtraData
 }

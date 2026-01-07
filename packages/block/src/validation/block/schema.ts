@@ -1,6 +1,6 @@
 import { z } from '@ts-ethereum/schema'
 import type { Withdrawal } from '@ts-ethereum/utils'
-import type { BlockHeader } from '../../header'
+import type { BlockHeaderManager } from '../../header-functional'
 
 /**
  * Maximum number of uncle headers allowed per block
@@ -13,7 +13,9 @@ export const MAX_UNCLE_HEADERS = 2
  * - No duplicate uncle hashes
  */
 export const zUncleHeadersSchema = z
-  .array(z.custom<BlockHeader>((val) => val !== null && val !== undefined))
+  .array(
+    z.custom<BlockHeaderManager>((val) => val !== null && val !== undefined),
+  )
   .default([])
   .superRefine((uncles, ctx) => {
     // Check max uncle count
@@ -56,7 +58,7 @@ export const zWithdrawalsSchema = z
  * Input types for block constructor validation
  */
 export interface BlockConstructorInput {
-  uncleHeaders?: BlockHeader[]
+  uncleHeaders?: BlockHeaderManager[]
   withdrawals?: Withdrawal[]
   isGenesis?: boolean
 }
@@ -65,8 +67,8 @@ export interface BlockConstructorInput {
  * Validated output types from block constructor validation
  */
 export interface ValidatedBlockData {
-  uncleHeaders: BlockHeader[]
+  uncleHeaders: BlockHeaderManager[]
   withdrawals: Withdrawal[] | undefined
 }
 
-export type { BlockHeader, Withdrawal }
+export type { BlockHeaderManager, Withdrawal }

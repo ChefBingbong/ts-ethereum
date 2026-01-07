@@ -92,6 +92,6 @@ export const zEIPFieldsSchema = z.object({
 
 export const zBlockHeaderSchema = zCoreHeaderSchema.merge(zEIPFieldsSchema)
 
-export type CoreHeaderFields = z.infer<typeof zCoreHeaderSchema>
-export type EIPHeaderFields = z.infer<typeof zEIPFieldsSchema>
+export type ValidatedCoreHeaderFields = z.infer<typeof zCoreHeaderSchema>
+export type ValidatedEIPHeaderFields = z.infer<typeof zEIPFieldsSchema>
 export type ValidatedHeader = z.infer<typeof zBlockHeaderSchema>
