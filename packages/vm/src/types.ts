@@ -447,6 +447,13 @@ export interface RunTxOpts {
    * To obtain an accurate tx receipt input the block gas used up until this tx.
    */
   blockGasUsed?: bigint
+
+  /**
+   * Optional EVM instance to use for execution.
+   * If provided, this EVM will be used instead of vm.evm.
+   * Used internally by runBlock to pass a block-scoped EVM.
+   */
+  evm?: EVMInterface
 }
 
 /**

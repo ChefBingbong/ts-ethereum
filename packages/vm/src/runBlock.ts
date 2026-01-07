@@ -8,7 +8,7 @@ import {
 } from '@ts-ethereum/block'
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
-import type { EVM, EVMInterface } from '@ts-ethereum/evm'
+import { createEVM, type EVM, type EVMInterface } from '@ts-ethereum/evm'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
 import { TransactionType } from '@ts-ethereum/tx'
@@ -167,6 +167,27 @@ export async function runBlock(
     }
   }
 
+  // Create a fresh EVM instance for this block's execution
+  // This ensures opcodes and precompiles are correctly configured for the block's hardfork
+  const vmEvmOpts = (vm.evm as EVM)['_optsCached']
+  const blockEvm: EVMInterface = await createEVM({
+    common: vm.hardforkManager,
+    hardfork: blockHardfork, // Lock to this block's hardfork
+    stateManager: vm.stateManager,
+    blockchain: vm.blockchain,
+    // Copy relevant options from VM's original EVM
+    allowUnlimitedContractSize: vmEvmOpts?.allowUnlimitedContractSize,
+    allowUnlimitedInitCodeSize: vmEvmOpts?.allowUnlimitedInitCodeSize,
+    customOpcodes: vmEvmOpts?.customOpcodes,
+    customPrecompiles: vmEvmOpts?.customPrecompiles,
+    customCrypto: vmEvmOpts?.customCrypto,
+    profiler: vmEvmOpts?.profiler,
+  })
+
+  if (vm.DEBUG) {
+    debug(`Created fresh EVM for block with hardfork=${blockHardfork}`)
+  }
+
   // check for DAO support and if we should apply the DAO fork
   const daoHardforkBlock = vm.hardforkManager.hardforkBlock(Hardfork.Dao)
   if (
@@ -178,13 +199,13 @@ export async function runBlock(
       debug(`Apply DAO hardfork`)
     }
 
-    await vm.evm.journal.checkpoint()
-    await _applyDAOHardfork(vm.evm)
-    await vm.evm.journal.commit()
+    await blockEvm.journal.checkpoint()
+    await _applyDAOHardfork(blockEvm)
+    await blockEvm.journal.commit()
   }
 
   // Checkpoint state
-  await vm.evm.journal.checkpoint()
+  await blockEvm.journal.checkpoint()
   if (vm.DEBUG) {
     debug(`block checkpoint`)
   }
@@ -192,7 +213,14 @@ export async function runBlock(
   let result: ApplyBlockResult
 
   try {
-    result = await applyBlock(vm, block, opts, blockContext, blockHardfork)
+    result = await applyBlock(
+      vm,
+      block,
+      opts,
+      blockContext,
+      blockHardfork,
+      blockEvm,
+    )
     if (vm.DEBUG) {
       debug(
         `Received block results gasUsed=${result.gasUsed} bloom=${short(result.bloom.bitvector)} (${
@@ -203,7 +231,7 @@ export async function runBlock(
       )
     }
   } catch (err: any) {
-    await vm.evm.journal.revert()
+    await blockEvm.journal.revert()
     if (vm.DEBUG) {
       debug(`block checkpoint reverted`)
     }
@@ -232,7 +260,7 @@ export async function runBlock(
   }
 
   // Persist state
-  await vm.evm.journal.commit()
+  await blockEvm.journal.commit()
   if (vm.DEBUG) {
     debug(`block checkpoint committed`)
   }
@@ -337,7 +365,7 @@ export async function runBlock(
     }
 
     if (vm.hardforkManager.isEIPActiveAtHardfork(7864, blockHardfork)) {
-      if (vm.evm.binaryTreeAccessWitness === undefined) {
+      if (blockEvm.binaryTreeAccessWitness === undefined) {
         throw Error(
           `binaryTreeAccessWitness required if binary tree (EIP-7864) is activated`,
         )
@@ -345,7 +373,7 @@ export async function runBlock(
       // If binary tree is activated and executing statelessly, only validate the post-state
       if (
         (await vm['_opts'].stateManager!.verifyBinaryTreePostState!(
-          vm.evm.binaryTreeAccessWitness,
+          blockEvm.binaryTreeAccessWitness,
         )) === false
       ) {
         throw EthereumJSErrorWithoutCode(
@@ -394,7 +422,7 @@ export async function runBlock(
   if (enableProfiler) {
     // eslint-disable-next-line no-console
     console.timeEnd(entireBlockLabel)
-    const logs = (vm.evm as EVM).getPerformanceLogs()
+    const logs = (blockEvm as EVM).getPerformanceLogs()
     if (logs.precompiles.length === 0 && logs.opcodes.length === 0) {
       // eslint-disable-next-line no-console
       console.log('No block txs with precompile or opcode execution.')
@@ -402,7 +430,7 @@ export async function runBlock(
 
     emitEVMProfile(logs.precompiles, 'Precompile performance')
     emitEVMProfile(logs.opcodes, 'Opcodes performance')
-    ;(vm.evm as EVM).clearPerformanceLogs()
+    ;(blockEvm as EVM).clearPerformanceLogs()
   }
 
   return results
@@ -422,6 +450,7 @@ async function applyBlock(
   opts: RunBlockOpts,
   blockContext: BlockContext,
   blockHardfork: string,
+  blockEvm: EVMInterface,
 ): Promise<ApplyBlockResult> {
   // Validate block
   if (opts.skipBlockValidation !== true) {
@@ -458,6 +487,7 @@ async function applyBlock(
       block.header.parentBeaconBlockRoot!,
       block.header.timestamp,
       blockHardfork,
+      blockEvm,
     )
   }
   if (vm.hardforkManager.isEIPActiveAtHardfork(2935, blockHardfork)) {
@@ -470,6 +500,7 @@ async function applyBlock(
       block.header.number,
       block.header.parentHash,
       blockHardfork,
+      blockEvm,
     )
   }
 
@@ -489,6 +520,7 @@ async function applyBlock(
     opts,
     blockContext,
     blockHardfork,
+    blockEvm,
   )
 
   if (enableProfiler) {
@@ -500,14 +532,14 @@ async function applyBlock(
   // Also add the coinbase preimage
 
   if (opts.reportPreimages === true) {
-    if (vm.evm.stateManager.getAppliedKey === undefined) {
+    if (blockEvm.stateManager.getAppliedKey === undefined) {
       throw EthereumJSErrorWithoutCode(
         'applyBlock: evm.stateManager.getAppliedKey can not be undefined if reportPreimages is true',
       )
     }
     blockResults.preimages.set(
       bytesToHex(
-        vm.evm.stateManager.getAppliedKey(block.header.coinbase.toBytes()),
+        blockEvm.stateManager.getAppliedKey(block.header.coinbase.toBytes()),
       ),
       block.header.coinbase.toBytes(),
     )
@@ -521,38 +553,41 @@ async function applyBlock(
   }
 
   if (vm.hardforkManager.isEIPActiveAtHardfork(4895, blockHardfork)) {
-    if (opts.reportPreimages === true) vm.evm.journal.startReportingPreimages!()
-    await assignWithdrawals(vm, block, blockHardfork)
+    if (opts.reportPreimages === true)
+      blockEvm.journal.startReportingPreimages!()
+    await assignWithdrawals(vm, block, blockHardfork, blockEvm)
     if (
       opts.reportPreimages === true &&
-      vm.evm.journal.preimages !== undefined
+      blockEvm.journal.preimages !== undefined
     ) {
-      for (const [key, preimage] of vm.evm.journal.preimages) {
+      for (const [key, preimage] of blockEvm.journal.preimages) {
         blockResults.preimages.set(key, preimage)
       }
     }
-    await vm.evm.journal.cleanup()
+    await blockEvm.journal.cleanup()
   }
   // Pay ommers and miners
   if (
     vm.hardforkManager.config.spec.chain.consensus.type ===
     ConsensusType.ProofOfWork
   ) {
-    await assignBlockRewards(vm, block, blockHardfork)
+    await assignBlockRewards(vm, block, blockHardfork, blockEvm)
   }
 
   if (
     vm.hardforkManager.isEIPActiveAtHardfork(7864, blockHardfork) &&
-    vm.evm.systemBinaryTreeAccessWitness !== undefined
+    blockEvm.systemBinaryTreeAccessWitness !== undefined
   ) {
-    vm.evm.systemBinaryTreeAccessWitness?.commit()
+    blockEvm.systemBinaryTreeAccessWitness?.commit()
     if (vm.DEBUG) {
       debug('Binary tree access witness aggregate costs:')
-      vm.evm.binaryTreeAccessWitness?.debugWitnessCost()
+      blockEvm.binaryTreeAccessWitness?.debugWitnessCost()
       debug('System binary tree access witness aggregate costs:')
-      vm.evm.systemBinaryTreeAccessWitness?.debugWitnessCost()
+      blockEvm.systemBinaryTreeAccessWitness?.debugWitnessCost()
     }
-    vm.evm.binaryTreeAccessWitness?.merge(vm.evm.systemBinaryTreeAccessWitness)
+    blockEvm.binaryTreeAccessWitness?.merge(
+      blockEvm.systemBinaryTreeAccessWitness,
+    )
   }
   return blockResults
 }
@@ -571,6 +606,7 @@ export async function accumulateParentBlockHash(
   currentBlockNumber: bigint,
   parentHash: Uint8Array,
   blockHardfork: string,
+  blockEvm: EVMInterface,
 ) {
   if (!vm.hardforkManager.isEIPActiveAtHardfork(2935, blockHardfork)) {
     throw EthereumJSErrorWithoutCode(
@@ -605,9 +641,9 @@ export async function accumulateParentBlockHash(
 
     // Note: accumulateParentBlockHash is called from applyBlock which already checks EIP-7864
     // So we can safely assume it's active if we reach here
-    if (vm.evm.systemBinaryTreeAccessWitness !== undefined) {
+    if (blockEvm.systemBinaryTreeAccessWitness !== undefined) {
       // Add to system binary tree access witness so that it doesn't warm up tx accesses
-      vm.evm.systemBinaryTreeAccessWitness.writeAccountStorage(
+      blockEvm.systemBinaryTreeAccessWitness.writeAccountStorage(
         historyAddress,
         ringKey,
       )
@@ -618,7 +654,7 @@ export async function accumulateParentBlockHash(
   await putBlockHash(vm, parentHash, currentBlockNumber - BIGINT_1)
 
   // do cleanup if the code was not deployed
-  await vm.evm.journal.cleanup()
+  await blockEvm.journal.cleanup()
 }
 
 export async function accumulateParentBeaconBlockRoot(
@@ -626,6 +662,7 @@ export async function accumulateParentBeaconBlockRoot(
   root: Uint8Array,
   timestamp: bigint,
   blockHardfork: string,
+  blockEvm: EVMInterface,
 ) {
   if (!vm.hardforkManager.isEIPActiveAtHardfork(4788, blockHardfork)) {
     throw EthereumJSErrorWithoutCode(
@@ -665,7 +702,7 @@ export async function accumulateParentBeaconBlockRoot(
   )
 
   // do cleanup if the code was not deployed
-  await vm.evm.journal.cleanup()
+  await blockEvm.journal.cleanup()
 }
 
 /**
@@ -681,6 +718,7 @@ async function applyTransactions(
   opts: RunBlockOpts,
   blockContext: BlockContext,
   blockHardfork: string,
+  blockEvm: EVMInterface,
 ) {
   if (enableProfiler) {
     // eslint-disable-next-line no-console
@@ -741,6 +779,7 @@ async function applyTransactions(
       skipHardForkValidation,
       blockGasUsed: gasUsed,
       reportPreimages,
+      evm: blockEvm, // Pass the block-scoped EVM
     })
     txResults.push(txRes)
     if (vm.DEBUG) {
@@ -786,6 +825,7 @@ async function assignWithdrawals(
   vm: VM,
   block: Block,
   blockHardfork: string,
+  blockEvm: EVMInterface,
 ): Promise<void> {
   const withdrawals = block.withdrawals!
   for (const withdrawal of withdrawals) {
@@ -795,7 +835,7 @@ async function assignWithdrawals(
     // Note: event if amount is 0, still reward the account
     // such that the account is touched and marked for cleanup if it is empty
     await rewardAccount(
-      vm.evm,
+      blockEvm,
       address,
       amount * GWEI_TO_WEI,
       vm.hardforkManager,
@@ -812,6 +852,7 @@ async function assignBlockRewards(
   vm: VM,
   block: Block,
   blockHardfork: string,
+  blockEvm: EVMInterface,
 ): Promise<void> {
   if (vm.DEBUG) {
     debug(`Assign block rewards`)
@@ -831,7 +872,7 @@ async function assignBlockRewards(
       minerReward,
     )
     const account = await rewardAccount(
-      vm.evm,
+      blockEvm,
       ommer.coinbase,
       reward,
       vm.hardforkManager,
@@ -854,7 +895,7 @@ async function assignBlockRewards(
   }
 
   const account = await rewardAccount(
-    vm.evm,
+    blockEvm,
     block.header.coinbase,
     reward,
     vm.hardforkManager,
