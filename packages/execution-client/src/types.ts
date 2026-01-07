@@ -1,6 +1,6 @@
 import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Block, BlockHeader } from '@ts-ethereum/block'
-import type { Blockchain } from '@ts-ethereum/blockchain'
+import type { BlockchainManager } from '@ts-ethereum/blockchain'
 import type { GenesisState } from '@ts-ethereum/chain-config'
 import type { Address } from '@ts-ethereum/utils'
 import type { AbstractLevel } from 'abstract-level'
@@ -153,7 +153,7 @@ export interface P2PEthereumClientOptions {
   config: Config
 
   /** Custom blockchain (optional) */
-  blockchain?: Blockchain
+  blockchain?: BlockchainManager
 
   /**
    * Database to store blocks and metadata.

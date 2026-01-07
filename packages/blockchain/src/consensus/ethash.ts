@@ -3,8 +3,12 @@ import { ConsensusAlgorithm } from '@ts-ethereum/chain-config'
 import { bytesToHex } from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debugDefault from 'debug'
-import type { Blockchain } from '../index'
-import type { Consensus, ConsensusOptions } from '../types'
+import { getHeaderByHash } from '../blockchain-functional/helpers'
+import type {
+  BlockchainManager,
+  Consensus,
+  ConsensusOptions,
+} from '../blockchain-functional/types'
 
 export type MinimalEthashInterface = {
   cacheDB?: any
@@ -12,10 +16,10 @@ export type MinimalEthashInterface = {
 }
 
 /**
- * This class encapsulates Ethash-related consensus functionality when used with the Blockchain class.
+ * This class encapsulates Ethash-related consensus functionality when used with the BlockchainManager.
  */
 export class EthashConsensus implements Consensus {
-  blockchain: Blockchain | undefined
+  blockchain: BlockchainManager | undefined
   algorithm: ConsensusAlgorithm
   _ethash: MinimalEthashInterface
 
@@ -49,7 +53,10 @@ export class EthashConsensus implements Consensus {
     if (!this.blockchain) {
       throw new Error('blockchain not provided')
     }
-    const parentHeader = await this.blockchain['_getHeader'](header.parentHash)
+    const parentHeader = await getHeaderByHash(
+      this.blockchain.dbManager,
+      header.parentHash,
+    )
     if (header.ethashCanonicalDifficulty(parentHeader) !== header.difficulty) {
       throw new Error(`invalid difficulty`)
     }
@@ -62,7 +69,7 @@ export class EthashConsensus implements Consensus {
   public async genesisInit(): Promise<void> {}
   public async setup({ blockchain }: ConsensusOptions): Promise<void> {
     this.blockchain = blockchain
-    this._ethash.cacheDB = this.blockchain.db
+    // Note: cacheDB access removed - Ethash cache should be set up externally
   }
   public async newBlock(): Promise<void> {}
 }

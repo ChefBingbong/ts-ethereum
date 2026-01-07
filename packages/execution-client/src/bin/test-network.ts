@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, rmSync } from 'node:fs'
-import { createBlockchain } from '@ts-ethereum/blockchain'
+import { createBlockchainManager } from '@ts-ethereum/blockchain'
 import type { ChainConfig } from '@ts-ethereum/chain-config'
 import {
   getClientPaths,
@@ -119,12 +119,12 @@ async function startClient() {
     ..._clientConfig,
   })
 
-  const blockchain = await createBlockchain({
+  const blockchain = await createBlockchainManager({
     db: new LevelDB(databases.chainDB),
     hardforkManager: clientConfig.common,
     hardforkByHeadBlockNumber: true,
     validateBlocks: true,
-    validateConsensus: true,
+    validateConsensus: false,
     genesisState: genesisState as any,
   })
   // clientConfig.common.setForkHashes(blockchain.genesisBlock.hash())

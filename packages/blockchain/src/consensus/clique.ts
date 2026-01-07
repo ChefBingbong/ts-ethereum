@@ -22,8 +22,11 @@ import {
   toType,
 } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
-import type { Blockchain } from '../index'
-import type { Consensus, ConsensusOptions } from '../types'
+import type {
+  BlockchainManager,
+  Consensus,
+  ConsensusOptions,
+} from '../blockchain-functional/types'
 
 const debug = debugDefault('blockchain:clique')
 
@@ -59,14 +62,14 @@ type CliqueBlockSigner = [blockNumber: bigint, signer: Address]
 type CliqueLatestBlockSigners = CliqueBlockSigner[]
 
 /**
- * This class encapsulates Clique-related consensus functionality when used with the Blockchain class.
+ * This class encapsulates Clique-related consensus functionality when used with the BlockchainManager.
  * Note: reorgs which happen between epoch transitions, which change the internal voting state over the reorg
  * will result in failure and is currently not supported.
  * The hotfix for this could be: re-load the latest epoch block (this has the clique state in the extraData of the header)
  * Now replay all blocks on top of it. This should validate the chain up to the new/reorged tip which previously threw.
  */
 export class CliqueConsensus implements Consensus {
-  blockchain: Blockchain | undefined
+  blockchain: BlockchainManager | undefined
   algorithm: ConsensusAlgorithm
 
   /**

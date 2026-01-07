@@ -5,9 +5,9 @@ import {
   createBlockHeaderFromBytesArray,
 } from '@ts-ethereum/block'
 import {
-  type Blockchain,
+  type BlockchainManager,
   type ConsensusDict,
-  createBlockchain,
+  createBlockchainManager,
 } from '@ts-ethereum/blockchain'
 import type { GenesisState } from '@ts-ethereum/chain-config'
 import {
@@ -43,7 +43,7 @@ export interface ChainOptions {
   /**
    * Specify a blockchain which implements the Chain interface
    */
-  blockchain?: Blockchain
+  blockchain?: BlockchainManager
 
   genesisState?: GenesisState
 
@@ -139,7 +139,7 @@ type BlockCache = {
 export class Chain {
   public config: Config
   public chainDB: DB<string | Uint8Array, string | Uint8Array | DBObject>
-  public blockchain: Blockchain
+  public blockchain: BlockchainManager
   public blockCache: BlockCache
   public _customGenesisState?: GenesisState
   public _customGenesisStateRoot?: Uint8Array
@@ -176,7 +176,7 @@ export class Chain {
 
     options.blockchain =
       options.blockchain ??
-      (await createBlockchain({
+      (await createBlockchainManager({
         db: new LevelDB(options.chainDB),
         hardforkManager: options.config.hardforkManager,
         validateBlocks: true,
