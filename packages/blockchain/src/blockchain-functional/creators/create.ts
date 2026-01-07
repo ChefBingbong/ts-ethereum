@@ -10,8 +10,8 @@ import {
 import type { DB, DBObject } from '@ts-ethereum/utils'
 import {
   BIGINT_0,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   MapDB,
 } from '@ts-ethereum/utils'
 import { createBlockchainManagerImpl } from '../blockchain-manager'
