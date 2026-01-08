@@ -3,7 +3,7 @@ import { EVMError } from './errors'
 import { EVM } from './evm'
 import type { InterpreterStep } from './interpreter'
 import { Message } from './message'
-import { getOpcodesForHF } from './opcodes/index'
+import { jumpTableToOpcodeList } from './opcodes/index'
 import {
   getActivePrecompiles,
   MCLBLS,
@@ -54,7 +54,7 @@ export {
   NobleBN254,
   RustBN254,
   getActivePrecompiles,
-  getOpcodesForHF,
+  jumpTableToOpcodeList,
   validateEOF,
 }
 

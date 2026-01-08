@@ -31,12 +31,8 @@ import type { Timer } from './logger'
 import { EVMPerformanceLogger } from './logger'
 import type { MessageWithTo } from './message'
 import { Message } from './message'
-import type {
-  AsyncDynamicGasHandler,
-  SyncDynamicGasHandler,
-} from './opcodes/gas'
-import type { OpcodeList, OpcodeMap, OpHandler } from './opcodes/index'
-import { getOpcodesForHF } from './opcodes/index'
+import type { JumpTable, OpcodeList } from './opcodes/index'
+import { buildJumpTable, jumpTableToOpcodeList } from './opcodes/index'
 import type { CustomPrecompile, PrecompileFunc } from './precompiles/index'
 import {
   getActivePrecompiles,
@@ -222,14 +218,7 @@ export class EVM implements EVMInterface {
   protected readonly _customPrecompiles?: CustomPrecompile[]
   protected readonly _customCrypto?: CustomCrypto
 
-  protected _handlers!: Map<number, OpHandler>
-
-  protected _dynamicGasHandlers!: Map<
-    number,
-    AsyncDynamicGasHandler | SyncDynamicGasHandler
-  >
-
-  protected _opcodeMap!: OpcodeMap
+  protected _jumpTable!: JumpTable
 
   protected _precompiles!: Map<string, PrecompileFunc>
 
@@ -243,6 +232,10 @@ export class EVM implements EVMInterface {
 
   public get opcodes() {
     return this._opcodes
+  }
+
+  public get jumpTable(): JumpTable {
+    return this._jumpTable
   }
 
   protected readonly _bls?: EVMBLSInterface
@@ -374,12 +367,17 @@ export class EVM implements EVMInterface {
    * available for EVM execution
    */
   getActiveOpcodes(): OpcodeList {
-    const data = getOpcodesForHF(this.common, this.fork, this._customOpcodes)
-    this._opcodes = data.opcodes
-    this._dynamicGasHandlers = data.dynamicGasHandlers
-    this._handlers = data.handlers
-    this._opcodeMap = data.opcodeMap
-    return data.opcodes
+    // Build jump table (single source of truth)
+    this._jumpTable = buildJumpTable(
+      this.common,
+      this.fork,
+      this._customOpcodes,
+    )
+
+    // Derive OpcodeList from JumpTable for public API compatibility
+    this._opcodes = jumpTableToOpcodeList(this._jumpTable)
+
+    return this._opcodes
   }
 
   protected async _executeCall(message: MessageWithTo): Promise<EVMResult> {

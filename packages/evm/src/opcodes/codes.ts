@@ -1,11 +1,29 @@
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { Hardfork } from '@ts-ethereum/chain-config'
-import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 import { type CustomOpcode, isAddOpcode } from '../types'
-import type { OpHandler } from './functions'
-import { handlers } from './functions'
-import type { AsyncDynamicGasHandler, SyncDynamicGasHandler } from './gas'
-import { dynamicGasHandlers } from './gas'
+import { OpNames } from './constants'
+import {
+  enableEIP663,
+  enableEIP1153,
+  enableEIP1283,
+  enableEIP2200,
+  enableEIP2929,
+  enableEIP3198,
+  enableEIP3855,
+  enableEIP4200,
+  enableEIP4750,
+  enableEIP4844,
+  enableEIP5656,
+  enableEIP6206,
+  enableEIP7069,
+  enableEIP7480,
+  enableEIP7516,
+  enableEIP7620,
+  enableEIP7939,
+} from './eips'
+import { getJumpTableForHardfork } from './tables'
+import type { JumpTable } from './types'
+import { makeOperation } from './types'
 import { getFullname } from './util'
 
 export class Opcode {
@@ -48,479 +66,191 @@ export class Opcode {
 }
 
 export type OpcodeList = Map<number, Opcode>
-type OpcodeEntry = {
-  [key: number]: { name: string; isAsync: boolean; dynamicGas: boolean }
-}
-type OpcodeEntryFee = OpcodeEntry & { [key: number]: { fee: number } }
-
-// Default: sync and no dynamic gas
-const defaultOp = (name: string) => {
-  return { name, isAsync: false, dynamicGas: false }
-}
-const dynamicGasOp = (name: string) => {
-  return { name, isAsync: false, dynamicGas: true }
-}
-const asyncOp = (name: string) => {
-  return { name, isAsync: true, dynamicGas: false }
-}
-const asyncAndDynamicGasOp = (name: string) => {
-  return { name, isAsync: true, dynamicGas: true }
-}
-
-// Base opcode list. The opcode list is extended in future hardforks
-const opcodes: OpcodeEntry = {
-  // 0x0 range - arithmetic ops
-  // name, async
-  0x00: defaultOp('STOP'),
-  0x01: defaultOp('ADD'),
-  0x02: defaultOp('MUL'),
-  0x03: defaultOp('SUB'),
-  0x04: defaultOp('DIV'),
-  0x05: defaultOp('SDIV'),
-  0x06: defaultOp('MOD'),
-  0x07: defaultOp('SMOD'),
-  0x08: defaultOp('ADDMOD'),
-  0x09: defaultOp('MULMOD'),
-  0x0a: dynamicGasOp('EXP'),
-  0x0b: defaultOp('SIGNEXTEND'),
-
-  // 0x10 range - bit ops
-  0x10: defaultOp('LT'),
-  0x11: defaultOp('GT'),
-  0x12: defaultOp('SLT'),
-  0x13: defaultOp('SGT'),
-  0x14: defaultOp('EQ'),
-  0x15: defaultOp('ISZERO'),
-  0x16: defaultOp('AND'),
-  0x17: defaultOp('OR'),
-  0x18: defaultOp('XOR'),
-  0x19: defaultOp('NOT'),
-  0x1a: defaultOp('BYTE'),
-
-  // 0x20 range - crypto
-  0x20: dynamicGasOp('KECCAK256'),
-
-  // 0x30 range - closure state
-  0x30: asyncOp('ADDRESS'),
-  0x31: asyncAndDynamicGasOp('BALANCE'),
-  0x32: asyncOp('ORIGIN'),
-  0x33: asyncOp('CALLER'),
-  0x34: asyncOp('CALLVALUE'),
-  0x35: asyncOp('CALLDATALOAD'),
-  0x36: asyncOp('CALLDATASIZE'),
-  0x37: asyncAndDynamicGasOp('CALLDATACOPY'),
-  0x38: defaultOp('CODESIZE'),
-  0x39: dynamicGasOp('CODECOPY'),
-  0x3a: defaultOp('GASPRICE'),
-  0x3b: asyncAndDynamicGasOp('EXTCODESIZE'),
-  0x3c: asyncAndDynamicGasOp('EXTCODECOPY'),
-
-  // '0x40' range - block operations
-  0x40: asyncOp('BLOCKHASH'),
-  0x41: asyncOp('COINBASE'),
-  0x42: asyncOp('TIMESTAMP'),
-  0x43: asyncOp('NUMBER'),
-  0x44: asyncOp('DIFFICULTY'),
-  0x45: asyncOp('GASLIMIT'),
-
-  // 0x50 range - 'storage' and execution
-  0x50: defaultOp('POP'),
-  0x51: dynamicGasOp('MLOAD'),
-  0x52: dynamicGasOp('MSTORE'),
-  0x53: dynamicGasOp('MSTORE8'),
-  0x54: asyncAndDynamicGasOp('SLOAD'),
-  0x55: asyncAndDynamicGasOp('SSTORE'),
-  0x56: defaultOp('JUMP'),
-  0x57: defaultOp('JUMPI'),
-  0x58: defaultOp('PC'),
-  0x59: defaultOp('MSIZE'),
-  0x5a: defaultOp('GAS'),
-  0x5b: defaultOp('JUMPDEST'),
-
-  // 0x60, range
-  0x60: defaultOp('PUSH'),
-  0x61: defaultOp('PUSH'),
-  0x62: defaultOp('PUSH'),
-  0x63: defaultOp('PUSH'),
-  0x64: defaultOp('PUSH'),
-  0x65: defaultOp('PUSH'),
-  0x66: defaultOp('PUSH'),
-  0x67: defaultOp('PUSH'),
-  0x68: defaultOp('PUSH'),
-  0x69: defaultOp('PUSH'),
-  0x6a: defaultOp('PUSH'),
-  0x6b: defaultOp('PUSH'),
-  0x6c: defaultOp('PUSH'),
-  0x6d: defaultOp('PUSH'),
-  0x6e: defaultOp('PUSH'),
-  0x6f: defaultOp('PUSH'),
-  0x70: defaultOp('PUSH'),
-  0x71: defaultOp('PUSH'),
-  0x72: defaultOp('PUSH'),
-  0x73: defaultOp('PUSH'),
-  0x74: defaultOp('PUSH'),
-  0x75: defaultOp('PUSH'),
-  0x76: defaultOp('PUSH'),
-  0x77: defaultOp('PUSH'),
-  0x78: defaultOp('PUSH'),
-  0x79: defaultOp('PUSH'),
-  0x7a: defaultOp('PUSH'),
-  0x7b: defaultOp('PUSH'),
-  0x7c: defaultOp('PUSH'),
-  0x7d: defaultOp('PUSH'),
-  0x7e: defaultOp('PUSH'),
-  0x7f: defaultOp('PUSH'),
-
-  0x80: defaultOp('DUP'),
-  0x81: defaultOp('DUP'),
-  0x82: defaultOp('DUP'),
-  0x83: defaultOp('DUP'),
-  0x84: defaultOp('DUP'),
-  0x85: defaultOp('DUP'),
-  0x86: defaultOp('DUP'),
-  0x87: defaultOp('DUP'),
-  0x88: defaultOp('DUP'),
-  0x89: defaultOp('DUP'),
-  0x8a: defaultOp('DUP'),
-  0x8b: defaultOp('DUP'),
-  0x8c: defaultOp('DUP'),
-  0x8d: defaultOp('DUP'),
-  0x8e: defaultOp('DUP'),
-  0x8f: defaultOp('DUP'),
-
-  0x90: defaultOp('SWAP'),
-  0x91: defaultOp('SWAP'),
-  0x92: defaultOp('SWAP'),
-  0x93: defaultOp('SWAP'),
-  0x94: defaultOp('SWAP'),
-  0x95: defaultOp('SWAP'),
-  0x96: defaultOp('SWAP'),
-  0x97: defaultOp('SWAP'),
-  0x98: defaultOp('SWAP'),
-  0x99: defaultOp('SWAP'),
-  0x9a: defaultOp('SWAP'),
-  0x9b: defaultOp('SWAP'),
-  0x9c: defaultOp('SWAP'),
-  0x9d: defaultOp('SWAP'),
-  0x9e: defaultOp('SWAP'),
-  0x9f: defaultOp('SWAP'),
-
-  0xa0: dynamicGasOp('LOG'),
-  0xa1: dynamicGasOp('LOG'),
-  0xa2: dynamicGasOp('LOG'),
-  0xa3: dynamicGasOp('LOG'),
-  0xa4: dynamicGasOp('LOG'),
-
-  // '0xf0' range - closures
-  0xf0: asyncAndDynamicGasOp('CREATE'),
-  0xf1: asyncAndDynamicGasOp('CALL'),
-  0xf2: asyncAndDynamicGasOp('CALLCODE'),
-  0xf3: dynamicGasOp('RETURN'),
-
-  // '0x70', range - other
-  0xfe: defaultOp('INVALID'),
-  0xff: asyncAndDynamicGasOp('SELFDESTRUCT'),
-}
-
-// Array of hard forks in order. These changes are repeatedly applied to `opcodes` until the hard fork is in the future based upon the common
-// TODO: All gas price changes should be moved to common
-// If the base gas cost of any of the operations change, then these should also be added to this list.
-// If there are context variables changed (such as "warm slot reads") which are not the base gas fees,
-// Then this does not have to be added.
-const hardforkOpcodes: { hardfork: Hardfork; opcodes: OpcodeEntry }[] = [
-  {
-    hardfork: Hardfork.Homestead,
-    opcodes: {
-      0xf4: asyncAndDynamicGasOp('DELEGATECALL'), // EIP-7
-    },
-  },
-  {
-    hardfork: Hardfork.TangerineWhistle,
-    opcodes: {
-      0x54: asyncAndDynamicGasOp('SLOAD'),
-      0xf1: asyncAndDynamicGasOp('CALL'),
-      0xf2: asyncAndDynamicGasOp('CALLCODE'),
-      0x3b: asyncAndDynamicGasOp('EXTCODESIZE'),
-      0x3c: asyncAndDynamicGasOp('EXTCODECOPY'),
-      0xf4: asyncAndDynamicGasOp('DELEGATECALL'), // EIP-7
-      0xff: asyncAndDynamicGasOp('SELFDESTRUCT'),
-      0x31: asyncAndDynamicGasOp('BALANCE'),
-    },
-  },
-  {
-    hardfork: Hardfork.Byzantium,
-    opcodes: {
-      0xfd: dynamicGasOp('REVERT'), // EIP-140
-      0xfa: asyncAndDynamicGasOp('STATICCALL'), // EIP-214
-      0x3d: asyncOp('RETURNDATASIZE'), // EIP-211
-      0x3e: asyncAndDynamicGasOp('RETURNDATACOPY'), // EIP-211
-    },
-  },
-  {
-    hardfork: Hardfork.Constantinople,
-    opcodes: {
-      0x1b: defaultOp('SHL'), // EIP-145
-      0x1c: defaultOp('SHR'), // EIP-145
-      0x1d: defaultOp('SAR'), // EIP-145
-      0x3f: asyncAndDynamicGasOp('EXTCODEHASH'), // EIP-1052
-      0xf5: asyncAndDynamicGasOp('CREATE2'), // EIP-1014
-    },
-  },
-  {
-    hardfork: Hardfork.Istanbul,
-    opcodes: {
-      0x46: defaultOp('CHAINID'), // EIP-1344
-      0x47: defaultOp('SELFBALANCE'), // EIP-1884
-    },
-  },
-  {
-    hardfork: Hardfork.Paris,
-    opcodes: {
-      0x44: asyncOp('PREVRANDAO'), // EIP-4399
-    },
-  },
-]
-
-const eipOpcodes: { eip: number; opcodes: OpcodeEntry }[] = [
-  {
-    eip: 663,
-    opcodes: {
-      0xe6: defaultOp('DUPN'),
-      0xe7: defaultOp('SWAPN'),
-      0xe8: defaultOp('EXCHANGE'),
-    },
-  },
-  {
-    eip: 1153,
-    opcodes: {
-      0x5c: defaultOp('TLOAD'),
-      0x5d: defaultOp('TSTORE'),
-    },
-  },
-  {
-    eip: 3198,
-    opcodes: {
-      0x48: defaultOp('BASEFEE'),
-    },
-  },
-  {
-    eip: 3855,
-    opcodes: {
-      0x5f: defaultOp('PUSH0'),
-    },
-  },
-  {
-    eip: 4200,
-    opcodes: {
-      0xe0: defaultOp('RJUMP'),
-      0xe1: defaultOp('RJUMPI'),
-      0xe2: defaultOp('RJUMPV'),
-    },
-  },
-  {
-    eip: 4750,
-    opcodes: {
-      0xe3: defaultOp('CALLF'),
-      0xe4: defaultOp('RETF'),
-    },
-  },
-  {
-    eip: 4844,
-    opcodes: {
-      0x49: defaultOp('BLOBHASH'),
-    },
-  },
-  {
-    eip: 5656,
-    opcodes: {
-      0x5e: dynamicGasOp('MCOPY'),
-    },
-  },
-  {
-    eip: 6206,
-    opcodes: {
-      0xe5: defaultOp('JUMPF'),
-    },
-  },
-  {
-    eip: 7069,
-    opcodes: {
-      0xf7: defaultOp('RETURNDATALOAD'),
-      0xf8: asyncAndDynamicGasOp('EXTCALL'),
-      0xf9: asyncAndDynamicGasOp('EXTDELEGATECALL'),
-      0xfb: asyncAndDynamicGasOp('EXTSTATICCALL'),
-    },
-  },
-  {
-    eip: 7480,
-    opcodes: {
-      0xd0: defaultOp('DATALOAD'),
-      0xd1: defaultOp('DATALOADN'),
-      0xd2: defaultOp('DATASIZE'),
-      0xd3: dynamicGasOp('DATACOPY'),
-    },
-  },
-  {
-    eip: 7516,
-    opcodes: {
-      0x4a: defaultOp('BLOBBASEFEE'),
-    },
-  },
-  {
-    eip: 7620,
-    opcodes: {
-      0xec: asyncAndDynamicGasOp('EOFCREATE'),
-      0xee: asyncAndDynamicGasOp('RETURNCONTRACT'),
-    },
-  },
-  {
-    eip: 7939,
-    opcodes: {
-      0x1e: defaultOp('CLZ'),
-    },
-  },
-]
 
 /**
- * Convert basic opcode info dictionary into complete OpcodeList instance.
+ * Convert JumpTable to OpcodeList for public API compatibility.
+ * This function derives the OpcodeList from the JumpTable, eliminating
+ * the need for separate opcode definitions.
  *
- * @param opcodes {Object} Receive basic opcodes info dictionary.
- * @returns {OpcodeList} Complete Opcode list
+ * @param jumpTable The jump table to convert
+ * @returns OpcodeList suitable for public API
  */
-function createOpcodes(opcodes: OpcodeEntryFee): OpcodeList {
+export function jumpTableToOpcodeList(jumpTable: JumpTable): OpcodeList {
   const result: OpcodeList = new Map()
-  for (const [key, value] of Object.entries(opcodes)) {
-    const code = Number.parseInt(key, 10)
-    if (Number.isNaN(value.fee)) value.fee = 0
+
+  for (let opcode = 0; opcode <= 0xff; opcode++) {
+    const operation = jumpTable[opcode]
+
+    // Skip undefined opcodes - they should not appear in the public API
+    // This matches the old getOpcodesForHF behavior
+    if (operation.undefined) {
+      continue
+    }
+
+    // Convert Operation to Opcode
     result.set(
-      code,
+      opcode,
       new Opcode({
-        code,
-        fullName: getFullname(code, value.name),
-        ...value,
+        code: opcode,
+        name: operation.name || 'INVALID',
+        fullName: operation.fullName || 'INVALID',
+        fee: Number(operation.constantGas),
+        isAsync: operation.isAsync,
+        dynamicGas: operation.dynamicGas !== undefined,
       }),
     )
   }
+
   return result
 }
 
-type OpcodeContext = {
-  dynamicGasHandlers: Map<
-    number,
-    AsyncDynamicGasHandler | SyncDynamicGasHandler
-  >
-  handlers: Map<number, OpHandler>
-  opcodes: OpcodeList
-  opcodeMap: OpcodeMap
-}
-
-export type OpcodeMapEntry = {
-  opcodeInfo: Opcode
-  opHandler: OpHandler
-  gasHandler: AsyncDynamicGasHandler | SyncDynamicGasHandler
-}
-export type OpcodeMap = OpcodeMapEntry[]
-
 /**
- * Get suitable opcodes for the required hardfork.
+ * Build a JumpTable using the new architecture.
+ * This function creates a jump table for the specified hardfork, applies any active EIPs,
+ * and populates opcodes with names and gas costs from chain params.
  *
- * @param common {HardforkManager} HardforkManager metadata object.
- * @param hardfork Hardfork identifier to use for opcode selection.
- * @param customOpcodes List with custom opcodes (see EVM `customOpcodes` option description).
- * @returns {OpcodeList} Opcodes dictionary object.
+ * @param common HardforkManager instance
+ * @param hardfork Hardfork identifier
+ * @param customOpcodes Optional custom opcodes to add/override
+ * @returns JumpTable with all opcodes for the hardfork
  */
-export function getOpcodesForHF(
+export function buildJumpTable(
   common: HardforkManager,
   hardfork: string,
   customOpcodes?: CustomOpcode[],
-): OpcodeContext {
-  let opcodeBuilder: any = { ...opcodes }
+): JumpTable {
+  // Get base jump table for the hardfork
+  const table = getJumpTableForHardfork(hardfork)
 
-  const handlersCopy = new Map(handlers)
-  const dynamicGasHandlersCopy = new Map(dynamicGasHandlers)
-
-  for (let fork = 0; fork < hardforkOpcodes.length; fork++) {
-    if (common.hardforkGte(hardfork, hardforkOpcodes[fork].hardfork)) {
-      opcodeBuilder = { ...opcodeBuilder, ...hardforkOpcodes[fork].opcodes }
-    }
+  // Apply gas-modifying EIPs first (they modify existing opcodes)
+  // These must be applied in order, as later EIPs may supersede earlier ones
+  // Note: EIP-1283, 2200, and 2929 are part of specific hardforks, not explicitly listed in HARDFORK_EIPS
+  if (common.hardforkGte(hardfork, Hardfork.Istanbul)) {
+    enableEIP1283(table)
   }
-  for (const eipOps of eipOpcodes) {
-    if (common.isEIPActiveAtHardfork(eipOps.eip, hardfork)) {
-      opcodeBuilder = { ...opcodeBuilder, ...eipOps.opcodes }
-    }
+  // EIP-2200 supersedes EIP-1283 at Istanbul
+  if (common.hardforkGte(hardfork, Hardfork.Constantinople)) {
+    enableEIP2200(table)
   }
-
-  for (const key in opcodeBuilder) {
-    const baseFee = Number(
-      common.getParamAtHardfork(
-        `${opcodeBuilder[key].name.toLowerCase()}Gas` as any,
-        hardfork,
-      ),
-    )
-    // explicitly verify that we have defined a base fee
-    if (baseFee === undefined) {
-      throw EthereumJSErrorWithoutCode(
-        `base fee not defined for: ${opcodeBuilder[key].name}`,
-      )
-    }
-    opcodeBuilder[key].fee = baseFee
+  if (common.isEIPActiveAtHardfork(2929, hardfork)) {
+    enableEIP2929(table)
   }
 
+  // Apply EIPs that add/modify opcodes
+  // Core EIPs
+  if (common.isEIPActiveAtHardfork(1153, hardfork)) enableEIP1153(table)
+  if (common.isEIPActiveAtHardfork(3198, hardfork)) enableEIP3198(table)
+  if (common.isEIPActiveAtHardfork(3855, hardfork)) enableEIP3855(table)
+  if (common.isEIPActiveAtHardfork(4844, hardfork)) enableEIP4844(table)
+  if (common.isEIPActiveAtHardfork(5656, hardfork)) enableEIP5656(table)
+  if (common.isEIPActiveAtHardfork(7516, hardfork)) enableEIP7516(table)
+
+  // EOF EIPs
+  if (common.isEIPActiveAtHardfork(663, hardfork)) enableEIP663(table)
+  if (common.isEIPActiveAtHardfork(4200, hardfork)) enableEIP4200(table)
+  if (common.isEIPActiveAtHardfork(4750, hardfork)) enableEIP4750(table)
+  if (common.isEIPActiveAtHardfork(6206, hardfork)) enableEIP6206(table)
+  if (common.isEIPActiveAtHardfork(7069, hardfork)) enableEIP7069(table)
+  if (common.isEIPActiveAtHardfork(7480, hardfork)) enableEIP7480(table)
+  if (common.isEIPActiveAtHardfork(7620, hardfork)) enableEIP7620(table)
+  if (common.isEIPActiveAtHardfork(7939, hardfork)) enableEIP7939(table)
+
+  // Apply custom opcodes
   if (customOpcodes) {
-    for (const _code of customOpcodes) {
-      const code = _code
-
-      if (!isAddOpcode(code)) {
-        delete opcodeBuilder[code.opcode]
+    for (const customOp of customOpcodes) {
+      if (!isAddOpcode(customOp)) {
+        // Delete opcode
+        table[customOp.opcode] = {
+          opcode: customOp.opcode,
+          name: 'INVALID',
+          fullName: 'INVALID',
+          execute: () => {
+            throw new Error('Invalid opcode')
+          },
+          constantGas: 0n,
+          minStack: 0,
+          maxStack: 0,
+          isAsync: false,
+          undefined: true,
+        }
         continue
       }
 
-      const entry = {
-        [code.opcode]: {
-          name: code.opcodeName,
-          isAsync: true,
-          dynamicGas: code.gasFunction !== undefined,
-          fee: code.baseFee,
-          feeBigInt: BigInt(code.baseFee),
-        },
+      // Add/override opcode
+      table[customOp.opcode] = makeOperation({
+        execute: customOp.logicFunction,
+        dynamicGas: customOp.gasFunction,
+        isAsync: true, // Custom opcodes are always async for safety
+      })
+      // Set custom opcode metadata
+      table[customOp.opcode].opcode = customOp.opcode
+      table[customOp.opcode].name = customOp.opcodeName
+      table[customOp.opcode].fullName = customOp.opcodeName
+      table[customOp.opcode].constantGas = BigInt(customOp.baseFee)
+    }
+  }
+
+  // Populate opcode metadata (opcode, name, fullName, constantGas, dynamicGas)
+  for (let opcode = 0; opcode <= 0xff; opcode++) {
+    const op = table[opcode]
+
+    // Set opcode number
+    op.opcode = opcode
+
+    // Skip if already has a custom name (custom opcodes)
+    if (op.name && op.name !== '' && op.name !== 'INVALID') {
+      continue
+    }
+
+    // Get full name from OpNames constant (e.g., 'PUSH1', 'DUP2')
+    // Special case: 0x44 is DIFFICULTY pre-Paris, PREVRANDAO post-Paris (EIP-4399)
+    let fullName = OpNames[opcode] ?? 'INVALID'
+    let baseName: string
+    if (opcode === 0x44) {
+      // EIP-4399: DIFFICULTY becomes PREVRANDAO at Paris
+      if (common.hardforkGte(hardfork, Hardfork.Paris)) {
+        fullName = 'PREVRANDAO'
+        baseName = 'PREVRANDAO'
+      } else {
+        fullName = 'DIFFICULTY'
+        baseName = 'DIFFICULTY'
       }
-      opcodeBuilder = { ...opcodeBuilder, ...entry }
-      if (code.gasFunction !== undefined) {
-        dynamicGasHandlersCopy.set(code.opcode, code.gasFunction)
+      op.name = baseName
+      op.fullName = fullName
+    } else {
+      // Get base name for gas param lookup (e.g., 'PUSH' from 'PUSH1', 'DUP' from 'DUP2')
+      baseName = getBaseName(opcode, fullName)
+      op.name = baseName
+      op.fullName = getFullname(opcode, baseName)
+    }
+
+    // Get gas cost from chain params (only for valid opcodes)
+    if (!op.undefined) {
+      const gasParamName = `${baseName.toLowerCase()}Gas` as any
+      const baseFee = common.getParamAtHardfork(gasParamName, hardfork)
+      if (baseFee !== undefined) {
+        op.constantGas = BigInt(baseFee)
       }
-      // logicFunction is never undefined
-      handlersCopy.set(code.opcode, code.logicFunction)
+      // Note: Dynamic gas handlers are now wired directly in jump table files
     }
   }
 
-  //const dynamicGasHandlers = dynamicGasHandlersCopy
-  //const handlers = handlersCopy
-  const ops = createOpcodes(opcodeBuilder)
+  return table
+}
 
-  const opcodeMap: OpcodeMap = []
-
-  for (const [opNumber, op] of ops) {
-    const dynamicGas = dynamicGasHandlersCopy.get(opNumber)!
-    const handler = handlersCopy.get(opNumber)!
-    opcodeMap[opNumber] = {
-      opcodeInfo: op,
-      opHandler: handler,
-      gasHandler: dynamicGas,
-    }
-  }
-
-  const INVALID = opcodeMap[0xfe]
-
-  for (let i = 0x0; i <= 0xff; i++) {
-    if (opcodeMap[i] === undefined) {
-      opcodeMap[i] = INVALID
-    }
-  }
-
-  return {
-    dynamicGasHandlers: dynamicGasHandlersCopy,
-    handlers: handlersCopy,
-    opcodes: ops,
-    opcodeMap,
-  }
+/**
+ * Get base opcode name for gas param lookup
+ * Strips numeric suffixes from opcodes like PUSH1, DUP2, LOG3, etc.
+ */
+function getBaseName(opcode: number, fullName: string): string {
+  // PUSH1-PUSH32 (0x60-0x7f)
+  if (opcode >= 0x60 && opcode <= 0x7f) return 'PUSH'
+  // DUP1-DUP16 (0x80-0x8f)
+  if (opcode >= 0x80 && opcode <= 0x8f) return 'DUP'
+  // SWAP1-SWAP16 (0x90-0x9f)
+  if (opcode >= 0x90 && opcode <= 0x9f) return 'SWAP'
+  // LOG0-LOG4 (0xa0-0xa4)
+  if (opcode >= 0xa0 && opcode <= 0xa4) return 'LOG'
+  // Default: return full name
+  return fullName
 }

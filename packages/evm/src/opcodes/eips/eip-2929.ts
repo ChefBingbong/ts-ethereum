@@ -1,16 +1,19 @@
+/**
+ * EIP-2929: Gas cost increases for state access opcodes
+ * Address and storage warm/cold access tracking
+ *
+ * This EIP modifies multiple opcodes to add warm/cold access gas costs.
+ * The helper functions are used by dynamic gas handlers.
+ */
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { BIGINT_0 } from '@ts-ethereum/utils'
-import type { RunState } from '../interpreter'
+import type { RunState } from '../../interpreter'
+import type { JumpTable } from '../types'
 
 /**
  * Adds address to accessedAddresses set if not already included.
  * Adjusts cost incurred for executing opcode based on whether address read
  * is warm/cold. (EIP 2929)
- * @param {RunState} runState
- * @param {Address}  address
- * @param {GlobalConfig}   common
- * @param {Boolean}  chargeGas (default: true)
- * @param {Boolean}  isSelfdestruct (default: false)
  */
 export function accessAddressEIP2929(
   runState: RunState,
@@ -49,9 +52,6 @@ export function accessAddressEIP2929(
  * Adds (address, key) to accessedStorage tuple set if not already included.
  * Adjusts cost incurred for executing opcode based on whether storage read
  * is warm/cold. (EIP 2929)
- * @param {RunState} runState
- * @param {Uint8Array} key (to storage slot)
- * @param {GlobalConfig} common
  */
 export function accessStorageEIP2929(
   runState: RunState,
@@ -93,12 +93,6 @@ export function accessStorageEIP2929(
 /**
  * Adjusts cost of SSTORE_RESET_GAS or SLOAD (aka sstorenoop) (EIP-2200) downward when storage
  * location is already warm
- * @param  {RunState} runState
- * @param  {Uint8Array}   key          storage slot
- * @param  {BigInt}   defaultCost  SSTORE_RESET_GAS / SLOAD
- * @param  {string}   costName     parameter name ('noop')
- * @param  {GlobalConfig}   common
- * @return {BigInt}                adjusted cost
  */
 export function adjustSstoreGasEIP2929(
   runState: RunState,
@@ -138,4 +132,30 @@ export function adjustSstoreGasEIP2929(
   }
 
   return defaultCost
+}
+
+/**
+ * Enable EIP-2929 on a jump table
+ * Modifies multiple opcodes to add warm/cold access gas costs
+ *
+ * Note: The dynamic gas handlers in instructions/gas.ts already incorporate
+ * EIP-2929 logic conditionally. This enabler primarily ensures constantGas
+ * values are set correctly (e.g., SLOAD constantGas -> 0, moved to dynamic).
+ * The actual gas calculation logic is in the handlers which call the helper
+ * functions above.
+ */
+export function enableEIP2929(table: JumpTable): JumpTable {
+  // According to Go implementation, EIP-2929 modifies constantGas for several opcodes:
+  // - SLOAD: constantGas = 0 (moved to dynamic)
+  // - BALANCE, EXTCODESIZE, EXTCODECOPY, EXTCODEHASH, CALL, CALLCODE, STATICCALL, DELEGATECALL:
+  //   constantGas = WarmStorageReadCostEIP2929 (base cost)
+
+  // However, in our system, constantGas is populated from chain params in buildJumpTable.
+  // The handlers already include the EIP-2929 logic conditionally, so we don't need to
+  // modify the handlers here. The constantGas adjustments are handled by chain params.
+
+  // We keep this enabler for consistency with the Go pattern and in case we need
+  // to make explicit modifications in the future.
+
+  return table
 }
