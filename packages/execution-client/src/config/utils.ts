@@ -54,6 +54,21 @@ export interface ResolvedConfigOptions {
   readonly rateLimit?: import('../rpc/rate-limit/types').RateLimitOptions
   readonly common: HardforkManager
   readonly logger?: Logger
+  readonly skeletonFillCanonicalBackStep: number
+  readonly skeletonSubchainMergeMinimum: number
+  readonly maxRangeBytes: number
+  readonly maxAccountRange: bigint
+  readonly maxStorageRange: bigint
+  readonly maxInvalidBlocksErrorCache: number
+  readonly pruneEngineCache: boolean
+  readonly engineParentLookupMaxDepth: number
+  readonly engineNewpayloadMaxExecute: number
+  readonly engineNewpayloadMaxTxsExecute: number
+  readonly snapAvailabilityDepth: bigint
+  readonly snapTransitionSafeDepth: bigint
+
+  // Defaulting to false as experimental as of now
+  readonly enableSnapSync: boolean
 }
 
 /**
@@ -88,10 +103,23 @@ export function createConfigFromDefaults(
     safeReorgDistance: constants.SAFE_REORG_DISTANCE,
     syncedStateRemovalPeriod: constants.SYNCED_STATE_REMOVAL_PERIOD,
     prefixStorageTrieKeys: true,
-    useStringValueTrieDB: false,
-    savePreimages: true,
     common,
     metrics: defaultMetricsOptions,
+    skeletonFillCanonicalBackStep: constants.SKELETON_FILL_CANONICAL_BACKSTEP,
+    skeletonSubchainMergeMinimum: constants.SKELETON_SUBCHAIN_MERGE_MINIMUM,
+    maxRangeBytes: constants.MAX_RANGE_BYTES,
+    maxAccountRange: constants.MAX_ACCOUNT_RANGE,
+    maxStorageRange: constants.MAX_STORAGE_RANGE,
+    maxInvalidBlocksErrorCache: constants.MAX_INVALID_BLOCKS_ERROR_CACHE,
+    pruneEngineCache: constants.PRUNE_ENGINE_CACHE,
+    engineParentLookupMaxDepth: constants.ENGINE_PARENT_LOOKUP_MAX_DEPTH,
+    engineNewpayloadMaxExecute: constants.ENGINE_NEWPAYLOAD_MAX_EXECUTE,
+    engineNewpayloadMaxTxsExecute: constants.ENGINE_NEWPAYLOAD_MAX_TXS_EXECUTE,
+    snapAvailabilityDepth: constants.SNAP_AVAILABILITY_DEPTH,
+    snapTransitionSafeDepth: constants.SNAP_TRANSITION_SAFE_DEPTH,
+    enableSnapSync: false,
+    useStringValueTrieDB: false,
+    savePreimages: true,
   }
 }
 
@@ -156,6 +184,31 @@ export function createConfigOptions(
     rateLimit: options.rateLimit,
     common: options.hardforkManager ?? defaults.common,
     logger: options.logger ?? defaults.logger,
+
+    skeletonFillCanonicalBackStep:
+      options.skeletonFillCanonicalBackStep ??
+      defaults.skeletonFillCanonicalBackStep,
+    skeletonSubchainMergeMinimum:
+      options.skeletonSubchainMergeMinimum ??
+      defaults.skeletonSubchainMergeMinimum,
+    maxRangeBytes: options.maxRangeBytes ?? defaults.maxRangeBytes,
+    maxAccountRange: options.maxAccountRange ?? defaults.maxAccountRange,
+    maxStorageRange: options.maxStorageRange ?? defaults.maxStorageRange,
+    maxInvalidBlocksErrorCache:
+      options.maxInvalidBlocksErrorCache ?? defaults.maxInvalidBlocksErrorCache,
+    pruneEngineCache: options.pruneEngineCache ?? defaults.pruneEngineCache,
+    engineParentLookupMaxDepth:
+      options.engineParentLookupMaxDepth ?? defaults.engineParentLookupMaxDepth,
+    engineNewpayloadMaxExecute:
+      options.engineNewpayloadMaxExecute ?? defaults.engineNewpayloadMaxExecute,
+    engineNewpayloadMaxTxsExecute:
+      options.engineNewpayloadMaxTxsExecute ??
+      defaults.engineNewpayloadMaxTxsExecute,
+    snapAvailabilityDepth:
+      options.snapAvailabilityDepth ?? defaults.snapAvailabilityDepth,
+    snapTransitionSafeDepth:
+      options.snapTransitionSafeDepth ?? defaults.snapTransitionSafeDepth,
+    enableSnapSync: options.enableSnapSync ?? defaults.enableSnapSync,
   }
 }
 

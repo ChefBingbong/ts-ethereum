@@ -5,7 +5,7 @@ import { EventEmitter } from 'eventemitter3'
 import { Level } from 'level'
 import { Logger } from 'winston'
 import type { Chain } from '../blockchain/chain'
-import { type ClientError, classifyError } from '../errors/index'
+import { classifyError, type ClientError } from '../errors/index'
 import type { NetworkService } from '../net/network-service'
 import { Event, type EventParams } from '../types'
 import type { ConfigOptions } from './types'
@@ -36,7 +36,7 @@ export class Config {
 
   public shutdown: boolean
 
-  private readonly logger: Logger
+  public readonly logger: Logger
 
   constructor(options: ConfigOptions) {
     this.events = new EventEmitter<EventParams>()
