@@ -32,6 +32,7 @@ export enum EthRpcMethods {
   eth_protocolVersion = 'eth_protocolVersion',
   eth_sendRawTransaction = 'eth_sendRawTransaction',
   eth_syncing = 'eth_syncing',
+  eth_feeHistory = 'eth_feeHistory',
 }
 
 export enum DebugRpcMethods {

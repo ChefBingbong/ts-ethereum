@@ -13,6 +13,7 @@ import { getBlockReceipts } from './get-block-receipts'
 import { getBlockTransactionCountByHash } from './get-block-transaction-count-by-hash'
 import { getBlockTransactionCountByNumber } from './get-block-transaction-count-by-number'
 import { getCode } from './get-code'
+import { getFeeHistory } from './get-fee-history'
 import { getLogs } from './get-logs'
 import { getProof } from './get-proof'
 import { getStorageAt } from './get-storage-at'
@@ -58,5 +59,6 @@ export const createEthRpcMethods = (
     eth_protocolVersion: protocolVersion(node),
     eth_sendRawTransaction: sendRawTransaction(node),
     eth_syncing: syncing(node),
+    eth_feeHistory: getFeeHistory(node),
   }
 }
