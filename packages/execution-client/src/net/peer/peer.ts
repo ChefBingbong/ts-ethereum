@@ -3,6 +3,7 @@ import { BIGINT_0, BIGINT_1, short } from '@ts-ethereum/utils'
 import { EventEmitter } from 'eventemitter3'
 import type { Config } from '../../config/config'
 import type { EthHandler } from '../../protocol/eth'
+import type { SnapHandler } from '../../protocol/snap'
 
 export interface PeerOptions {
   /* Config */
@@ -42,6 +43,7 @@ export abstract class Peer extends EventEmitter {
   private _idle: boolean
 
   public eth?: EthHandler
+  public snap?: SnapHandler
 
   /*
     If the peer is in the PeerPool.

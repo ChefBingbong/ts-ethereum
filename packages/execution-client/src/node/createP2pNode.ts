@@ -3,6 +3,7 @@ import { P2PNode, type P2PNode as P2PNodeType, rlpx } from '@ts-ethereum/p2p'
 import type { ConfigOptions } from '../config/types'
 import { dptDiscovery } from '../net/discovery/dpt-discovery'
 import { ETH } from '../net/protocol/eth/eth'
+import { SNAP } from '../net/protocol/snap/snap'
 
 export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
   const kadDiscovery = []
@@ -27,6 +28,12 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
     )
   }
 
+  // Build capabilities list - always include ETH, optionally include SNAP
+  const capabilities = [ETH.eth68]
+  if (options.enableSnapSync) {
+    capabilities.push(SNAP.snap1 as any)
+  }
+
   const node = new P2PNode({
     privateKey: options.key as any,
     peerDiscovery: kadDiscovery,
@@ -41,7 +48,7 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
     transports: [
       rlpx({
         privateKey: options.key as any,
-        capabilities: [ETH.eth68],
+        capabilities,
         common: options.hardforkManager ?? options.common!,
         timeout: 10000,
         maxConnections: options.maxPeers,
