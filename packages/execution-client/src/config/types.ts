@@ -19,6 +19,7 @@ export type SyncMode = (typeof SyncMode)[keyof typeof SyncMode]
 
 export const SyncMode = {
   Full: 'full',
+  Beacon: 'beacon',
   None: 'none',
 } as const
 

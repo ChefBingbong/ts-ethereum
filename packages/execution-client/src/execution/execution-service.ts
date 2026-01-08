@@ -3,10 +3,12 @@ import type { VM } from '@ts-ethereum/vm'
 import type { AbstractLevel } from 'abstract-level'
 import type { Chain } from '../blockchain/chain'
 import type { Config } from '../config/index'
+import { SyncMode } from '../config/types'
 import { Miner } from '../miner/index'
 import type { NetworkCore } from '../net/core/network-core'
+import { Skeleton } from '../service/skeleton'
 import { TxPool } from '../service/txpool'
-import { FullSynchronizer } from '../sync/index'
+import { BeaconSynchronizer, FullSynchronizer } from '../sync/index'
 import { Event } from '../types'
 import type { VMExecution } from './vmexecution'
 
@@ -16,7 +18,8 @@ export interface ExecutionServiceModules {
   execution: VMExecution
   txPool: TxPool
   miner: Miner
-  synchronizer: FullSynchronizer
+  synchronizer: FullSynchronizer | BeaconSynchronizer
+  skeleton?: Skeleton
 }
 
 export interface ExecutionServiceInitOptions {
@@ -46,8 +49,38 @@ export class ExecutionService {
   public readonly execution: VMExecution
   public readonly txPool: TxPool
   public readonly miner: Miner
-  public readonly synchronizer: FullSynchronizer
+  public synchronizer: FullSynchronizer | BeaconSynchronizer
   public readonly config: Config
+  public skeleton?: Skeleton
+
+  /**
+   * Check if we should use beacon sync mode
+   */
+  private static shouldUseBeaconSync(config: Config, chain: Chain): boolean {
+    // Explicit config override
+    if (config.options.syncmode === SyncMode.Beacon) {
+      return true
+    }
+    if (config.options.syncmode === SyncMode.Full) {
+      return false
+    }
+
+    // Auto-detect: check if we're post-merge (Paris hardfork or later)
+    const currentHeight = chain.blocks.height
+    const hardfork = config.hardforkManager.getHardforkByBlock(currentHeight)
+
+    // Paris hardfork names that indicate post-merge
+    const postMergeHardforks = [
+      'paris',
+      'merge',
+      'shanghai',
+      'cancun',
+      'prague',
+      'osaka',
+    ]
+
+    return postMergeHardforks.includes(hardfork.toLowerCase())
+  }
 
   static async init(
     options: ExecutionServiceInitOptions,
@@ -59,17 +92,53 @@ export class ExecutionService {
       execution: options.execution,
     })
 
-    const synchronizer = new FullSynchronizer({
-      core: options.networkCore,
-      txPool,
-      execution: options.execution,
-      interval: 1000,
-    })
+    // Create skeleton if metaDB is provided
+    let skeleton: Skeleton | undefined
+    if (options.metaDB !== undefined) {
+      skeleton = new Skeleton({
+        config: options.config,
+        chain: options.chain,
+        metaDB: options.metaDB,
+      })
+    }
+
+    // Determine sync mode
+    const useBeaconSync = this.shouldUseBeaconSync(
+      options.config,
+      options.chain,
+    )
+
+    let synchronizer: FullSynchronizer | BeaconSynchronizer
+
+    if (useBeaconSync && skeleton !== undefined) {
+      options.config.options.logger?.info(
+        'Using BeaconSynchronizer (post-merge mode)',
+      )
+      synchronizer = new BeaconSynchronizer({
+        core: options.networkCore,
+        skeleton,
+        execution: options.execution,
+        interval: 1000,
+      })
+    } else {
+      if (useBeaconSync && skeleton === undefined) {
+        options.config.options.logger?.warn(
+          'BeaconSync requested but metaDB not provided, falling back to FullSynchronizer',
+        )
+      }
+      options.config.options.logger?.info('Using FullSynchronizer')
+      synchronizer = new FullSynchronizer({
+        core: options.networkCore,
+        txPool,
+        execution: options.execution,
+        interval: 1000,
+      })
+    }
 
     const miner = new Miner({
       config: options.config,
       txPool: txPool,
-      synchronizer: synchronizer,
+      synchronizer: synchronizer as FullSynchronizer,
       chain: options.chain,
       execution: options.execution,
     })
@@ -81,11 +150,18 @@ export class ExecutionService {
       txPool,
       miner,
       synchronizer,
+      skeleton,
     })
 
     // Initialize components
     await options.execution.open()
     txPool.open()
+
+    // Open skeleton before synchronizer if using beacon sync
+    if (skeleton !== undefined) {
+      await skeleton.open()
+    }
+
     await synchronizer.open()
     synchronizer.opened = true
 
@@ -101,6 +177,7 @@ export class ExecutionService {
     this.txPool = modules.txPool
     this.miner = modules.miner
     this.synchronizer = modules.synchronizer
+    this.skeleton = modules.skeleton
   }
 
   /**
@@ -108,6 +185,55 @@ export class ExecutionService {
    */
   get vm(): VM | undefined {
     return this.execution.vm
+  }
+
+  /**
+   * Public accessor for BeaconSynchronizer. Returns undefined if unavailable.
+   */
+  get beaconSync(): BeaconSynchronizer | undefined {
+    if (this.synchronizer instanceof BeaconSynchronizer) {
+      return this.synchronizer
+    }
+    return undefined
+  }
+
+  /**
+   * Switch to beacon sync mode dynamically.
+   * Stops current synchronizer and creates a new BeaconSynchronizer.
+   */
+  async switchToBeaconSync(): Promise<boolean> {
+    if (this.synchronizer instanceof BeaconSynchronizer) {
+      this.config.options.logger?.debug('Already using BeaconSynchronizer')
+      return true
+    }
+
+    if (this.skeleton === undefined) {
+      this.config.options.logger?.error(
+        'Cannot switch to beacon sync: skeleton not initialized (metaDB required)',
+      )
+      return false
+    }
+
+    // Stop current synchronizer
+    if (this.synchronizer instanceof FullSynchronizer) {
+      await this.synchronizer.stop()
+      await this.synchronizer.close()
+      this.miner?.stop()
+      this.config.superMsg('Transitioning to beacon sync')
+    }
+
+    // Create new beacon synchronizer
+    this.synchronizer = new BeaconSynchronizer({
+      core: this.synchronizer['pool'] as NetworkCore,
+      skeleton: this.skeleton,
+      execution: this.execution,
+      interval: 1000,
+    })
+
+    await this.synchronizer.open()
+    this.synchronizer.opened = true
+
+    return true
   }
 
   private setupEventListeners(): void {
@@ -183,6 +309,7 @@ export class ExecutionService {
       this.txPool.stop()
       this.miner?.stop()
       await this.synchronizer?.stop()
+      await this.skeleton?.close()
       await this.execution.stop()
       this.removeEventListeners()
       return true
@@ -195,6 +322,7 @@ export class ExecutionService {
     try {
       this.txPool.close()
       await this.synchronizer?.close()
+      await this.skeleton?.close()
       this.removeEventListeners()
     } catch {
       this.removeEventListeners()
