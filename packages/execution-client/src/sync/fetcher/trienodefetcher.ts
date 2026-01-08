@@ -5,8 +5,8 @@ import {
   decodeMPTNode,
   ExtensionMPTNode,
   LeafMPTNode,
-  mergeAndFormatKeyPaths,
   MerklePatriciaTrie,
+  mergeAndFormatKeyPaths,
   pathToHexKey,
 } from '@ts-ethereum/mpt'
 import { bytesToHex } from '@ts-ethereum/rlp'

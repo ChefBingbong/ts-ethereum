@@ -16,8 +16,8 @@ import {
   BIGINT_2,
   bytesToHex,
   bytesToUnprefixedHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   hexToBytes,
   type PrefixedHexString,
 } from '@ts-ethereum/utils'

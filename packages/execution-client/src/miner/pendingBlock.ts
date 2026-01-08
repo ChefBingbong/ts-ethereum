@@ -16,14 +16,14 @@ import {
   concatBytes,
   createZeroAddress,
   type PrefixedHexString,
-  toType,
   TypeOutput,
+  toType,
   type WithdrawalData,
 } from '@ts-ethereum/utils'
 import {
   type BlockBuilder,
-  buildBlock,
   BuildStatus,
+  buildBlock,
   type TxReceipt,
   type VM,
 } from '@ts-ethereum/vm'

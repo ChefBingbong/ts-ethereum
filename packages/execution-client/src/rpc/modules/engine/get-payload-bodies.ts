@@ -7,7 +7,7 @@ import {
   getPayloadBodiesByHashV1Schema,
   getPayloadBodiesByRangeV1Schema,
 } from './schema'
-import type { Bytes32, Bytes8, ExecutionPayloadBodyV1 } from './types'
+import type { Bytes8, Bytes32, ExecutionPayloadBodyV1 } from './types'
 import { getPayloadBody } from './util/index'
 
 /**
