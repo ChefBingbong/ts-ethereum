@@ -10,7 +10,7 @@ import {
   safeError,
   safeResult,
 } from '@ts-ethereum/utils'
-import type { ReceiptsManager } from 'src/execution/receipt'
+import type { ReceiptsManager } from '../../../execution/receipt'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'
