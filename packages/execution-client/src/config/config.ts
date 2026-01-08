@@ -36,7 +36,7 @@ export class Config {
 
   public shutdown: boolean
 
-  private readonly logger: Logger
+  public readonly logger: Logger
 
   constructor(options: ConfigOptions) {
     this.events = new EventEmitter<EventParams>()

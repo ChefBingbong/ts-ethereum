@@ -299,4 +299,21 @@ export interface ConfigOptions {
   useP2PServer?: boolean
 
   node?: P2PNode
+
+  // engine /beacon sync options
+  skeletonFillCanonicalBackStep?: number
+  skeletonSubchainMergeMinimum?: number
+  maxRangeBytes?: number
+  maxAccountRange?: bigint
+  maxStorageRange?: bigint
+  maxInvalidBlocksErrorCache?: number
+  pruneEngineCache?: boolean
+  engineParentLookupMaxDepth?: number
+  engineNewpayloadMaxExecute?: number
+  engineNewpayloadMaxTxsExecute?: number
+  snapAvailabilityDepth?: bigint
+  snapTransitionSafeDepth?: bigint
+
+  // Defaulting to false as experimental as of now
+  enableSnapSync?: boolean
 }
