@@ -69,6 +69,7 @@ export interface ResolvedConfigOptions {
 
   // Defaulting to false as experimental as of now
   readonly enableSnapSync: boolean
+  readonly blobsAndProofsCacheBlocks: number
 }
 
 /**
@@ -120,6 +121,7 @@ export function createConfigFromDefaults(
     enableSnapSync: false,
     useStringValueTrieDB: false,
     savePreimages: true,
+    blobsAndProofsCacheBlocks: constants.BLOBS_AND_PROOFS_CACHE_BLOCKS,
   }
 }
 
@@ -209,6 +211,8 @@ export function createConfigOptions(
     snapTransitionSafeDepth:
       options.snapTransitionSafeDepth ?? defaults.snapTransitionSafeDepth,
     enableSnapSync: options.enableSnapSync ?? defaults.enableSnapSync,
+    blobsAndProofsCacheBlocks:
+      options.blobsAndProofsCacheBlocks ?? defaults.blobsAndProofsCacheBlocks,
   }
 }
 

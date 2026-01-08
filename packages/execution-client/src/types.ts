@@ -2,6 +2,7 @@ import type { Multiaddr } from '@multiformats/multiaddr'
 import type { Block, BlockHeader } from '@ts-ethereum/block'
 import type { BlockchainManager } from '@ts-ethereum/blockchain'
 import type { GenesisState } from '@ts-ethereum/chain-config'
+import type { MerkleStateManager } from '@ts-ethereum/state-manager'
 import type { Address } from '@ts-ethereum/utils'
 import type { AbstractLevel } from 'abstract-level'
 import type * as promClient from 'prom-client'
@@ -22,6 +23,8 @@ export const Event = {
   SYNC_SYNCHRONIZED: 'sync:synchronized',
   SYNC_ERROR: 'sync:error',
   SYNC_FETCHER_ERROR: 'sync:fetcher:error',
+  SYNC_SNAPSYNC_PROGRESS: 'sync:snapsync:progress',
+  SYNC_SNAPSYNC_COMPLETE: 'sync:snapsync:complete',
   PEER_CONNECTED: 'peer:connected',
   PEER_DISCONNECTED: 'peer:disconnected',
   PEER_ERROR: 'peer:error',
@@ -49,6 +52,7 @@ export interface EventParams {
     task: unknown,
     peer: Peer | null | undefined,
   ]
+  [Event.SYNC_SNAPSYNC_PROGRESS]: [{ type: string; count: number }]
   [Event.CHAIN_REORG]: [oldBlocks: Block[], newBlocks: Block[]]
   [Event.PEER_CONNECTED]: [connectedPeer: Peer]
   [Event.PEER_DISCONNECTED]: [disconnectedPeer: Peer]
@@ -67,6 +71,10 @@ export interface EventParams {
     },
   ]
   [Event.RPC_READY]: [{ address: string; port: number }]
+  [Event.SYNC_SNAPSYNC_COMPLETE]: [
+    root: Uint8Array,
+    stateManager: MerkleStateManager,
+  ]
 }
 
 /**

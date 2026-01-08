@@ -171,6 +171,7 @@ export type ProtocolType = (typeof ProtocolType)[keyof typeof ProtocolType]
 
 export const ProtocolType = {
   ETH: 'eth',
+  SNAP: 'snap',
 } as const
 
 export interface KBucketOptions {

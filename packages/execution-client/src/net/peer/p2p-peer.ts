@@ -4,6 +4,7 @@ import debug from 'debug'
 import type { Chain } from '../../blockchain/index'
 import type { VMExecution } from '../../execution/index'
 import { EthHandler } from '../../protocol/eth'
+import { SnapHandler } from '../../protocol/snap'
 import { Event } from '../../types'
 import type { EthHandlerContext } from '../protocol/eth/handlers'
 import type { PeerOptions } from './peer'
@@ -144,6 +145,50 @@ export class P2PPeer extends Peer {
       }
     } else {
       log('No ETH protocol found for peer %s', this.id.slice(0, 8))
+    }
+
+    // Find SNAP protocol
+    const snapProtocol = protocols.find((p) => p.constructor.name === 'SNAP')
+
+    if (snapProtocol) {
+      log('Binding SNAP protocol for peer %s', this.id.slice(0, 8))
+
+      if (this.chain) {
+        // Create SnapHandler
+        log('Creating SnapHandler for peer %s', this.id.slice(0, 8))
+        const snapHandler = new SnapHandler({
+          config: this.config,
+          chain: this.chain,
+          rlpxConnection: this.rlpxConnection,
+        })
+
+        // Forward messages from SnapHandler to service via PROTOCOL_MESSAGE event
+        snapHandler.on('message', (_message: any) => {
+          const message = {
+            message: _message,
+            protocol: 'snap',
+            peer: this,
+          }
+          this.config.events.emit(Event.PROTOCOL_MESSAGE, message)
+        })
+
+        this.snap = snapHandler
+        this.boundProtocols.push({
+          name: 'snap',
+          handleMessageQueue: () => {},
+        })
+        log(
+          'SNAP protocol bound using SnapHandler for peer %s',
+          this.id.slice(0, 8),
+        )
+      } else {
+        log(
+          'Chain not available, skipping SNAP handler creation for peer %s',
+          this.id.slice(0, 8),
+        )
+      }
+    } else {
+      log('No SNAP protocol found for peer %s', this.id.slice(0, 8))
     }
   }
 

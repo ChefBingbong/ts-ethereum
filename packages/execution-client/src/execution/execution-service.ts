@@ -8,7 +8,11 @@ import { Miner } from '../miner/index'
 import type { NetworkCore } from '../net/core/network-core'
 import { Skeleton } from '../service/skeleton'
 import { TxPool } from '../service/txpool'
-import { BeaconSynchronizer, FullSynchronizer } from '../sync/index'
+import {
+  BeaconSynchronizer,
+  FullSynchronizer,
+  SnapSynchronizer,
+} from '../sync/index'
 import { Event } from '../types'
 import type { VMExecution } from './vmexecution'
 
@@ -20,6 +24,7 @@ export interface ExecutionServiceModules {
   miner: Miner
   synchronizer: FullSynchronizer | BeaconSynchronizer
   skeleton?: Skeleton
+  snapsync?: SnapSynchronizer
 }
 
 export interface ExecutionServiceInitOptions {
@@ -52,6 +57,7 @@ export class ExecutionService {
   public synchronizer: FullSynchronizer | BeaconSynchronizer
   public readonly config: Config
   public skeleton?: Skeleton
+  public snapsync?: SnapSynchronizer
 
   /**
    * Check if we should use beacon sync mode
@@ -143,6 +149,19 @@ export class ExecutionService {
       execution: options.execution,
     })
 
+    // Create SnapSynchronizer if enabled
+    let snapsync: SnapSynchronizer | undefined
+    if (options.config.options.enableSnapSync && skeleton !== undefined) {
+      options.config.options.logger?.info(
+        'Creating SnapSynchronizer for fast state sync',
+      )
+      snapsync = new SnapSynchronizer({
+        core: options.networkCore,
+        skeleton,
+        execution: options.execution,
+      })
+    }
+
     const service = new ExecutionService({
       config: options.config,
       chain: options.chain,
@@ -151,6 +170,7 @@ export class ExecutionService {
       miner,
       synchronizer,
       skeleton,
+      snapsync,
     })
 
     // Initialize components
@@ -165,6 +185,11 @@ export class ExecutionService {
     await synchronizer.open()
     synchronizer.opened = true
 
+    // Open snap synchronizer if enabled
+    if (snapsync !== undefined) {
+      await snapsync.open()
+    }
+
     service.setupEventListeners()
 
     return service
@@ -178,6 +203,7 @@ export class ExecutionService {
     this.miner = modules.miner
     this.synchronizer = modules.synchronizer
     this.skeleton = modules.skeleton
+    this.snapsync = modules.snapsync
   }
 
   /**

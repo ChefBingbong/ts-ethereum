@@ -6,7 +6,7 @@ import type { Chain } from '../../../blockchain/index'
 import type { VMExecution } from '../../../execution/index'
 import type { TxReceiptWithType } from '../../../execution/receipt'
 import type { TxPool } from '../../../service/txpool'
-import { FullSynchronizer } from '../../../sync/index'
+import { type BeaconSynchronizer, FullSynchronizer } from '../../../sync/index'
 import type { NetworkCore } from '../../core/network-core'
 import type { Peer } from '../../peer/peer'
 
@@ -36,6 +36,7 @@ export interface EthHandlerContext {
   chain: Chain
   txPool: TxPool
   synchronizer?: FullSynchronizer
+  beaconSynchronizer?: BeaconSynchronizer
   execution: VMExecution
   networkCore: NetworkCore
 }
@@ -117,7 +118,9 @@ export async function handleNewBlock(
 ) {
   const [block] = data
   const { synchronizer } = context
-  await synchronizer?.handleNewBlock(block, peer)
+  if (synchronizer instanceof FullSynchronizer) {
+    await synchronizer.handleNewBlock(block, peer)
+  }
 }
 
 /**

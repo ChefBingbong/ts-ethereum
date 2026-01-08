@@ -8,6 +8,7 @@ import { VMExecution } from '../execution/vmexecution'
 import { NetworkService } from '../net/network-service'
 import type { Peer } from '../net/peer/peer'
 import { RpcServer } from '../rpc/server/index'
+import { BeaconSynchronizer, FullSynchronizer } from '../sync'
 import { TxFetcher } from '../sync/fetcher/txFetcher'
 import { Event } from '../types'
 import type { V8Engine } from '../util/index'
@@ -90,10 +91,18 @@ export class ExecutionNode {
     })
 
     // Set handler context for protocol message routing
+    // Extract synchronizer with proper type narrowing
+    const synchronizer = executionService.synchronizer
+    const fullSynchronizer =
+      synchronizer instanceof FullSynchronizer ? synchronizer : undefined
+    const beaconSynchronizer =
+      synchronizer instanceof BeaconSynchronizer ? synchronizer : undefined
+
     network.setHandlerContext({
       chain,
       txPool: executionService.txPool,
-      synchronizer: executionService.synchronizer,
+      synchronizer: fullSynchronizer,
+      beaconSynchronizer,
       execution,
       networkCore: network.core,
     })
@@ -325,10 +334,14 @@ export class ExecutionNode {
   }
 
   private setHandlerContext(): void {
+    const synchronizer = this.execution.synchronizer
     const handlerContext = {
       chain: this.chain,
       txPool: this.execution.txPool,
-      synchronizer: this.execution.synchronizer,
+      synchronizer:
+        synchronizer instanceof FullSynchronizer ? synchronizer : undefined,
+      beaconSynchronizer:
+        synchronizer instanceof BeaconSynchronizer ? synchronizer : undefined,
       execution: this.execution.execution,
       networkCore: this.network.core,
     }

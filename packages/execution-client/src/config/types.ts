@@ -317,4 +317,5 @@ export interface ConfigOptions {
 
   // Defaulting to false as experimental as of now
   enableSnapSync?: boolean
+  blobsAndProofsCacheBlocks?: number
 }
