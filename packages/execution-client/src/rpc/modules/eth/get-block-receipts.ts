@@ -1,5 +1,9 @@
 import type { Block } from '@ts-ethereum/block'
-import { Capability, type FeeMarket1559Tx, type LegacyTx } from '@ts-ethereum/tx'
+import {
+  Capability,
+  type FeeMarket1559Tx,
+  type LegacyTx,
+} from '@ts-ethereum/tx'
 import {
   hexToBytes,
   isHexString,

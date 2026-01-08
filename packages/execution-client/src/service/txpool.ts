@@ -14,8 +14,8 @@ import {
   BIGINT_1,
   bytesToHex,
   bytesToUnprefixedHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   hexToBytes,
 } from '@ts-ethereum/utils'
 import type { VM } from '@ts-ethereum/vm'

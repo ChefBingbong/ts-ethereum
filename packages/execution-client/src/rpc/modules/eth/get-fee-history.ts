@@ -1,4 +1,4 @@
-import { BlockManager } from '@ts-ethereum/block'
+import type { BlockManager } from '@ts-ethereum/block'
 import { Hardfork } from '@ts-ethereum/chain-config'
 import {
   BIGINT_0,
@@ -10,7 +10,7 @@ import {
   safeError,
   safeResult,
 } from '@ts-ethereum/utils'
-import { ReceiptsManager } from 'src/execution/receipt'
+import type { ReceiptsManager } from 'src/execution/receipt'
 import type { ExecutionNode } from '../../../node/index'
 import { getBlockByOption } from '../../helpers'
 import { createRpcMethod } from '../../validation'

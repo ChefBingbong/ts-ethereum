@@ -1,4 +1,8 @@
-import { Capability, type FeeMarket1559Tx, type LegacyTx } from '@ts-ethereum/tx'
+import {
+  Capability,
+  type FeeMarket1559Tx,
+  type LegacyTx,
+} from '@ts-ethereum/tx'
 import { BIGINT_0, bigIntToHex, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { createRpcMethod } from '../../validation'
