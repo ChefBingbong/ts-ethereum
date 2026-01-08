@@ -38,6 +38,9 @@ export const sendRawTransaction = (node: ExecutionNode) => {
         txTargetHeight = chainHeight + BIGINT_1
       }
 
+      console.log('txTargetHeight', txTargetHeight)
+      console.log('chainHeight', chainHeight)
+      console.log('syncTargetHeight', syncTargetHeight)
       // common.setHardforkBy({
       //   blockNumber: txTargetHeight,
       //   timestamp: Math.floor(Date.now() / 1000),
@@ -61,14 +64,12 @@ export const sendRawTransaction = (node: ExecutionNode) => {
             )
           }
 
-          const blobGasLimit = common.getParamAtHardfork(
-            'maxBlobGasPerBlock',
-            hardfork,
-          )!
-          const blobGasPerBlob = common.getParamAtHardfork(
-            'blobGasPerBlob',
-            hardfork,
-          )!
+          const blobGasLimit = BigInt(
+            common.getParamAtHardfork('maxBlobGasPerBlock', hardfork)!,
+          )
+          const blobGasPerBlob = BigInt(
+            common.getParamAtHardfork('blobGasPerBlob', hardfork)!,
+          )
 
           if (BigInt((tx.blobs ?? []).length) * blobGasPerBlob > blobGasLimit) {
             return safeError(

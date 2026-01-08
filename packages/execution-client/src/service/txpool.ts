@@ -1,5 +1,8 @@
 import type { Block } from '@ts-ethereum/block'
 import {
+  isAccessList2930Tx,
+  isBlob4844Tx,
+  isFeeMarket1559Tx,
   isLegacyTx,
   type LegacyTx,
   type TypedTransaction,
@@ -1345,9 +1348,23 @@ export class TxPool {
       }
     }
 
-    throw EthereumJSErrorWithoutCode(
-      `tx of type ${(tx as TypedTransaction).type} unknown`,
-    )
+    if (isAccessList2930Tx(tx)) {
+      return {
+        maxFee: tx.gasPrice,
+        tip: tx.gasPrice,
+      }
+    }
+
+    if (isFeeMarket1559Tx(tx) || isBlob4844Tx(tx)) {
+      return {
+        maxFee: tx.maxFeePerGas,
+        tip: tx.maxPriorityFeePerGas,
+      }
+    } else {
+      throw EthereumJSErrorWithoutCode(
+        `tx of type ${(tx as TypedTransaction).type} unknown`,
+      )
+    }
   }
 
   /**
