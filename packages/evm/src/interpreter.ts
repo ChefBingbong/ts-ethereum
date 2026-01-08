@@ -30,7 +30,7 @@ import type { Journal } from './journal'
 import type { EVMPerformanceLogger, Timer } from './logger'
 import { Memory } from './memory'
 import { Message } from './message'
-import type { AsyncOpHandler, Opcode, OpcodeMapEntry } from './opcodes/index'
+import type { Opcode, Operation } from './opcodes/index'
 import { trap } from './opcodes/index'
 import { Stack } from './stack'
 import type {
@@ -294,7 +294,7 @@ export class Interpreter {
     }
 
     let err
-    let cachedOpcodes: OpcodeMapEntry[]
+    let cachedOpcodes: Operation[]
     let doJumpAnalysis = true
 
     let timer: Timer | undefined
@@ -311,7 +311,6 @@ export class Interpreter {
     while (this._runState.programCounter < this._runState.code.length) {
       const programCounter = this._runState.programCounter
       let opCode: number
-      let opCodeObj: OpcodeMapEntry | undefined
       if (doJumpAnalysis) {
         opCode = this._runState.code[programCounter]
         // Only run the jump destination analysis if `code` actually contains a JUMP/JUMPI/JUMPSUB opcode
@@ -325,8 +324,8 @@ export class Interpreter {
           doJumpAnalysis = false
         }
       } else {
-        opCodeObj = cachedOpcodes![programCounter]
-        opCode = opCodeObj.opcodeInfo.code
+        // Use cached operation to get opcode
+        opCode = cachedOpcodes![programCounter].opcode
       }
 
       // if its an invalid opcode with binary activated, then check if its because of a missing code
@@ -357,7 +356,7 @@ export class Interpreter {
         if (overheadTimer !== undefined) {
           this.performanceLogger.pauseTimer()
         }
-        await this.runStep(opCodeObj)
+        await this.runStep()
         if (overheadTimer !== undefined) {
           this.performanceLogger.unpauseTimer(overheadTimer)
         }
@@ -394,26 +393,26 @@ export class Interpreter {
    * Executes the opcode to which the program counter is pointing,
    * reducing its base gas cost, and increments the program counter.
    */
-  async runStep(opcodeObj?: OpcodeMapEntry): Promise<void> {
-    const opEntry = opcodeObj ?? this.lookupOpInfo(this._runState.opCode)
-    const opInfo = opEntry.opcodeInfo
+  async runStep(): Promise<void> {
+    const opCode = this._runState.opCode
+    const operation = this.lookupOperation(opCode)
 
     let timer: Timer
 
     if (this.profilerOpts?.enabled === true) {
-      timer = this.performanceLogger.startTimer(opInfo.name)
+      timer = this.performanceLogger.startTimer(operation.name)
     }
 
-    let gas = opInfo.feeBigInt
+    // Get base gas from new jump table (populated from chain params)
+    let gas = operation.constantGas
 
     // Cache pre-gas memory size if doing tracing (EIP-7756)
     const memorySizeCache = this._runState.memoryWordCount
 
     try {
-      if (opInfo.dynamicGas) {
-        // This function updates the gas in-place.
-        // It needs the base fee, for correct gas limit calculation for the CALL opcodes
-        gas = await opEntry.gasHandler(this._runState, gas, this.common)
+      // Use dynamic gas handler from new jump table
+      if (operation.dynamicGas) {
+        gas = await operation.dynamicGas(this._runState, gas, this.common)
       }
 
       if (this._evm.events.listenerCount('step') > 0 || this._evm.DEBUG) {
@@ -438,47 +437,43 @@ export class Interpreter {
         debugGas(`codechunk accessed statelessGas=${statelessGas} (-> ${gas})`)
       }
 
-      // Check for invalid opcode
-      if (opInfo.isInvalid) {
+      // Check for invalid opcode using new jump table
+      if (operation.undefined) {
         throw new EVMError(EVMError.errorMessages.INVALID_OPCODE)
       }
 
       // Reduce opcode's base fee
-      this.useGas(gas, opInfo)
+      this.useGas(gas, operation.name)
 
       // Advance program counter
       this._runState.programCounter++
 
-      // Execute opcode handler
-      const opFn = opEntry.opHandler
-
-      if (opInfo.isAsync) {
-        await (opFn as AsyncOpHandler).apply(null, [
-          this._runState,
-          this.common,
-        ])
+      // Execute opcode handler from new jump table
+      if (operation.isAsync) {
+        await operation.execute(this._runState, this.common)
       } else {
-        opFn.apply(null, [this._runState, this.common])
+        operation.execute(this._runState, this.common)
       }
       this._runState.env.accessWitness?.commit()
     } finally {
       if (this.profilerOpts?.enabled === true) {
+        const baseFee = Number(operation.constantGas)
         this.performanceLogger.stopTimer(
           timer!,
           Number(gas),
           'opcodes',
-          opInfo.fee,
-          Number(gas) - opInfo.fee,
+          baseFee,
+          Number(gas) - baseFee,
         )
       }
     }
   }
 
   /**
-   * Get info for an opcode from EVM's list of opcodes.
+   * Get operation from the jump table.
    */
-  lookupOpInfo(op: number): OpcodeMapEntry {
-    return this._evm['_opcodeMap'][op]
+  lookupOperation(op: number): Operation {
+    return this._evm.jumpTable[op]
   }
 
   async _runStepHook(
@@ -486,14 +481,15 @@ export class Interpreter {
     gasLeft: bigint,
     memorySize: bigint,
   ): Promise<void> {
-    const opcodeInfo = this.lookupOpInfo(this._runState.opCode).opcodeInfo
+    const opCode = this._runState.opCode
+    const operation = this.lookupOperation(opCode)
     const section =
       this._env.eof?.container.header.getSectionFromProgramCounter(
         this._runState.programCounter,
       )
     let error
     let immediate
-    if (opcodeInfo.code === 0xfd) {
+    if (opCode === 0xfd) {
       // If opcode is REVERT, read error data and return in trace
       const [offset, length] = this._runState.stack.peek(2)
       error = new Uint8Array(0)
@@ -504,14 +500,12 @@ export class Interpreter {
 
     // Add immediate if present (i.e. bytecode parameter for a preceding opcode like (RJUMP 01 - jumps to PC 1))
     if (
-      stackDelta[opcodeInfo.code] !== undefined &&
-      stackDelta[opcodeInfo.code].intermediates > 0
+      stackDelta[opCode] !== undefined &&
+      stackDelta[opCode].intermediates > 0
     ) {
       immediate = this._runState.code.slice(
         this._runState.programCounter + 1, // immediates start "immediately" following current opcode
-        this._runState.programCounter +
-          1 +
-          stackDelta[opcodeInfo.code].intermediates,
+        this._runState.programCounter + 1 + stackDelta[opCode].intermediates,
       )
     }
 
@@ -521,11 +515,11 @@ export class Interpreter {
       gasLeft,
       gasRefund: this._runState.gasRefund,
       opcode: {
-        name: opcodeInfo.fullName,
-        fee: opcodeInfo.fee,
+        name: operation.fullName,
+        fee: Number(operation.constantGas),
         dynamicFee,
-        isAsync: opcodeInfo.isAsync,
-        code: opcodeInfo.code,
+        isAsync: operation.isAsync,
+        code: opCode,
       },
       stack: this._runState.stack.getStack(),
       depth: this._env.depth,
@@ -605,11 +599,11 @@ export class Interpreter {
     const jumps = new Uint8Array(code.length)
     const pushes: { [pc: number]: bigint } = {}
 
-    const opcodesCached = Array(code.length)
+    const opcodesCached: Operation[] = Array(code.length)
 
     for (let i = 0; i < code.length; i++) {
       const opcode = code[i]
-      opcodesCached[i] = this.lookupOpInfo(opcode)
+      opcodesCached[i] = this.lookupOperation(opcode)
       // skip over PUSH0-32 since no jump destinations in the middle of a push block
       if (opcode <= 0x7f) {
         if (opcode >= 0x60) {

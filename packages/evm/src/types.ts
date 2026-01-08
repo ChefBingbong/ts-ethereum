@@ -19,11 +19,11 @@ import type { EOFContainer } from './eof/container'
 import type { EVMError } from './errors'
 import type { InterpreterStep, RunState } from './interpreter'
 import type { Message } from './message'
+import type { OpHandler } from './opcodes/index'
 import type {
   AsyncDynamicGasHandler,
   SyncDynamicGasHandler,
-} from './opcodes/gas'
-import type { OpHandler } from './opcodes/index'
+} from './opcodes/instructions/gas'
 import type { CustomPrecompile } from './precompiles/index'
 import type { PrecompileFunc } from './precompiles/types'
 
