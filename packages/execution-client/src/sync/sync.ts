@@ -7,7 +7,11 @@ import type { NetworkCore } from '../net/index'
 import type { Peer } from '../net/peer/peer'
 import { Event } from '../types'
 import { wait } from '../util/wait'
-import type { BlockFetcher, ReverseBlockFetcher } from './fetcher/index'
+import type {
+  AccountFetcher,
+  BlockFetcher,
+  ReverseBlockFetcher,
+} from './fetcher/index'
 
 export interface SynchronizerOptions {
   /* Refresh interval in ms (default: 1000) */
@@ -28,7 +32,8 @@ export abstract class Synchronizer {
   protected interval: number
   protected forceSync: boolean
 
-  public _fetcher: BlockFetcher | ReverseBlockFetcher | null
+  public _fetcher: AccountFetcher | BlockFetcher | ReverseBlockFetcher | null
+
   public opened: boolean
   public running: boolean
   public startingBlock: bigint
@@ -154,11 +159,15 @@ export abstract class Synchronizer {
     return 'sync'
   }
 
-  get fetcher(): BlockFetcher | null {
+  get fetcher(): AccountFetcher | BlockFetcher | ReverseBlockFetcher | null {
     return this._fetcher
   }
 
-  set fetcher(fetcher: BlockFetcher | null) {
+  set fetcher(fetcher:
+    | AccountFetcher
+    | BlockFetcher
+    | ReverseBlockFetcher
+    | null) {
     this._fetcher = fetcher
   }
 

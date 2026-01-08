@@ -50,7 +50,7 @@ export class SnapSynchronizer extends Synchronizer {
     if (this._fetcher !== null && !(this._fetcher instanceof AccountFetcher)) {
       throw Error(`Invalid Fetcher, expected AccountFetcher`)
     }
-    return this._fetcher as AccountFetcher | null
+    return this._fetcher
   }
 
   set fetcher(fetcher: AccountFetcher | null) {
