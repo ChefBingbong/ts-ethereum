@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha2'
+import { sha256 } from '@noble/hashes/sha2.js'
 import type { Block, ExecutionPayload } from '@ts-ethereum/block'
 import {
   createBlockFromExecutionPayload,
@@ -33,7 +33,7 @@ export const validate4844BlobVersionedHashes = (
   let validationError: string | null = null
 
   // Collect versioned hashes in the flat array `txVersionedHashes` to match with received
-  const txVersionedHashes: Uint8Array[] = []
+  const txVersionedHashes = []
   for (const tx of headBlock.transactions) {
     if (tx instanceof Blob4844Tx) {
       for (const vHash of tx.blobVersionedHashes) {
@@ -48,9 +48,7 @@ export const validate4844BlobVersionedHashes = (
     // match individual hashes
     for (let vIndex = 0; vIndex < blobVersionedHashes.length; vIndex++) {
       // if mismatch, record error and break
-      if (
-        blobVersionedHashes[vIndex] !== bytesToHex(txVersionedHashes[vIndex])
-      ) {
+      if (blobVersionedHashes[vIndex] !== txVersionedHashes[vIndex]) {
         validationError = `Error verifying blobVersionedHashes: mismatch at index=${vIndex} expected=${short(
           txVersionedHashes[vIndex],
         )} received=${short(blobVersionedHashes[vIndex])}`
@@ -123,7 +121,10 @@ export const assembleBlock = async (
   const { blockNumber, timestamp } = payload
   const { config } = chain
   const hardforkManager = config.hardforkManager
-  const hardfork = hardforkManager.getHardforkByBlock(blockNumber, timestamp)
+  const hardfork = hardforkManager.getHardforkByBlock(
+    BigInt(blockNumber),
+    BigInt(timestamp),
+  )
 
   try {
     // Validate CL data to see if it matches with the assembled block

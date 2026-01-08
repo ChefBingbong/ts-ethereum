@@ -1,11 +1,12 @@
 import { OrderedMap } from '@js-sdsl/ordered-map'
+import { keccak_256 as keccak256 } from '@noble/hashes/sha3.js'
 import {
   BranchMPTNode,
   decodeMPTNode,
   ExtensionMPTNode,
   LeafMPTNode,
-  MerklePatriciaTrie,
   mergeAndFormatKeyPaths,
+  MerklePatriciaTrie,
   pathToHexKey,
 } from '@ts-ethereum/mpt'
 import { bytesToHex } from '@ts-ethereum/rlp'
@@ -23,7 +24,7 @@ import {
 } from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debug from 'debug'
-import { keccak256 } from 'ethereum-cryptography/keccak'
+
 import { hexToBytes } from 'ethereum-cryptography/utils'
 import type { Peer } from '../../net/peer/index'
 import type { FetcherOptions } from './fetcher'
@@ -48,7 +49,7 @@ export interface TrieNodeFetcherOptions extends FetcherOptions {
   fetcherDoneFlags?: SnapFetcherDoneFlags
 }
 
-export type JobTask = {
+type JobTask = {
   pathStrings: string[]
   paths: Uint8Array[][] // paths to nodes for requesting from SNAP API kept in compact encoding
 }

@@ -1,3 +1,4 @@
+import { keccak_256 as keccak256 } from '@noble/hashes/sha3.js'
 import {
   type MerklePatriciaTrie,
   verifyMerkleRangeProof,
@@ -7,8 +8,8 @@ import {
   accountBodyToRLP,
   BIGINT_0,
   BIGINT_1,
-  BIGINT_2EXP256,
   BIGINT_100,
+  BIGINT_2EXP256,
   bigIntToBytes,
   bytesToBigInt,
   bytesToHex,
@@ -21,7 +22,7 @@ import {
 } from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debugDefault from 'debug'
-import { keccak256 } from 'ethereum-cryptography/keccak'
+
 import type { Peer } from '../../net/peer/index'
 import type { AccountData } from '../../net/protocol/snap/definitions'
 import { Event } from '../../types'

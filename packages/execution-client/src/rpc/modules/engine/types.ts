@@ -1,6 +1,6 @@
 import type { Block, ExecutionPayload } from '@ts-ethereum/block'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
-import type { Skeleton } from '../../../service/index'
+import type { Skeleton } from '../../../service/skeleton'
 import { UNKNOWN_PAYLOAD } from '../../error-code'
 
 export type Status = (typeof Status)[keyof typeof Status]

@@ -1,20 +1,29 @@
 import type { Block, HeaderData } from '@ts-ethereum/block'
 import { Hardfork } from '@ts-ethereum/chain-config'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import {
+  type Blob4844Tx,
+  isBlob4844Tx,
+  type TypedTransaction,
+} from '@ts-ethereum/tx'
 import {
   BIGINT_1,
   BIGINT_2,
   bigIntToUnpaddedBytes,
   bytesToHex,
   bytesToUnprefixedHex,
+  type CLRequest,
+  type CLRequestType,
   concatBytes,
-  TypeOutput,
+  createZeroAddress,
+  type PrefixedHexString,
   toType,
+  TypeOutput,
+  type WithdrawalData,
 } from '@ts-ethereum/utils'
 import {
   type BlockBuilder,
-  BuildStatus,
   buildBlock,
+  BuildStatus,
   type TxReceipt,
   type VM,
 } from '@ts-ethereum/vm'
@@ -32,6 +41,12 @@ interface PendingBlockOpts {
 
   /* Skip hardfork validation */
   skipHardForkValidation?: boolean
+}
+
+export interface BlobsBundle {
+  blobs: PrefixedHexString[]
+  commitments: PrefixedHexString[]
+  proofs: PrefixedHexString[]
 }
 
 /**
@@ -68,6 +83,8 @@ export class PendingBlock {
   txPool: TxPool
 
   pendingPayloads: Map<string, CachedPendingBlock> = new Map()
+  blobsBundles: Map<string, BlobsBundle> = new Map()
+  executionRequests: Map<string, CLRequest<CLRequestType>[]> = new Map()
 
   private skipHardForkValidation?: boolean
 
@@ -129,17 +146,13 @@ export class PendingBlock {
     vm: VM,
     parentBlock: Block,
     headerData: Partial<HeaderData> = {},
+    withdrawals?: WithdrawalData[],
   ) {
     const number = parentBlock.header.number + BIGINT_1
     const { timestamp, mixHash, parentBeaconBlockRoot, coinbase } = headerData
     const parentHash = bytesToUnprefixedHex(parentBlock.hash())
 
     let { gasLimit } = parentBlock.header
-
-    // vm.common.setHardforkBy({
-    //   blockNumber: number,
-    //   timestamp,
-    // })
 
     const baseFeePerGas = vm.hardforkManager.isEIPActiveAtHardfork(
       1559,
@@ -162,10 +175,38 @@ export class PendingBlock {
     const gasLimitBuf = bigIntToUnpaddedBytes(gasLimit)
     const mixHashBuf =
       toType(mixHash!, TypeOutput.Uint8Array) ?? new Uint8Array(32)
+    const parentBeaconBlockRootBuf =
+      toType(parentBeaconBlockRoot!, TypeOutput.Uint8Array) ??
+      new Uint8Array(32)
     const coinbaseBuf = toType(
       coinbase ?? new Uint8Array(20),
       TypeOutput.Uint8Array,
     )
+
+    // Encode withdrawals for payload ID calculation (post-Shanghai)
+    let withdrawalsBuf = new Uint8Array()
+    if (withdrawals !== undefined && withdrawals !== null) {
+      const withdrawalsBufTemp: Uint8Array[] = []
+      for (const withdrawal of withdrawals) {
+        const indexBuf = bigIntToUnpaddedBytes(
+          toType(withdrawal.index ?? 0, TypeOutput.BigInt),
+        )
+        const validatorIndex = bigIntToUnpaddedBytes(
+          toType(withdrawal.validatorIndex ?? 0, TypeOutput.BigInt),
+        )
+        const address = toType(
+          withdrawal.address ?? createZeroAddress(),
+          TypeOutput.Uint8Array,
+        )
+        const amount = bigIntToUnpaddedBytes(
+          toType(withdrawal.amount ?? 0, TypeOutput.BigInt),
+        )
+        withdrawalsBufTemp.push(
+          concatBytes(indexBuf, validatorIndex, address, amount),
+        )
+      }
+      withdrawalsBuf = concatBytes(...withdrawalsBufTemp)
+    }
 
     const keccakFunction = keccak256
 
@@ -175,7 +216,9 @@ export class PendingBlock {
         mixHashBuf,
         timestampBuf,
         gasLimitBuf,
+        parentBeaconBlockRootBuf,
         coinbaseBuf,
+        withdrawalsBuf,
       ),
     ).subarray(0, 8)
 
@@ -190,7 +233,7 @@ export class PendingBlock {
       return payloadIdBytes
     }
 
-    // Prune the builders
+    // Prune the builders and blobsBundles
     this.pruneSetToMax(MAX_PAYLOAD_CACHE)
 
     // Set the state root to ensure the resulting state
@@ -207,6 +250,7 @@ export class PendingBlock {
         gasLimit,
         baseFeePerGas,
       },
+      withdrawals,
       blockOpts: {
         putBlockIntoBlockchain: false,
         setHardfork: true,
@@ -221,21 +265,52 @@ export class PendingBlock {
       created: Date.now(),
     })
 
+    // Get if and how many blobs are allowed in the tx
+    let allowedBlobs: number
+    const blockHardfork = vm.hardforkManager.getHardforkFromContext({
+      blockNumber: number,
+    })
+    if (vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)) {
+      const blobGasLimit =
+        vm.hardforkManager.getParamAtHardfork(
+          'maxBlobGasPerBlock',
+          blockHardfork,
+        ) ?? 0n
+      const blobGasPerBlob =
+        vm.hardforkManager.getParamAtHardfork(
+          'blobGasPerBlob',
+          blockHardfork,
+        ) ?? 1n
+      allowedBlobs = Number(blobGasLimit / blobGasPerBlob)
+    } else {
+      allowedBlobs = 0
+    }
+
     // Add current txs in pool using incremental selection
     const txSet = await this.txPool.txsByPriceAndNonce(vm, {
       minGasPrice: this.config.options.minerGasPrice,
+      baseFee: baseFeePerGas,
+      allowedBlobs,
       priorityAddresses: this.config.options.minerPriorityAddresses
         ? [...this.config.options.minerPriorityAddresses]
         : undefined,
     })
 
-    const { addedTxs, skippedByAddErrors } = await this.addTransactions(
-      builder,
-      txSet,
-    )
+    const { addedTxs, skippedByAddErrors, blobTxs } =
+      await this.addTransactions(builder, txSet)
     this.config.options.logger?.info(
       `Pending: Added txs=${addedTxs} skippedByAddErrors=${skippedByAddErrors}`,
     )
+
+    // Construct initial blobs bundle when payload is constructed (EIP-4844)
+    if (
+      vm.hardforkManager.isEIPActiveAtHardfork(
+        4844,
+        vm.hardforkManager.getHardforkFromContext({ blockNumber: number }),
+      )
+    ) {
+      this.constructBlobsBundle(payloadId, blobTxs)
+    }
 
     return payloadIdBytes
   }
@@ -254,6 +329,8 @@ export class PendingBlock {
     void cached.builder.revert()
     // Remove from pendingPayloads
     this.pendingPayloads.delete(payloadId)
+    this.blobsBundles.delete(payloadId)
+    this.executionRequests.delete(payloadId)
   }
 
   /**
@@ -261,7 +338,16 @@ export class PendingBlock {
    */
   async build(
     payloadIdBytes: Uint8Array | string,
-  ): Promise<void | [block: Block, receipts: TxReceipt[], value: bigint]> {
+  ): Promise<
+    | void
+    | [
+        block: Block,
+        receipts: TxReceipt[],
+        value: bigint,
+        blobs?: BlobsBundle,
+        requests?: CLRequest<CLRequestType>[],
+      ]
+  > {
     const payloadId =
       typeof payloadIdBytes !== 'string'
         ? bytesToHex(payloadIdBytes)
@@ -277,11 +363,39 @@ export class PendingBlock {
         blockStatus.block,
         builder.transactionReceipts,
         builder.minerValue,
+        this.blobsBundles.get(payloadId),
+        this.executionRequests.get(payloadId),
       ]
     }
     const { vm, headerData } = builder as unknown as {
       vm: VM
       headerData: HeaderData
+    }
+
+    // Get the number of blobs that can be further added
+    let allowedBlobs: number
+    const buildHardfork = vm.hardforkManager.getHardforkFromContext({
+      blockNumber: headerData.number as bigint,
+    })
+    if (vm.hardforkManager.isEIPActiveAtHardfork(4844, buildHardfork)) {
+      const bundle = this.blobsBundles.get(payloadId) ?? {
+        blobs: [],
+        commitments: [],
+        proofs: [],
+      }
+      const blobGasLimit =
+        vm.hardforkManager.getParamAtHardfork(
+          'maxBlobGasPerBlock',
+          buildHardfork,
+        ) ?? 0n
+      const blobGasPerBlob =
+        vm.hardforkManager.getParamAtHardfork(
+          'blobGasPerBlob',
+          buildHardfork,
+        ) ?? 1n
+      allowedBlobs = Number(blobGasLimit / blobGasPerBlob) - bundle.blobs.length
+    } else {
+      allowedBlobs = 0
     }
 
     // Get existing transaction hashes
@@ -293,29 +407,58 @@ export class PendingBlock {
     // Get new transactions using incremental selection
     const txSet = await this.txPool.txsByPriceAndNonce(vm, {
       minGasPrice: this.config.options.minerGasPrice,
+      baseFee: headerData.baseFeePerGas as bigint | undefined,
+      allowedBlobs,
       priorityAddresses: this.config.options.minerPriorityAddresses
         ? [...this.config.options.minerPriorityAddresses]
         : undefined,
     })
 
     // Filter out already included transactions and add new ones
-    const { skippedByAddErrors } = await this.addTransactions(
+    const { skippedByAddErrors, blobTxs } = await this.addTransactions(
       builder,
       txSet,
       existingTxHashes,
     )
 
-    const { block } = await builder.build()
+    const { block, requests } = await builder.build()
+
+    // Store execution requests if present
+    if (requests !== undefined) {
+      this.executionRequests.set(payloadId, requests)
+    }
+
+    // Construct blobs bundle (EIP-4844)
+    const blobs = vm.hardforkManager.isEIPActiveAtHardfork(
+      4844,
+      vm.hardforkManager.getHardforkFromContext({
+        blockNumber: block.header.number,
+      }),
+    )
+      ? this.constructBlobsBundle(payloadId, blobTxs)
+      : undefined
+
+    const withdrawalsStr =
+      block.withdrawals !== undefined
+        ? ` withdrawals=${block.withdrawals.length}`
+        : ''
+    const blobsStr = blobs ? ` blobs=${blobs.blobs.length}` : ''
 
     this.config.options.logger?.info(
       `Pending: Built block number=${block.header.number} txs=${
         block.transactions.length
-      } skippedByAddErrors=${skippedByAddErrors} hash=${bytesToHex(
+      }${withdrawalsStr}${blobsStr} skippedByAddErrors=${skippedByAddErrors} hash=${bytesToHex(
         block.hash(),
       )}`,
     )
 
-    return [block, builder.transactionReceipts, builder.minerValue]
+    return [
+      block,
+      builder.transactionReceipts,
+      builder.minerValue,
+      blobs,
+      requests,
+    ]
   }
 
   private async addTransactions(
@@ -326,6 +469,7 @@ export class PendingBlock {
     let addedTxs = 0
     let skippedByAddErrors = 0
     let blockFull = false
+    const blobTxs: Blob4844Tx[] = []
     const gasLimit = (builder as any).headerData.gasLimit as bigint
 
     // Incremental transaction selection
@@ -358,6 +502,10 @@ export class PendingBlock {
       switch (addTxResult) {
         case AddTxResult.Success:
           addedTxs++
+          // Track blob transactions for bundle construction
+          if (isBlob4844Tx(tx)) {
+            blobTxs.push(tx)
+          }
           txSet.shift()
           break
         case AddTxResult.BlockFull:
@@ -385,6 +533,7 @@ export class PendingBlock {
     return {
       addedTxs,
       skippedByAddErrors,
+      blobTxs,
     }
   }
 
@@ -397,9 +546,8 @@ export class PendingBlock {
       })
       addTxResult = AddTxResult.Success
     } catch (error: any) {
-      const errorMsg = error.message
       if (
-        errorMsg ===
+        error.message ===
         'tx has a higher gas limit than the remaining gas in the block'
       ) {
         if (
@@ -407,30 +555,62 @@ export class PendingBlock {
           (builder as any).headerData.gasLimit - BigInt(21000)
         ) {
           // If block has less than 21000 gas remaining, consider it full
-          this.config.options.logger?.info(`Pending: Assembled block full`)
+          this.config.logger?.info(`Pending: Assembled block full`)
           addTxResult = AddTxResult.BlockFull
         } else {
           addTxResult = AddTxResult.SkippedByGasLimit
         }
-      } else if (
-        errorMsg.includes('insufficient balance') ||
-        errorMsg.includes('invalid')
-      ) {
-        // Invalid transaction: should pop account
-        this.config.options.logger?.debug(
-          `Pending: Invalid tx ${bytesToHex(tx.hash())}: ${errorMsg}`,
+      } else if ((error as Error).message.includes('blobs missing')) {
+        // Remove the blob tx which doesn't has blobs bundled
+        this.txPool.removeByHash(bytesToHex(tx.hash()), tx)
+        this.config.logger?.error(
+          `Pending: Removed from txPool a blob tx ${bytesToHex(tx.hash())} with missing blobs`,
         )
         addTxResult = AddTxResult.RemovedByErrors
       } else {
-        // Other errors: skip transaction but continue with account
-        this.config.options.logger?.debug(
+        // If there is an error adding a tx, it will be skipped
+        this.config.logger?.debug(
           `Pending: Skipping tx ${bytesToHex(
             tx.hash(),
-          )}, error encountered: ${errorMsg}`,
+          )}, error encountered when trying to add tx:\n${error}`,
         )
         addTxResult = AddTxResult.SkippedByErrors
       }
     }
     return addTxResult
+  }
+
+  /**
+   * An internal helper for storing the blob bundle associated with each transaction in an EIP4844 world
+   * @param payloadId the payload Id of the pending block
+   * @param txs an array of Blob4844Tx transactions
+   */
+  private constructBlobsBundle = (payloadId: string, txs: Blob4844Tx[]) => {
+    let blobs: PrefixedHexString[] = []
+    let commitments: PrefixedHexString[] = []
+    let proofs: PrefixedHexString[] = []
+    const bundle = this.blobsBundles.get(payloadId)
+    if (bundle !== undefined) {
+      blobs = bundle.blobs
+      commitments = bundle.commitments
+      proofs = bundle.proofs
+    }
+
+    for (let tx of txs) {
+      tx = tx as Blob4844Tx
+      if (tx.blobs !== undefined && tx.blobs.length > 0) {
+        blobs = blobs.concat(tx.blobs)
+        commitments = commitments.concat(tx.kzgCommitments!)
+        proofs = proofs.concat(tx.kzgProofs!)
+      }
+    }
+
+    const blobsBundle = {
+      blobs,
+      commitments,
+      proofs,
+    }
+    this.blobsBundles.set(payloadId, blobsBundle)
+    return blobsBundle
   }
 }

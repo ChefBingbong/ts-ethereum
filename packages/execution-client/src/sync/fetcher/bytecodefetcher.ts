@@ -1,4 +1,4 @@
-import { keccak_256 } from '@noble/hashes/sha3'
+import { keccak_256 } from '@noble/hashes/sha3.js'
 import { bytesToHex, concatBytes } from '@ts-ethereum/rlp'
 import { CODEHASH_PREFIX, MerkleStateManager } from '@ts-ethereum/state-manager'
 import {
@@ -32,7 +32,7 @@ export interface ByteCodeFetcherOptions extends FetcherOptions {
 }
 
 // root comes from block?
-export type JobTask = {
+type JobTask = {
   hashes: Uint8Array[]
 }
 

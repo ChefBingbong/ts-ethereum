@@ -24,7 +24,7 @@ export const recursivelyFindParents = async (
   ) {
     return []
   }
-  const maxDepth = chain.config.engineParentLookupMaxDepth
+  const maxDepth = chain.config.options.engineParentLookupMaxDepth
 
   const parentBlocks = []
   const block = await chain.getBlock(parentHash)
@@ -96,7 +96,7 @@ export const validHash = async (
   chainCache: ChainCache,
 ): Promise<PrefixedHexString | null> => {
   const { remoteBlocks, executedBlocks, invalidBlocks, skeleton } = chainCache
-  const maxDepth = chain.config.engineParentLookupMaxDepth
+  const maxDepth = chain.config.options.engineParentLookupMaxDepth
 
   try {
     let validParent: Block | null = null
@@ -123,7 +123,7 @@ export const validHash = async (
       if (isBlockExecuted) {
         return bytesToHex(hash)
       } else {
-        hash = validParent.header.parentHash
+        hash = validParent?.header.parentHash ?? new Uint8Array(32)
       }
     }
   } catch {

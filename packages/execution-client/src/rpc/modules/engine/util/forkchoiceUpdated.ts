@@ -34,7 +34,7 @@ export const pruneCachedBlocks = (chain: Chain, chainCache: ChainCache) => {
 
     // prune invalidBlocks with some max length
     const pruneInvalidLength =
-      invalidBlocks.size - chain.config.maxInvalidBlocksErrorCache
+      invalidBlocks.size - chain.config.options.maxInvalidBlocksErrorCache
     let pruned = 0
     for (const blockHash of invalidBlocks.keys()) {
       if (pruned >= pruneInvalidLength) {

@@ -1,6 +1,5 @@
-import { Hardfork } from '@ethereumjs/common'
-import { bytesToUnprefixedHex } from '@ethereumjs/util'
-import { safeResult } from '@ts-ethereum/utils'
+import { Hardfork } from '@ts-ethereum/chain-config'
+import { bytesToUnprefixedHex, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { INTERNAL_ERROR, validEngineCodes } from '../../error-code'
 import { createRpcMethod } from '../../validation'

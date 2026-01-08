@@ -1,3 +1,4 @@
+import { keccak_256 as keccak256 } from '@noble/hashes/sha3.js'
 import { verifyMerkleRangeProof } from '@ts-ethereum/mpt'
 import { bytesToHex } from '@ts-ethereum/rlp'
 import { MerkleStateManager } from '@ts-ethereum/state-manager'
@@ -14,7 +15,7 @@ import {
 } from '@ts-ethereum/utils'
 import type { Debugger } from 'debug'
 import debugDefault from 'debug'
-import { keccak256 } from 'ethereum-cryptography/keccak'
+
 import type { Peer } from '../../net/peer/index'
 import type { StorageData } from '../../net/protocol/snap/definitions'
 import { short } from '../../util/index'
@@ -59,7 +60,7 @@ export interface StorageFetcherOptions extends FetcherOptions {
   fetcherDoneFlags: SnapFetcherDoneFlags
 }
 
-export type JobTask = {
+type JobTask = {
   storageRequests: StorageRequest[]
   multi: boolean
 }

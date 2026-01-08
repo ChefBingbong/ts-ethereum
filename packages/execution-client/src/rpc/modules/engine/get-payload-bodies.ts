@@ -1,5 +1,4 @@
-import { BIGINT_1, hexToBytes } from '@ethereumjs/util'
-import { safeResult } from '@ts-ethereum/utils'
+import { BIGINT_1, hexToBytes, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { INVALID_PARAMS, TOO_LARGE_REQUEST } from '../../error-code'
 import { createRpcMethod } from '../../validation'
@@ -8,7 +7,7 @@ import {
   getPayloadBodiesByHashV1Schema,
   getPayloadBodiesByRangeV1Schema,
 } from './schema'
-import type { Bytes8, Bytes32, ExecutionPayloadBodyV1 } from './types'
+import type { Bytes32, Bytes8, ExecutionPayloadBodyV1 } from './types'
 import { getPayloadBody } from './util/index'
 
 /**

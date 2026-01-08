@@ -1,5 +1,6 @@
 import type { Block } from '@ts-ethereum/block'
 import {
+  type Blob4844Tx,
   isAccessList2930Tx,
   isBlob4844Tx,
   isFeeMarket1559Tx,
@@ -12,11 +13,13 @@ import {
   Address,
   BIGINT_0,
   BIGINT_1,
+  BIGINT_2,
   bytesToHex,
   bytesToUnprefixedHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
+  type PrefixedHexString,
 } from '@ts-ethereum/utils'
 import type { VM } from '@ts-ethereum/vm'
 import type { Chain } from '../blockchain/chain'
@@ -31,14 +34,19 @@ import type { PeerPoolLike } from '../net/peerpool-types'
 
 // Configuration constants
 const MIN_GAS_PRICE_BUMP_PERCENT = 10
+const MIN_GAS_PRICE = BigInt(100000000) // .1 GWei
 const TX_MAX_DATA_SIZE = 128 * 1024 // 128KB
 const MAX_TXS_PER_ACCOUNT = 100
+const MAX_POOL_SIZE = 5000
 
 // Pool limits (matching Geth defaults)
 const GLOBAL_SLOTS = 4096 // Max pending tx slots globally
 const GLOBAL_QUEUE = 1024 // Max queued tx slots globally
 const ACCOUNT_SLOTS = 16 // Max pending per account
 const ACCOUNT_QUEUE = 64 // Max queued per account
+
+// Default number of blocks to cache blobs and proofs
+const DEFAULT_BLOBS_AND_PROOFS_CACHE_BLOCKS = 10
 
 export interface TxPoolOptions {
   /* Config */
@@ -183,6 +191,20 @@ export class TxPool {
   public queuedCount: number
   private rebroadcastInterval: NodeJS.Timeout | undefined
 
+  // EIP-4844 blob and proof cache (versionedHash -> {blob, proof})
+  public blobAndProofByHash: Map<
+    PrefixedHexString,
+    { blob: PrefixedHexString; proof: PrefixedHexString }
+  >
+  // EIP 7594 network wrapper blobs
+  public blobAndProofsByHash: Map<
+    PrefixedHexString,
+    { blob: PrefixedHexString; proofs: PrefixedHexString[] }
+  >
+
+  // Number of blocks to cache blobs and proofs
+  public blobsAndProofsCacheBlocks: number
+
   /**
    * Create new tx pool
    * @param options constructor parameters
@@ -213,6 +235,18 @@ export class TxPool {
       UnprefixedHash,
       { address: UnprefixedAddress; poolType: 'pending' | 'queued' }
     >()
+
+    // EIP-4844 blob cache
+    this.blobAndProofByHash = new Map<
+      PrefixedHexString,
+      { blob: PrefixedHexString; proof: PrefixedHexString }
+    >()
+    this.blobAndProofsByHash = new Map<
+      PrefixedHexString,
+      { blob: PrefixedHexString; proofs: PrefixedHexString[] }
+    >()
+    this.blobsAndProofsCacheBlocks =
+      this.config.options.blobsAndProofsCacheBlocks
 
     this.opened = false
     this.running = false
@@ -367,6 +401,21 @@ export class TxPool {
         `replacement gas too low, got tip ${newGasPrice.tip}, min: ${minTipCap}, got fee ${newGasPrice.maxFee}, min: ${minFeeCap}`,
       )
     }
+
+    // EIP-4844: Also check blob gas bump for blob transactions
+    if (isBlob4844Tx(addedTx) && isBlob4844Tx(existingTx)) {
+      const existingBlobTx = existingTx as Blob4844Tx
+      const addedBlobTx = addedTx as Blob4844Tx
+      const minBlobGasFee =
+        existingBlobTx.maxFeePerBlobGas +
+        (existingBlobTx.maxFeePerBlobGas * BigInt(MIN_GAS_PRICE_BUMP_PERCENT)) /
+          BigInt(100)
+      if (addedBlobTx.maxFeePerBlobGas < minBlobGasFee) {
+        throw EthereumJSErrorWithoutCode(
+          `replacement blob gas too low, got: ${addedBlobTx.maxFeePerBlobGas}, min: ${minBlobGasFee}`,
+        )
+      }
+    }
   }
 
   /**
@@ -441,9 +490,22 @@ export class TxPool {
     const currentGasPrice = this.txGasPrice(tx)
     // This is the tip which the miner receives: miner does not want
     // to mine underpriced txs where miner gets almost no fees
-    // Check if tx is underpriced when pool is near capacity
+    const currentTip = currentGasPrice.tip
+
     if (!isLocalTransaction) {
       const totalTxs = this.pendingCount + this.queuedCount
+      if (totalTxs >= MAX_POOL_SIZE) {
+        throw EthereumJSErrorWithoutCode('Cannot add tx: pool is full')
+      }
+
+      // Local txs are not checked against MIN_GAS_PRICE
+      if (currentTip < MIN_GAS_PRICE) {
+        throw EthereumJSErrorWithoutCode(
+          `Tx does not pay the minimum gas price of ${MIN_GAS_PRICE}`,
+        )
+      }
+
+      // Check if tx is underpriced when pool is near capacity
       if (totalTxs >= (GLOBAL_SLOTS + GLOBAL_QUEUE) * 0.9) {
         // Pool is >90% full, check if tx can compete
         const minPrice = this.getMinPrice()
@@ -487,6 +549,22 @@ export class TxPool {
       }
     }
     const block = await this.chain.getCanonicalHeadHeader()
+
+    // EIP-1559: Check baseFee validation (tx must be able to pay at least 50% of current baseFee)
+    if (
+      typeof block.baseFeePerGas === 'bigint' &&
+      block.baseFeePerGas !== BIGINT_0
+    ) {
+      if (
+        currentGasPrice.maxFee < block.baseFeePerGas / BIGINT_2 &&
+        !isLocalTransaction
+      ) {
+        throw EthereumJSErrorWithoutCode(
+          `Tx cannot pay basefee of ${block.baseFeePerGas}, have ${currentGasPrice.maxFee} (not within 50% range of current basefee)`,
+        )
+      }
+    }
+
     if (tx.gasLimit > block.gasLimit) {
       throw EthereumJSErrorWithoutCode(
         `Tx gaslimit of ${tx.gasLimit} exceeds block gas limit of ${block.gasLimit} (exceeds last block gas limit)`,
@@ -581,6 +659,20 @@ export class TxPool {
       // Update hash index for O(1) lookup
       this.hashIndex.set(hash, { address, poolType: pool })
 
+      // EIP-4844: Cache blobs and proofs for blob transactions
+      if (isBlob4844Tx(tx)) {
+        const blobTx = tx as Blob4844Tx
+        if (blobTx.blobs !== undefined && blobTx.kzgProofs !== undefined) {
+          for (let i = 0; i < blobTx.blobVersionedHashes.length; i++) {
+            const versionedHash = blobTx.blobVersionedHashes[i]
+            const blob = blobTx.blobs[i]
+            const proof = blobTx.kzgProofs[i]
+            this.blobAndProofByHash.set(versionedHash, { blob, proof })
+          }
+          this.pruneBlobsAndProofsCache()
+        }
+      }
+
       // Try to promote queued txs if we added to pending
       if (pool === 'pending') {
         await this.promoteExecutables(address)
@@ -591,6 +683,39 @@ export class TxPool {
     } catch (e) {
       this.handled.set(hash, { address, added, error: e as Error })
       throw e
+    }
+  }
+
+  pruneBlobsAndProofsCache() {
+    const blobGasLimit =
+      this.config.hardforkManager.getParamAtHardfork('maxBlobGasPerBlock')!
+    const blobGasPerBlob =
+      this.config.hardforkManager.getParamAtHardfork('blobGasPerBlob')!
+    const allowedBlobsPerBlock = Number(blobGasLimit / blobGasPerBlob)
+
+    let pruneLength =
+      this.blobAndProofByHash.size -
+      allowedBlobsPerBlock * this.config.options.blobsAndProofsCacheBlocks
+    let pruned = 0
+    // since keys() is sorted by insertion order this prunes the oldest data in cache
+    for (const versionedHash of this.blobAndProofByHash.keys()) {
+      if (pruned >= pruneLength) {
+        break
+      }
+      this.blobAndProofByHash.delete(versionedHash)
+      pruned++
+    }
+
+    pruneLength =
+      this.blobAndProofsByHash.size -
+      allowedBlobsPerBlock * this.config.options.blobsAndProofsCacheBlocks
+    pruned = 0
+    for (const versionedHash of this.blobAndProofsByHash.keys()) {
+      if (pruned >= pruneLength) {
+        break
+      }
+      this.blobAndProofsByHash.delete(versionedHash)
+      pruned++
     }
   }
 
@@ -1327,12 +1452,27 @@ export class TxPool {
 
   /**
    * Helper to return a normalized gas price across different
-   * transaction types. For legacy transactions, this is the gas price.
+   * transaction types. Providing the baseFee param returns the
+   * priority tip, and omitting it returns the max total fee.
    * @param tx The tx
-   * @param baseFee Unused for legacy transactions
+   * @param baseFee Provide a baseFee to subtract from the legacy
+   * gasPrice to determine the leftover priority tip.
    */
-  protected normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint) {
-    return (tx as LegacyTx).gasPrice
+  protected normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint): bigint {
+    const supports1559 = isFeeMarket1559Tx(tx) || isBlob4844Tx(tx)
+    if (typeof baseFee === 'bigint' && baseFee !== BIGINT_0) {
+      if (supports1559) {
+        return (tx as any).maxPriorityFeePerGas as bigint
+      } else {
+        return (tx as LegacyTx).gasPrice - baseFee
+      }
+    } else {
+      if (supports1559) {
+        return (tx as any).maxFeePerGas as bigint
+      } else {
+        return (tx as LegacyTx).gasPrice
+      }
+    }
   }
 
   /**
@@ -1374,7 +1514,7 @@ export class TxPool {
    * Returns a TransactionsByPriceAndNonce instance for incremental selection.
    *
    * @param vm VM instance for account nonce verification
-   * @param options Options including baseFee (unused for legacy), minGasPrice, and priorityAddresses
+   * @param options Options including baseFee, allowedBlobs, minGasPrice, and priorityAddresses
    */
   async txsByPriceAndNonce(
     vm: VM,
@@ -1390,8 +1530,11 @@ export class TxPool {
       priorityAddresses?: Address[]
     } = {},
   ): Promise<TransactionsByPriceAndNonce> {
-    const byNonce = new Map<string, TxPoolObject[]>()
-    let skippedByNonce = 0
+    const skippedStats = {
+      byNonce: 0,
+      byPrice: 0,
+      byBlobsLimit: 0,
+    }
 
     // Convert priority addresses to unprefixed strings for comparison
     const priorityAddressSet = new Set<string>()
@@ -1408,7 +1551,7 @@ export class TxPool {
     // Only iterate over pending pool - these are executable
     for (const [address, poolObjects] of this.pending) {
       // Sort by nonce
-      const txsSortedByNonce = [...poolObjects].sort((a, b) =>
+      let txsSortedByNonce = [...poolObjects].sort((a, b) =>
         Number(a.tx.nonce - b.tx.nonce),
       )
 
@@ -1422,7 +1565,25 @@ export class TxPool {
 
       if (txsSortedByNonce[0].tx.nonce !== account.nonce) {
         // Shouldn't happen if promoteExecutables works correctly
-        skippedByNonce += txsSortedByNonce.length
+        skippedStats.byNonce += txsSortedByNonce.length
+        continue
+      }
+
+      // Filter by baseFee if provided (EIP-1559)
+      if (typeof baseFee === 'bigint' && baseFee !== BIGINT_0) {
+        // If any tx has an insufficient gasPrice,
+        // remove all txs after that since they cannot be executed
+        const found = txsSortedByNonce.findIndex(
+          (txObj) => this.normalizedGasPrice(txObj.tx) < baseFee,
+        )
+        if (found > -1) {
+          skippedStats.byPrice += txsSortedByNonce.length - found
+          txsSortedByNonce = txsSortedByNonce.slice(0, found)
+        }
+      }
+
+      // Skip if no txs left after filtering
+      if (txsSortedByNonce.length === 0) {
         continue
       }
 
@@ -1453,7 +1614,7 @@ export class TxPool {
     )
 
     this.config.options.logger?.info(
-      `txsByPriceAndNonce created txSet with ${allTxs.size} accounts, skipped byNonce=${skippedByNonce}`,
+      `txsByPriceAndNonce created txSet with ${allTxs.size} accounts, skipped byNonce=${skippedStats.byNonce} byPrice=${skippedStats.byPrice}`,
     )
 
     return txSet
@@ -1489,6 +1650,9 @@ export class TxPool {
     this.fetchingHashes = []
     this.pendingCount = 0
     this.queuedCount = 0
+
+    // Clear blob cache
+    this.blobAndProofByHash.clear()
 
     // Rebuild empty priced heap
     this.priced = new Heap({
