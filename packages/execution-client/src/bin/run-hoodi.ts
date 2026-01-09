@@ -20,6 +20,8 @@
  *     --checkpointSyncUrl https://beaconstate-hoodi.chainsafe.io
  */
 
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { createBlockchainManager } from '@ts-ethereum/blockchain'
 import {
   type ChainConfig,
@@ -29,8 +31,6 @@ import {
 } from '@ts-ethereum/chain-config'
 import { initDatabases } from '@ts-ethereum/db'
 import { bytesToHex, genPrivateKey, hexToBytes } from '@ts-ethereum/utils'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
-import { homedir } from 'node:os'
 
 import { Config, createConfigOptions, SyncMode } from '../config/index'
 import { LevelDB } from '../execution/level'

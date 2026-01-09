@@ -11,4 +11,3 @@ export {
   createBlockchainManagerFromBlocksData,
   createBlockchainManagerFromJsonRpcBlocks,
 } from './from-blocks-data'
-

@@ -335,4 +335,3 @@ export class BeaconSynchronizer extends Synchronizer {
     await super.close()
   }
 }
-

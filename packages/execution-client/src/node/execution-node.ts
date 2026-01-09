@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import type { HealthCheckFn, HttpMetricsServer } from '@ts-ethereum/metrics'
 import { getHttpMetricsServer } from '@ts-ethereum/metrics'
 import type { P2PNode as P2PNodeType } from '@ts-ethereum/p2p'
@@ -7,7 +8,6 @@ import {
   hexToBytes,
   randomBytes,
 } from '@ts-ethereum/utils'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 import { ExecutionService } from '../execution/execution-service'

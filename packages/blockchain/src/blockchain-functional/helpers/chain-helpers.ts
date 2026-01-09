@@ -399,4 +399,3 @@ export async function createDeleteChildOps(
 
   return { ops, updatedHeadHeaderHash, updatedHeadBlockHash }
 }
-

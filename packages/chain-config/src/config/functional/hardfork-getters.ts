@@ -88,4 +88,3 @@ export function isHardforkAfter(
 
   return hfIdx >= targetIdx
 }
-
