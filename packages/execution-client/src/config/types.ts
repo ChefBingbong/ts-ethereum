@@ -318,4 +318,35 @@ export interface ConfigOptions {
   // Defaulting to false as experimental as of now
   enableSnapSync?: boolean
   blobsAndProofsCacheBlocks?: number
+
+  // Engine API RPC server options
+  /**
+   * Enable Engine API RPC server for consensus client communication
+   * Default: false
+   */
+  rpcEngine?: boolean
+
+  /**
+   * Engine API RPC server port
+   * Default: 8551
+   */
+  rpcEnginePort?: number
+
+  /**
+   * Engine API RPC server address
+   * Default: '127.0.0.1' (localhost only for security)
+   */
+  rpcEngineAddr?: string
+
+  /**
+   * Path to JWT secret file for Engine API authentication.
+   * If not provided, a new secret will be generated and saved.
+   */
+  jwtSecret?: string
+
+  /**
+   * Enable/disable JWT authentication for Engine API
+   * Default: true (should only be disabled for local development)
+   */
+  rpcEngineAuth?: boolean
 }

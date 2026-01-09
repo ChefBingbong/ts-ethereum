@@ -1,13 +1,20 @@
 import type { HealthCheckFn, HttpMetricsServer } from '@ts-ethereum/metrics'
 import { getHttpMetricsServer } from '@ts-ethereum/metrics'
 import type { P2PNode as P2PNodeType } from '@ts-ethereum/p2p'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 import { ExecutionService } from '../execution/execution-service'
 import { VMExecution } from '../execution/vmexecution'
 import { NetworkService } from '../net/network-service'
 import type { Peer } from '../net/peer/peer'
-import { RpcServer } from '../rpc/server/index'
+import {
+  ENGINE_API_DEFAULT_PORT,
+  EngineRpcServer,
+  generateJwtSecret,
+  RpcServer,
+} from '../rpc/server/index'
 import { BeaconSynchronizer, FullSynchronizer } from '../sync'
 import { TxFetcher } from '../sync/fetcher/txFetcher'
 import { Event } from '../types'
@@ -33,6 +40,7 @@ export class ExecutionNode {
   public txFetcher: TxFetcher
   public p2pNode: P2PNodeType
   public rpcServer?: RpcServer
+  public engineRpcServer?: EngineRpcServer
   public isRpcReady: boolean
 
   public opened: boolean
@@ -49,6 +57,7 @@ export class ExecutionNode {
   private started = false
   protected metricsServer?: HttpMetricsServer
   private startTime = Date.now()
+  private jwtSecret?: string
 
   public static async init(
     options: ExecutionNodeInitOptions,
@@ -230,7 +239,95 @@ export class ExecutionNode {
     }
 
     node.config.events.on(Event.SYNC_SYNCHRONIZED, onRpcReady)
+
+    // Start Engine RPC server if enabled
+    if (options.config.options.rpcEngine) {
+      await node.startEngineRpcServer(options)
+    }
+
     return node
+  }
+
+  /**
+   * Start the Engine API RPC server for consensus client communication.
+   * Handles JWT secret generation/loading and server initialization.
+   */
+  private async startEngineRpcServer(
+    options: ExecutionNodeInitOptions,
+  ): Promise<void> {
+    const opts = options.config.options
+
+    // Handle JWT secret
+    let jwtSecret: string
+
+    if (opts.jwtSecret) {
+      // Load JWT secret from file
+      if (existsSync(opts.jwtSecret)) {
+        const content = readFileSync(opts.jwtSecret, 'utf-8').trim()
+        // Remove 0x prefix if present
+        jwtSecret = content.startsWith('0x') ? content.slice(2) : content
+        this.config.logger?.info(`Loaded JWT secret from ${opts.jwtSecret}`)
+      } else {
+        // Generate new secret and save to specified path
+        jwtSecret = generateJwtSecret()
+        try {
+          mkdirSync(dirname(opts.jwtSecret), { recursive: true })
+          writeFileSync(opts.jwtSecret, `0x${jwtSecret}\n`, 'utf-8')
+          this.config.logger?.info(
+            `Generated new JWT secret and saved to ${opts.jwtSecret}`,
+          )
+        } catch (err) {
+          this.config.logger?.error(
+            `Failed to save JWT secret to ${opts.jwtSecret}: ${err}`,
+          )
+          throw err
+        }
+      }
+    } else {
+      // Generate ephemeral JWT secret (not persisted)
+      jwtSecret = generateJwtSecret()
+      this.config.logger?.warn(
+        'No JWT secret path specified - generated ephemeral secret. ' +
+          'Specify --jwt-secret to persist the secret for CL client connection.',
+      )
+    }
+
+    this.jwtSecret = jwtSecret
+
+    // Create and start Engine RPC server
+    const engineRpcServer = new EngineRpcServer(
+      {
+        enabled: true,
+        address: opts.rpcEngineAddr ?? '127.0.0.1',
+        port: opts.rpcEnginePort ?? ENGINE_API_DEFAULT_PORT,
+        jwtSecret,
+        jwtAuth: opts.rpcEngineAuth !== false,
+        debug: false,
+        stacktraces: false,
+      },
+      {
+        logger: this.config.options.logger!,
+        node: this,
+      },
+    )
+
+    await engineRpcServer.listen()
+    this.engineRpcServer = engineRpcServer
+
+    // Log connection info for the consensus client
+    const port = opts.rpcEnginePort ?? ENGINE_API_DEFAULT_PORT
+    const addr = opts.rpcEngineAddr ?? '127.0.0.1'
+    this.config.logger?.info(
+      `\n` +
+        `${'='.repeat(60)}\n` +
+        `Engine API server ready for consensus client connection\n` +
+        `  URL:        http://${addr}:${port}\n` +
+        `  JWT Auth:   ${opts.rpcEngineAuth !== false ? 'enabled' : 'DISABLED'}\n` +
+        (opts.jwtSecret
+          ? `  JWT Secret: ${opts.jwtSecret}\n`
+          : `  JWT Secret: (ephemeral - not persisted)\n`) +
+        `${'='.repeat(60)}\n`,
+    )
   }
 
   protected constructor(modules: ExecutionNodeModules) {
@@ -357,6 +454,7 @@ export class ExecutionNode {
 
       await this.metricsServer?.close()
       await this.rpcServer?.close?.()
+      await this.engineRpcServer?.close?.()
       await this.execution.stop()
       await this.network.stop()
       this.txFetcher.stop()

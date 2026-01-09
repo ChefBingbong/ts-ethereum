@@ -70,6 +70,13 @@ export interface ResolvedConfigOptions {
   // Defaulting to false as experimental as of now
   readonly enableSnapSync: boolean
   readonly blobsAndProofsCacheBlocks: number
+
+  // Engine API RPC server options
+  readonly rpcEngine: boolean
+  readonly rpcEnginePort: number
+  readonly rpcEngineAddr: string
+  readonly jwtSecret?: string
+  readonly rpcEngineAuth: boolean
 }
 
 /**
@@ -122,6 +129,12 @@ export function createConfigFromDefaults(
     useStringValueTrieDB: false,
     savePreimages: true,
     blobsAndProofsCacheBlocks: constants.BLOBS_AND_PROOFS_CACHE_BLOCKS,
+
+    // Engine API RPC server defaults
+    rpcEngine: false,
+    rpcEnginePort: 8551,
+    rpcEngineAddr: '127.0.0.1',
+    rpcEngineAuth: true,
   }
 }
 
@@ -213,6 +226,13 @@ export function createConfigOptions(
     enableSnapSync: options.enableSnapSync ?? defaults.enableSnapSync,
     blobsAndProofsCacheBlocks:
       options.blobsAndProofsCacheBlocks ?? defaults.blobsAndProofsCacheBlocks,
+
+    // Engine API RPC server options
+    rpcEngine: options.rpcEngine ?? defaults.rpcEngine,
+    rpcEnginePort: options.rpcEnginePort ?? defaults.rpcEnginePort,
+    rpcEngineAddr: options.rpcEngineAddr ?? defaults.rpcEngineAddr,
+    jwtSecret: options.jwtSecret,
+    rpcEngineAuth: options.rpcEngineAuth ?? defaults.rpcEngineAuth,
   }
 }
 

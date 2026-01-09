@@ -13,6 +13,17 @@ import {
   type RpcServerOpts,
 } from './base'
 
+// Export Engine RPC server
+export {
+  createEngineJwt,
+  ENGINE_API_DEFAULT_PORT,
+  EngineRpcServer,
+  engineRpcServerOpts,
+  generateJwtSecret,
+  type EngineRpcServerModules,
+  type EngineRpcServerOpts,
+} from './engine'
+
 export type RpcServerOptsExtended = RpcServerOpts & {
   enabled: boolean
   debug?: boolean
