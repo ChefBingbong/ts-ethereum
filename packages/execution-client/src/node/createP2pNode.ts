@@ -14,6 +14,7 @@ export function createP2PNodeFromConfig(options: ConfigOptions): P2PNodeType {
   const listenIP = options.extIP ?? '0.0.0.0'
   const announceIP = options.announceIP ?? options.extIP ?? '127.0.0.1'
 
+  console.log('options.bootnodes', options.bootnodes)
   if (options.discV4) {
     kadDiscovery.push(
       dptDiscovery({

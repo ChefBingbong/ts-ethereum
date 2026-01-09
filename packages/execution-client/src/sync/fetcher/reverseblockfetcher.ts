@@ -71,3 +71,4 @@ export class ReverseBlockFetcher extends BlockFetcher {
     return { destroyFetcher, banPeer, stepBack }
   }
 }
+

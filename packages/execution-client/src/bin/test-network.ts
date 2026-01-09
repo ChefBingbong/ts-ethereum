@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { existsSync, rmSync } from 'node:fs'
 import { createBlockchainManager } from '@ts-ethereum/blockchain'
 import type { ChainConfig } from '@ts-ethereum/chain-config'
 import {
@@ -10,6 +9,7 @@ import {
 } from '@ts-ethereum/chain-config'
 import { getDbPaths, initDatabases } from '@ts-ethereum/db'
 import debug from 'debug'
+import { existsSync, rmSync } from 'node:fs'
 import { Config, createConfigOptions } from '../config/index'
 import { LevelDB } from '../execution/level'
 import { getLogger, type Logger } from '../logging'
@@ -91,6 +91,8 @@ async function startClient() {
   const isBootnode = port === BOOTNODE_PORT
   const nodeLogger: Logger | undefined = getLogger({ logLevel: 'debug' })
 
+  const portOffset = port - BOOTNODE_PORT
+
   const _clientConfig = await initClientConfig({
     dataDir: process.env.DATA_DIR || `${SHARED_DIR}/node-${port}`,
     network: 'testnet',
@@ -103,9 +105,15 @@ async function startClient() {
     logger: nodeLogger,
     persistNetworkIdentity: true,
     savePreimages: true,
+    // rpcEngine: true, // Enable Engine API
+    // rpcEnginePort: portOffset + 8551, // Port (default: 8551)
+    // rpcEngineAddr: '127.0.0.1', // Address (default: localhost)
+    // jwtSecret: `${SHARED_DIR}/node-${port}/jwt.hex`, // Path to JWT secret file
+    // rpcEngineAuth: true,
   })
-
-  const clientConfig = await createConfigOptions(_clientConfig)
+  const clientConfig = await createConfigOptions({
+    ..._clientConfig,
+  })
   if (cleanStart) cleanDataDir(clientConfig.datadir)
 
   const paths = getClientPaths({ dataDir: clientConfig.datadir }, 'testnet')

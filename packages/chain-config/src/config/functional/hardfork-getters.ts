@@ -18,30 +18,54 @@ export function getHardforkByBlock(
   timestamp?: bigint,
 ) {
   const { hardforks } = config.spec
-  let result: string | undefined
+  const defaultHardfork = config.spec.chain?.defaultHardfork
 
+  // Get the index of the default hardfork (minimum floor)
+  const defaultHfIndex = defaultHardfork
+    ? hardforks.findIndex((hf) => hf.name === defaultHardfork)
+    : -1
+
+  let blockResultIndex = -1
+  let timestampResultIndex = -1
+
+  // Find latest hardfork by block number (for pre-merge forks)
   if (blockNumber !== undefined) {
-    // Find the LAST hardfork where blockNumber >= hf.block (most recent applicable hardfork)
-    // We need to iterate backwards to find the most recent one
     for (let i = hardforks.length - 1; i >= 0; i--) {
       const hf = hardforks[i]
       if (hf.block !== null && blockNumber >= hf.block) {
-        result = hf.name
-        break
-      }
-    }
-  } else if (timestamp !== undefined) {
-    // Find the LAST hardfork where timestamp >= hf.timestamp (most recent applicable hardfork)
-    for (let i = hardforks.length - 1; i >= 0; i--) {
-      const hf = hardforks[i]
-      if (hf.timestamp !== undefined && timestamp >= BigInt(hf.timestamp)) {
-        result = hf.name
+        blockResultIndex = i
         break
       }
     }
   }
 
-  return result ?? hardforks[hardforks.length - 1].name
+  // Find latest hardfork by timestamp (for post-merge forks: Shanghai, Cancun, Prague)
+  // IMPORTANT: Check independently - NOT as else-if!
+  if (timestamp !== undefined) {
+    for (let i = hardforks.length - 1; i >= 0; i--) {
+      const hf = hardforks[i]
+      if (hf.timestamp !== undefined && timestamp >= BigInt(hf.timestamp)) {
+        timestampResultIndex = i
+        break
+      }
+    }
+  }
+
+  // Return the LATER hardfork (higher index = more recent)
+  let resultIndex = Math.max(blockResultIndex, timestampResultIndex)
+
+  // Apply defaultHardfork as minimum floor
+  // For chains that specify a defaultHardfork, never return an earlier hardfork
+  if (defaultHfIndex >= 0 && resultIndex < defaultHfIndex) {
+    resultIndex = defaultHfIndex
+  }
+
+  if (resultIndex >= 0) {
+    return hardforks[resultIndex].name
+  }
+
+  // Fallback to defaultHardfork or last hardfork
+  return defaultHardfork ?? hardforks[hardforks.length - 1].name
 }
 
 export function isHardforkAfter(
@@ -64,3 +88,4 @@ export function isHardforkAfter(
 
   return hfIdx >= targetIdx
 }
+

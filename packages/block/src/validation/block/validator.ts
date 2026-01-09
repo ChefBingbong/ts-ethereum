@@ -20,6 +20,7 @@ import {
 export interface BlockValidatorOptions {
   hardforkManager: HardforkManager
   number: BigIntLike
+  timestamp?: BigIntLike
 }
 
 /**
@@ -30,7 +31,10 @@ export function createBlockConstructorSchema(opts: BlockValidatorOptions) {
   const { hardforkManager: common } = opts
   const consensusType = common.config.spec.chain.consensus.type
   const blockNumber = zBigInt().parse(opts.number ?? 0)
-  const isEIP4895Active = common.isEIPActiveAtBlock(4895, { blockNumber })
+  const timestamp =
+    opts.timestamp !== undefined ? zBigInt().parse(opts.timestamp) : undefined
+  const blockContext = { blockNumber, timestamp }
+  const isEIP4895Active = common.isEIPActiveAtBlock(4895, blockContext)
 
   return z
     .object({
@@ -106,9 +110,12 @@ export function validateBlockConstructor(
   const { uncleHeaders, withdrawals } = result.data
 
   // Apply default withdrawals for EIP-4895 if not provided
+  const timestamp =
+    opts.timestamp !== undefined ? zBigInt().parse(opts.timestamp) : undefined
+  const blockContext = { blockNumber, timestamp }
   const finalWithdrawals =
     withdrawals ??
-    (opts.hardforkManager.isEIPActiveAtBlock(4895, { blockNumber })
+    (opts.hardforkManager.isEIPActiveAtBlock(4895, blockContext)
       ? []
       : undefined)
 

@@ -25,10 +25,17 @@ export function createBlockHeaderSchema(opts: {
   const { hardforkManager: common, validateConsensus = true } = opts
 
   const blockNumber = zBigInt().parse(opts.header.number ?? 0)
+  // For post-merge chains, timestamp is required to determine the correct hardfork
+  const timestamp =
+    opts.header.timestamp !== undefined
+      ? zBigInt().parse(opts.header.timestamp)
+      : undefined
+  const blockContext = { blockNumber, timestamp }
+
   return zCoreHeaderSchema
     .extend({
       // EIP-1559: baseFeePerGas (default is BIGINT_2 for non-London blocks)
-      baseFeePerGas: common.isEIPActiveAtBlock(1559, { blockNumber })
+      baseFeePerGas: common.isEIPActiveAtBlock(1559, blockContext)
         ? zBigInt({
             defaultValue:
               opts.header.number === common.hardforkBlock(Hardfork.London)
@@ -39,35 +46,35 @@ export function createBlockHeaderSchema(opts: {
             message: 'baseFeePerGas cannot be set before EIP-1559',
           }),
       // EIP-4895: withdrawalsRoot
-      withdrawalsRoot: common.isEIPActiveAtBlock(4895, { blockNumber })
+      withdrawalsRoot: common.isEIPActiveAtBlock(4895, blockContext)
         ? zBytes32({ defaultValue: KECCAK256_RLP })
         : zOptionalBytes32.refine((val) => val === undefined, {
             message: 'withdrawalsRoot cannot be set before EIP-4895',
           }),
 
       // EIP-4844: blobGasUsed
-      blobGasUsed: common.isEIPActiveAtBlock(4844, { blockNumber })
+      blobGasUsed: common.isEIPActiveAtBlock(4844, blockContext)
         ? zBigInt({ defaultValue: BIGINT_0 })
         : zOptionalBigInt.refine((val) => val === undefined, {
             message: 'blobGasUsed cannot be set before EIP-4844',
           }),
 
       // EIP-4844: excessBlobGas
-      excessBlobGas: common.isEIPActiveAtBlock(4844, { blockNumber })
+      excessBlobGas: common.isEIPActiveAtBlock(4844, blockContext)
         ? zBigInt({ defaultValue: BIGINT_0 })
         : zOptionalBigInt.refine((val) => val === undefined, {
             message: 'excessBlobGas cannot be set before EIP-4844',
           }),
 
       // EIP-4788: parentBeaconBlockRoot
-      parentBeaconBlockRoot: common.isEIPActiveAtBlock(4788, { blockNumber })
+      parentBeaconBlockRoot: common.isEIPActiveAtBlock(4788, blockContext)
         ? zBytes32({ defaultValue: new Uint8Array(32) })
         : zOptionalBytes32.refine((val) => val === undefined, {
             message: 'parentBeaconBlockRoot cannot be set before EIP-4788',
           }),
 
       // EIP-7685: requestsHash
-      requestsHash: common.isEIPActiveAtBlock(7685, { blockNumber })
+      requestsHash: common.isEIPActiveAtBlock(7685, blockContext)
         ? zBytes32({ defaultValue: SHA256_NULL })
         : zOptionalBytes32.refine((val) => val === undefined, {
             message: 'requestsHash cannot be set before EIP-7685',
@@ -84,7 +91,7 @@ export function createBlockHeaderSchema(opts: {
       }
 
       // EIP-1559: baseFeePerGas requirements
-      if (common.isEIPActiveAtBlock(1559, { blockNumber })) {
+      if (common.isEIPActiveAtBlock(1559, blockContext)) {
         if (data.baseFeePerGas === undefined) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -116,7 +123,7 @@ export function createBlockHeaderSchema(opts: {
 
       // EIP-4895: withdrawalsRoot requirements
       if (
-        common.isEIPActiveAtBlock(4895, { blockNumber }) &&
+        common.isEIPActiveAtBlock(4895, blockContext) &&
         data.withdrawalsRoot === undefined
       ) {
         ctx.addIssue({
@@ -128,7 +135,7 @@ export function createBlockHeaderSchema(opts: {
 
       // EIP-4788: parentBeaconBlockRoot requirements
       if (
-        common.isEIPActiveAtBlock(4788, { blockNumber }) &&
+        common.isEIPActiveAtBlock(4788, blockContext) &&
         data.parentBeaconBlockRoot === undefined
       ) {
         ctx.addIssue({
@@ -140,7 +147,7 @@ export function createBlockHeaderSchema(opts: {
 
       // EIP-7685: requestsHash requirements
       if (
-        common.isEIPActiveAtBlock(7685, { blockNumber }) &&
+        common.isEIPActiveAtBlock(7685, blockContext) &&
         data.requestsHash === undefined
       ) {
         ctx.addIssue({

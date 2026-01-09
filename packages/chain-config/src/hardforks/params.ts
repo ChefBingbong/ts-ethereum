@@ -404,6 +404,20 @@ export const EIP7939_PARAMS = {
   clzGas: 5n,
 } as const
 
+// BPO1 increases blob gas limits (12 blobs max)
+export const BPO1_BLOB_PARAMS = {
+  targetBlobGasPerBlock: 1048576n, // 8 blobs target
+  maxBlobGasPerBlock: 1572864n, // 12 blobs max
+  blobGasPriceUpdateFraction: 5007716n,
+} as const
+
+// BPO2 further increases blob gas limits (24 blobs max)
+export const BPO2_BLOB_PARAMS = {
+  targetBlobGasPerBlock: 2097152n, // 16 blobs target
+  maxBlobGasPerBlock: 3145728n, // 24 blobs max
+  blobGasPriceUpdateFraction: 5007716n,
+} as const
+
 export const EIP_PARAMS = {
   [EIP.EIP_1]: EIP1_PARAMS,
   [EIP.EIP_606]: EIP606_PARAMS,
@@ -449,6 +463,9 @@ export const EIP_PARAMS = {
   [EIP.EIP_7825]: EIP7825_PARAMS,
   [EIP.EIP_7934]: EIP7934_PARAMS,
   [EIP.EIP_7939]: EIP7939_PARAMS,
+  // BPO hardfork blob increase params
+  [EIP.EIP_BPO1_BLOBS]: BPO1_BLOB_PARAMS,
+  [EIP.EIP_BPO2_BLOBS]: BPO2_BLOB_PARAMS,
 } as const
 
 export type AllEIPParams = typeof EIP_PARAMS
@@ -566,6 +583,10 @@ type _OsakaWith7620 = Merge<_OsakaWith7480, typeof EIP7620_PARAMS>
 type _OsakaWith7934 = Merge<_OsakaWith7620, typeof EIP7934_PARAMS>
 type _Osaka = Merge<_OsakaWith7934, typeof EIP7939_PARAMS>
 
+// BPO hardforks with increased blob limits
+type _Bpo1 = Merge<_Osaka, typeof BPO1_BLOB_PARAMS>
+type _Bpo2 = Merge<_Bpo1, typeof BPO2_BLOB_PARAMS>
+
 /**
  * Maps hardfork names to their aggregated param types.
  * Each hardfork includes params from all prior hardforks plus its own EIPs.
@@ -592,12 +613,12 @@ export type HardforkParamsMap = {
   cancun: _Cancun
   prague: _Prague
   osaka: _Osaka
-  // Future hardforks inherit from osaka
-  bpo1: _Osaka
-  bpo2: _Osaka
-  bpo3: _Osaka
-  bpo4: _Osaka
-  bpo5: _Osaka
+  // BPO hardforks with increased blob limits
+  bpo1: _Bpo1
+  bpo2: _Bpo2
+  bpo3: _Bpo2
+  bpo4: _Bpo2
+  bpo5: _Bpo2
 }
 
 /**

@@ -476,7 +476,7 @@ export const Holesky: ChainConfig = {
 export const Hoodi: ChainConfig = {
   name: 'hoodi',
   chainId: 560048n,
-  defaultHardfork: 'prague',
+  defaultHardfork: 'cancun', // Active from genesis (timestamp='0'), Prague activated later
   consensus: {
     type: 'pos',
     algorithm: 'casper',

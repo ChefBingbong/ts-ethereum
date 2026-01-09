@@ -46,7 +46,7 @@ export type EngineRpcServerModules = RpcServerModules & {
  */
 export class EngineRpcServer extends RpcServerBase {
   readonly modules: EngineRpcServerModules
-  private jwtSecret?: string
+  private jwtSecret?: string | Uint8Array
   private jwtAuthEnabled: boolean
 
   constructor(
@@ -126,11 +126,11 @@ export class EngineRpcServer extends RpcServerBase {
       )
     }
 
-    const token = authHeader.slice(7).trim()
+    const token = authHeader.trim().split(' ')[1]
 
     try {
       // Decode and verify JWT
-      const payload = jwt.decode(token, this.jwtSecret)
+      const payload = jwt.decode(token, this.jwtSecret as never)
 
       // Validate "iat" (issued at) claim
       if (payload.iat === undefined) {

@@ -68,6 +68,7 @@ export function fromBlockData(
     {
       hardforkManager: opts.hardforkManager,
       number: frozenHeader.data.number,
+      timestamp: frozenHeader.data.timestamp,
     },
     frozenHeader.data.number,
   )

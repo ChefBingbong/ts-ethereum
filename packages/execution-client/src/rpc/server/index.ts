@@ -18,10 +18,10 @@ export {
   createEngineJwt,
   ENGINE_API_DEFAULT_PORT,
   EngineRpcServer,
-  type EngineRpcServerModules,
-  type EngineRpcServerOpts,
   engineRpcServerOpts,
   generateJwtSecret,
+  type EngineRpcServerModules,
+  type EngineRpcServerOpts,
 } from './engine'
 
 export type RpcServerOptsExtended = RpcServerOpts & {

@@ -1,8 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
 import type { HealthCheckFn, HttpMetricsServer } from '@ts-ethereum/metrics'
 import { getHttpMetricsServer } from '@ts-ethereum/metrics'
 import type { P2PNode as P2PNodeType } from '@ts-ethereum/p2p'
+import {
+  bytesToUnprefixedHex,
+  EthereumJSErrorWithoutCode,
+  hexToBytes,
+  randomBytes,
+} from '@ts-ethereum/utils'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { Chain } from '../blockchain/index'
 import type { Config } from '../config/index'
 import { ExecutionService } from '../execution/execution-service'
@@ -12,7 +17,6 @@ import type { Peer } from '../net/peer/peer'
 import {
   ENGINE_API_DEFAULT_PORT,
   EngineRpcServer,
-  generateJwtSecret,
   RpcServer,
 } from '../rpc/server/index'
 import { BeaconSynchronizer, FullSynchronizer } from '../sync'
@@ -23,6 +27,46 @@ import { getV8Engine } from '../util/index'
 import { createP2PNodeFromConfig } from './createP2pNode'
 import type { ExecutionNodeInitOptions, ExecutionNodeModules } from './types'
 
+function parseJwtSecret(config: Config, jwtFilePath?: string): Uint8Array {
+  let jwtSecret: Uint8Array
+  const defaultJwtPath = `${config.options.datadir}/jwtsecret`
+  const usedJwtPath = jwtFilePath ?? defaultJwtPath
+
+  // If jwtFilePath is provided, it should exist
+  if (jwtFilePath !== undefined && !existsSync(jwtFilePath)) {
+    throw EthereumJSErrorWithoutCode(
+      `No file exists at provided jwt secret path=${jwtFilePath}`,
+    )
+  }
+
+  if (jwtFilePath !== undefined || existsSync(defaultJwtPath)) {
+    const jwtSecretContents = readFileSync(
+      jwtFilePath ?? defaultJwtPath,
+      'utf-8',
+    ).trim()
+    const hexPattern = new RegExp(/^(0x|0X)?(?<jwtSecret>[a-fA-F0-9]+)$/, 'g')
+    const jwtSecretHex = hexPattern.exec(jwtSecretContents)?.groups?.jwtSecret
+    if (jwtSecretHex === undefined || jwtSecretHex.length !== 64) {
+      throw Error('Need a valid 256 bit hex encoded secret')
+    }
+    jwtSecret = hexToBytes(`0x${jwtSecretHex}`)
+  } else {
+    const folderExists = existsSync(config.options.datadir)
+    if (!folderExists) {
+      mkdirSync(config.options.datadir, { recursive: true })
+    }
+
+    jwtSecret = randomBytes(32)
+    writeFileSync(defaultJwtPath, bytesToUnprefixedHex(jwtSecret), {})
+    config.logger?.info(
+      `New Engine API JWT token created path=${defaultJwtPath}`,
+    )
+  }
+  config.logger?.info(
+    `Using Engine API with JWT token authentication path=${usedJwtPath}`,
+  )
+  return jwtSecret
+}
 export const STATS_INTERVAL = 1000 * 30 // 30 seconds
 export const MEMORY_SHUTDOWN_THRESHOLD = 92
 
@@ -66,7 +110,7 @@ export class ExecutionNode {
 
     // Create P2P node first (needed for NetworkService)
     const bootnodes = options.config.options.bootnodes ?? []
-
+    console.log('bootnodes', bootnodes)
     const p2pNode = createP2PNodeFromConfig({
       ...options.config.options,
       accounts: [...options.config.options.accounts],
@@ -238,7 +282,9 @@ export class ExecutionNode {
       node.config.events.off(Event.SYNC_SYNCHRONIZED, onRpcReady)
     }
 
-    node.config.events.on(Event.SYNC_SYNCHRONIZED, onRpcReady)
+    await rpcServer.listen()
+    node.rpcServer = rpcServer
+    node.isRpcReady = true
 
     // Start Engine RPC server if enabled
     if (options.config.options.rpcEngine) {
@@ -257,42 +303,7 @@ export class ExecutionNode {
   ): Promise<void> {
     const opts = options.config.options
 
-    // Handle JWT secret
-    let jwtSecret: string
-
-    if (opts.jwtSecret) {
-      // Load JWT secret from file
-      if (existsSync(opts.jwtSecret)) {
-        const content = readFileSync(opts.jwtSecret, 'utf-8').trim()
-        // Remove 0x prefix if present
-        jwtSecret = content.startsWith('0x') ? content.slice(2) : content
-        this.config.logger?.info(`Loaded JWT secret from ${opts.jwtSecret}`)
-      } else {
-        // Generate new secret and save to specified path
-        jwtSecret = generateJwtSecret()
-        try {
-          mkdirSync(dirname(opts.jwtSecret), { recursive: true })
-          writeFileSync(opts.jwtSecret, `0x${jwtSecret}\n`, 'utf-8')
-          this.config.logger?.info(
-            `Generated new JWT secret and saved to ${opts.jwtSecret}`,
-          )
-        } catch (err) {
-          this.config.logger?.error(
-            `Failed to save JWT secret to ${opts.jwtSecret}: ${err}`,
-          )
-          throw err
-        }
-      }
-    } else {
-      // Generate ephemeral JWT secret (not persisted)
-      jwtSecret = generateJwtSecret()
-      this.config.logger?.warn(
-        'No JWT secret path specified - generated ephemeral secret. ' +
-          'Specify --jwt-secret to persist the secret for CL client connection.',
-      )
-    }
-
-    this.jwtSecret = jwtSecret
+    this.jwtSecret = parseJwtSecret(this.config) as unknown as string
 
     // Create and start Engine RPC server
     const engineRpcServer = new EngineRpcServer(
@@ -300,7 +311,7 @@ export class ExecutionNode {
         enabled: true,
         address: opts.rpcEngineAddr ?? '127.0.0.1',
         port: opts.rpcEnginePort ?? ENGINE_API_DEFAULT_PORT,
-        jwtSecret,
+        jwtSecret: this.jwtSecret,
         jwtAuth: opts.rpcEngineAuth !== false,
         debug: false,
         stacktraces: false,

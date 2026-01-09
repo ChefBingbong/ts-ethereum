@@ -70,3 +70,4 @@ export async function createBlockchainManagerFromJsonRpcBlocks(
 
   return blockchain
 }
+

@@ -132,8 +132,8 @@ export const HARDFORK_EIPS = {
 
   mergeNetsplitBlock: [],
 
-  bpo1: [],
-  bpo2: [],
+  bpo1: [EIP.EIP_BPO1_BLOBS],
+  bpo2: [EIP.EIP_BPO2_BLOBS],
   bpo3: [],
   bpo4: [],
   bpo5: [],

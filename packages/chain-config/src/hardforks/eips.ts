@@ -64,6 +64,9 @@ export const EIP = {
   EIP_7934: 7934,
   EIP_7939: 7939,
   EIP_7951: 7951,
+  // BPO hardfork blob increase params (internal pseudo-EIPs)
+  EIP_BPO1_BLOBS: 99001,
+  EIP_BPO2_BLOBS: 99002,
 } as const
 
 export type EIP = (typeof EIP)[keyof typeof EIP]
