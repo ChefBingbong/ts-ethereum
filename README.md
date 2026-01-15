@@ -2,27 +2,18 @@
 
 > Full Ethereum execution and consensus client implementation in TypeScript (WIP).
 
-Not production-ready. Expect breaking changes, missing features, and incomplete protocol coverage.
-
----
-
-## Getting started
-
-### Prerequisites
-- Bun (this repo was created with Bun tooling), but also supports Node.js.
-
-Tip: If `index.ts` lives inside a package (common in monorepos), run it from that package directory or use the relevant workspace script once added.
+What started off as a hobby solo project im turning into a full production ready execution client for the TS/JS ecosystems. the first of its kind. but probs wont be ready untik the end of the year. this is a huge undertaking. i dont want to opensource this or make releases until im happy with the state of it. Not production-ready. Expect breaking changes, missing features, and incomplete protocol coverage.
 
 ---
 
 ## Project status (today)
 
 ### In progress
-- Smart contract support: not yet (no EVM / contracts execution support currently) — in progress
+- Smart contract support: working, but i have minimal support for most post megre hardfork and eip changes. im working on iy
 - Testing suite: in progress
 
 ### To do / not started (planned)
-- Consensus client: to do
+- Consensus client: to do. lol probs wont start this at all since lodestar does this. but might make a minified lodestart for my own learnig purposes
 - Execution client completeness (state, tx pool, block building/import, etc.): to do
 - Wire protocol completeness, syncing, peer discovery hardening: to do
 - Metrics/observability, fuzzing, long-run testing: to do
@@ -30,28 +21,6 @@ Tip: If `index.ts` lives inside a package (common in monorepos), run it from tha
 ### Repo activity signals
 - No releases published
 - No issues or PRs currently open
-
----
-
-## Roadmap (suggested milestones)
-
-1. Networking foundation
-   - Stable peer lifecycle
-   - Message encoding/decoding + protocol versioning
-   - Basic gossip/broadcast flows
-2. Core data structures
-   - Blocks, headers, transactions
-   - Canonical chain selection (basic fork-choice rules)
-3. Execution (no smart contracts → then contracts)
-   - Start with minimal state + value transfers
-   - Add EVM + smart contract execution (WIP)
-4. Consensus client
-   - Beacon-style consensus components (planned)
-   - Fork-choice + validation pipeline
-5. Testing + correctness
-   - Unit + integration suites
-   - Local multi-node simulations (docker/compose)
-   - Regression tests for protocol edge-cases
 
 ---
 
