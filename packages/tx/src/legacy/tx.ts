@@ -1,4 +1,4 @@
-import { Hardfork, type HardforkManager } from '@ts-ethereum/chain-config'
+import type { Hardfork, HardforkManager } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
