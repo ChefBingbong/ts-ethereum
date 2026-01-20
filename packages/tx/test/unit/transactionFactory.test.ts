@@ -35,7 +35,7 @@ const txTypes = [
   },
 ]
 
-describe.skip('[TransactionFactory]: Basic functions', () => {
+describe('[TransactionFactory]: Basic functions', () => {
   it('fromSerializedData() -> success cases', () => {
     for (const txType of txTypes) {
       const serialized = txType.unsigned.serialize()

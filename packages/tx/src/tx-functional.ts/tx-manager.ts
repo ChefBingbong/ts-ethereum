@@ -1,8 +1,8 @@
-import {
-  type Capability,
+import type {
+  Capability,
   TransactionType,
-  type TxOptions,
-  type TxValuesArray,
+  TxOptions,
+  TxValuesArray,
 } from '../types'
 import * as helpers from './helpers'
 import type { FrozenTx, Signer, TxData, TxManager } from './types'

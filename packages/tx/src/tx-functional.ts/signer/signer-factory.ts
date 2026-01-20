@@ -1,5 +1,5 @@
 import { Hardfork, type HardforkManager } from '@ts-ethereum/chain-config'
-import { HardforkContext } from '@ts-ethereum/chain-config/src/config/functional'
+import type { HardforkContext } from '@ts-ethereum/chain-config/src/config/functional'
 import type { Signer } from '../types'
 import { CancunSigner } from './cancun'
 import { EIP155Signer } from './eip155'
@@ -33,8 +33,6 @@ export function makeSigner(
   }
   // Check hardforks in order (most recent first)
   if (common.hardforkGte(hardfork, Hardfork.Prague)) {
-    console.log(hardfork, 'hardfork')
-
     return new PragueSigner(chainId)
   }
   if (common.hardforkGte(hardfork, Hardfork.Cancun)) {

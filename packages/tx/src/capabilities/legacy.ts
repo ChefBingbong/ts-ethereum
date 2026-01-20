@@ -5,8 +5,8 @@ import {
   bigIntMax,
   bigIntToUnpaddedBytes,
   bytesToHex,
-  ecrecover,
   EthereumJSErrorWithoutCode,
+  ecrecover,
   publicToAddress,
   SECP256K1_ORDER_DIV_2,
   unpadBytes,
@@ -309,7 +309,6 @@ export function sign(
   }
   const hardfork = tx.fork
 
-  console.log(hardfork, 'hardfork-old')
   // TODO (Jochem, 05 nov 2024): figure out what this hack does and clean it up
 
   // Hack for the constellation that we have got a legacy tx after spuriousDragon with a non-EIP155 conforming signature

@@ -109,7 +109,7 @@ const legacyTxValues = {
   gasPrice: generateBigIntLikeValues(100),
 }
 
-describe.skip('[Transaction Input Values]', () => {
+describe('[Transaction Input Values]', () => {
   it('Legacy Transaction Values', () => {
     const common = createHardforkManagerFromConfig(Mainnet)
     const blockNumber = 0n

@@ -101,10 +101,11 @@ export function isSigned(tx: FrozenTx): boolean {
 }
 
 /**
- * Returns the appropriate signer for the transaction based on hardfork.
+ * Returns the appropriate signer for the transaction based on its hardfork context.
  */
 function getSignerForTx(tx: FrozenTx): Signer {
-  return makeSigner(tx.common, undefined, undefined)
+  // Use the transaction's fork context to get the correct signer
+  return makeSigner(tx.common, undefined, undefined, tx.fork)
 }
 
 /**

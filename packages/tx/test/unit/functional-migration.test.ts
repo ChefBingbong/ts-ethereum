@@ -193,7 +193,6 @@ describe('[Functional Migration: Legacy Tx]', () => {
       const signedNewTx = signTx(tx, signer, privateKey)
 
       // Compare v, r, s values
-      console.log(signedNewTx.v, signedOldTx.v)
       assert.strictEqual(signedNewTx.v, signedOldTx.v, 'v values should match')
       assert.strictEqual(signedNewTx.r, signedOldTx.r, 'r values should match')
       assert.strictEqual(signedNewTx.s, signedOldTx.s, 's values should match')
@@ -267,7 +266,7 @@ describe('[Functional Migration: Legacy Tx]', () => {
         data: txData.data,
       })
       const tx = newTx(newTxData, { common, blockNumber, timestamp })
-      const signer = makeSigner(common)
+      const signer = makeSigner(common, blockNumber, timestamp)
       const signedNewTx = signTx(tx, signer, privateKey)
 
       // Recover sender using Go-style sender(signer, tx)
@@ -304,7 +303,7 @@ describe('[Functional Migration: Legacy Tx]', () => {
         data: txData.data,
       })
       const tx = newTx(newTxData, { common, blockNumber, timestamp })
-      const signer = makeSigner(common)
+      const signer = makeSigner(common, blockNumber, timestamp)
       const signedNewTx = signTx(tx, signer, privateKey)
 
       assert.isTrue(
@@ -441,7 +440,6 @@ describe('[Functional Migration: Legacy Tx]', () => {
       const signer = makeSigner(common, blockNumber, timestamp, hardfork)
       const signedNewTx = signTx(tx, signer, privateKey)
 
-      console.log(signedNewTx.isValid(), signedOldTx.isValid())
       assert.strictEqual(
         signedNewTx.isValid(),
         signedOldTx.isValid(),
@@ -473,7 +471,7 @@ describe('[Functional Migration: Legacy Tx]', () => {
         data: txData.data,
       })
       const tx = newTx(newTxData, { common, blockNumber, timestamp })
-      const signer = makeSigner(common)
+      const signer = makeSigner(common, blockNumber, timestamp)
       const signedNewTx = signTx(tx, signer, privateKey)
 
       assert.strictEqual(
@@ -610,7 +608,7 @@ describe('[Functional Migration: Legacy Tx]', () => {
         data: txData.data,
       })
       const tx = newTx(newTxData, { common, blockNumber, timestamp })
-      const signer = makeSigner(common)
+      const signer = makeSigner(common, blockNumber, timestamp)
       const signedTx = signTx(tx, signer, privateKey)
 
       assert.isTrue(

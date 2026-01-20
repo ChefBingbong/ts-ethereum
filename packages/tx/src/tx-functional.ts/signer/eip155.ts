@@ -96,12 +96,6 @@ export class EIP155Signer implements Signer {
       throw new Error('Invalid signature: transaction is not signed')
     }
 
-    // For EIP-155: recover V by subtracting (chainId * 2 + 8)
-    // V was encoded as: recovery + 35 + chainId * 2
-    // recovery = V - 35 - chainId * 2
-    // V_ecrecover = recovery + 27 = V - chainId * 2 - 8
-    const adjustedV = v - this._chainIdMul - 8n
-
     // Validate S value (EIP-2 / Homestead rule)
     if (s > SECP256K1_ORDER_DIV_2) {
       throw new Error(
@@ -109,10 +103,12 @@ export class EIP155Signer implements Signer {
       )
     }
 
+    // Pass original V and chainId to ecrecover - it handles the adjustment internally
+    // ecrecover calculates: recovery = (v - 35 - chainId*2) when chainId is provided
     const sigHash = this.hash(tx)
     const publicKey = ecrecover(
       sigHash,
-      adjustedV,
+      v,
       bigIntToUnpaddedBytes(r),
       bigIntToUnpaddedBytes(s),
       this._chainId,

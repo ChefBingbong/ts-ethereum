@@ -1,4 +1,9 @@
-import type { Address } from '@ts-ethereum/utils'
+import {
+  Address,
+  bigIntToUnpaddedBytes,
+  ecrecover,
+  publicToAddress,
+} from '@ts-ethereum/utils'
 import { TransactionType } from '../../types'
 import type { Signer, TxManager } from '../types'
 import { EIP155Signer } from './eip155'
@@ -92,11 +97,10 @@ export class EIP2930Signer implements Signer {
       throw new Error('Invalid signature: transaction is not signed')
     }
 
+    // For typed transactions, V is 0 or 1, add 27 to get standard format for ecrecover
     const adjustedV = v + 27n
     const sigHash = this.hash(tx)
 
-    const { ecrecover, publicToAddress, bigIntToUnpaddedBytes, Address } =
-      require('@ts-ethereum/utils')
     const publicKey = ecrecover(
       sigHash,
       adjustedV,

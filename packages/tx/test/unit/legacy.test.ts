@@ -26,7 +26,7 @@ import {
 
 import { txsData } from './testData/txs'
 
-describe.skip('[Transaction]', () => {
+describe('[Transaction]', () => {
   const transactions: TypedTransaction[] = []
   const common = createHardforkManagerFromConfig(Mainnet)
   const blockNumber = 0n
@@ -357,7 +357,7 @@ describe.skip('[Transaction]', () => {
     const signedTxn = txn.sign(pkey)
     assert.strictEqual(
       signedTxn.common.getHardforkByBlock(blockNumber, timestamp),
-      Hardfork.Chainstart,
+      Hardfork.Prague,
       'signed tx common is taken from tx.common',
     )
   })
