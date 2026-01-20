@@ -159,7 +159,7 @@ export class LegacyTx
       )
     }
 
-    const hf = Hardfork.Chainstart
+    const hf = this.common.getHardforkFromContext(this.txOptions.hardfork)
     // EIP-155 replay protection capability
     // NOTE: We recognize EIP-155 signed txs regardless of hardfork because:
     // 1. Modern wallets always sign with EIP-155 (chainId in v)

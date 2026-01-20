@@ -1,74 +1,18 @@
 import {
-  Capability,
-  type Transaction,
+  type Capability,
   TransactionType,
   type TxOptions,
   type TxValuesArray,
 } from '../types'
 import * as helpers from './helpers'
-import type { FrozenTx, TxData, TxManager } from './types'
+import type { FrozenTx, Signer, TxData, TxManager } from './types'
 
 /**
- * Calculates the active capabilities for a transaction based on its type,
- * signature state, and hardfork configuration.
- */
-function getActiveCapabilities(
-  txData: TxData,
-  fork: string,
-  common: TxOptions['common'],
-): number[] {
-  const capabilities: number[] = []
-
-  if (txData.type === TransactionType.Legacy) {
-    // For legacy transactions, EIP-155 replay protection depends on:
-    // 1. If unsigned: hardfork must support it (>= spuriousDragon)
-    // 2. If signed: v >= 37 indicates EIP-155 was used
-    const isSigned =
-      txData.v !== undefined && txData.r !== undefined && txData.s !== undefined
-
-    if (!isSigned) {
-      // For unsigned txs: only enable EIP-155 if hardfork supports it
-      if (common.hardforkGte(fork, 'spuriousDragon')) {
-        capabilities.push(Capability.EIP155ReplayProtection)
-      }
-    } else {
-      // For signed txs: detect if tx was signed with EIP-155 (v >= 37)
-      const v = txData.v !== undefined ? Number(txData.v) : undefined
-      if (v !== undefined && v >= 37) {
-        capabilities.push(Capability.EIP155ReplayProtection)
-      }
-    }
-  } else if (txData.type === TransactionType.AccessListEIP2930) {
-    capabilities.push(Capability.EIP155ReplayProtection)
-    capabilities.push(Capability.EIP2718TypedTransaction)
-    capabilities.push(Capability.EIP2930AccessLists)
-  } else if (txData.type === TransactionType.FeeMarketEIP1559) {
-    capabilities.push(Capability.EIP155ReplayProtection)
-    capabilities.push(Capability.EIP2718TypedTransaction)
-    capabilities.push(Capability.EIP2930AccessLists)
-    capabilities.push(Capability.EIP1559FeeMarket)
-  } else if (txData.type === TransactionType.BlobEIP4844) {
-    capabilities.push(Capability.EIP155ReplayProtection)
-    capabilities.push(Capability.EIP2718TypedTransaction)
-    capabilities.push(Capability.EIP2930AccessLists)
-    capabilities.push(Capability.EIP1559FeeMarket)
-  } else if (txData.type === TransactionType.EOACodeEIP7702) {
-    capabilities.push(Capability.EIP155ReplayProtection)
-    capabilities.push(Capability.EIP2718TypedTransaction)
-    capabilities.push(Capability.EIP2930AccessLists)
-    capabilities.push(Capability.EIP1559FeeMarket)
-    capabilities.push(Capability.EIP7702EOACode)
-  }
-
-  return capabilities
-}
-
-/**
- * NewTx creates a new transaction - equivalent to Go's NewTx function
+ * NewTx creates a new transaction.
+ * Equivalent to Go's NewTx function.
  */
 export function newTx(txData: TxData, opts: TxOptions): TxManager {
   const fork = opts.common.getHardforkFromContext(opts.hardfork)
-  const activeCapabilities = getActiveCapabilities(txData, fork, opts.common)
 
   const frozenTx: FrozenTx = {
     inner: txData,
@@ -76,21 +20,24 @@ export function newTx(txData: TxData, opts: TxOptions): TxManager {
     fork,
     cache: {},
     txOptions: opts,
-    activeCapabilities,
   }
   return createTxManagerFromTx(frozenTx)
 }
 
 /**
- * Create manager from frozen tx
+ * Create TxManager from frozen tx.
+ * This is our TypeScript equivalent of Go's Transaction struct methods.
  */
 export function createTxManagerFromTx<T extends TransactionType>(
   tx: FrozenTx,
 ): TxManager<T> {
-  return Object.freeze({
+  const manager: TxManager<T> = {
     tx,
 
-    // Accessors matching TransactionInterface
+    // ============================================================================
+    // Property accessors
+    // ============================================================================
+
     get common() {
       return tx.common
     },
@@ -131,34 +78,103 @@ export function createTxManagerFromTx<T extends TransactionType>(
       return tx.txOptions
     },
 
-    // Methods matching TransactionInterface
+    // ============================================================================
+    // Go-style methods (primary API)
+    // ============================================================================
+
+    /**
+     * Returns a new transaction with the given signature.
+     * Equivalent to Go's Transaction.WithSignature(signer, sig).
+     */
+    withSignature(signer: Signer, sig: Uint8Array): TxManager<T> {
+      const { r, s, v } = signer.signatureValues(manager, sig)
+
+      // Create new inner tx with signature values
+      const chainId = signer.chainID() ?? 0n
+      const newInner = tx.inner.setSignatureValues(chainId, v, r, s)
+
+      // Create new FrozenTx with updated inner
+      const newFrozenTx: FrozenTx = {
+        inner: newInner,
+        common: tx.common,
+        fork: tx.fork,
+        cache: {},
+        txOptions: tx.txOptions,
+      }
+
+      return createTxManagerFromTx(newFrozenTx)
+    },
+
+    /**
+     * Returns whether the transaction is replay-protected.
+     * Equivalent to Go's Transaction.Protected().
+     */
+    protected: () => helpers.isProtected(tx),
+
+    /**
+     * Returns the transaction hash (only valid for signed transactions).
+     * Equivalent to Go's Transaction.Hash().
+     */
+    hash: () => helpers.hash(tx),
+
+    /**
+     * Returns the raw V, R, S signature values.
+     * Equivalent to Go's Transaction.RawSignatureValues().
+     */
+    rawSignatureValues: () => tx.inner.rawSignatureValues(),
+
+    /**
+     * Returns the chain ID of the transaction.
+     * Equivalent to Go's Transaction.ChainId().
+     */
+    chainId: () => tx.inner.chainID(),
+
+    // ============================================================================
+    // Type checks
+    // ============================================================================
+
+    isTypedTransaction: () => helpers.isTypedTransaction(tx),
     supports: (capability: Capability) => helpers.supports(tx, capability),
+
+    // ============================================================================
+    // Gas calculations
+    // ============================================================================
+
     getIntrinsicGas: () => helpers.getIntrinsicGas(tx),
     getDataGas: () => helpers.getDataGas(tx),
     getUpfrontCost: () => helpers.getUpfrontCost(tx),
+
+    // ============================================================================
+    // Serialization
+    // ============================================================================
+
     toCreationAddress: () => helpers.toCreationAddress(tx),
     raw: () => tx.inner.raw() as TxValuesArray[T],
     serialize: () => helpers.serialize(tx),
-    getMessageToSign: () => helpers.getMessageToSign(tx),
-    getHashedMessageToSign: () => helpers.getHashedMessageToSign(tx),
-    hash: () => helpers.hash(tx),
-    getMessageToVerifySignature: () => helpers.getMessageToVerifySignature(tx),
-    getValidationErrors: () => helpers.getValidationErrors(tx),
+
+    // ============================================================================
+    // Validation
+    // ============================================================================
+
     isSigned: () => helpers.isSigned(tx),
     isValid: () => helpers.isValid(tx),
+    getValidationErrors: () => helpers.getValidationErrors(tx),
     verifySignature: () => helpers.verifySignature(tx),
+
+    // ============================================================================
+    // Sender recovery (convenience methods)
+    // ============================================================================
+
     getSenderAddress: () => helpers.getSenderAddress(tx),
     getSenderPublicKey: () => helpers.getSenderPublicKey(tx),
-    sign: (privateKey: Uint8Array, extraEntropy?: Uint8Array | boolean) =>
-      helpers.sign(tx, privateKey, extraEntropy) as unknown as Transaction[T],
+
+    // ============================================================================
+    // JSON
+    // ============================================================================
+
     toJSON: () => helpers.toJSON(tx),
     errorStr: () => helpers.errorStr(tx),
-    addSignature: (
-      v: bigint,
-      r: Uint8Array | bigint,
-      s: Uint8Array | bigint,
-      convertV?: boolean,
-    ) =>
-      helpers.addSignature(tx, v, r, s, convertV) as unknown as Transaction[T],
-  })
+  }
+
+  return Object.freeze(manager)
 }

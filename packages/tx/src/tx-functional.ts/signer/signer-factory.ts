@@ -1,4 +1,6 @@
-import type { HardforkManager } from '@ts-ethereum/chain-config'
+import { Hardfork, type HardforkManager } from '@ts-ethereum/chain-config'
+import { HardforkContext } from '@ts-ethereum/chain-config/src/config/functional'
+import type { Signer } from '../types'
 import { CancunSigner } from './cancun'
 import { EIP155Signer } from './eip155'
 import { EIP2930Signer } from './eip2930'
@@ -6,36 +8,48 @@ import { FrontierSigner } from './frontier'
 import { HomesteadSigner } from './homestead'
 import { LondonSigner } from './london'
 import { PragueSigner } from './prague'
-import type { Signer } from './types'
 
 /**
- * MakeSigner returns a Signer based on the given chain config and block number.
+ * MakeSigner returns a Signer based on the given chain config and hardfork.
  * Equivalent to Go's MakeSigner function.
+ *
+ * Uses the latest hardfork from HardforkManager if no specific context is given.
  */
 export function makeSigner(
   common: HardforkManager,
   blockNumber?: bigint,
   blockTime?: bigint,
+  hardforkContext?: HardforkContext,
 ): Signer {
   const chainId = common.chainId()
 
+  // Get the active hardfork for the given block context, or use latest
+  let hardfork = common.getLatestHardfork()
+  if (hardforkContext) {
+    hardfork = common.getHardforkFromContext(hardforkContext)
+  }
+  if (blockNumber !== undefined || blockTime !== undefined) {
+    hardfork = common.getHardforkByBlock(blockNumber, blockTime)
+  }
   // Check hardforks in order (most recent first)
-  if (common.isPragueActive(blockNumber, blockTime)) {
+  if (common.hardforkGte(hardfork, Hardfork.Prague)) {
+    console.log(hardfork, 'hardfork')
+
     return new PragueSigner(chainId)
   }
-  if (common.isCancunActive(blockNumber, blockTime)) {
+  if (common.hardforkGte(hardfork, Hardfork.Cancun)) {
     return new CancunSigner(chainId)
   }
-  if (common.isLondonActive(blockNumber)) {
+  if (common.hardforkGte(hardfork, Hardfork.London)) {
     return new LondonSigner(chainId)
   }
-  if (common.isBerlinActive(blockNumber)) {
+  if (common.hardforkGte(hardfork, Hardfork.Berlin)) {
     return new EIP2930Signer(chainId)
   }
-  if (common.isEIP155Active(blockNumber)) {
+  if (common.hardforkGte(hardfork, Hardfork.SpuriousDragon)) {
     return new EIP155Signer(chainId)
   }
-  if (common.isHomesteadActive(blockNumber)) {
+  if (common.hardforkGte(hardfork, Hardfork.Homestead)) {
     return new HomesteadSigner()
   }
   return new FrontierSigner()
@@ -44,24 +58,27 @@ export function makeSigner(
 /**
  * LatestSigner returns the 'most permissive' Signer available.
  * Equivalent to Go's LatestSigner function.
+ *
+ * Uses the latest configured hardfork regardless of current block.
  */
 export function latestSigner(common: HardforkManager): Signer {
   const chainId = common.chainId()
+  const hardfork = common.getLatestHardfork()
 
-  // Check if hardforks are scheduled (regardless of block number)
-  if (common.hasPrague()) {
+  // Check hardforks in order (most recent first)
+  if (common.hardforkGte(hardfork, Hardfork.Prague)) {
     return new PragueSigner(chainId)
   }
-  if (common.hasCancun()) {
+  if (common.hardforkGte(hardfork, Hardfork.Cancun)) {
     return new CancunSigner(chainId)
   }
-  if (common.hasLondon()) {
+  if (common.hardforkGte(hardfork, Hardfork.London)) {
     return new LondonSigner(chainId)
   }
-  if (common.hasBerlin()) {
+  if (common.hardforkGte(hardfork, Hardfork.Berlin)) {
     return new EIP2930Signer(chainId)
   }
-  if (common.hasEIP155()) {
+  if (common.hardforkGte(hardfork, Hardfork.SpuriousDragon)) {
     return new EIP155Signer(chainId)
   }
   return new HomesteadSigner()

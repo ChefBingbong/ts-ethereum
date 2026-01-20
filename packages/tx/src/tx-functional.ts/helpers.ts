@@ -1,35 +1,91 @@
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
-  Address,
+  type Address,
   BIGINT_0,
-  BIGINT_2,
   bigIntMax,
   bigIntToHex,
-  bigIntToUnpaddedBytes,
-  bytesToBigInt,
   bytesToHex,
-  ecrecover,
-  publicToAddress,
-  SECP256K1_ORDER_DIV_2,
-  toBytes,
-  unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import { secp256k1 } from 'ethereum-cryptography/secp256k1'
 import { Capability, type JSONTx, TransactionType } from '../types'
+import { makeSigner } from './signer/signer-factory'
+import { sender } from './signing'
 import { createTxManagerFromTx } from './tx-manager'
-import type { FrozenTx, TxManager } from './types'
+import type { FrozenTx, Signer } from './types'
 
 // ============================================================================
-// Capability Support
+// Transaction Type Checks (Go-style)
 // ============================================================================
 
 /**
- * Checks if a capability is supported based on the frozen tx's activeCapabilities.
+ * Checks if a V value indicates EIP-155 replay protection.
+ * Equivalent to Go's isProtectedV function.
+ */
+export function isProtectedV(v: bigint): boolean {
+  return v !== 27n && v !== 28n && v !== 1n && v !== 0n
+}
+
+/**
+ * Returns whether the transaction is replay-protected (EIP-155).
+ * Equivalent to Go's Transaction.Protected() method.
+ */
+export function isProtected(tx: FrozenTx): boolean {
+  if (tx.inner.type === TransactionType.Legacy) {
+    const v = tx.inner.v
+    return v !== undefined && isProtectedV(v)
+  }
+  // All typed transactions (EIP-2718) are inherently protected
+  return true
+}
+
+/**
+ * Checks if the transaction is a typed transaction (EIP-2718).
+ */
+export function isTypedTransaction(tx: FrozenTx): boolean {
+  return tx.inner.type !== TransactionType.Legacy
+}
+
+/**
+ * Checks if the transaction supports EIP-1559 fee market.
+ */
+export function supportsFeeMarket(tx: FrozenTx): boolean {
+  return (
+    tx.inner.type === TransactionType.FeeMarketEIP1559 ||
+    tx.inner.type === TransactionType.BlobEIP4844 ||
+    tx.inner.type === TransactionType.EOACodeEIP7702
+  )
+}
+
+/**
+ * Checks if the transaction supports access lists.
+ */
+export function supportsAccessList(tx: FrozenTx): boolean {
+  return tx.inner.type !== TransactionType.Legacy
+}
+
+/**
+ * Legacy supports() function for backward compatibility.
+ * @deprecated Use isProtected(), isTypedTransaction(), etc. instead
  */
 export function supports(tx: FrozenTx, capability: Capability): boolean {
-  return tx.activeCapabilities?.includes(capability) ?? false
+  switch (capability) {
+    case Capability.EIP155ReplayProtection:
+      if (tx.inner.type === TransactionType.Legacy && !isSigned(tx)) {
+        return tx.common.hardforkGte(tx.fork, 'spuriousDragon')
+      }
+      return isProtected(tx)
+    case Capability.EIP2718TypedTransaction:
+      return isTypedTransaction(tx)
+    case Capability.EIP2930AccessLists:
+      return supportsAccessList(tx)
+    case Capability.EIP1559FeeMarket:
+      return supportsFeeMarket(tx)
+    case Capability.EIP7702EOACode:
+      return tx.inner.type === TransactionType.EOACodeEIP7702
+    default:
+      return false
+  }
 }
 
 // ============================================================================
@@ -37,7 +93,7 @@ export function supports(tx: FrozenTx, capability: Capability): boolean {
 // ============================================================================
 
 /**
- * Checks if a transaction is signed
+ * Checks if a transaction is signed.
  */
 export function isSigned(tx: FrozenTx): boolean {
   const { v, r, s } = tx.inner
@@ -45,67 +101,37 @@ export function isSigned(tx: FrozenTx): boolean {
 }
 
 /**
- * Validates the S value per EIP-2 (Homestead rule)
+ * Returns the appropriate signer for the transaction based on hardfork.
  */
-function validateHighS(tx: FrozenTx): void {
-  const { s } = tx.inner
-  if (
-    tx.common.hardforkGte(Hardfork.Homestead, tx.fork) &&
-    s !== undefined &&
-    s > SECP256K1_ORDER_DIV_2
-  ) {
-    throw new Error(
-      'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid',
-    )
-  }
+function getSignerForTx(tx: FrozenTx): Signer {
+  return makeSigner(tx.common, undefined, undefined)
 }
 
 /**
  * Recovers the sender's public key from the transaction signature.
+ * Note: Go doesn't expose this - use getSenderAddress instead.
  */
-export function getSenderPublicKey(tx: FrozenTx): Uint8Array {
-  if (tx.cache.senderPubKey !== undefined) {
-    return tx.cache.senderPubKey
-  }
-
-  const msgHash = getMessageToVerifySignature(tx)
-  const { v, r, s } = tx.inner
-
-  validateHighS(tx)
-
-  try {
-    const sender = ecrecover(
-      msgHash,
-      v!,
-      bigIntToUnpaddedBytes(r!),
-      bigIntToUnpaddedBytes(s!),
-      supports(tx, Capability.EIP155ReplayProtection)
-        ? tx.common.chainId()
-        : undefined,
-    )
-    if (Object.isFrozen(tx)) {
-      ;(tx.cache as any).senderPubKey = sender
-    }
-    return sender
-  } catch {
-    throw new Error('Invalid Signature')
-  }
+export function getSenderPublicKey(_tx: FrozenTx): Uint8Array {
+  throw new Error('getSenderPublicKey is not supported - use getSenderAddress')
 }
 
 /**
- * Returns the sender's address
+ * Returns the sender's address.
+ * Equivalent to Go's Sender(signer, tx) function.
  */
 export function getSenderAddress(tx: FrozenTx): Address {
-  return new Address(publicToAddress(getSenderPublicKey(tx), false))
+  const signer = getSignerForTx(tx)
+  const txManager = createTxManagerFromTx(tx)
+  return sender(signer, txManager)
 }
 
 /**
- * Determines if the signature is valid
+ * Determines if the signature is valid.
  */
 export function verifySignature(tx: FrozenTx): boolean {
   try {
-    const publicKey = getSenderPublicKey(tx)
-    return unpadBytes(publicKey).length !== 0
+    getSenderAddress(tx)
+    return true
   } catch {
     return false
   }
@@ -116,51 +142,19 @@ export function verifySignature(tx: FrozenTx): boolean {
 // ============================================================================
 
 /**
- * Serializes the transaction
+ * Serializes the transaction to RLP.
  */
 export function serialize(tx: FrozenTx): Uint8Array {
   return RLP.encode(tx.inner.raw())
 }
 
 /**
- * Returns the message to sign (unsigned tx fields)
- */
-export function getMessageToSign(tx: FrozenTx): Uint8Array | Uint8Array[] {
-  if (tx.inner.type === TransactionType.Legacy) {
-    const supportsEIP155 = supports(tx, Capability.EIP155ReplayProtection)
-    return tx.inner.getMessageToSign(tx.common.chainId(), supportsEIP155)
-  }
-  // For typed transactions, return the serialized form
-  return serialize(tx)
-}
-
-/**
- * Returns the hashed message to sign
- */
-export function getHashedMessageToSign(tx: FrozenTx): Uint8Array {
-  if (tx.inner.type === TransactionType.Legacy) {
-    const message = getMessageToSign(tx) as Uint8Array[]
-    return keccak256(RLP.encode(message))
-  }
-  return keccak256(getMessageToSign(tx) as Uint8Array)
-}
-
-/**
- * Computes a sha3-256 hash which can be used to verify the signature
- */
-export function getMessageToVerifySignature(tx: FrozenTx): Uint8Array {
-  if (!isSigned(tx)) {
-    throw new Error('Transaction is not signed')
-  }
-  return getHashedMessageToSign(tx)
-}
-
-/**
- * Computes the transaction hash (only for signed transactions)
+ * Computes the transaction hash (only for signed transactions).
+ * Equivalent to Go's Transaction.Hash().
  */
 export function hash(tx: FrozenTx): Uint8Array {
   if (!isSigned(tx)) {
-    throw new Error('Cannot call hash method if transaction is not signed')
+    throw new Error('Cannot hash unsigned transaction')
   }
 
   if (Object.isFrozen(tx) && tx.cache.hash !== undefined) {
@@ -170,7 +164,7 @@ export function hash(tx: FrozenTx): Uint8Array {
   const txHash = keccak256(serialize(tx))
 
   if (Object.isFrozen(tx)) {
-    ;(tx.cache as any).hash = txHash
+    ;(tx.cache as { hash?: Uint8Array }).hash = txHash
   }
 
   return txHash
@@ -181,14 +175,14 @@ export function hash(tx: FrozenTx): Uint8Array {
 // ============================================================================
 
 /**
- * Checks if the transaction targets the creation address (contract deployment)
+ * Checks if the transaction targets the creation address (contract deployment).
  */
 export function toCreationAddress(tx: FrozenTx): boolean {
   return tx.inner.to === undefined || tx.inner.to.bytes.length === 0
 }
 
 /**
- * The amount of gas paid for the data in this tx
+ * The amount of gas paid for the data in this tx.
  */
 export function getDataGas(tx: FrozenTx): bigint {
   const hardfork = tx.fork
@@ -218,10 +212,7 @@ export function getDataGas(tx: FrozenTx): bigint {
   }
 
   if (Object.isFrozen(tx)) {
-    ;(tx.cache as any).dataFee = {
-      value: cost,
-      hardfork: hardfork,
-    }
+    ;(tx.cache as any).dataFee = { value: cost, hardfork }
   }
 
   return cost
@@ -258,9 +249,9 @@ export function getIntrinsicGas(tx: FrozenTx): bigint {
 }
 
 /**
- * The up front amount that an account must have for this transaction to be valid
+ * The up front amount that an account must have for this transaction to be valid.
  */
-export function getUpfrontCost(tx: FrozenTx, baseFee?: bigint): bigint {
+export function getUpfrontCost(tx: FrozenTx, _baseFee?: bigint): bigint {
   return tx.inner.gasLimit * tx.inner.gasPrice() + tx.inner.value
 }
 
@@ -294,7 +285,7 @@ export function getValidationErrors(tx: FrozenTx): string[] {
 
   if (intrinsicGas > tx.inner.gasLimit) {
     errors.push(
-      `gasLimit is too low. The gasLimit is lower than the minimum gas limit of ${getIntrinsicGas(tx)}, the gas limit is: ${tx.inner.gasLimit}`,
+      `gasLimit is too low. Minimum: ${getIntrinsicGas(tx)}, got: ${tx.inner.gasLimit}`,
     )
   }
 
@@ -302,77 +293,10 @@ export function getValidationErrors(tx: FrozenTx): string[] {
 }
 
 /**
- * Returns true if the transaction is valid
+ * Returns true if the transaction is valid.
  */
 export function isValid(tx: FrozenTx): boolean {
   return getValidationErrors(tx).length === 0
-}
-
-// ============================================================================
-// Signing
-// ============================================================================
-
-/**
- * Signs a transaction with the provided private key.
- */
-export function sign(
-  tx: FrozenTx,
-  privateKey: Uint8Array,
-  extraEntropy: Uint8Array | boolean = true,
-): TxManager {
-  if (privateKey.length !== 32) {
-    throw new Error('Private key must be 32 bytes in length.')
-  }
-
-  const msgHash = getHashedMessageToSign(tx)
-  const { recovery, r, s } = secp256k1.sign(msgHash, privateKey, {
-    extraEntropy,
-  })
-
-  if (recovery === undefined) {
-    throw new Error('Invalid signature recovery')
-  }
-
-  return addSignature(tx, BigInt(recovery), r, s, true)
-}
-
-/**
- * Adds a signature to the transaction and returns a new TxManager.
- */
-export function addSignature(
-  tx: FrozenTx,
-  v: bigint,
-  r: Uint8Array | bigint,
-  s: Uint8Array | bigint,
-  convertV = false,
-): TxManager {
-  const rBytes = toBytes(r)
-  const sBytes = toBytes(s)
-
-  let finalV = v
-  if (convertV && supports(tx, Capability.EIP155ReplayProtection)) {
-    finalV = v + 35n + tx.common.chainId() * BIGINT_2
-  } else if (convertV) {
-    finalV = v + 27n
-  }
-
-  const newTxData = tx.inner.setSignatureValues(
-    tx.common.chainId(),
-    finalV,
-    bytesToBigInt(rBytes),
-    bytesToBigInt(sBytes),
-  )
-
-  const newFrozenTx: FrozenTx = {
-    inner: newTxData,
-    common: tx.common,
-    fork: tx.fork,
-    cache: {},
-    txOptions: tx.txOptions,
-    activeCapabilities: tx.activeCapabilities,
-  }
-
-  return createTxManagerFromTx(newFrozenTx)
 }
 
 // ============================================================================
@@ -399,7 +323,7 @@ export function toJSON(tx: FrozenTx): JSONTx {
 }
 
 /**
- * Builds a compact string that summarizes common transaction fields for error messages.
+ * Builds a compact string that summarizes common transaction fields.
  */
 export function errorStr(tx: FrozenTx): string {
   let hashStr = ''
@@ -408,21 +332,6 @@ export function errorStr(tx: FrozenTx): string {
   } catch {
     hashStr = 'error'
   }
-  let isSignedStr = ''
-  try {
-    isSignedStr = isSigned(tx).toString()
-  } catch {
-    isSignedStr = 'error'
-  }
-  let hf = ''
-  try {
-    hf = tx.fork
-  } catch {
-    hf = 'error'
-  }
 
-  let postfix = `tx type=${tx.inner.type} hash=${hashStr} nonce=${tx.inner.nonce} value=${tx.inner.value} `
-  postfix += `signed=${isSignedStr} hf=${hf}`
-
-  return postfix
+  return `tx type=${tx.inner.type} hash=${hashStr} nonce=${tx.inner.nonce} value=${tx.inner.value} signed=${isSigned(tx)} hf=${tx.fork}`
 }

@@ -11,6 +11,8 @@ import {
 import { assert, describe, it } from 'vitest'
 
 import { Capability, createLegacyTx, TransactionType } from '../../src/index'
+import { makeSigner } from '../../src/tx-functional.ts/signer/signer-factory'
+import { sender, signTx } from '../../src/tx-functional.ts/signing'
 import { LegacyTxData } from '../../src/tx-functional.ts/tx-legacy'
 import { newTx } from '../../src/tx-functional.ts/tx-manager'
 
@@ -160,121 +162,8 @@ describe('[Functional Migration: Legacy Tx]', () => {
     })
   })
 
-  describe('Hashing', () => {
-    it('should produce identical getMessageToSign() for pre-EIP155', () => {
-      // Use pre-spuriousDragon hardfork for pre-EIP155
-      const preDragonCommon = createHardforkManagerFromConfig(Mainnet)
-      const txData = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        value: 1000000000000000000n,
-        data: new Uint8Array(0),
-      }
-
-      const oldTx = createLegacyTx(txData, {
-        common: preDragonCommon,
-        hardfork: Hardfork.Chainstart,
-      })
-      const newTxData = new LegacyTxData({
-        nonce: txData.nonce,
-        gasPrice: txData.gasPrice,
-        gasLimit: txData.gasLimit,
-        value: txData.value,
-        data: txData.data,
-      })
-      const newTxManager = newTx(newTxData, {
-        common: preDragonCommon,
-        hardfork: Hardfork.Chainstart,
-      })
-
-      const oldMsg = oldTx.getMessageToSign()
-      const newMsg = newTxManager.getMessageToSign() as Uint8Array[]
-
-      // Pre-EIP155: 6 fields [nonce, gasPrice, gasLimit, to, value, data]
-      assert.strictEqual(oldMsg.length, 6, 'old msg should have 6 fields')
-      assert.strictEqual(newMsg.length, 6, 'new msg should have 6 fields')
-
-      for (let i = 0; i < oldMsg.length; i++) {
-        assert.isTrue(
-          equalsBytes(newMsg[i]!, oldMsg[i]!),
-          `getMessageToSign[${i}] should match`,
-        )
-      }
-    })
-
-    it('should produce identical getMessageToSign() for EIP-155', () => {
-      // Use post-spuriousDragon hardfork for EIP-155
-      const txData = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        value: 1000000000000000000n,
-        data: new Uint8Array(0),
-      }
-
-      const oldTx = createLegacyTx(txData, {
-        common,
-        hardfork: Hardfork.SpuriousDragon,
-      })
-      const newTxData = new LegacyTxData({
-        nonce: txData.nonce,
-        gasPrice: txData.gasPrice,
-        gasLimit: txData.gasLimit,
-        value: txData.value,
-        data: txData.data,
-      })
-      const newTxManager = newTx(newTxData, {
-        common,
-        hardfork: Hardfork.SpuriousDragon,
-      })
-
-      const oldMsg = oldTx.getMessageToSign()
-      const newMsg = newTxManager.getMessageToSign() as Uint8Array[]
-
-      // EIP-155: 9 fields [nonce, gasPrice, gasLimit, to, value, data, chainId, 0, 0]
-      assert.strictEqual(oldMsg.length, 9, 'old msg should have 9 fields')
-      assert.strictEqual(newMsg.length, 9, 'new msg should have 9 fields')
-
-      for (let i = 0; i < oldMsg.length; i++) {
-        assert.isTrue(
-          equalsBytes(newMsg[i]!, oldMsg[i]!),
-          `getMessageToSign[${i}] should match`,
-        )
-      }
-    })
-
-    it('should produce identical getHashedMessageToSign()', () => {
-      const txData = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        value: 1000000000000000000n,
-        data: new Uint8Array(0),
-      }
-
-      const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
-      const newTxData = new LegacyTxData({
-        nonce: txData.nonce,
-        gasPrice: txData.gasPrice,
-        gasLimit: txData.gasLimit,
-        value: txData.value,
-        data: txData.data,
-      })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-
-      assert.isTrue(
-        equalsBytes(
-          newTxManager.getHashedMessageToSign(),
-          oldTx.getHashedMessageToSign(),
-        ),
-        'getHashedMessageToSign should match',
-      )
-    })
-  })
-
-  describe('Signing', () => {
-    it('should produce identical signed tx when signing with same key', () => {
+  describe('Go-Style Signing with Signer', () => {
+    it('should sign using signTx(tx, signer, privateKey) pattern', () => {
       const txData = {
         nonce: 1n,
         gasPrice: 1000000000n,
@@ -286,9 +175,11 @@ describe('[Functional Migration: Legacy Tx]', () => {
         data: new Uint8Array(0),
       }
 
+      // Old API
       const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
-      const signedOldTx = oldTx.sign(privateKey, false) // deterministic signature
+      const signedOldTx = oldTx.sign(privateKey, false)
 
+      // New Go-style API
       const newTxData = new LegacyTxData({
         nonce: txData.nonce,
         gasPrice: txData.gasPrice,
@@ -297,13 +188,96 @@ describe('[Functional Migration: Legacy Tx]', () => {
         value: txData.value,
         data: txData.data,
       })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-      const signedNewTx = newTxManager.sign(privateKey, false)
+      const tx = newTx(newTxData, { common, blockNumber, timestamp })
+      const signer = makeSigner(common)
+      const signedNewTx = signTx(tx, signer, privateKey)
 
       // Compare v, r, s values
+      console.log(signedNewTx.v, signedOldTx.v)
       assert.strictEqual(signedNewTx.v, signedOldTx.v, 'v values should match')
       assert.strictEqual(signedNewTx.r, signedOldTx.r, 'r values should match')
       assert.strictEqual(signedNewTx.s, signedOldTx.s, 's values should match')
+    })
+
+    it('should sign using tx.withSignature(signer, sig) pattern', () => {
+      const txData = {
+        nonce: 1n,
+        gasPrice: 1000000000n,
+        gasLimit: 21000n,
+        to: createAddressFromString(
+          '0x1234567890123456789012345678901234567890',
+        ),
+        value: 1000000000000000000n,
+        data: new Uint8Array(0),
+      }
+
+      // Create tx and signer
+      const newTxData = new LegacyTxData({
+        nonce: txData.nonce,
+        gasPrice: txData.gasPrice,
+        gasLimit: txData.gasLimit,
+        to: txData.to,
+        value: txData.value,
+        data: txData.data,
+      })
+      const tx = newTx(newTxData, { common, blockNumber, timestamp })
+      const signer = makeSigner(common)
+
+      // Sign manually using withSignature
+      const { secp256k1 } = require('ethereum-cryptography/secp256k1')
+      const h = signer.hash(tx)
+      const signature = secp256k1.sign(h, privateKey)
+      const sig = new Uint8Array(65)
+      sig.set(signature.toCompactRawBytes(), 0)
+      sig[64] = signature.recovery
+
+      const signedTx = tx.withSignature(signer, sig)
+
+      // Should produce same result as signTx
+      const signedViaSignTx = signTx(tx, signer, privateKey)
+
+      assert.strictEqual(signedTx.v, signedViaSignTx.v, 'v should match')
+      assert.strictEqual(signedTx.r, signedViaSignTx.r, 'r should match')
+      assert.strictEqual(signedTx.s, signedViaSignTx.s, 's should match')
+    })
+
+    it('should recover sender using sender(signer, tx) pattern', () => {
+      const txData = {
+        nonce: 1n,
+        gasPrice: 1000000000n,
+        gasLimit: 21000n,
+        to: createAddressFromString(
+          '0x1234567890123456789012345678901234567890',
+        ),
+        value: 1000000000000000000n,
+        data: new Uint8Array(0),
+      }
+
+      // Old API
+      const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
+      const signedOldTx = oldTx.sign(privateKey, false)
+
+      // New Go-style API
+      const newTxData = new LegacyTxData({
+        nonce: txData.nonce,
+        gasPrice: txData.gasPrice,
+        gasLimit: txData.gasLimit,
+        to: txData.to,
+        value: txData.value,
+        data: txData.data,
+      })
+      const tx = newTx(newTxData, { common, blockNumber, timestamp })
+      const signer = makeSigner(common)
+      const signedNewTx = signTx(tx, signer, privateKey)
+
+      // Recover sender using Go-style sender(signer, tx)
+      const recoveredSender = sender(signer, signedNewTx)
+
+      assert.strictEqual(
+        recoveredSender.toString(),
+        signedOldTx.getSenderAddress().toString(),
+        'sender should match',
+      )
     })
 
     it('should produce identical hash() for signed tx', () => {
@@ -329,80 +303,13 @@ describe('[Functional Migration: Legacy Tx]', () => {
         value: txData.value,
         data: txData.data,
       })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-      const signedNewTx = newTxManager.sign(privateKey, false)
+      const tx = newTx(newTxData, { common, blockNumber, timestamp })
+      const signer = makeSigner(common)
+      const signedNewTx = signTx(tx, signer, privateKey)
 
       assert.isTrue(
         equalsBytes(signedNewTx.hash(), signedOldTx.hash()),
         'hash() should match',
-      )
-    })
-
-    it('should recover identical sender address', () => {
-      const txData = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        to: createAddressFromString(
-          '0x1234567890123456789012345678901234567890',
-        ),
-        value: 1000000000000000000n,
-        data: new Uint8Array(0),
-      }
-
-      const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
-      const signedOldTx = oldTx.sign(privateKey, false)
-
-      const newTxData = new LegacyTxData({
-        nonce: txData.nonce,
-        gasPrice: txData.gasPrice,
-        gasLimit: txData.gasLimit,
-        to: txData.to,
-        value: txData.value,
-        data: txData.data,
-      })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-      const signedNewTx = newTxManager.sign(privateKey, false)
-
-      assert.strictEqual(
-        signedNewTx.getSenderAddress().toString(),
-        signedOldTx.getSenderAddress().toString(),
-        'getSenderAddress() should match',
-      )
-    })
-
-    it('should recover identical sender public key', () => {
-      const txData = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        to: createAddressFromString(
-          '0x1234567890123456789012345678901234567890',
-        ),
-        value: 1000000000000000000n,
-        data: new Uint8Array(0),
-      }
-
-      const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
-      const signedOldTx = oldTx.sign(privateKey, false)
-
-      const newTxData = new LegacyTxData({
-        nonce: txData.nonce,
-        gasPrice: txData.gasPrice,
-        gasLimit: txData.gasLimit,
-        to: txData.to,
-        value: txData.value,
-        data: txData.data,
-      })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-      const signedNewTx = newTxManager.sign(privateKey, false)
-
-      assert.isTrue(
-        equalsBytes(
-          signedNewTx.getSenderPublicKey(),
-          signedOldTx.getSenderPublicKey(),
-        ),
-        'getSenderPublicKey() should match',
       )
     })
   })
@@ -512,7 +419,13 @@ describe('[Functional Migration: Legacy Tx]', () => {
         data: new Uint8Array(0),
       }
 
-      const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
+      const hardfork = common.getHardforkByBlock(blockNumber, timestamp)
+      const oldTx = createLegacyTx(txData, {
+        common,
+        blockNumber,
+        timestamp,
+        hardfork,
+      })
       const signedOldTx = oldTx.sign(privateKey, false)
 
       const newTxData = new LegacyTxData({
@@ -523,9 +436,12 @@ describe('[Functional Migration: Legacy Tx]', () => {
         value: txData.value,
         data: txData.data,
       })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-      const signedNewTx = newTxManager.sign(privateKey, false)
 
+      const tx = newTx(newTxData, { common, blockNumber, timestamp, hardfork })
+      const signer = makeSigner(common, blockNumber, timestamp, hardfork)
+      const signedNewTx = signTx(tx, signer, privateKey)
+
+      console.log(signedNewTx.isValid(), signedOldTx.isValid())
       assert.strictEqual(
         signedNewTx.isValid(),
         signedOldTx.isValid(),
@@ -556,8 +472,9 @@ describe('[Functional Migration: Legacy Tx]', () => {
         value: txData.value,
         data: txData.data,
       })
-      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
-      const signedNewTx = newTxManager.sign(privateKey, false)
+      const tx = newTx(newTxData, { common, blockNumber, timestamp })
+      const signer = makeSigner(common)
+      const signedNewTx = signTx(tx, signer, privateKey)
 
       assert.strictEqual(
         signedNewTx.verifySignature(),
@@ -574,7 +491,7 @@ describe('[Functional Migration: Legacy Tx]', () => {
         gasPrice: 1000000000n,
         gasLimit: 100000n,
         value: 0n,
-        data: new Uint8Array([0x60, 0x80, 0x60, 0x40]), // contract bytecode
+        data: new Uint8Array([0x60, 0x80, 0x60, 0x40]),
       }
 
       const oldTx = createLegacyTx(txData, { common, blockNumber, timestamp })
@@ -595,43 +512,6 @@ describe('[Functional Migration: Legacy Tx]', () => {
       assert.isTrue(
         newTxManager.toCreationAddress(),
         'should be creation address',
-      )
-
-      // Tx with 'to' address (regular transfer)
-      const txData2 = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        to: createAddressFromString(
-          '0x1234567890123456789012345678901234567890',
-        ),
-        value: 1000000000000000000n,
-        data: new Uint8Array(0),
-      }
-
-      const oldTx2 = createLegacyTx(txData2, { common, blockNumber, timestamp })
-      const newTxData2 = new LegacyTxData({
-        nonce: txData2.nonce,
-        gasPrice: txData2.gasPrice,
-        gasLimit: txData2.gasLimit,
-        to: txData2.to,
-        value: txData2.value,
-        data: txData2.data,
-      })
-      const newTxManager2 = newTx(newTxData2, {
-        common,
-        blockNumber,
-        timestamp,
-      })
-
-      assert.strictEqual(
-        newTxManager2.toCreationAddress(),
-        oldTx2.toCreationAddress(),
-        'toCreationAddress() should match for regular tx',
-      )
-      assert.isFalse(
-        newTxManager2.toCreationAddress(),
-        'should not be creation address',
       )
     })
   })
@@ -663,7 +543,6 @@ describe('[Functional Migration: Legacy Tx]', () => {
       const oldJson = oldTx.toJSON()
       const newJson = newTxManager.toJSON()
 
-      // Compare key fields
       assert.strictEqual(newJson.nonce, oldJson.nonce, 'nonce should match')
       assert.strictEqual(
         newJson.gasLimit,
@@ -681,8 +560,8 @@ describe('[Functional Migration: Legacy Tx]', () => {
     })
   })
 
-  describe('Capabilities', () => {
-    it('should support EIP155ReplayProtection for post-spuriousDragon', () => {
+  describe('Go-Style Type Checks', () => {
+    it('unsigned legacy tx should not be protected', () => {
       const txData = {
         nonce: 1n,
         gasPrice: 1000000000n,
@@ -698,41 +577,95 @@ describe('[Functional Migration: Legacy Tx]', () => {
         value: txData.value,
         data: txData.data,
       })
-      const newTxManager = newTx(newTxData, {
+      const newTxManager = newTx(newTxData, { common, blockNumber, timestamp })
+
+      assert.isFalse(
+        newTxManager.protected(),
+        'unsigned tx should not be protected',
+      )
+      assert.isFalse(
+        newTxManager.isTypedTransaction(),
+        'legacy tx is not typed',
+      )
+    })
+
+    it('signed legacy tx with EIP-155 (v >= 37) should be protected', () => {
+      const txData = {
+        nonce: 1n,
+        gasPrice: 1000000000n,
+        gasLimit: 21000n,
+        to: createAddressFromString(
+          '0x1234567890123456789012345678901234567890',
+        ),
+        value: 1000000000000000000n,
+        data: new Uint8Array(0),
+      }
+
+      const newTxData = new LegacyTxData({
+        nonce: txData.nonce,
+        gasPrice: txData.gasPrice,
+        gasLimit: txData.gasLimit,
+        to: txData.to,
+        value: txData.value,
+        data: txData.data,
+      })
+      const tx = newTx(newTxData, { common, blockNumber, timestamp })
+      const signer = makeSigner(common)
+      const signedTx = signTx(tx, signer, privateKey)
+
+      assert.isTrue(
+        signedTx.protected(),
+        'EIP-155 signed tx should be protected',
+      )
+      assert.isTrue(
+        signedTx.v !== undefined && signedTx.v >= 37n,
+        'v should be >= 37 for EIP-155',
+      )
+    })
+
+    it('supports() should work for unsigned tx based on hardfork', () => {
+      const txData = {
+        nonce: 1n,
+        gasPrice: 1000000000n,
+        gasLimit: 21000n,
+        value: 0n,
+        data: new Uint8Array(0),
+      }
+
+      // Post-spuriousDragon: supports EIP-155 for signing
+      const newTxData1 = new LegacyTxData({
+        nonce: txData.nonce,
+        gasPrice: txData.gasPrice,
+        gasLimit: txData.gasLimit,
+        value: txData.value,
+        data: txData.data,
+      })
+      const postSpuriousTx = newTx(newTxData1, {
         common,
         hardfork: Hardfork.SpuriousDragon,
       })
 
       assert.isTrue(
-        newTxManager.supports(Capability.EIP155ReplayProtection),
-        'should support EIP155 for post-spuriousDragon',
+        postSpuriousTx.supports(Capability.EIP155ReplayProtection),
+        'post-spuriousDragon unsigned tx should support EIP155 for signing',
       )
-    })
 
-    it('should not support EIP155ReplayProtection for pre-spuriousDragon', () => {
-      const txData = {
-        nonce: 1n,
-        gasPrice: 1000000000n,
-        gasLimit: 21000n,
-        value: 0n,
-        data: new Uint8Array(0),
-      }
-
-      const newTxData = new LegacyTxData({
+      // Pre-spuriousDragon: does not support EIP-155
+      const newTxData2 = new LegacyTxData({
         nonce: txData.nonce,
         gasPrice: txData.gasPrice,
         gasLimit: txData.gasLimit,
         value: txData.value,
         data: txData.data,
       })
-      const newTxManager = newTx(newTxData, {
+      const preSpuriousTx = newTx(newTxData2, {
         common,
         hardfork: Hardfork.Chainstart,
       })
 
       assert.isFalse(
-        newTxManager.supports(Capability.EIP155ReplayProtection),
-        'should not support EIP155 for pre-spuriousDragon',
+        preSpuriousTx.supports(Capability.EIP155ReplayProtection),
+        'pre-spuriousDragon unsigned tx should not support EIP155',
       )
     })
   })

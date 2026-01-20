@@ -9,31 +9,51 @@ import type { Signer, TxManager } from '../types'
 import { FrontierSigner } from './frontier'
 
 /**
- * HomesteadSigner implements Signer using the Homestead rules.
- * Same as FrontierSigner but with stricter S validation (EIP-2).
+ * HomesteadSigner implements Signer using the homestead rules.
+ * Equivalent to Go's HomesteadSigner.
+ *
+ * The only valid reason to use this type is creating legacy transactions
+ * which are intentionally not replay-protected.
+ *
+ * Extends FrontierSigner and adds strict S value validation (EIP-2).
  */
 export class HomesteadSigner extends FrontierSigner {
   /**
-   * HomesteadSigner has no chain ID (pre-EIP155).
+   * HomesteadSigner has no chain ID.
    */
   chainID(): bigint | null {
     return null
   }
 
   /**
-   * Recovers the sender address from the transaction signature.
-   * Uses stricter S validation per EIP-2 (s <= secp256k1n/2).
+   * Inherits SignatureValues from FrontierSigner.
    */
-  getSenderAddress(tx: TxManager): Address {
-    const [v, r, s] = tx.tx.inner.rawSignatureValues()
-    if (v === undefined || r === undefined || s === undefined) {
-      throw new Error('Cannot recover sender: transaction is not signed')
+  signatureValues(
+    tx: TxManager,
+    sig: Uint8Array,
+  ): { r: bigint; s: bigint; v: bigint } {
+    return super.signatureValues(tx, sig)
+  }
+
+  /**
+   * Recovers the sender address from the transaction signature.
+   * Uses strict S validation (Homestead/EIP-2 rule).
+   * Equivalent to Go's HomesteadSigner.Sender(tx).
+   */
+  sender(tx: TxManager): Address {
+    if (tx.type !== 0) {
+      throw new Error('Transaction type not supported by HomesteadSigner')
     }
 
-    // EIP-2: Validate S value
+    const [v, r, s] = tx.rawSignatureValues()
+    if (v === undefined || r === undefined || s === undefined) {
+      throw new Error('Invalid signature: transaction is not signed')
+    }
+
+    // Validate S value (EIP-2 / Homestead rule)
     if (s > SECP256K1_ORDER_DIV_2) {
       throw new Error(
-        'Invalid Signature: s-values greater than secp256k1n/2 are considered invalid',
+        'Invalid signature: s-values greater than secp256k1n/2 are invalid',
       )
     }
 

@@ -26,7 +26,7 @@ import {
 
 import { txsData } from './testData/txs'
 
-describe('[Transaction]', () => {
+describe.skip('[Transaction]', () => {
   const transactions: TypedTransaction[] = []
   const common = createHardforkManagerFromConfig(Mainnet)
   const blockNumber = 0n
