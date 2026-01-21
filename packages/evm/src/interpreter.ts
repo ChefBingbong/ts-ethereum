@@ -13,8 +13,8 @@ import {
   bigIntToHex,
   bytesToBigInt,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   MAX_UINT64,
   setLengthRight,
 } from '@ts-ethereum/utils'

@@ -1,11 +1,11 @@
 import { Hardfork } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import {
-  type Address,
-  BIGINT_0,
-  bigIntMax,
-  bigIntToHex,
-  bytesToHex,
+    type Address,
+    BIGINT_0,
+    bigIntMax,
+    bigIntToHex,
+    bytesToHex,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import { Capability, type JSONTx, TransactionType } from '../types'
