@@ -1,10 +1,6 @@
 import type { Block, HeaderData } from '@ts-ethereum/block'
 import { Hardfork } from '@ts-ethereum/chain-config'
-import {
-  type Blob4844Tx,
-  isBlob4844Tx,
-  type TypedTransaction,
-} from '@ts-ethereum/tx'
+import { isBlobTxManager, type TxManager } from '@ts-ethereum/tx'
 import {
   BIGINT_1,
   BIGINT_2,
@@ -400,7 +396,7 @@ export class PendingBlock {
 
     // Get existing transaction hashes
     const existingTxHashes = new Set<string>()
-    for (const tx of (builder as any).transactions as TypedTransaction[]) {
+    for (const tx of (builder as any).transactions as TxManager[]) {
       existingTxHashes.add(bytesToUnprefixedHex(tx.hash()))
     }
 
@@ -469,7 +465,7 @@ export class PendingBlock {
     let addedTxs = 0
     let skippedByAddErrors = 0
     let blockFull = false
-    const blobTxs: Blob4844Tx[] = []
+    const blobTxs: TxManager[] = []
     const gasLimit = (builder as any).headerData.gasLimit as bigint
 
     // Incremental transaction selection
@@ -503,7 +499,7 @@ export class PendingBlock {
         case AddTxResult.Success:
           addedTxs++
           // Track blob transactions for bundle construction
-          if (isBlob4844Tx(tx)) {
+          if (isBlobTxManager(tx)) {
             blobTxs.push(tx)
           }
           txSet.shift()
@@ -537,7 +533,7 @@ export class PendingBlock {
     }
   }
 
-  private async addTransaction(builder: BlockBuilder, tx: TypedTransaction) {
+  private async addTransaction(builder: BlockBuilder, tx: TxManager) {
     let addTxResult: AddTxResult
 
     try {
@@ -583,9 +579,9 @@ export class PendingBlock {
   /**
    * An internal helper for storing the blob bundle associated with each transaction in an EIP4844 world
    * @param payloadId the payload Id of the pending block
-   * @param txs an array of Blob4844Tx transactions
+   * @param txs an array of blob TxManager transactions
    */
-  private constructBlobsBundle = (payloadId: string, txs: Blob4844Tx[]) => {
+  private constructBlobsBundle = (payloadId: string, txs: TxManager[]) => {
     let blobs: PrefixedHexString[] = []
     let commitments: PrefixedHexString[] = []
     let proofs: PrefixedHexString[] = []
@@ -596,12 +592,14 @@ export class PendingBlock {
       proofs = bundle.proofs
     }
 
-    for (let tx of txs) {
-      tx = tx as Blob4844Tx
-      if (tx.blobs !== undefined && tx.blobs.length > 0) {
-        blobs = blobs.concat(tx.blobs)
-        commitments = commitments.concat(tx.kzgCommitments!)
-        proofs = proofs.concat(tx.kzgProofs!)
+    for (const tx of txs) {
+      // Access sidecar data from inner BlobTxData
+      const blobTxData = tx.tx.inner as import('@ts-ethereum/tx').BlobTxData
+      const sidecar = blobTxData.sidecar
+      if (sidecar?.blobs !== undefined && sidecar.blobs.length > 0) {
+        blobs = blobs.concat(sidecar.blobs)
+        commitments = commitments.concat(sidecar.commitments)
+        proofs = proofs.concat(sidecar.proofs)
       }
     }
 

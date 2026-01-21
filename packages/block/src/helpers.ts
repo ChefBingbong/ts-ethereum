@@ -2,7 +2,7 @@ import { concatBytes } from '@noble/hashes/utils.js'
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
-import { Blob4844Tx, type TypedTransaction } from '@ts-ethereum/tx'
+import { isBlobTxManager, type TxManager } from '@ts-ethereum/tx'
 import type {
   BlockContext,
   CLRequest,
@@ -122,11 +122,11 @@ export function getDifficulty(headerData: HeaderData): bigint | null {
  * @param transactions Transactions to inspect for blob data
  * @returns Number of blob versioned hashes referenced
  */
-export const getNumBlobs = (transactions: TypedTransaction[]) => {
+export const getNumBlobs = (transactions: TxManager[]) => {
   let numBlobs = 0
   for (const tx of transactions) {
-    if (tx instanceof Blob4844Tx) {
-      numBlobs += tx.blobVersionedHashes.length
+    if (isBlobTxManager(tx)) {
+      numBlobs += tx.numBlobs()
     }
   }
   return numBlobs
@@ -191,12 +191,12 @@ export async function genWithdrawalsTrieRoot(
 }
 
 /**
- * Returns the txs trie root for array of TypedTransaction
- * @param txs array of TypedTransaction to compute the root of
+ * Returns the txs trie root for array of TxManager
+ * @param txs array of TxManager to compute the root of
  * @param emptyTrie Optional trie used to generate the root
  */
 export async function genTransactionsTrieRoot(
-  txs: TypedTransaction[],
+  txs: TxManager[],
   emptyTrie?: MerklePatriciaTrie,
 ) {
   const trie = emptyTrie ?? new MerklePatriciaTrie()

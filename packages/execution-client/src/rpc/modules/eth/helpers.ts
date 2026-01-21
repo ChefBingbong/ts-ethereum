@@ -1,6 +1,6 @@
 import type { Block, JSONRPCBlock } from '@ts-ethereum/block'
 import type { Log } from '@ts-ethereum/evm'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import type { Address } from '@ts-ethereum/utils'
 import { bigIntToHex, bytesToHex, intToHex } from '@ts-ethereum/utils'
 import type {
@@ -92,7 +92,7 @@ type JSONRPCLog = {
 const toJSONRPCLog = async (
   log: Log,
   block?: Block,
-  tx?: TypedTransaction,
+  tx?: TxManager,
   txIndex?: number,
   logIndex?: number,
 ): Promise<JSONRPCLog> => ({
@@ -116,7 +116,7 @@ export const toJSONRPCReceipt = async (
   gasUsed: bigint,
   effectiveGasPrice: bigint,
   block: Block,
-  tx: TypedTransaction,
+  tx: TxManager,
   txIndex: number,
   logIndex: number,
   contractAddress: Address,

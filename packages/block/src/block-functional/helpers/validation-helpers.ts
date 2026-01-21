@@ -1,5 +1,5 @@
 import { EIP } from '@ts-ethereum/chain-config'
-import { Blob4844Tx } from '@ts-ethereum/tx'
+import { isBlobTxManager } from '@ts-ethereum/tx'
 import { BIGINT_0, EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 import type { BlockHeaderManager } from '../../header-functional'
 import { createBlockHeaderManagerFromHeader } from '../../header-functional'
@@ -93,9 +93,9 @@ export function validateBlobTransactions(
     let blobGasPrice: bigint | undefined
 
     for (const tx of block.transactions) {
-      if (tx instanceof Blob4844Tx) {
+      if (isBlobTxManager(tx)) {
         blobGasPrice = blobGasPrice ?? parentHeader.getBlobGasPrice()
-        if (tx.maxFeePerBlobGas < blobGasPrice) {
+        if (tx.maxFeePerBlobGas! < blobGasPrice) {
           throw EthereumJSErrorWithoutCode(
             `blob transaction maxFeePerBlobGas ${
               tx.maxFeePerBlobGas
@@ -103,7 +103,7 @@ export function validateBlobTransactions(
           )
         }
 
-        blobGasUsed += BigInt(tx.blobVersionedHashes.length) * blobGasPerBlob
+        blobGasUsed += BigInt(tx.numBlobs()) * blobGasPerBlob
 
         if (blobGasUsed > blobGasLimit) {
           throw EthereumJSErrorWithoutCode(

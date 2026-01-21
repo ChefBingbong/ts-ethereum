@@ -6,13 +6,76 @@ import {
   bigIntMax,
   bigIntToHex,
   bytesToHex,
+  concatBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
+import type { AccessListBytes } from '../types'
 import { Capability, type JSONTx, TransactionType } from '../types'
 import { makeSigner } from './signer/signer-factory'
 import { sender } from './signing'
+import type { AccessListTxData } from './tx-access-list'
+import type { BlobTxData } from './tx-blob'
+import type { DynamicFeeTxData } from './tx-dynamic-fee'
 import { createTxManagerFromTx } from './tx-manager'
-import type { FrozenTx, Signer } from './types'
+import type { SetCodeTxData } from './tx-set-code'
+import type { FrozenTx, Signer, TxManager } from './types'
+
+// ============================================================================
+// TxManager Type Guards
+// ============================================================================
+
+/**
+ * Type guard to check if a TxManager wraps a legacy transaction.
+ */
+export function isLegacyTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.Legacy
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-2930 access list transaction.
+ */
+export function isAccessListTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.AccessListEIP2930
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-1559 dynamic fee transaction.
+ */
+export function isFeeMarketTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.FeeMarketEIP1559
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-4844 blob transaction.
+ */
+export function isBlobTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.BlobEIP4844
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-7702 set code transaction.
+ */
+export function isEOACodeTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.EOACodeEIP7702
+}
+
+/**
+ * Type guard to check if a TxManager supports EIP-1559 fee market.
+ */
+export function isFeeMarketCompatibleTxManager(tx: TxManager): boolean {
+  return (
+    tx.type === TransactionType.FeeMarketEIP1559 ||
+    tx.type === TransactionType.BlobEIP4844 ||
+    tx.type === TransactionType.EOACodeEIP7702
+  )
+}
+
+/**
+ * Type guard to check if a TxManager supports access lists.
+ */
+export function isAccessListCompatibleTxManager(tx: TxManager): boolean {
+  return tx.type !== TransactionType.Legacy
+}
 
 // ============================================================================
 // Transaction Type Checks (Go-style)
@@ -143,15 +206,27 @@ export function verifySignature(tx: FrozenTx): boolean {
 // ============================================================================
 
 /**
- * Serializes the transaction to RLP.
+ * Serializes the transaction to bytes.
+ * For legacy transactions: RLP encode directly
+ * For typed transactions (EIP-2718): type byte || RLP([...])
  */
 export function serialize(tx: FrozenTx): Uint8Array {
-  return RLP.encode(tx.inner.raw())
+  if (tx.inner.type === TransactionType.Legacy) {
+    // Legacy transactions are just RLP encoded
+    return RLP.encode(tx.inner.raw())
+  }
+
+  // Typed transactions (EIP-2718): type byte prefix + RLP encoded data
+  const encoded = RLP.encode(tx.inner.raw())
+  return concatBytes(new Uint8Array([tx.inner.type]), encoded)
 }
 
 /**
  * Computes the transaction hash (only for signed transactions).
  * Equivalent to Go's Transaction.Hash().
+ *
+ * For legacy transactions: keccak256(rlp([...]))
+ * For typed transactions: keccak256(type || rlp([...]))
  */
 export function hash(tx: FrozenTx): Uint8Array {
   if (!isSigned(tx)) {
@@ -162,6 +237,7 @@ export function hash(tx: FrozenTx): Uint8Array {
     return tx.cache.hash
   }
 
+  // serialize() already handles the type byte prefix for typed transactions
   const txHash = keccak256(serialize(tx))
 
   if (Object.isFrozen(tx)) {
@@ -220,6 +296,58 @@ export function getDataGas(tx: FrozenTx): bigint {
 }
 
 /**
+ * Calculates the gas cost for an access list.
+ * EIP-2930: ACCESS_LIST_ADDRESS_COST (2400) per address + ACCESS_LIST_STORAGE_KEY_COST (1900) per key
+ */
+export function getAccessListGas(
+  accessList: AccessListBytes | null,
+  tx: FrozenTx,
+): bigint {
+  if (!accessList || accessList.length === 0) {
+    return BIGINT_0
+  }
+
+  const hardfork = tx.fork
+  const accessListAddressCost =
+    tx.common.getParamAtHardfork('accessListAddressGas', hardfork) ?? 2400n
+  const accessListStorageKeyCost =
+    tx.common.getParamAtHardfork('accessListStorageKeyGas', hardfork) ?? 1900n
+
+  let cost = BIGINT_0
+  for (const [_address, storageKeys] of accessList) {
+    cost += accessListAddressCost
+    cost += accessListStorageKeyCost * BigInt(storageKeys.length)
+  }
+
+  return cost
+}
+
+/**
+ * Calculates the gas cost for an authorization list (EIP-7702).
+ * PER_AUTH_BASE_COST per authorization entry.
+ */
+export function getAuthorizationListGas(tx: FrozenTx): bigint {
+  if (tx.inner.type !== TransactionType.EOACodeEIP7702) {
+    return BIGINT_0
+  }
+
+  const setCodeTx = tx.inner as unknown as SetCodeTxData
+  if (
+    !setCodeTx.authorizationList ||
+    setCodeTx.authorizationList.length === 0
+  ) {
+    return BIGINT_0
+  }
+
+  const hardfork = tx.fork
+  // EIP-7702: PER_AUTH_BASE_COST = 2500
+  const perAuthBaseCost =
+    tx.common.getParamAtHardfork('perAuthBaseGas', hardfork) ?? 2500n
+
+  return perAuthBaseCost * BigInt(setCodeTx.authorizationList.length)
+}
+
+/**
  * The minimum gas limit which the tx must have to be valid.
  */
 export function getIntrinsicGas(tx: FrozenTx): bigint {
@@ -246,14 +374,42 @@ export function getIntrinsicGas(tx: FrozenTx): bigint {
     if (txCreationFee) fee += txCreationFee
   }
 
+  // Add access list gas for typed transactions
+  if (supportsAccessList(tx)) {
+    const accessList = tx.inner.accessList()
+    fee += getAccessListGas(accessList, tx)
+  }
+
+  // Add authorization list gas for EIP-7702 transactions
+  fee += getAuthorizationListGas(tx)
+
   return fee
 }
 
 /**
  * The up front amount that an account must have for this transaction to be valid.
+ * For EIP-1559 txs: gasLimit * maxFeePerGas + value
+ * For blob txs: gasLimit * maxFeePerGas + blobGas * maxFeePerBlobGas + value
  */
-export function getUpfrontCost(tx: FrozenTx, _baseFee?: bigint): bigint {
-  return tx.inner.gasLimit * tx.inner.gasPrice() + tx.inner.value
+export function getUpfrontCost(tx: FrozenTx, baseFee?: bigint): bigint {
+  let cost = tx.inner.gasLimit * tx.inner.gasFeeCap() + tx.inner.value
+
+  // For blob transactions, add blob gas cost
+  if (tx.inner.type === TransactionType.BlobEIP4844) {
+    const blobTx = tx.inner as unknown as BlobTxData
+    cost += blobTx.blobGas() * blobTx.maxFeePerBlobGas
+  }
+
+  return cost
+}
+
+/**
+ * Returns the effective gas price for the transaction given the block base fee.
+ * For legacy/access list txs: gasPrice
+ * For EIP-1559 txs: min(maxFeePerGas, baseFee + maxPriorityFeePerGas)
+ */
+export function getEffectiveGasPrice(tx: FrozenTx, baseFee?: bigint): bigint {
+  return tx.inner.effectiveGasPrice(baseFee)
 }
 
 // ============================================================================
@@ -305,22 +461,80 @@ export function isValid(tx: FrozenTx): boolean {
 // ============================================================================
 
 /**
+ * Converts access list bytes to JSON format.
+ */
+function accessListToJSON(
+  accessList: AccessListBytes | null,
+): Array<{ address: string; storageKeys: string[] }> | undefined {
+  if (!accessList || accessList.length === 0) {
+    return undefined
+  }
+
+  return accessList.map(([address, storageKeys]) => ({
+    address: bytesToHex(address),
+    storageKeys: storageKeys.map((key) => bytesToHex(key)),
+  }))
+}
+
+/**
  * Returns an object with the JSON representation of the transaction.
  */
 export function toJSON(tx: FrozenTx): JSONTx {
-  return {
+  const base: JSONTx = {
     type: bigIntToHex(BigInt(tx.inner.type)),
     nonce: bigIntToHex(tx.inner.nonce),
     gasLimit: bigIntToHex(tx.inner.gasLimit),
-    gasPrice: bigIntToHex(tx.inner.gasPrice()),
     to: tx.inner.to?.toString(),
     value: bigIntToHex(tx.inner.value),
     data: bytesToHex(tx.inner.data),
     v: tx.inner.v !== undefined ? bigIntToHex(tx.inner.v) : undefined,
     r: tx.inner.r !== undefined ? bigIntToHex(tx.inner.r) : undefined,
     s: tx.inner.s !== undefined ? bigIntToHex(tx.inner.s) : undefined,
-    chainId: bigIntToHex(tx.common.chainId()),
+    chainId: bigIntToHex(tx.inner.chainID()),
   }
+
+  // Add type-specific fields
+  switch (tx.inner.type) {
+    case TransactionType.Legacy:
+      base.gasPrice = bigIntToHex(tx.inner.gasPrice())
+      break
+
+    case TransactionType.AccessListEIP2930: {
+      const accessListTx = tx.inner as unknown as AccessListTxData
+      base.gasPrice = bigIntToHex(accessListTx.gasPrice())
+      base.accessList = accessListToJSON(accessListTx.accessList())
+      break
+    }
+
+    case TransactionType.FeeMarketEIP1559: {
+      const dynamicFeeTx = tx.inner as unknown as DynamicFeeTxData
+      base.maxPriorityFeePerGas = bigIntToHex(dynamicFeeTx.maxPriorityFeePerGas)
+      base.maxFeePerGas = bigIntToHex(dynamicFeeTx.maxFeePerGas)
+      base.accessList = accessListToJSON(dynamicFeeTx.accessList())
+      break
+    }
+
+    case TransactionType.BlobEIP4844: {
+      const blobTx = tx.inner as unknown as BlobTxData
+      base.maxPriorityFeePerGas = bigIntToHex(blobTx.maxPriorityFeePerGas)
+      base.maxFeePerGas = bigIntToHex(blobTx.maxFeePerGas)
+      base.maxFeePerBlobGas = bigIntToHex(blobTx.maxFeePerBlobGas)
+      base.accessList = accessListToJSON(blobTx.accessList())
+      base.blobVersionedHashes = blobTx.blobVersionedHashes
+      break
+    }
+
+    case TransactionType.EOACodeEIP7702: {
+      const setCodeTx = tx.inner as unknown as SetCodeTxData
+      base.maxPriorityFeePerGas = bigIntToHex(setCodeTx.maxPriorityFeePerGas)
+      base.maxFeePerGas = bigIntToHex(setCodeTx.maxFeePerGas)
+      base.accessList = accessListToJSON(setCodeTx.accessList())
+      // authorizationList would need special handling - skipping for now
+      break
+    }
+  }
+
+  return base
 }
 
 /**

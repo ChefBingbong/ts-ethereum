@@ -1,5 +1,5 @@
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
-import { createTxFromRLP, type TypedTransaction } from '@ts-ethereum/tx'
+import { createTxManagerFromRLP, type TxManager } from '@ts-ethereum/tx'
 import {
   bytesToHex,
   createWithdrawal,
@@ -25,11 +25,10 @@ export async function fromExecutionPayload(
     withdrawals: withdrawalsData,
   } = payload
 
-  const txs: TypedTransaction[] = []
+  const txs: TxManager[] = []
   for (const [index, serializedTx] of transactions.entries()) {
     try {
-      // TODO: Migrate tx package to use hardforkManager
-      const tx = createTxFromRLP(hexToBytes(serializedTx), {
+      const tx = createTxManagerFromRLP(hexToBytes(serializedTx), {
         ...opts,
         common: opts.hardforkManager,
       })

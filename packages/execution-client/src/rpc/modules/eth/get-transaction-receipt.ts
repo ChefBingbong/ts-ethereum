@@ -1,8 +1,4 @@
-import {
-  Capability,
-  type FeeMarket1559Tx,
-  type LegacyTx,
-} from '@ts-ethereum/tx'
+import { isFeeMarketTxManager } from '@ts-ethereum/tx'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
   equalsBytes,
@@ -52,14 +48,14 @@ export const getTransactionReceipt = (node: ExecutionNode) => {
 
         const parentBlock = await node.chain.getBlock(block.header.parentHash)
         const tx = block.transactions[txIdx]
-        const effectiveGasPrice = tx.supports(Capability.EIP1559FeeMarket)
-          ? (tx as FeeMarket1559Tx).maxPriorityFeePerGas <
-            (tx as FeeMarket1559Tx).maxFeePerGas - block.header.baseFeePerGas!
-            ? (tx as FeeMarket1559Tx).maxPriorityFeePerGas
-            : (tx as FeeMarket1559Tx).maxFeePerGas -
+        const effectiveGasPrice = isFeeMarketTxManager(tx)
+          ? tx.maxPriorityFeePerGas! <
+            tx.maxFeePerGas! - block.header.baseFeePerGas!
+            ? tx.maxPriorityFeePerGas!
+            : tx.maxFeePerGas! -
               block.header.baseFeePerGas! +
               block.header.baseFeePerGas!
-          : (tx as LegacyTx).gasPrice
+          : tx.gasPrice
 
         const vmCopy = await vm!.shallowCopy()
         // vmCopy.common.setHardfork(tx.common.hardfork())

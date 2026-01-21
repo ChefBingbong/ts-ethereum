@@ -1,6 +1,6 @@
 import {
-  createTxFromBlockBodyData,
-  type TypedTransaction,
+  createTxManagerFromBlockBodyData,
+  type TxManager,
 } from '@ts-ethereum/tx'
 import {
   createWithdrawal,
@@ -63,11 +63,10 @@ export function fromBytesArray(
   }
 
   // Parse transactions
-  const transactions: TypedTransaction[] = []
+  const transactions: TxManager[] = []
   for (const txData of txsData ?? []) {
-    // TODO: Migrate tx package to use hardforkManager
     transactions.push(
-      createTxFromBlockBodyData(txData, {
+      createTxManagerFromBlockBodyData(txData, {
         ...opts,
         common: opts.hardforkManager,
       }),
@@ -120,7 +119,7 @@ export function fromBytesArray(
 
   const block: FrozenBlock = {
     header: frozenHeader,
-    transactions: Object.freeze(transactions) as readonly TypedTransaction[],
+    transactions: Object.freeze(transactions) as readonly TxManager[],
     uncleHeaders: Object.freeze(
       uncleHeaders,
     ) as readonly (typeof frozenHeader)[],

@@ -1,5 +1,5 @@
 import type { BlockBodyBytes, BlockHeader } from '@ts-ethereum/block'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import type { TxReceipt } from '@ts-ethereum/vm'
 
 type GetBlockHeadersOpts = {
@@ -49,7 +49,7 @@ export interface EthProtocolMethods {
   ) => Promise<[bigint, BlockBodyBytes[]]>
   getPooledTransactions: (
     opts: GetPooledTransactionsOpts,
-  ) => Promise<[bigint, TypedTransaction[]]>
+  ) => Promise<[bigint, TxManager[]]>
   getReceipts: (opts: GetReceiptsOpts) => Promise<[bigint, TxReceipt[]]>
   updatedBestHeader?: BlockHeader
   status?: {

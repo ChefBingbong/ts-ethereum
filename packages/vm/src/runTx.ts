@@ -11,16 +11,14 @@ import {
   type EVM,
   type EVMInterface,
 } from '@ts-ethereum/evm'
-import type {
-  AccessList,
-  AccessList2930Tx,
-  AccessListItem,
-  EIP7702CompatibleTx,
-  FeeMarket1559Tx,
-  LegacyTx,
-  TypedTransaction,
+import type { AccessList, AccessListItem, TxManager } from '@ts-ethereum/tx'
+import {
+  Capability,
+  isBlobTxManager,
+  isEOACodeTxManager,
+  isFeeMarketTxManager,
+  isLegacyTxManager,
 } from '@ts-ethereum/tx'
-import { Capability, isBlob4844Tx } from '@ts-ethereum/tx'
 import type { BlockContext } from '@ts-ethereum/utils'
 import {
   Account,
@@ -231,23 +229,23 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
       throw EthereumJSErrorWithoutCode(msg)
     }
 
-    const castedTx = opts.tx as AccessList2930Tx
+    const txAccessList = opts.tx.accessList
 
     // DEBUG: Log access list for deposit contract transactions
     const txTo = opts.tx.to?.toString().toLowerCase()
     const isDepositTx = txTo === '0x00000000219ab540356cbb839cbe05303d7705fa'
-    if (isDepositTx && castedTx.accessList.length > 0) {
+    if (isDepositTx && txAccessList.length > 0) {
       // eslint-disable-next-line no-console
       console.log(`[DEBUG] Deposit tx access list:`, {
-        accessListLength: castedTx.accessList.length,
-        entries: castedTx.accessList.map((item) => ({
+        accessListLength: txAccessList.length,
+        entries: txAccessList.map((item) => ({
           address: bytesToUnprefixedHex(item[0]),
           slotsCount: item[1].length,
         })),
       })
     }
 
-    for (const accessListItem of castedTx.accessList) {
+    for (const accessListItem of txAccessList) {
       const [addressBytes, slotBytesList] = accessListItem
       const address = bytesToUnprefixedHex(addressBytes)
       // Note: in here, the 0x is stripped, so immediately do this here
@@ -408,13 +406,14 @@ async function _runTx(
     // EIP-1559 spec:
     // Ensure that the user was willing to at least pay the base fee
     // assert transaction.max_fee_per_gas >= block.base_fee_per_gas
-    const maxFeePerGas = 'maxFeePerGas' in tx ? tx.maxFeePerGas : tx.gasPrice
+    const isEIP1559 = isFeeMarketTxManager(tx)
+    const maxFeePerGas = isEIP1559 ? tx.maxFeePerGas! : tx.gasPrice
     const baseFeePerGas =
       block?.header.baseFeePerGas ?? DEFAULT_HEADER.baseFeePerGas!
     if (maxFeePerGas < baseFeePerGas) {
       const msg = _errorMsg(
         `Transaction's ${
-          'maxFeePerGas' in tx ? 'maxFeePerGas' : 'gasPrice'
+          isEIP1559 ? 'maxFeePerGas' : 'gasPrice'
         } (${maxFeePerGas}) is less than the block's baseFeePerGas (${baseFeePerGas})`,
         vm,
         block,
@@ -495,10 +494,10 @@ async function _runTx(
     // EIP-1559 spec:
     // The signer must be able to afford the transaction
     // `assert balance >= gas_limit * max_fee_per_gas`
-    maxCost += tx.gasLimit * (tx as FeeMarket1559Tx).maxFeePerGas
+    maxCost += tx.gasLimit * tx.maxFeePerGas!
   }
 
-  if (isBlob4844Tx(tx)) {
+  if (isBlobTxManager(tx)) {
     if (!vm.hardforkManager.isEIPActiveAtHardfork(4844, blockHardfork)) {
       const msg = _errorMsg(
         'blob transactions are only valid with EIP4844 active',
@@ -514,12 +513,12 @@ async function _runTx(
     totalblobGas =
       vm.hardforkManager.getParamAtHardfork('blobGasPerBlob', blockHardfork)! *
       BigInt(tx.numBlobs())
-    maxCost += totalblobGas * tx.maxFeePerBlobGas
+    maxCost += totalblobGas * tx.maxFeePerBlobGas!
 
     // 4844 minimum blobGas price check
     blobGasPrice =
       opts.block?.header.getBlobGasPrice() ?? DEFAULT_HEADER.getBlobGasPrice()
-    if (tx.maxFeePerBlobGas < blobGasPrice) {
+    if (tx.maxFeePerBlobGas! < blobGasPrice) {
       const msg = _errorMsg(
         `Transaction's maxFeePerBlobGas ${tx.maxFeePerBlobGas}) is less than block blobGasPrice (${blobGasPrice}).`,
         vm,
@@ -568,19 +567,19 @@ async function _runTx(
 
     gasPrice = inclusionFeePerGas + baseFee
   } else {
-    // Have to cast as legacy tx since EIP1559 tx does not have gas price
-    gasPrice = (tx as LegacyTx).gasPrice
+    // Legacy/access list tx - use gasPrice property
+    gasPrice = tx.gasPrice
     if (vm.hardforkManager.isEIPActiveAtHardfork(1559, blockHardfork)) {
       const baseFee =
         block?.header.baseFeePerGas ?? DEFAULT_HEADER.baseFeePerGas!
-      inclusionFeePerGas = (tx as LegacyTx).gasPrice - baseFee
+      inclusionFeePerGas = tx.gasPrice - baseFee
     }
   }
 
   // EIP-4844 tx
-  let blobVersionedHashes
-  if (isBlob4844Tx(tx)) {
-    blobVersionedHashes = tx.blobVersionedHashes
+  let blobVersionedHashes: `0x${string}`[] | undefined
+  if (isBlobTxManager(tx)) {
+    blobVersionedHashes = [...tx.blobVersionedHashes!] as `0x${string}`[]
   }
 
   // Update from account's balance
@@ -597,7 +596,7 @@ async function _runTx(
 
   if (tx.supports(Capability.EIP7702EOACode)) {
     // Add contract code for authority tuples provided by EIP 7702 tx
-    const authorizationList = (tx as EIP7702CompatibleTx).authorizationList
+    const authorizationList = tx.authorizationList!
     for (let i = 0; i < authorizationList.length; i++) {
       // Authority tuple validation
       const data = authorizationList[i]
@@ -782,7 +781,7 @@ async function _runTx(
   }
 
   // Add blob gas used to result
-  if (isBlob4844Tx(tx)) {
+  if (isBlobTxManager(tx)) {
     results.blobGasUsed = totalblobGas
   }
 
@@ -1020,7 +1019,7 @@ function txLogsBloom(
  */
 export async function generateTxReceipt(
   vm: VM,
-  tx: TypedTransaction,
+  tx: TxManager,
   txResult: RunTxResult,
   cumulativeGasUsed: bigint,
   blockHardfork: string,
@@ -1063,7 +1062,7 @@ export async function generateTxReceipt(
     }
   } else {
     // Typed EIP-2718 Transaction
-    if (isBlob4844Tx(tx)) {
+    if (isBlobTxManager(tx)) {
       receipt = {
         blobGasUsed,
         blobGasPrice,
@@ -1090,7 +1089,7 @@ function _errorMsg(
   msg: string,
   vm: VM,
   block: Block | undefined,
-  tx: TypedTransaction,
+  tx: TxManager,
 ) {
   const blockOrHeader = block ?? DEFAULT_HEADER
   const blockErrorStr =

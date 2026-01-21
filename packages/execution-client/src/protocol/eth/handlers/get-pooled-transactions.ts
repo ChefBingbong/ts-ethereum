@@ -3,7 +3,7 @@
  * Processes incoming GET_POOLED_TRANSACTIONS requests and sends POOLED_TRANSACTIONS response
  */
 
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import debug from 'debug'
 import {
   ETH_MESSAGES,
@@ -31,7 +31,7 @@ export async function handleGetPooledTransactions(
     log('GET_POOLED_TRANSACTIONS: reqId=%d, hashes=%d', reqId, hashes.length)
 
     // Get transactions from tx pool via context
-    const txs: TypedTransaction[] = []
+    const txs: TxManager[] = []
     if (handler.context?.txPool) {
       for (const hash of hashes) {
         const tx = handler.context.txPool.getByHash([hash])

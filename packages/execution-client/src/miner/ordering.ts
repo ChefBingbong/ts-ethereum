@@ -1,4 +1,4 @@
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import { BIGINT_0 } from '@ts-ethereum/utils'
 import type { QHeap } from '../ext/qheap'
 import { Heap } from '../ext/qheap'
@@ -7,7 +7,7 @@ import { Heap } from '../ext/qheap'
  * Transaction pool object structure (matches TxPoolObject from txpool.ts)
  */
 export interface TxPoolObject {
-  tx: TypedTransaction
+  tx: TxManager
   hash: string // Unprefixed hash
   added: number // Timestamp when tx was added to pool
   error?: Error
@@ -27,7 +27,7 @@ class TxWithMinerFee {
     this.fees = fees
   }
 
-  get tx(): TypedTransaction {
+  get tx(): TxManager {
     return this.txObj.tx
   }
 
@@ -50,7 +50,7 @@ export class TransactionsByPriceAndNonce {
   // Next transaction for each unique account (price heap)
   private heads: QHeap<TxWithMinerFee>
   // Function to extract gas price from transaction
-  private getGasPrice: (tx: TypedTransaction) => bigint
+  private getGasPrice: (tx: TxManager) => bigint
 
   /**
    * Creates a transaction set that can retrieve price sorted transactions
@@ -62,7 +62,7 @@ export class TransactionsByPriceAndNonce {
    */
   constructor(
     txsByAccount: Map<string, TxPoolObject[]>,
-    getGasPrice: (tx: TypedTransaction) => bigint,
+    getGasPrice: (tx: TxManager) => bigint,
     minGasPrice: bigint = BIGINT_0,
   ) {
     this.txs = new Map()
@@ -118,7 +118,7 @@ export class TransactionsByPriceAndNonce {
    * Returns the next transaction by price without removing it.
    * @returns Transaction and its miner fee, or undefined if empty
    */
-  peek(): { tx: TypedTransaction; fees: bigint } | undefined {
+  peek(): { tx: TxManager; fees: bigint } | undefined {
     const head = this.heads.peek()
     if (!head) return undefined
     return { tx: head.tx, fees: head.fees }

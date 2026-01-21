@@ -3,7 +3,7 @@ import type {
   HardforkManager,
   ParamType,
 } from '@ts-ethereum/chain-config'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import type { Withdrawal } from '@ts-ethereum/utils'
 import type {
   BlockHeaderManager,
@@ -24,7 +24,7 @@ export type { BlockBytes }
  */
 export interface FrozenBlock {
   readonly header: FrozenBlockHeader
-  readonly transactions: readonly TypedTransaction[]
+  readonly transactions: readonly TxManager[]
   readonly uncleHeaders: readonly FrozenBlockHeader[]
   readonly withdrawals?: readonly Withdrawal[]
   readonly hardforkManager: HardforkManager
@@ -52,7 +52,7 @@ export interface BlockManager {
 
   // Backward compatibility properties (matching old Block class)
   readonly header: BlockHeaderManager
-  readonly transactions: readonly TypedTransaction[]
+  readonly transactions: readonly TxManager[]
   readonly uncleHeaders: readonly BlockHeaderManager[]
   readonly withdrawals?: readonly Withdrawal[]
   readonly hardforkManager: HardforkManager

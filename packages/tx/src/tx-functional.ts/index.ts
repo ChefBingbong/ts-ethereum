@@ -29,16 +29,51 @@
  * ```
  */
 
+// Factory functions
+export {
+  // Type-specific factories
+  createAccessListTxManager,
+  createAccessListTxManagerFromRLP,
+  createBlobTxManager,
+  createBlobTxManagerFromRLP,
+  createDynamicFeeTxManager,
+  createDynamicFeeTxManagerFromRLP,
+  createLegacyTxManager,
+  createLegacyTxManagerFromBytesArray,
+  createLegacyTxManagerFromRLP,
+  createSetCodeTxManager,
+  createSetCodeTxManagerFromRLP,
+  // Generic factories
+  createTxManager,
+  createTxManagerFromBlockBodyData,
+  createTxManagerFromJSONRPCProvider,
+  createTxManagerFromRLP,
+  createTxManagerFromRPC,
+} from './factory'
 // Helper functions
 export {
   errorStr,
+  // Access list gas calculation
+  getAccessListGas,
+  // Authorization list gas calculation (EIP-7702)
+  getAuthorizationListGas,
   getDataGas,
+  // Effective gas price calculation
+  getEffectiveGasPrice,
   getIntrinsicGas,
   getSenderAddress,
   getUpfrontCost,
   // Validation
   getValidationErrors,
   hash,
+  // TxManager type guards
+  isAccessListCompatibleTxManager,
+  isAccessListTxManager,
+  isBlobTxManager,
+  isEOACodeTxManager,
+  isFeeMarketCompatibleTxManager,
+  isFeeMarketTxManager,
+  isLegacyTxManager,
   // Go-style type checks (preferred)
   isProtected,
   isProtectedV,
@@ -77,9 +112,13 @@ export {
 
 // Go-style signing functions
 export { Sender, SignTx, sender, signTx } from './signing'
+export { AccessListTxData } from './tx-access-list'
+export { BlobTxData, type BlobTxSidecar } from './tx-blob'
+export { DynamicFeeTxData } from './tx-dynamic-fee'
 // Transaction data implementations
 export { LegacyTxData } from './tx-legacy'
 // Transaction manager functions
 export { createTxManagerFromTx, newTx } from './tx-manager'
+export { SetCodeTxData } from './tx-set-code'
 // Core types
 export type { FrozenTx, Signer, TxData, TxManager } from './types'

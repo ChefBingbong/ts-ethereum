@@ -1,5 +1,9 @@
 import type { HardforkManager } from '@ts-ethereum/chain-config'
-import type { Address } from '@ts-ethereum/utils'
+import type { Input } from '@ts-ethereum/rlp'
+import type {
+  Address,
+  EOACode7702AuthorizationListBytes,
+} from '@ts-ethereum/utils'
 import type {
   AccessListBytes,
   Capability,
@@ -60,8 +64,9 @@ export interface TxData {
 
   /**
    * Returns the raw RLP-encodable array including signature values.
+   * The array may contain nested arrays for access lists, etc.
    */
-  raw(): Uint8Array[]
+  raw(): Input[]
 }
 
 /**
@@ -203,7 +208,7 @@ export interface TxManager<T extends TransactionType = TransactionType> {
 
   getIntrinsicGas(): bigint
   getDataGas(): bigint
-  getUpfrontCost(): bigint
+  getUpfrontCost(baseFee?: bigint): bigint
 
   // ============================================================================
   // Serialization
@@ -235,4 +240,63 @@ export interface TxManager<T extends TransactionType = TransactionType> {
 
   toJSON(): JSONTx
   errorStr(): string
+
+  // ============================================================================
+  // Type-specific accessors (return undefined if not applicable to tx type)
+  // ============================================================================
+
+  /**
+   * Returns the gas price for legacy/access list transactions.
+   * For EIP-1559+ transactions, returns maxFeePerGas.
+   */
+  readonly gasPrice: bigint
+
+  /**
+   * Returns the max priority fee per gas (EIP-1559+).
+   * Returns undefined for legacy/access list transactions.
+   */
+  readonly maxPriorityFeePerGas?: bigint
+
+  /**
+   * Returns the max fee per gas (EIP-1559+).
+   * Returns undefined for legacy/access list transactions.
+   */
+  readonly maxFeePerGas?: bigint
+
+  /**
+   * Returns the access list for typed transactions.
+   * Returns empty array for legacy transactions.
+   */
+  readonly accessList: AccessListBytes
+
+  /**
+   * Returns the max fee per blob gas (EIP-4844).
+   * Returns undefined for non-blob transactions.
+   */
+  readonly maxFeePerBlobGas?: bigint
+
+  /**
+   * Returns the blob versioned hashes (EIP-4844).
+   * Returns undefined for non-blob transactions.
+   */
+  readonly blobVersionedHashes?: readonly string[]
+
+  /**
+   * Returns the number of blobs (EIP-4844).
+   * Returns 0 for non-blob transactions.
+   */
+  numBlobs(): number
+
+  /**
+   * Returns the authorization list (EIP-7702).
+   * Returns undefined for non-7702 transactions.
+   */
+  readonly authorizationList?: EOACode7702AuthorizationListBytes
+
+  /**
+   * Returns the effective priority fee per gas.
+   * For legacy/access list txs: gasPrice - baseFee
+   * For EIP-1559+ txs: min(maxPriorityFeePerGas, maxFeePerGas - baseFee)
+   */
+  getEffectivePriorityFee(baseFee?: bigint): bigint
 }

@@ -1,7 +1,8 @@
 import {
   createBlob4844TxFromSerializedNetworkWrapper,
-  createTxFromRLP,
+  createTxManagerFromRLP,
   NetworkWrapperType,
+  type TxManager,
 } from '@ts-ethereum/tx'
 import type { PrefixedHexString } from '@ts-ethereum/utils'
 import {
@@ -47,19 +48,22 @@ export const sendRawTransaction = (node: ExecutionNode) => {
       // })
 
       const hardfork = common.getHardforkByBlock(txTargetHeight)
-      let tx
+      let tx: TxManager
       try {
         const txBuf = hexToBytes(serializedTx)
         if (txBuf[0] === 0x03) {
           // Blob Transactions sent over RPC are expected to be in Network Wrapper format
-          tx = createBlob4844TxFromSerializedNetworkWrapper(txBuf, { common })
+          // Uses old class for network wrapper handling, then cast to TxManager
+          const blobTx = createBlob4844TxFromSerializedNetworkWrapper(txBuf, {
+            common,
+          })
           if (
             common.isEIPActiveAtHardfork(7594, hardfork) &&
-            tx.networkWrapperVersion !== NetworkWrapperType.EIP7594
+            blobTx.networkWrapperVersion !== NetworkWrapperType.EIP7594
           ) {
             return safeError(
               new Error(
-                `tx with networkWrapperVersion=${tx.networkWrapperVersion} sent for EIP-7594 activated hardfork=${common.getHardforkByBlock(txTargetHeight)}`,
+                `tx with networkWrapperVersion=${blobTx.networkWrapperVersion} sent for EIP-7594 activated hardfork=${common.getHardforkByBlock(txTargetHeight)}`,
               ),
             )
           }
@@ -71,17 +75,22 @@ export const sendRawTransaction = (node: ExecutionNode) => {
             common.getParamAtHardfork('blobGasPerBlob', hardfork)!,
           )
 
-          if (BigInt((tx.blobs ?? []).length) * blobGasPerBlob > blobGasLimit) {
+          if (
+            BigInt((blobTx.blobs ?? []).length) * blobGasPerBlob >
+            blobGasLimit
+          ) {
             return safeError(
               new Error(
-                `tx blobs=${(tx.blobs ?? []).length} exceeds block limit=${
+                `tx blobs=${(blobTx.blobs ?? []).length} exceeds block limit=${
                   blobGasLimit / blobGasPerBlob
                 }`,
               ),
             )
           }
+          // Cast to TxManager for compatibility - both have similar interfaces
+          tx = blobTx as unknown as TxManager
         } else {
-          tx = createTxFromRLP(txBuf, { common })
+          tx = createTxManagerFromRLP(txBuf, { common })
         }
       } catch (e: any) {
         return safeError(

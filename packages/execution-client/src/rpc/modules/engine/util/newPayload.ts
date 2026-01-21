@@ -5,7 +5,7 @@ import {
   genRequestsRoot,
 } from '@ts-ethereum/block'
 import type { HardforkManager } from '@ts-ethereum/chain-config'
-import { Blob4844Tx } from '@ts-ethereum/tx'
+import { isBlobTxManager } from '@ts-ethereum/tx'
 import {
   bytesToHex,
   CLRequest,
@@ -35,8 +35,8 @@ export const validate4844BlobVersionedHashes = (
   // Collect versioned hashes in the flat array `txVersionedHashes` to match with received
   const txVersionedHashes = []
   for (const tx of headBlock.transactions) {
-    if (tx instanceof Blob4844Tx) {
-      for (const vHash of tx.blobVersionedHashes) {
+    if (isBlobTxManager(tx)) {
+      for (const vHash of tx.blobVersionedHashes!) {
         txVersionedHashes.push(vHash)
       }
     }
