@@ -5,7 +5,7 @@ import {
   MAX_UINT64,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
-import type { EIP7702CompatibleTx } from '../types'
+import type { EIP7702CompatibleTx } from '../../types'
 import * as EIP2930 from './eip2930'
 
 /**

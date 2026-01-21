@@ -14,14 +14,10 @@ import {
   hexToBytes,
   intToUnpaddedBytes,
   MAX_INTEGER,
-  TypeOutput,
   toBytes,
   toType,
+  TypeOutput,
 } from '@ts-ethereum/utils'
-import * as EIP1559 from '../capabilities/eip1559'
-import * as EIP2718 from '../capabilities/eip2718'
-import * as EIP2930 from '../capabilities/eip2930'
-import * as Legacy from '../capabilities/legacy'
 import type {
   AccessListBytes,
   TxData as AllTypesTxData,
@@ -31,15 +27,19 @@ import type {
   TransactionCache,
   TransactionInterface,
   TxOptions,
-} from '../types'
-import { isAccessList, TransactionType } from '../types'
-import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
+} from '../../types'
+import { isAccessList, TransactionType } from '../../types'
+import { accessListBytesToJSON, accessListJSONToBytes } from '../../util/access'
 import {
   getBaseJSON,
   sharedConstructor,
   validateNotArray,
   valueOverflowCheck,
-} from '../util/internal'
+} from '../../util/internal'
+import * as EIP1559 from '../capabilities/eip1559'
+import * as EIP2718 from '../capabilities/eip2718'
+import * as EIP2930 from '../capabilities/eip2930'
+import * as Legacy from '../capabilities/legacy'
 import { createBlob4844Tx } from './constructors'
 
 export type TxData = AllTypesTxData[typeof TransactionType.BlobEIP4844]

@@ -1,16 +1,20 @@
 import type { HardforkManager } from '@ts-ethereum/chain-config'
-import type { Address } from '@ts-ethereum/utils'
+import type {
+  Address,
+  EOACode7702AuthorizationListBytes,
+} from '@ts-ethereum/utils'
 import {
+  BIGINT_0,
   bigIntToHex,
   bigIntToUnpaddedBytes,
   bytesToBigInt,
+  eoaCode7702AuthorizationListBytesItemToJSON,
+  eoaCode7702AuthorizationListJSONItemToBytes,
   EthereumJSErrorWithoutCode,
+  isEOACode7702AuthorizationList,
   MAX_INTEGER,
   toBytes,
 } from '@ts-ethereum/utils'
-import * as EIP2718 from '../capabilities/eip2718'
-import * as EIP2930 from '../capabilities/eip2930'
-import * as Legacy from '../capabilities/legacy'
 import type {
   AccessListBytes,
   TxData as AllTypesTxData,
@@ -20,40 +24,48 @@ import type {
   TransactionCache,
   TransactionInterface,
   TxOptions,
-} from '../types'
-import { isAccessList, TransactionType } from '../types'
-import { accessListBytesToJSON, accessListJSONToBytes } from '../util/access'
+} from '../../types'
+import { isAccessList, TransactionType } from '../../types'
+import { accessListBytesToJSON, accessListJSONToBytes } from '../../util/access'
 import {
   getBaseJSON,
   sharedConstructor,
+  validateNotArray,
   valueOverflowCheck,
-} from '../util/internal'
-import { createAccessList2930Tx } from './constructors'
+} from '../../util/internal'
+import * as EIP1559 from '../capabilities/eip1559'
+import * as EIP2718 from '../capabilities/eip2718'
+import * as EIP2930 from '../capabilities/eip2930'
+import * as EIP7702 from '../capabilities/eip7702'
+import * as Legacy from '../capabilities/legacy'
+import { createEOACode7702Tx } from './constructors'
 
-export type TxData = AllTypesTxData[typeof TransactionType.AccessListEIP2930]
+export type TxData = AllTypesTxData[typeof TransactionType.EOACodeEIP7702]
 export type TxValuesArray =
-  AllTypesTxValuesArray[typeof TransactionType.AccessListEIP2930]
+  AllTypesTxValuesArray[typeof TransactionType.EOACodeEIP7702]
 
 /**
- * Typed transaction with optional access lists
+ * Typed transaction with the ability to set codes on EOA accounts
  *
- * - TransactionType: 1
- * - EIP: [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)
+ * - TransactionType: 4
+ * - EIP: [EIP-7702](https://github.com/ethereum/EIPs/blob/62419ca3f45375db00b04a368ea37c0bfb05386a/EIPS/eip-7702.md)
  */
-export class AccessList2930Tx
-  implements TransactionInterface<typeof TransactionType.AccessListEIP2930>
+export class EOACode7702Tx
+  implements TransactionInterface<typeof TransactionType.EOACodeEIP7702>
 {
-  public type = TransactionType.AccessListEIP2930 // 2930 tx type
+  public type = TransactionType.EOACodeEIP7702 // 7702 tx type
 
   // Tx data part (part of the RLP)
-  public readonly gasPrice: bigint
   public readonly nonce!: bigint
   public readonly gasLimit!: bigint
   public readonly value!: bigint
   public readonly data!: Uint8Array
   public readonly to?: Address
   public readonly accessList: AccessListBytes
+  public readonly authorizationList: EOACode7702AuthorizationListBytes
   public readonly chainId: bigint
+  public readonly maxPriorityFeePerGas: bigint
+  public readonly maxFeePerGas: bigint
 
   // Props only for signed txs
   public readonly v?: bigint
@@ -86,11 +98,18 @@ export class AccessList2930Tx
   public constructor(txData: TxData, opts: TxOptions) {
     sharedConstructor(
       this,
-      { ...txData, type: TransactionType.AccessListEIP2930 },
+      { ...txData, type: TransactionType.EOACodeEIP7702 },
       opts,
     )
-    const { chainId, accessList: rawAccessList, gasPrice } = txData
+    const {
+      chainId,
+      accessList: rawAccessList,
+      authorizationList: rawAuthorizationList,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+    } = txData
     const accessList = rawAccessList ?? []
+    const authorizationList = rawAuthorizationList ?? []
 
     if (
       chainId !== undefined &&
@@ -102,13 +121,14 @@ export class AccessList2930Tx
     }
     this.chainId = this.common.chainId()
 
-    // EIP-2718 check is done in HardforkManager
-    if (!this.common.isEIPActiveAtHardfork(2930, this.fork)) {
+    if (!this.common.isEIPActiveAtHardfork(7702, this.fork)) {
       throw EthereumJSErrorWithoutCode(
-        'EIP-2930 not enabled on HardforkManager',
+        'EIP-7702 not enabled on HardforkManager',
       )
     }
-    this.activeCapabilities = this.activeCapabilities.concat([2718, 2930])
+    this.activeCapabilities = this.activeCapabilities.concat([
+      1559, 2718, 2930, 7702,
+    ])
 
     // Populate the access list fields
     this.accessList = isAccessList(accessList)
@@ -117,20 +137,51 @@ export class AccessList2930Tx
     // Verify the access list format.
     EIP2930.verifyAccessList(this)
 
-    this.gasPrice = bytesToBigInt(toBytes(gasPrice))
+    // Populate the authority list fields
+    this.authorizationList = isEOACode7702AuthorizationList(authorizationList)
+      ? authorizationList.map((item) =>
+          eoaCode7702AuthorizationListJSONItemToBytes(item),
+        )
+      : authorizationList
+    // Verify the authority list format.
+    EIP7702.verifyAuthorizationList(this)
 
-    valueOverflowCheck({ gasPrice: this.gasPrice })
+    this.maxFeePerGas = bytesToBigInt(toBytes(maxFeePerGas))
+    this.maxPriorityFeePerGas = bytesToBigInt(toBytes(maxPriorityFeePerGas))
 
-    if (this.gasPrice * this.gasLimit > MAX_INTEGER) {
+    valueOverflowCheck({
+      maxFeePerGas: this.maxFeePerGas,
+      maxPriorityFeePerGas: this.maxPriorityFeePerGas,
+    })
+
+    validateNotArray(txData)
+
+    if (this.gasLimit * this.maxFeePerGas > MAX_INTEGER) {
       const msg = Legacy.errorMsg(
         this,
-        'gasLimit * gasPrice cannot exceed MAX_INTEGER',
+        'gasLimit * maxFeePerGas cannot exceed MAX_INTEGER (2^256-1)',
+      )
+      throw EthereumJSErrorWithoutCode(msg)
+    }
+
+    if (this.maxFeePerGas < this.maxPriorityFeePerGas) {
+      const msg = Legacy.errorMsg(
+        this,
+        'maxFeePerGas cannot be less than maxPriorityFeePerGas (The total must be the larger of the two)',
       )
       throw EthereumJSErrorWithoutCode(msg)
     }
 
     EIP2718.validateYParity(this)
     Legacy.validateHighS(this)
+
+    if (this.to === undefined) {
+      const msg = Legacy.errorMsg(
+        this,
+        `tx should have a "to" field and cannot be used to create contracts`,
+      )
+      throw EthereumJSErrorWithoutCode(msg)
+    }
 
     const freeze = opts?.freeze ?? true
     if (freeze) {
@@ -158,22 +209,27 @@ export class AccessList2930Tx
     return this.activeCapabilities.includes(capability)
   }
 
-  getEffectivePriorityFee(baseFee?: bigint): bigint {
-    return Legacy.getEffectivePriorityFee(this.gasPrice, baseFee)
-  }
-
   /**
    * The amount of gas paid for the data in this tx
    */
   getDataGas(): bigint {
-    return EIP2930.getDataGas(this)
+    return EIP7702.getDataGas(this)
+  }
+
+  /**
+   * Returns the minimum of calculated priority fee (from maxFeePerGas and baseFee) and maxPriorityFeePerGas
+   * @param baseFee Base fee retrieved from block
+   */
+  getEffectivePriorityFee(baseFee: bigint): bigint {
+    return EIP1559.getEffectivePriorityFee(this, baseFee)
   }
 
   /**
    * The up front amount that an account must have for this transaction to be valid
+   * @param baseFee The base fee of the block (will be set to 0 if not provided)
    */
-  getUpfrontCost(): bigint {
-    return this.gasLimit * this.gasPrice + this.value
+  getUpfrontCost(baseFee: bigint = BIGINT_0): bigint {
+    return EIP1559.getUpfrontCost(this, baseFee)
   }
 
   /**
@@ -186,37 +242,38 @@ export class AccessList2930Tx
     return Legacy.getIntrinsicGas(this)
   }
 
-  // TODO figure out if this is necessary
   /**
-   * If the tx's `to` is to the creation address
+   * EOACode7702Tx cannot create contracts
    */
-  toCreationAddress(): boolean {
-    return Legacy.toCreationAddress(this)
+  toCreationAddress(): never {
+    throw EthereumJSErrorWithoutCode('EOACode7702Tx cannot create contracts')
   }
 
   /**
-   * Returns a Uint8Array Array of the raw Bytes of the EIP-2930 transaction, in order.
+   * Returns a Uint8Array Array of the raw Bytes of the EIP-7702 transaction, in order.
    *
-   * Format: `[chainId, nonce, gasPrice, gasLimit, to, value, data, accessList,
-   * signatureYParity (v), signatureR (r), signatureS (s)]`
+   * Format: `[chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
+   * accessList, authorizationList, signatureYParity, signatureR, signatureS]`
    *
-   * Use {@link AccessList2930Tx.serialize} to add a transaction to a block
+   * Use {@link EOACode7702Transaction.serialize} to add a transaction to a block
    * with {@link createBlockFromBytesArray}.
    *
    * For an unsigned tx this method uses the empty Bytes values for the
    * signature parameters `v`, `r` and `s` for encoding. For an EIP-155 compliant
-   * representation for external signing use {@link AccessList2930Tx.getMessageToSign}.
+   * representation for external signing use {@link EOACode7702Transaction.getMessageToSign}.
    */
   raw(): TxValuesArray {
     return [
       bigIntToUnpaddedBytes(this.chainId),
       bigIntToUnpaddedBytes(this.nonce),
-      bigIntToUnpaddedBytes(this.gasPrice),
+      bigIntToUnpaddedBytes(this.maxPriorityFeePerGas),
+      bigIntToUnpaddedBytes(this.maxFeePerGas),
       bigIntToUnpaddedBytes(this.gasLimit),
       this.to !== undefined ? this.to.bytes : new Uint8Array(0),
       bigIntToUnpaddedBytes(this.value),
       this.data,
       this.accessList,
+      this.authorizationList,
       this.v !== undefined ? bigIntToUnpaddedBytes(this.v) : new Uint8Array(0),
       this.r !== undefined ? bigIntToUnpaddedBytes(this.r) : new Uint8Array(0),
       this.s !== undefined ? bigIntToUnpaddedBytes(this.s) : new Uint8Array(0),
@@ -224,10 +281,10 @@ export class AccessList2930Tx
   }
 
   /**
-   * Returns the serialized encoding of the EIP-2930 transaction.
+   * Returns the serialized encoding of the EIP-7702 transaction.
    *
-   * Format: `0x01 || rlp([chainId, nonce, gasPrice, gasLimit, to, value, data, accessList,
-   * signatureYParity (v), signatureR (r), signatureS (s)])`
+   * Format: `0x02 || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
+   * accessList, authorizationList, signatureYParity, signatureR, signatureS])`
    *
    * Note that in contrast to the legacy tx serialization format this is not
    * valid RLP any more due to the raw tx type preceding and concatenated to
@@ -250,7 +307,7 @@ export class AccessList2930Tx
    * @returns Serialized unsigned transaction payload
    */
   getMessageToSign(): Uint8Array {
-    return EIP2718.serialize(this, this.raw().slice(0, 8))
+    return EIP2718.serialize(this, this.raw().slice(0, 10))
   }
 
   /**
@@ -269,10 +326,10 @@ export class AccessList2930Tx
    * Computes a sha3-256 hash of the serialized tx.
    *
    * This method can only be used for signed txs (it throws otherwise).
-   * Use {@link Transaction.getMessageToSign} to get a tx hash for the purpose of signing.
+   * Use {@link EOACode7702Transaction.getMessageToSign} to get a tx hash for the purpose of signing.
    * @returns Hash of the serialized signed transaction
    */
-  hash(): Uint8Array {
+  public hash(): Uint8Array {
     return Legacy.hash(this)
   }
 
@@ -294,30 +351,32 @@ export class AccessList2930Tx
 
   /**
    * Adds the provided signature values and returns a new transaction instance.
-   * @param v - Recovery parameter (y-parity)
-   * @param r - `r` component of the signature
-   * @param s - `s` component of the signature
-   * @returns New `AccessList2930Tx` with the supplied signature
+   * @param v - Recovery parameter
+   * @param r - Signature `r` value
+   * @param s - Signature `s` value
+   * @returns New `EOACode7702Tx` that includes the signature
    */
   addSignature(
     v: bigint,
     r: Uint8Array | bigint,
     s: Uint8Array | bigint,
-  ): AccessList2930Tx {
+  ): EOACode7702Tx {
     r = toBytes(r)
     s = toBytes(s)
     const opts = { ...this.txOptions, common: this.common }
 
-    return createAccessList2930Tx(
+    return createEOACode7702Tx(
       {
         chainId: this.chainId,
         nonce: this.nonce,
-        gasPrice: this.gasPrice,
+        maxPriorityFeePerGas: this.maxPriorityFeePerGas,
+        maxFeePerGas: this.maxFeePerGas,
         gasLimit: this.gasLimit,
         to: this.to,
         value: this.value,
         data: this.data,
         accessList: this.accessList,
+        authorizationList: this.authorizationList,
         v,
         r: bytesToBigInt(r),
         s: bytesToBigInt(s),
@@ -332,18 +391,24 @@ export class AccessList2930Tx
    */
   toJSON(): JSONTx {
     const accessListJSON = accessListBytesToJSON(this.accessList)
+    const authorizationList = this.authorizationList.map((item) =>
+      eoaCode7702AuthorizationListBytesItemToJSON(item),
+    )
+
     const baseJSON = getBaseJSON(this)
 
     return {
       ...baseJSON,
       chainId: bigIntToHex(this.chainId),
-      gasPrice: bigIntToHex(this.gasPrice),
+      maxPriorityFeePerGas: bigIntToHex(this.maxPriorityFeePerGas),
+      maxFeePerGas: bigIntToHex(this.maxFeePerGas),
       accessList: accessListJSON,
+      authorizationList,
     }
   }
 
   /**
-   * Runs transaction validation and returns any discovered errors.
+   * Returns the list of validation errors, if any.
    * @returns Array of validation error messages
    */
   getValidationErrors(): string[] {
@@ -351,14 +416,14 @@ export class AccessList2930Tx
   }
 
   /**
-   * @returns true if the transaction has no validation errors
+   * @returns true if the transaction has no validation issues
    */
   isValid(): boolean {
     return Legacy.isValid(this)
   }
 
   /**
-   * Checks whether the signature currently attached to the transaction is valid.
+   * Verifies the embedded signature.
    * @returns true if signature verification succeeds
    */
   verifySignature(): boolean {
@@ -366,7 +431,7 @@ export class AccessList2930Tx
   }
 
   /**
-   * Returns the signer's address recovered from the signature.
+   * Returns the recovered sender address.
    * @returns Sender {@link Address}
    */
   getSenderAddress(): Address {
@@ -374,24 +439,29 @@ export class AccessList2930Tx
   }
 
   /**
-   * Signs the transaction with the provided private key and returns a new instance.
+   * Signs the transaction and returns the signed instance.
    * @param privateKey - 32-byte private key
-   * @param extraEntropy - Optional entropy fed into the signing algorithm
+   * @param extraEntropy - Optional entropy supplied to the signing routine
    * @returns Newly signed transaction
    */
   sign(
     privateKey: Uint8Array,
     extraEntropy: Uint8Array | boolean = false,
-  ): AccessList2930Tx {
-    return Legacy.sign(this, privateKey, extraEntropy) as AccessList2930Tx
+  ): EOACode7702Tx {
+    return Legacy.sign(this, privateKey, extraEntropy) as EOACode7702Tx
   }
 
   /**
-   * Reports whether the transaction already contains signature values.
+   * Indicates whether the transaction already carries signature data.
    * @returns true if signature parts are present
    */
-  isSigned(): boolean {
-    return Legacy.isSigned(this)
+  public isSigned(): boolean {
+    const { v, r, s } = this
+    if (v === undefined || r === undefined || s === undefined) {
+      return false
+    } else {
+      return true
+    }
   }
 
   /**
@@ -399,8 +469,7 @@ export class AccessList2930Tx
    */
   public errorStr() {
     let errorStr = Legacy.getSharedErrorPostfix(this)
-    // Keep ? for this.accessList since this otherwise causes Hardhat E2E tests to fail
-    errorStr += ` gasPrice=${this.gasPrice} accessListCount=${this.accessList?.length ?? 0}`
+    errorStr += ` maxFeePerGas=${this.maxFeePerGas} maxPriorityFeePerGas=${this.maxPriorityFeePerGas}`
     return errorStr
   }
 }

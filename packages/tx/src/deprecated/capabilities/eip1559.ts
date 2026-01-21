@@ -1,6 +1,6 @@
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
 
-import type { EIP1559CompatibleTx } from '../types'
+import type { EIP1559CompatibleTx } from '../../types'
 
 /**
  * Calculates the total upfront wei cost required for an EIP-1559 compatible transaction.

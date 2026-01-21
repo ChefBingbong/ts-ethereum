@@ -5,17 +5,17 @@ import {
   bigIntMax,
   bigIntToUnpaddedBytes,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   ecrecover,
+  EthereumJSErrorWithoutCode,
   publicToAddress,
   SECP256K1_ORDER_DIV_2,
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak.js'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1'
+import type { LegacyTxInterface, Transaction } from '../../types'
+import { Capability, TransactionType } from '../../types'
 import type { LegacyTx } from '../legacy/tx'
-import type { LegacyTxInterface, Transaction } from '../types'
-import { Capability, TransactionType } from '../types'
 
 /**
  * Creates an error message with transaction context

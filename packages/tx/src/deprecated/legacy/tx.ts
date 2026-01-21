@@ -13,7 +13,6 @@ import {
   unpadBytes,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import * as Legacy from '../capabilities/legacy'
 import type {
   TxData as AllTypesTxData,
   TxValuesArray as AllTypesTxValuesArray,
@@ -21,13 +20,14 @@ import type {
   TransactionCache,
   TransactionInterface,
   TxOptions,
-} from '../types'
-import { Capability, TransactionType } from '../types'
+} from '../../types'
+import { Capability, TransactionType } from '../../types'
 import {
   getBaseJSON,
   sharedConstructor,
   valueOverflowCheck,
-} from '../util/internal'
+} from '../../util/internal'
+import * as Legacy from '../capabilities/legacy'
 import { createLegacyTx } from './constructors'
 
 export type TxData = AllTypesTxData[typeof TransactionType.Legacy]

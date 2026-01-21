@@ -13,11 +13,11 @@ import type {
   PrefixedHexString,
 } from '@ts-ethereum/utils'
 import { bytesToBigInt, toBytes } from '@ts-ethereum/utils'
-import type { FeeMarket1559Tx } from './1559/tx'
-import type { AccessList2930Tx } from './2930/tx'
-import type { Blob4844Tx } from './4844/tx'
-import type { EOACode7702Tx } from './7702/tx'
-import type { LegacyTx } from './legacy/tx'
+import type { FeeMarket1559Tx } from './deprecated/1559/tx'
+import type { AccessList2930Tx } from './deprecated/2930/tx'
+import type { Blob4844Tx } from './deprecated/4844/tx'
+import type { EOACode7702Tx } from './deprecated/7702/tx'
+import type { LegacyTx } from './deprecated/legacy/tx'
 
 export type Capability = (typeof Capability)[keyof typeof Capability]
 

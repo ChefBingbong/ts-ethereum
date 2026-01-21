@@ -4,6 +4,16 @@ import {
   fetchFromProvider,
   getProvider,
 } from '@ts-ethereum/utils'
+import type { Transaction, TxData, TxOptions, TypedTxData } from '../types'
+import {
+  isAccessList2930TxData,
+  isBlob4844TxData,
+  isEOACode7702TxData,
+  isFeeMarket1559TxData,
+  isLegacyTxData,
+  TransactionType,
+} from '../types'
+import { normalizeTxParams } from '../util/general'
 import {
   createFeeMarket1559Tx,
   createFeeMarket1559TxFromRLP,
@@ -22,16 +32,6 @@ import {
   createLegacyTxFromBytesArray,
   createLegacyTxFromRLP,
 } from './legacy/constructors'
-import type { Transaction, TxData, TxOptions, TypedTxData } from './types'
-import {
-  isAccessList2930TxData,
-  isBlob4844TxData,
-  isEOACode7702TxData,
-  isFeeMarket1559TxData,
-  isLegacyTxData,
-  TransactionType,
-} from './types'
-import { normalizeTxParams } from './util/general'
 /**
  * Create a transaction from a `txData` object
  *

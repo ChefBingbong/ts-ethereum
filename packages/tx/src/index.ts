@@ -42,8 +42,8 @@ export {
   getSenderAddress,
   getUpfrontCost,
   getValidationErrors,
-  HomesteadSigner,
   hash,
+  HomesteadSigner,
   // TxManager type guards
   isAccessListCompatibleTxManager,
   isAccessListTxManager,
@@ -58,20 +58,20 @@ export {
   isSigned,
   isTypedTransaction,
   isValid,
-  LegacyTxData,
-  LondonSigner,
   // Signer factory functions
   latestSigner,
   latestSignerForChainID,
+  LegacyTxData,
+  LondonSigner,
   makeSigner,
   newTx,
   PragueSigner,
   // Go-style signing functions
   Sender,
-  SetCodeTxData,
-  SignTx,
   sender,
   serialize,
+  SetCodeTxData,
+  SignTx,
   signTx,
   supports,
   supportsAccessList,
@@ -85,8 +85,8 @@ export type { BlobTxSidecar } from './tx-functional.ts/tx-blob'
 // Export new types with functional prefix to avoid conflicts
 export type {
   FrozenTx,
-  Signer,
   TxData as FunctionalTxData,
+  Signer,
   TxManager,
 } from './tx-functional.ts/types'
 
@@ -95,15 +95,11 @@ export type {
 // ============================================================================
 
 // Tx class constructors (deprecated - use functional factories instead)
-export * from './1559/index'
-export * from './2930/index'
-export * from './4844/index'
-export * from './7702/index'
-export * from './legacy/index'
-
-// Parameters
-export * from './params'
-
+export * from './deprecated/1559/index'
+export * from './deprecated/2930/index'
+export * from './deprecated/4844/index'
+export * from './deprecated/7702/index'
+export * from './deprecated/legacy/index'
 // Old transaction factory (deprecated - use createTxManager instead)
 export {
   createTx,
@@ -111,7 +107,9 @@ export {
   createTxFromJSONRPCProvider,
   createTxFromRLP,
   createTxFromRPC,
-} from './transactionFactory'
+} from './deprecated/transactionFactory'
+// Parameters
+export * from './params'
 
 // Types (includes both old and new type definitions)
 export * from './types'

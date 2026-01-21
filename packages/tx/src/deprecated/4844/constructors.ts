@@ -12,8 +12,8 @@ import {
   CELLS_PER_EXT_BLOB,
   commitmentsToVersionedHashes,
   computeVersionedHash,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   getBlobs,
   intToHex,
   validateNoLeadingZeroes,
@@ -23,10 +23,10 @@ import type {
   BlobEIP7594NetworkValuesArray,
   JSONBlobTxNetworkWrapper,
   TxOptions,
-} from '../types'
-import { TransactionType } from '../types'
-import { accessListBytesToJSON } from '../util/access'
-import { txTypeBytes, validateNotArray } from '../util/internal'
+} from '../../types'
+import { TransactionType } from '../../types'
+import { accessListBytesToJSON } from '../../util/access'
+import { txTypeBytes, validateNotArray } from '../../util/internal'
 import type { TxData, TxValuesArray } from './tx'
 import { Blob4844Tx, NetworkWrapperType } from './tx'
 

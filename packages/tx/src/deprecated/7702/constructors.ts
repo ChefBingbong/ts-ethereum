@@ -2,15 +2,15 @@ import { RLP } from '@ts-ethereum/rlp'
 import {
   bytesToBigInt,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
-import type { TxOptions } from '../types'
-import { TransactionType } from '../types'
-import { txTypeBytes, validateNotArray } from '../util/internal'
+import type { TxOptions } from '../../types'
+import { TransactionType } from '../../types'
+import { txTypeBytes, validateNotArray } from '../../util/internal'
 import type { TxData, TxValuesArray } from './tx'
-import { FeeMarket1559Tx } from './tx'
+import { EOACode7702Tx } from './tx'
 
 /**
  * Instantiate a transaction from a data dictionary.
@@ -22,23 +22,23 @@ import { FeeMarket1559Tx } from './tx'
  * - `chainId` will be set automatically if not provided
  * - All parameters are optional and have some basic default values
  */
-export function createFeeMarket1559Tx(txData: TxData, opts: TxOptions) {
-  return new FeeMarket1559Tx(txData, opts)
+export function createEOACode7702Tx(txData: TxData, opts: TxOptions) {
+  return new EOACode7702Tx(txData, opts)
 }
 
 /**
  * Create a transaction from an array of byte encoded values ordered according to the devp2p network encoding - format noted below.
  *
  * Format: `[chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
- * accessList, signatureYParity, signatureR, signatureS]`
+ * accessList, authorityList, signatureYParity, signatureR, signatureS]`
  */
-export function create1559FeeMarketTxFromBytesArray(
+export function createEOACode7702TxFromBytesArray(
   values: TxValuesArray,
   opts: TxOptions,
 ) {
-  if (values.length !== 9 && values.length !== 12) {
+  if (values.length !== 10 && values.length !== 13) {
     throw EthereumJSErrorWithoutCode(
-      'Invalid EIP-1559 transaction. Only expecting 9 values (for unsigned tx) or 12 values (for signed tx).',
+      'Invalid EIP-7702 transaction. Only expecting 10 values (for unsigned tx) or 13 values (for signed tx).',
     )
   }
 
@@ -52,6 +52,7 @@ export function create1559FeeMarketTxFromBytesArray(
     value,
     data,
     accessList,
+    authorityList,
     v,
     r,
     s,
@@ -69,7 +70,7 @@ export function create1559FeeMarketTxFromBytesArray(
     s,
   })
 
-  return new FeeMarket1559Tx(
+  return new EOACode7702Tx(
     {
       chainId: bytesToBigInt(chainId),
       nonce,
@@ -80,6 +81,7 @@ export function create1559FeeMarketTxFromBytesArray(
       value,
       data,
       accessList: accessList ?? [],
+      authorizationList: authorityList ?? [],
       v: v !== undefined ? bytesToBigInt(v) : undefined, // EIP2930 supports v's with value 0 (empty Uint8Array)
       r,
       s,
@@ -89,24 +91,24 @@ export function create1559FeeMarketTxFromBytesArray(
 }
 
 /**
- * Instantiate a transaction from an RLP serialized tx.
+ * Instantiate a transaction from a RLP serialized tx.
  *
- * Format: `0x02 || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
+ * Format: `0x04 || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data,
  * accessList, signatureYParity, signatureR, signatureS])`
  */
-export function createFeeMarket1559TxFromRLP(
+export function createEOACode7702TxFromRLP(
   serialized: Uint8Array,
   opts: TxOptions,
 ) {
   if (
     equalsBytes(
       serialized.subarray(0, 1),
-      txTypeBytes(TransactionType.FeeMarketEIP1559),
+      txTypeBytes(TransactionType.EOACodeEIP7702),
     ) === false
   ) {
     throw EthereumJSErrorWithoutCode(
-      `Invalid serialized tx input: not an EIP-1559 transaction (wrong tx type, expected: ${
-        TransactionType.FeeMarketEIP1559
+      `Invalid serialized tx input: not an EIP-7702 transaction (wrong tx type, expected: ${
+        TransactionType.EOACodeEIP7702
       }, received: ${bytesToHex(serialized.subarray(0, 1))}`,
     )
   }
@@ -119,5 +121,5 @@ export function createFeeMarket1559TxFromRLP(
     )
   }
 
-  return create1559FeeMarketTxFromBytesArray(values as TxValuesArray, opts)
+  return createEOACode7702TxFromBytesArray(values as TxValuesArray, opts)
 }

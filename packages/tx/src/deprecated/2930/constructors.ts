@@ -2,13 +2,13 @@ import { RLP } from '@ts-ethereum/rlp'
 import {
   bytesToBigInt,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
-import type { AccessList, TxOptions } from '../types'
-import { TransactionType } from '../types'
-import { txTypeBytes, validateNotArray } from '../util/internal'
+import type { AccessList, TxOptions } from '../../types'
+import { TransactionType } from '../../types'
+import { txTypeBytes, validateNotArray } from '../../util/internal'
 import type { TxData, TxValuesArray } from './tx'
 import { AccessList2930Tx } from './tx'
 

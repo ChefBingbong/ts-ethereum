@@ -3,7 +3,7 @@ import {
   EthereumJSErrorWithoutCode,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
-import type { TxOptions } from '../types'
+import type { TxOptions } from '../../types'
 import type { TxData, TxValuesArray } from './tx'
 import { LegacyTx } from './tx'
 

@@ -1,5 +1,5 @@
 import { EthereumJSErrorWithoutCode } from '@ts-ethereum/utils'
-import type { EIP2930CompatibleTx } from '../types'
+import type { EIP2930CompatibleTx } from '../../types'
 import * as Legacy from './legacy'
 
 /**

@@ -7,8 +7,8 @@ import {
   EthereumJSErrorWithoutCode,
 } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
-import type { EIP2718CompatibleTx } from '../types'
-import { txTypeBytes } from '../util/internal'
+import type { EIP2718CompatibleTx } from '../../types'
+import { txTypeBytes } from '../../util/internal'
 import { errorMsg } from './legacy'
 
 /**
