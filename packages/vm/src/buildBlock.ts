@@ -15,13 +15,14 @@ import { RLP } from '@ts-ethereum/rlp'
 import type { TxManager, TypedTransaction } from '@ts-ethereum/tx'
 import {
   Blob4844Tx,
-  isBlobTxManager,
   createMinimal4844TxFromNetworkWrapper,
+  isBlobTxManager,
   NetworkWrapperType,
 } from '@ts-ethereum/tx'
 
 // Union type for transactions during migration - TxManager is preferred
 type BuilderTx = TxManager | TypedTransaction
+
 import type { Withdrawal } from '@ts-ethereum/utils'
 import {
   Address,

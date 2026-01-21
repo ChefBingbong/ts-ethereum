@@ -379,10 +379,7 @@ export class TxPool {
     }
   }
 
-  private validateTxGasBump(
-    existingTx: TxManager,
-    addedTx: TxManager,
-  ) {
+  private validateTxGasBump(existingTx: TxManager, addedTx: TxManager) {
     const existingTxGasPrice = this.txGasPrice(existingTx)
     const newGasPrice = this.txGasPrice(addedTx)
     const minTipCap =
@@ -1500,9 +1497,7 @@ export class TxPool {
         tip: tx.maxPriorityFeePerGas!,
       }
     } else {
-      throw EthereumJSErrorWithoutCode(
-        `tx of type ${tx.type} unknown`,
-      )
+      throw EthereumJSErrorWithoutCode(`tx of type ${tx.type} unknown`)
     }
   }
 

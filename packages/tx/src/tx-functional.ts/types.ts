@@ -1,6 +1,9 @@
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import type { Input } from '@ts-ethereum/rlp'
-import type { Address, EOACode7702AuthorizationListBytes } from '@ts-ethereum/utils'
+import type {
+  Address,
+  EOACode7702AuthorizationListBytes,
+} from '@ts-ethereum/utils'
 import type {
   AccessListBytes,
   Capability,

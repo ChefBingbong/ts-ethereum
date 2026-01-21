@@ -54,7 +54,9 @@ export const sendRawTransaction = (node: ExecutionNode) => {
         if (txBuf[0] === 0x03) {
           // Blob Transactions sent over RPC are expected to be in Network Wrapper format
           // Uses old class for network wrapper handling, then cast to TxManager
-          const blobTx = createBlob4844TxFromSerializedNetworkWrapper(txBuf, { common })
+          const blobTx = createBlob4844TxFromSerializedNetworkWrapper(txBuf, {
+            common,
+          })
           if (
             common.isEIPActiveAtHardfork(7594, hardfork) &&
             blobTx.networkWrapperVersion !== NetworkWrapperType.EIP7594
@@ -73,7 +75,10 @@ export const sendRawTransaction = (node: ExecutionNode) => {
             common.getParamAtHardfork('blobGasPerBlob', hardfork)!,
           )
 
-          if (BigInt((blobTx.blobs ?? []).length) * blobGasPerBlob > blobGasLimit) {
+          if (
+            BigInt((blobTx.blobs ?? []).length) * blobGasPerBlob >
+            blobGasLimit
+          ) {
             return safeError(
               new Error(
                 `tx blobs=${(blobTx.blobs ?? []).length} exceeds block limit=${

@@ -4,8 +4,36 @@
 
 // Re-export functional module (excluding names that conflict with old API)
 export {
+  // Transaction data implementations (new functional API)
+  AccessListTxData,
+  BlobTxData,
+  // Signer implementations
+  CancunSigner,
+  createAccessListTxManager,
+  createAccessListTxManagerFromRLP,
+  createBlobTxManager,
+  createBlobTxManagerFromRLP,
+  createDynamicFeeTxManager,
+  createDynamicFeeTxManagerFromRLP,
+  createLegacyTxManager,
+  createLegacyTxManagerFromBytesArray,
+  createLegacyTxManagerFromRLP,
+  createSetCodeTxManager,
+  createSetCodeTxManagerFromRLP,
+  // Factory functions
+  createTxManager,
+  createTxManagerFromBlockBodyData,
+  createTxManagerFromJSONRPCProvider,
+  createTxManagerFromRLP,
+  createTxManagerFromRPC,
+  // Transaction manager functions
+  createTxManagerFromTx,
+  DynamicFeeTxData,
+  EIP155Signer,
+  EIP2930Signer,
   // Helper functions
   errorStr,
+  FrontierSigner,
   getAccessListGas,
   getAuthorizationListGas,
   getDataGas,
@@ -14,6 +42,7 @@ export {
   getSenderAddress,
   getUpfrontCost,
   getValidationErrors,
+  HomesteadSigner,
   hash,
   // TxManager type guards
   isAccessListCompatibleTxManager,
@@ -29,58 +58,30 @@ export {
   isSigned,
   isTypedTransaction,
   isValid,
+  LegacyTxData,
+  LondonSigner,
+  // Signer factory functions
+  latestSigner,
+  latestSignerForChainID,
+  makeSigner,
+  newTx,
+  PragueSigner,
+  // Go-style signing functions
+  Sender,
+  SetCodeTxData,
+  SignTx,
+  sender,
   serialize,
+  signTx,
   supports,
   supportsAccessList,
   supportsFeeMarket,
   toCreationAddress,
   toJSON,
   verifySignature,
-  // Factory functions
-  createTxManager,
-  createTxManagerFromBlockBodyData,
-  createTxManagerFromJSONRPCProvider,
-  createTxManagerFromRLP,
-  createTxManagerFromRPC,
-  createAccessListTxManager,
-  createAccessListTxManagerFromRLP,
-  createBlobTxManager,
-  createBlobTxManagerFromRLP,
-  createDynamicFeeTxManager,
-  createDynamicFeeTxManagerFromRLP,
-  createLegacyTxManager,
-  createLegacyTxManagerFromBytesArray,
-  createLegacyTxManagerFromRLP,
-  createSetCodeTxManager,
-  createSetCodeTxManagerFromRLP,
-  // Signer factory functions
-  latestSigner,
-  latestSignerForChainID,
-  makeSigner,
-  // Signer implementations
-  CancunSigner,
-  EIP155Signer,
-  EIP2930Signer,
-  FrontierSigner,
-  HomesteadSigner,
-  LondonSigner,
-  PragueSigner,
-  // Go-style signing functions
-  Sender,
-  SignTx,
-  sender,
-  signTx,
-  // Transaction data implementations (new functional API)
-  AccessListTxData,
-  BlobTxData,
-  DynamicFeeTxData,
-  LegacyTxData,
-  SetCodeTxData,
-  // Transaction manager functions
-  createTxManagerFromTx,
-  newTx,
 } from './tx-functional.ts/index'
-
+// Export BlobTxSidecar type
+export type { BlobTxSidecar } from './tx-functional.ts/tx-blob'
 // Export new types with functional prefix to avoid conflicts
 export type {
   FrozenTx,
@@ -88,9 +89,6 @@ export type {
   TxData as FunctionalTxData,
   TxManager,
 } from './tx-functional.ts/types'
-
-// Export BlobTxSidecar type
-export type { BlobTxSidecar } from './tx-functional.ts/tx-blob'
 
 // ============================================================================
 // OLD CLASS-BASED API (Deprecated - kept for backward compatibility)

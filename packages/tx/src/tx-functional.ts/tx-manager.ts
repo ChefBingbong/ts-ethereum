@@ -230,9 +230,12 @@ export function createTxManagerFromTx<T extends TransactionType>(
       }
       return 0
     },
-    get authorizationList(): import('@ts-ethereum/utils').EOACode7702AuthorizationListBytes | undefined {
+    get authorizationList():
+      | import('@ts-ethereum/utils').EOACode7702AuthorizationListBytes
+      | undefined {
       if (tx.inner.type === TxType.EOACodeEIP7702) {
-        return (tx.inner as unknown as SetCodeTxData).authorizationList as import('@ts-ethereum/utils').EOACode7702AuthorizationListBytes
+        return (tx.inner as unknown as SetCodeTxData)
+          .authorizationList as import('@ts-ethereum/utils').EOACode7702AuthorizationListBytes
       }
       return undefined
     },

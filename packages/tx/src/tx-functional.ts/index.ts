@@ -29,6 +29,27 @@
  * ```
  */
 
+// Factory functions
+export {
+  // Type-specific factories
+  createAccessListTxManager,
+  createAccessListTxManagerFromRLP,
+  createBlobTxManager,
+  createBlobTxManagerFromRLP,
+  createDynamicFeeTxManager,
+  createDynamicFeeTxManagerFromRLP,
+  createLegacyTxManager,
+  createLegacyTxManagerFromBytesArray,
+  createLegacyTxManagerFromRLP,
+  createSetCodeTxManager,
+  createSetCodeTxManagerFromRLP,
+  // Generic factories
+  createTxManager,
+  createTxManagerFromBlockBodyData,
+  createTxManagerFromJSONRPCProvider,
+  createTxManagerFromRLP,
+  createTxManagerFromRPC,
+} from './factory'
 // Helper functions
 export {
   errorStr,
@@ -72,28 +93,6 @@ export {
   toJSON,
   verifySignature,
 } from './helpers'
-
-// Factory functions
-export {
-  // Generic factories
-  createTxManager,
-  createTxManagerFromBlockBodyData,
-  createTxManagerFromJSONRPCProvider,
-  createTxManagerFromRLP,
-  createTxManagerFromRPC,
-  // Type-specific factories
-  createAccessListTxManager,
-  createAccessListTxManagerFromRLP,
-  createBlobTxManager,
-  createBlobTxManagerFromRLP,
-  createDynamicFeeTxManager,
-  createDynamicFeeTxManagerFromRLP,
-  createLegacyTxManager,
-  createLegacyTxManagerFromBytesArray,
-  createLegacyTxManagerFromRLP,
-  createSetCodeTxManager,
-  createSetCodeTxManagerFromRLP,
-} from './factory'
 // Signer factory functions
 export {
   latestSigner,

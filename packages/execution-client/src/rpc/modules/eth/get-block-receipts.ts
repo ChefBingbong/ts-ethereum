@@ -59,8 +59,7 @@ export const getBlockReceipts = (node: ExecutionNode) => {
           const effectiveGasPrice = isFeeMarketTxManager(tx)
             ? tx.maxPriorityFeePerGas! <
               tx.maxFeePerGas! - block.header.baseFeePerGas!
-              ? tx.maxPriorityFeePerGas! +
-                block.header.baseFeePerGas!
+              ? tx.maxPriorityFeePerGas! + block.header.baseFeePerGas!
               : tx.maxFeePerGas!
             : tx.gasPrice
 

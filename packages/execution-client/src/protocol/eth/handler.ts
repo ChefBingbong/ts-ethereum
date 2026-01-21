@@ -545,36 +545,34 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
     )
 
     // Wait for response
-    const promise = new Promise<[bigint, TxManager[]]>(
-      (resolve, reject) => {
-        const timeout = setTimeout(() => {
-          if (this.resolvers.has(reqId)) {
-            this.resolvers.delete(reqId)
-            this.inFlightRequests.delete(requestKey)
-            reject(
-              new Error(
-                `GET_POOLED_TRANSACTIONS request timed out (reqId=${reqId})`,
-              ),
-            )
-          }
-        }, this.timeout)
+    const promise = new Promise<[bigint, TxManager[]]>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (this.resolvers.has(reqId)) {
+          this.resolvers.delete(reqId)
+          this.inFlightRequests.delete(requestKey)
+          reject(
+            new Error(
+              `GET_POOLED_TRANSACTIONS request timed out (reqId=${reqId})`,
+            ),
+          )
+        }
+      }, this.timeout)
 
-        this.resolvers.set(reqId, {
-          resolve: (value: unknown) => {
-            clearTimeout(timeout)
-            this.inFlightRequests.delete(requestKey)
-            const result = value as [bigint, TxManager[]]
-            resolve(result)
-          },
-          reject: (err) => {
-            clearTimeout(timeout)
-            this.inFlightRequests.delete(requestKey)
-            reject(err)
-          },
-          timeout,
-        })
-      },
-    )
+      this.resolvers.set(reqId, {
+        resolve: (value: unknown) => {
+          clearTimeout(timeout)
+          this.inFlightRequests.delete(requestKey)
+          const result = value as [bigint, TxManager[]]
+          resolve(result)
+        },
+        reject: (err) => {
+          clearTimeout(timeout)
+          this.inFlightRequests.delete(requestKey)
+          reject(err)
+        },
+        timeout,
+      })
+    })
 
     this.inFlightRequests.set(requestKey, promise)
     return promise

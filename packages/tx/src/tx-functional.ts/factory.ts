@@ -19,13 +19,13 @@ import {
 
 import type {
   AccessListBytes,
-  TxOptions,
-  TypedTxData,
   AccessList2930TxData as InputAccessList2930TxData,
   BlobEIP4844TxData as InputBlobEIP4844TxData,
   EOACode7702TxData as InputEOACode7702TxData,
   FeeMarketEIP1559TxData as InputFeeMarket1559TxData,
   LegacyTxData as InputLegacyTxData,
+  TxOptions,
+  TypedTxData,
 } from '../types'
 import {
   isAccessList2930TxData,
