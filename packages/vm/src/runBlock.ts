@@ -829,7 +829,8 @@ async function applyTransactions(
         gasUsed: txRes.totalGasSpent.toString(),
         cumulativeGasUsed: gasUsed.toString(),
         // status is only on PostByzantiumTxReceipt, stateRoot on PreByzantiumTxReceipt
-        status: 'status' in txRes.receipt ? txRes.receipt.status : 'pre-byzantium',
+        status:
+          'status' in txRes.receipt ? txRes.receipt.status : 'pre-byzantium',
         logsCount: txRes.receipt.logs.length,
       })
     }
