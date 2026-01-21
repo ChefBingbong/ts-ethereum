@@ -5,7 +5,7 @@ import {
   DBSetHashToNumber,
   DBSetTD,
 } from '@ts-ethereum/blockchain'
-import { RustBN254 } from '@ts-ethereum/evm'
+import { MCLBLS, RustBN254 } from '@ts-ethereum/evm'
 import { createMPT } from '@ts-ethereum/mpt'
 import {
   Caches,
@@ -220,6 +220,7 @@ export class VMExecution extends Execution {
       evmOpts: {
         common: this.config.hardforkManager,
         bn254: new RustBN254(rustBN),
+        bls: new MCLBLS(mcl),
       },
     })
     this.vm = this.merkleVM

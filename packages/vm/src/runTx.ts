@@ -233,6 +233,20 @@ export async function runTx(vm: VM, opts: RunTxOpts): Promise<RunTxResult> {
 
     const castedTx = opts.tx as AccessList2930Tx
 
+    // DEBUG: Log access list for deposit contract transactions
+    const txTo = opts.tx.to?.toString().toLowerCase()
+    const isDepositTx = txTo === '0x00000000219ab540356cbb839cbe05303d7705fa'
+    if (isDepositTx && castedTx.accessList.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG] Deposit tx access list:`, {
+        accessListLength: castedTx.accessList.length,
+        entries: castedTx.accessList.map((item) => ({
+          address: bytesToUnprefixedHex(item[0]),
+          slotsCount: item[1].length,
+        })),
+      })
+    }
+
     for (const accessListItem of castedTx.accessList) {
       const [addressBytes, slotBytesList] = accessListItem
       const address = bytesToUnprefixedHex(addressBytes)

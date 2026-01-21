@@ -332,7 +332,7 @@ export class Interpreter {
       // chunk in the witness, and throw appropriate error to distinguish from an actual invalid opcode
       if (
         opCode === 0xfe &&
-        this.common.isEIPActiveAtHardfork(7864, this.fork) &&
+        this.common.isEIPActiveAtHardfork(6800, this.fork) &&
         // is this a code loaded from state using witnesses
         this._runState.env.chargeCodeAccesses === true
       ) {
@@ -422,8 +422,7 @@ export class Interpreter {
       }
 
       if (
-        (this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-          this.common.isEIPActiveAtHardfork(7864, this.fork)) &&
+        this.common.isEIPActiveAtHardfork(6800, this.fork) &&
         this._env.chargeCodeAccesses === true
       ) {
         const contract = this._runState.interpreter.getAddress()

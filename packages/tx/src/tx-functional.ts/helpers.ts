@@ -236,7 +236,7 @@ export function getIntrinsicGas(tx: FrozenTx): bigint {
   }
 
   if (
-    tx.common.hardforkGte(Hardfork.Homestead, hardfork) &&
+    tx.common.hardforkGte(hardfork, Hardfork.Homestead) &&
     isContractCreation
   ) {
     const txCreationFee = tx.common.getParamAtHardfork(

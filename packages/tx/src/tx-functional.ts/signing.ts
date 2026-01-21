@@ -6,7 +6,6 @@
  * - SignNewTx(privateKey, signer, txData) -> creates and signs in one step
  * - Sender(signer, tx) -> recovers sender address (with caching)
  */
-
 import type { Address } from '@ts-ethereum/utils'
 import { secp256k1 } from 'ethereum-cryptography/secp256k1'
 import type { Signer, TxManager } from './types'

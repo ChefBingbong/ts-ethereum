@@ -99,7 +99,7 @@ export function getIntrinsicGas(tx: LegacyTxInterface): bigint {
     isContractCreation = false
   }
   if (
-    tx.common.hardforkGte(Hardfork.Homestead, hardfork) &&
+    tx.common.hardforkGte(hardfork, Hardfork.Homestead) &&
     isContractCreation
   ) {
     const txCreationFee = tx.common.getParamAtHardfork(
@@ -108,6 +108,7 @@ export function getIntrinsicGas(tx: LegacyTxInterface): bigint {
     )!
     if (txCreationFee) fee += txCreationFee
   }
+
   return fee
 }
 
@@ -153,7 +154,7 @@ export function validateHighS(tx: LegacyTxInterface): void {
   const hardfork = tx.fork
   const { s } = tx
   if (
-    tx.common.hardforkGte(Hardfork.Homestead, hardfork) &&
+    tx.common.hardforkGte(hardfork, Hardfork.Homestead) &&
     s !== undefined &&
     s > SECP256K1_ORDER_DIV_2
   ) {
@@ -318,7 +319,7 @@ export function sign(
   let hackApplied = false
   if (
     tx.type === TransactionType.Legacy &&
-    tx.common.hardforkGte(Hardfork.SpuriousDragon, hardfork) &&
+    tx.common.hardforkGte(hardfork, Hardfork.SpuriousDragon) &&
     !tx.supports(Capability.EIP155ReplayProtection)
   ) {
     ;(tx as LegacyTx)['activeCapabilities'].push(

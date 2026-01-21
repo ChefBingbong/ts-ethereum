@@ -108,10 +108,7 @@ export const dynamicGasBalance: AsyncDynamicGasHandler = async (
   const hardfork = runState.interpreter.fork
   const address = createAddressFromStackBigInt(runState.stack.peek()[0])
   let charge2929Gas = true
-  if (
-    common.isEIPActiveAtHardfork(6800, hardfork) ||
-    common.isEIPActiveAtHardfork(7864, hardfork)
-  ) {
+  if (common.isEIPActiveAtHardfork(6800, hardfork)) {
     const coldAccessGas =
       runState.env.accessWitness!.readAccountBasicData(address)
     gas += coldAccessGas
@@ -163,8 +160,7 @@ export const dynamicGasCodecopy: AsyncDynamicGasHandler = async (
       divCeil(dataLength, BIGINT_32)
 
     if (
-      (common.isEIPActiveAtHardfork(6800, hardfork) ||
-        common.isEIPActiveAtHardfork(7864, hardfork)) &&
+      common.isEIPActiveAtHardfork(6800, hardfork) &&
       runState.env.chargeCodeAccesses === true
     ) {
       const contract = runState.interpreter.getAddress()
@@ -195,8 +191,7 @@ export const dynamicGasExtcodesize: AsyncDynamicGasHandler = async (
 
   let charge2929Gas = true
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(address) === undefined &&
     !address.equals(
       createAddressFromStackBigInt(
@@ -241,8 +236,7 @@ export const dynamicGasExtcodecopy: AsyncDynamicGasHandler = async (
 
   let charge2929Gas = true
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(address) === undefined &&
     !address.equals(
       createAddressFromStackBigInt(
@@ -274,10 +268,7 @@ export const dynamicGasExtcodecopy: AsyncDynamicGasHandler = async (
       common.getParamAtHardfork('copyGas', hardfork)! *
       divCeil(dataLength, BIGINT_32)
 
-    if (
-      common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)
-    ) {
+    if (common.isEIPActiveAtHardfork(6800, hardfork)) {
       let codeEnd = _codeOffset + dataLength
       const codeSize = BigInt(
         (await runState.stateManager.getCode(address)).length,
@@ -335,8 +326,7 @@ export const dynamicGasExtcodehash: AsyncDynamicGasHandler = async (
   let charge2929Gas = true
 
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(address) === undefined &&
     !address.equals(
       createAddressFromStackBigInt(
@@ -413,10 +403,7 @@ export const dynamicGasSload: AsyncDynamicGasHandler = async (
   const keyBuf = setLengthLeft(bigIntToBytes(key), 32)
 
   let charge2929Gas = true
-  if (
-    common.isEIPActiveAtHardfork(6800, hardfork) ||
-    common.isEIPActiveAtHardfork(7864, hardfork)
-  ) {
+  if (common.isEIPActiveAtHardfork(6800, hardfork)) {
     const address = runState.interpreter.getAddress()
     const coldAccessGas = runState.env.accessWitness!.readAccountStorage(
       address,
@@ -475,10 +462,7 @@ export const dynamicGasSstore: AsyncDynamicGasHandler = async (
   )
 
   let charge2929Gas = true
-  if (
-    common.isEIPActiveAtHardfork(6800, hardfork) ||
-    common.isEIPActiveAtHardfork(7864, hardfork)
-  ) {
+  if (common.isEIPActiveAtHardfork(6800, hardfork)) {
     const contract = runState.interpreter.getAddress()
     const coldAccessGas = runState.env.accessWitness!.writeAccountStorage(
       contract,
@@ -667,8 +651,7 @@ export const dynamicGasCall: AsyncDynamicGasHandler = async (
 
   let charge2929Gas = true
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(toAddress) === undefined
   ) {
     const coldAccessGas =
@@ -702,11 +685,7 @@ export const dynamicGasCall: AsyncDynamicGasHandler = async (
     )
   }
 
-  if (
-    value !== BIGINT_0 &&
-    !common.isEIPActiveAtHardfork(6800, hardfork) &&
-    !common.isEIPActiveAtHardfork(7864, hardfork)
-  ) {
+  if (value !== BIGINT_0 && !common.isEIPActiveAtHardfork(6800, hardfork)) {
     gas += common.getParamAtHardfork('callValueTransferGas', hardfork)!
   }
 
@@ -767,8 +746,7 @@ export const dynamicGasCallcode: AsyncDynamicGasHandler = async (
 
   let charge2929Gas = true
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(toAddress) === undefined
   ) {
     const coldAccessGas =
@@ -843,8 +821,7 @@ export const dynamicGasDelegatecall: AsyncDynamicGasHandler = async (
 
   let charge2929Gas = true
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(toAddress) === undefined
   ) {
     const coldAccessGas =
@@ -1068,8 +1045,7 @@ export const dynamicGasStaticcall: AsyncDynamicGasHandler = async (
   let charge2929Gas = true
   const toAddress = createAddressFromStackBigInt(toAddr)
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.interpreter._evm.getPrecompile(toAddress) === undefined
   ) {
     const coldAccessGas =
@@ -1218,8 +1194,7 @@ export const dynamicGasSelfdestruct: AsyncDynamicGasHandler = async (
 
   let selfDestructToCharge2929Gas = true
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.env.chargeCodeAccesses === true
   ) {
     gas += runState.env.accessWitness!.readAccountBasicData(contractAddress)

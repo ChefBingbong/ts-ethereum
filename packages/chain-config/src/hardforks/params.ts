@@ -327,6 +327,12 @@ export const EIP4200_PARAMS = {
   rjumpvGas: 4n,
 } as const
 
+export const EIP6800_PARAMS = {
+  // gasPrices
+  createGas: 1000n, // Base fee of the CREATE opcode
+  coldsloadGas: 0n, // Gas cost of the first read of storage from a given location (per transaction)
+} as const
+
 export const EIP4750_PARAMS = {
   callfGas: 5n,
   retfGas: 3n,
@@ -450,6 +456,7 @@ export const EIP_PARAMS = {
   [EIP.EIP_4200]: EIP4200_PARAMS,
   [EIP.EIP_4750]: EIP4750_PARAMS,
   [EIP.EIP_6206]: EIP6206_PARAMS,
+  [EIP.EIP_6800]: EIP6800_PARAMS,
   [EIP.EIP_7002]: EIP7002_PARAMS,
   [EIP.EIP_7069]: EIP7069_PARAMS,
   [EIP.EIP_7251]: EIP7251_PARAMS,
@@ -543,7 +550,8 @@ type _Berlin = Merge<_BerlinWith2929, typeof EIP2930_PARAMS>
 // London merges multiple EIPs
 type _LondonBase = Merge<_Berlin, typeof EIP1559_PARAMS>
 type _LondonWith3198 = Merge<_LondonBase, typeof EIP3198_PARAMS>
-type _London = Merge<_LondonWith3198, typeof EIP3529_PARAMS>
+type _LondonWith6800 = Merge<_LondonWith3198, typeof EIP6800_PARAMS>
+type _London = Merge<_LondonWith6800, typeof EIP3529_PARAMS>
 
 type _ArrowGlacier = Merge<_London, typeof EIP4345_PARAMS>
 type _GrayGlacier = Merge<_ArrowGlacier, typeof EIP5133_PARAMS>
