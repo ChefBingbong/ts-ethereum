@@ -3,7 +3,6 @@
  * Modifies SSTORE gas calculation starting in Istanbul
  */
 
-import { Hardfork } from '@ts-ethereum/chain-config'
 import {
   BIGINT_0,
   bigIntToBytes,
@@ -14,10 +13,16 @@ import { EVMError } from '../../errors'
 import { Op } from '../constants'
 import type { AsyncDynamicGasHandler, JumpTable } from '../types'
 import { setLengthLeftStorage, trap } from '../util'
-import { accessStorageEIP2929, adjustSstoreGasEIP2929 } from './eip-2929'
 
 /**
- * Dynamic gas handler for SSTORE with EIP-2200 (Istanbul)
+ * Dynamic gas handler for SSTORE with EIP-2200 (Istanbul) + EIP-2929 (Berlin)
+ *
+ * This follows go-ethereum's approach: check cold access FIRST and add the cost
+ * upfront so all code paths include it.
+ *
+ * EIP-2929 modifies EIP-2200 parameters:
+ * - SLOAD_GAS (800) -> WARM_STORAGE_READ_COST (100)
+ * - SSTORE_RESET_GAS (5000) -> 5000 - COLD_SLOAD_COST (2900)
  */
 const dynamicGasSstoreEIP2200: AsyncDynamicGasHandler = async (
   runState,
@@ -46,76 +51,83 @@ const dynamicGasSstoreEIP2200: AsyncDynamicGasHandler = async (
   // Normalize value to 32 bytes for comparison
   const normalizedValue = setLengthLeftStorage(value)
   const hardfork = runState.interpreter.fork
-  const eip2200Hardfork = common.getHardforkForEIP(2200) ?? Hardfork.Istanbul
 
   // Fail if not enough gas is left
   if (
     runState.interpreter.getGasLeft() <=
-    common.getParamAtHardfork('sstoreSentryEIP2200Gas', eip2200Hardfork)!
+    common.getParamAtHardfork('sstoreSentryEIP2200Gas', hardfork)!
   ) {
     trap(EVMError.errorMessages.OUT_OF_GAS)
   }
 
-  // Noop
-  if (equalsBytes(currentStorage, normalizedValue)) {
-    const sstoreNoopCost = common.getParamAtHardfork(
-      'sstoreNoopEIP2200Gas',
-      eip2200Hardfork,
-    )!
-    return (
-      gas +
-      adjustSstoreGasEIP2929(
-        runState,
-        keyBytes,
-        sstoreNoopCost,
-        'noop',
-        common,
-        hardfork,
-      )
+  // EIP-2929: Check cold access FIRST and add cost upfront (like go-ethereum)
+  // This ensures ALL code paths include the cold access gas
+  let coldAccessCost = BIGINT_0
+  if (common.isEIPActiveAtHardfork(2929, hardfork)) {
+    const address = runState.interpreter.getAddress().bytes
+    const slotIsCold = !runState.interpreter.journal.isWarmedStorage(
+      address,
+      keyBytes,
     )
+    if (slotIsCold) {
+      runState.interpreter.journal.addWarmedStorage(address, keyBytes)
+      if (!common.isEIPActiveAtHardfork(6800, hardfork)) {
+        coldAccessCost = common.getParamAtHardfork('coldsloadGas', hardfork)!
+      }
+    }
+  }
+
+  // Get gas values - params are already adjusted for EIP-2929 when hardfork >= Berlin
+  // Pre-Berlin: sstoreNoopEIP2200Gas = 800, sstoreCleanEIP2200Gas = 5000
+  // Berlin+: sstoreNoopEIP2200Gas = 100 (warmStorageReadCost), sstoreCleanEIP2200Gas = 2900
+  const warmStorageReadCost = common.getParamAtHardfork(
+    'sstoreNoopEIP2200Gas',
+    hardfork,
+  )!
+  const sstoreResetGas = common.getParamAtHardfork(
+    'sstoreCleanEIP2200Gas',
+    hardfork,
+  )!
+
+  // Noop (1): current == value
+  if (equalsBytes(currentStorage, normalizedValue)) {
+    // EIP-2929: return cost + WARM_STORAGE_READ_COST
+    return gas + coldAccessCost + warmStorageReadCost
   }
 
   if (equalsBytes(originalStorage, currentStorage)) {
-    // Create slot
+    // Create slot (2.1.1): original == current && original == 0
     if (originalStorage.length === 0) {
       return (
         gas +
-        common.getParamAtHardfork('sstoreInitEIP2200Gas', eip2200Hardfork)!
+        coldAccessCost +
+        common.getParamAtHardfork('sstoreInitEIP2200Gas', hardfork)!
       )
     }
-    // Delete slot
+    // Delete slot (2.1.2b): original == current && value == 0
     if (normalizedValue.length === 0) {
       runState.interpreter.refundGas(
-        common.getParamAtHardfork(
-          'sstoreClearRefundEIP2200Gas',
-          eip2200Hardfork,
-        )!,
+        common.getParamAtHardfork('sstoreClearRefundEIP2200Gas', hardfork)!,
         'EIP-2200 -> sstoreClearRefundEIP2200',
       )
     }
-    // Write existing slot
-    return (
-      gas + common.getParamAtHardfork('sstoreCleanEIP2200Gas', eip2200Hardfork)!
-    )
+    // Write existing slot (2.1.2): original == current
+    // EIP-2929: return cost + (SSTORE_RESET_GAS - COLD_SLOAD_COST)
+    return gas + coldAccessCost + sstoreResetGas
   }
 
+  // Dirty updates (2.2): original != current
   if (originalStorage.length > 0) {
     if (currentStorage.length === 0) {
-      // Recreate slot
+      // Recreate slot (2.2.1.1)
       runState.interpreter.subRefund(
-        common.getParamAtHardfork(
-          'sstoreClearRefundEIP2200Gas',
-          eip2200Hardfork,
-        )!,
+        common.getParamAtHardfork('sstoreClearRefundEIP2200Gas', hardfork)!,
         'EIP-2200 -> sstoreClearRefundEIP2200',
       )
     } else if (normalizedValue.length === 0) {
-      // Delete slot
+      // Delete slot (2.2.1.2)
       runState.interpreter.refundGas(
-        common.getParamAtHardfork(
-          'sstoreClearRefundEIP2200Gas',
-          eip2200Hardfork,
-        )!,
+        common.getParamAtHardfork('sstoreClearRefundEIP2200Gas', hardfork)!,
         'EIP-2200 -> sstoreClearRefundEIP2200',
       )
     }
@@ -123,84 +135,28 @@ const dynamicGasSstoreEIP2200: AsyncDynamicGasHandler = async (
 
   if (equalsBytes(originalStorage, normalizedValue)) {
     if (originalStorage.length === 0) {
-      // Reset to original non-existent slot
-      // Refund = sstoreInitEIP2200Gas - sstoreNoopEIP2200Gas = 20000 - 800 = 19200
+      // Reset to original non-existent slot (2.2.2.1)
+      // EIP-2929: Refund = SSTORE_SET_GAS - WARM_STORAGE_READ_COST
       const sstoreInitGas = common.getParamAtHardfork(
         'sstoreInitEIP2200Gas',
-        eip2200Hardfork,
+        hardfork,
       )!
-      const sstoreNoopGas = common.getParamAtHardfork(
-        'sstoreNoopEIP2200Gas',
-        eip2200Hardfork,
-      )!
-      const refund = sstoreInitGas - sstoreNoopGas
       runState.interpreter.refundGas(
-        adjustSstoreGasEIP2929(
-          runState,
-          keyBytes,
-          refund,
-          'initRefund',
-          common,
-          hardfork,
-        ),
+        sstoreInitGas - warmStorageReadCost,
         'EIP-2200 -> initRefund',
       )
     } else {
-      // Reset to original existing slot
-      // Refund = sstoreCleanEIP2200Gas - sstoreNoopEIP2200Gas = 5000 - 800 = 4200
-      const sstoreCleanGas = common.getParamAtHardfork(
-        'sstoreCleanEIP2200Gas',
-        eip2200Hardfork,
-      )!
-      const sstoreNoopGas = common.getParamAtHardfork(
-        'sstoreNoopEIP2200Gas',
-        eip2200Hardfork,
-      )!
-      const refund = sstoreCleanGas - sstoreNoopGas
+      // Reset to original existing slot (2.2.2.2)
+      // EIP-2929: Refund = (SSTORE_RESET_GAS - COLD_SLOAD_COST) - WARM_STORAGE_READ_COST
       runState.interpreter.refundGas(
-        adjustSstoreGasEIP2929(
-          runState,
-          keyBytes,
-          refund,
-          'cleanRefund',
-          common,
-          hardfork,
-        ),
+        sstoreResetGas - warmStorageReadCost,
         'EIP-2200 -> cleanRefund',
       )
     }
   }
 
-  // Dirty update (returns SloadGasEIP2200 which equals sstoreNoopEIP2200Gas)
-  gas += common.getParamAtHardfork('sstoreNoopEIP2200Gas', eip2200Hardfork)!
-
-  // EIP-2929: Add warm/cold storage access gas
-  let charge2929Gas = true
-  if (
-    common.isEIPActiveAtHardfork(6800, hardfork) ||
-    common.isEIPActiveAtHardfork(7864, hardfork)
-  ) {
-    const contract = runState.interpreter.getAddress()
-    const coldAccessGas = runState.env.accessWitness!.writeAccountStorage(
-      contract,
-      key,
-    )
-    gas += coldAccessGas
-    charge2929Gas = coldAccessGas === BIGINT_0
-  }
-
-  if (common.isEIPActiveAtHardfork(2929, hardfork)) {
-    gas += accessStorageEIP2929(
-      runState,
-      keyBytes,
-      true,
-      common,
-      hardfork,
-      charge2929Gas,
-    )
-  }
-
-  return gas
+  // Dirty update (2.2): return cost + WARM_STORAGE_READ_COST
+  return gas + coldAccessCost + warmStorageReadCost
 }
 
 /**

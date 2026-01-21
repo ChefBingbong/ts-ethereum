@@ -5,7 +5,7 @@ import {
   DBSetHashToNumber,
   DBSetTD,
 } from '@ts-ethereum/blockchain'
-import { RustBN254 } from '@ts-ethereum/evm'
+import { MCLBLS, RustBN254 } from '@ts-ethereum/evm'
 import { createMPT } from '@ts-ethereum/mpt'
 import {
   Caches,
@@ -16,8 +16,8 @@ import {
   BIGINT_0,
   BIGINT_1,
   bytesToHex,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   hexToBytes,
   Lock,
   type PrefixedHexString,
@@ -25,8 +25,8 @@ import {
 } from '@ts-ethereum/utils'
 import {
   createVM,
-  type RunBlockOpts,
   runBlock,
+  type RunBlockOpts,
   runTx,
   type TxReceipt,
   type VM,
@@ -220,6 +220,7 @@ export class VMExecution extends Execution {
       evmOpts: {
         common: this.config.hardforkManager,
         bn254: new RustBN254(rustBN),
+        bls: new MCLBLS(mcl),
       },
     })
     this.vm = this.merkleVM

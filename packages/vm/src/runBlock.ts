@@ -156,6 +156,20 @@ export async function runBlock(
     await stateManager.setStateRoot(root, clearCache)
   }
 
+  // DEBUG: Log state and hardfork info for blocks 130-140
+  if (block.header.number >= 130n && block.header.number <= 140n) {
+    const currentStateRoot = await stateManager.getStateRoot()
+    // eslint-disable-next-line no-console
+    console.log(`[DEBUG] Block ${block.header.number} execution start:`, {
+      hardfork: blockHardfork,
+      blockTimestamp: block.header.timestamp.toString(),
+      stateRootBefore: bytesToHex(currentStateRoot),
+      providedRoot: root ? bytesToHex(root) : 'none',
+      txCount: block.transactions.length,
+      gasLimit: block.header.gasLimit.toString(),
+    })
+  }
+
   if (vm.hardforkManager.isEIPActiveAtHardfork(7864, blockHardfork)) {
     // Initialize the access witness
 
@@ -801,6 +815,24 @@ async function applyTransactions(
     receipts.push(txRes.receipt)
     const encodedReceipt = encodeReceipt(txRes.receipt, tx.type)
     await receiptTrie!.put(RLP.encode(txIdx), encodedReceipt)
+
+    // DEBUG: Log receipt details for each transaction
+    if (block.header.number >= 130n && block.header.number <= 140n) {
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG] Block ${block.header.number} tx ${txIdx}:`, {
+        txHash: bytesToHex(tx.hash()),
+        txType: tx.type,
+        // Check if this is a contract creation
+        toAddress: tx.to ? tx.to.toString() : 'undefined',
+        toCreationAddress: tx.toCreationAddress(),
+        intrinsicGas: tx.getIntrinsicGas().toString(),
+        gasUsed: txRes.totalGasSpent.toString(),
+        cumulativeGasUsed: gasUsed.toString(),
+        // status is only on PostByzantiumTxReceipt, stateRoot on PreByzantiumTxReceipt
+        status: 'status' in txRes.receipt ? txRes.receipt.status : 'pre-byzantium',
+        logsCount: txRes.receipt.logs.length,
+      })
+    }
   }
 
   if (enableProfiler) {
@@ -810,6 +842,19 @@ async function applyTransactions(
 
   const receiptsRoot =
     receiptTrie !== undefined ? receiptTrie.root() : KECCAK256_RLP
+
+  // DEBUG: Log receipt root comparison for blocks 130-140
+  if (block.header.number >= 130n && block.header.number <= 140n) {
+    // eslint-disable-next-line no-console
+    console.log(`[DEBUG] Block ${block.header.number} receipts:`, {
+      txCount: block.transactions.length,
+      computedReceiptsRoot: bytesToHex(receiptsRoot),
+      expectedReceiptsRoot: bytesToHex(block.header.receiptTrie),
+      match: bytesToHex(receiptsRoot) === bytesToHex(block.header.receiptTrie),
+      totalGasUsed: gasUsed.toString(),
+      expectedGasUsed: block.header.gasUsed.toString(),
+    })
+  }
 
   return {
     bloom,

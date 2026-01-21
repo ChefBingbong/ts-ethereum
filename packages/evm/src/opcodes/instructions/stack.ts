@@ -36,8 +36,7 @@ export const opPush: ExecuteFunc = (
   const numToPush = runState.opCode - 0x5f
   const hardfork = runState.interpreter.fork
   if (
-    (common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)) &&
+    common.isEIPActiveAtHardfork(6800, hardfork) &&
     runState.env.chargeCodeAccesses === true
   ) {
     const contract = runState.interpreter.getAddress()

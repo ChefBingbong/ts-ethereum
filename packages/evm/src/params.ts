@@ -242,6 +242,11 @@ export const paramsEVM: ParamsDict = {
     bls12381MapG1Gas: 5500, // Gas cost of BLS12-381 map field element to G1
     bls12381MapG2Gas: 23800, // Gas cost of BLS12-381 map field element to G2
   },
+  6800: {
+    // gasPrices
+    createGas: 1000, // Base fee of the CREATE opcode
+    coldsloadGas: 0, // Gas cost of the first read of storage from a given location (per transaction)
+  },
   /**
 .  * Gas cost increases for state access opcodes
 .  */

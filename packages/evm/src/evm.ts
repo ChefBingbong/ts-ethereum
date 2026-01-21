@@ -9,8 +9,8 @@ import {
   bigIntToBytes,
   bytesToUnprefixedHex,
   createZeroAddress,
-  EthereumJSErrorWithoutCode,
   equalsBytes,
+  EthereumJSErrorWithoutCode,
   generateAddress,
   generateAddress2,
   KECCAK256_NULL,
@@ -273,12 +273,12 @@ export class EVM implements EVMInterface {
     // Resolve hardfork using helper method
     this.fork = opts.common.getHardforkFromContext(opts.hardfork)
 
-    if (this.common.isEIPActiveAtHardfork(7864, this.fork)) {
+    if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
       const mandatory = ['checkChunkWitnessPresent']
       for (const m of mandatory) {
         if (!(m in this.stateManager)) {
           throw EthereumJSErrorWithoutCode(
-            `State manager used must implement ${m} if Binary Trees (EIP-7864) is activated`,
+            `State manager used must implement ${m} if Binary Trees (EIP-6800) is activated`,
           )
         }
       }
@@ -384,10 +384,10 @@ export class EVM implements EVMInterface {
     let gasLimit = message.gasLimit
     const fromAddress = message.caller
 
-    if (this.common.isEIPActiveAtHardfork(7864, this.fork)) {
+    if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
       if (message.accessWitness === undefined) {
         throw EthereumJSErrorWithoutCode(
-          'accessWitness is required for EIP-7864',
+          'accessWitness is required for EIP-6800',
         )
       }
       const sendsValue = message.value !== BIGINT_0
@@ -454,10 +454,7 @@ export class EVM implements EVMInterface {
     // Load `to` account
     let toAccount = await this.stateManager.getAccount(message.to)
     if (!toAccount) {
-      if (
-        this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-        this.common.isEIPActiveAtHardfork(7864, this.fork)
-      ) {
+      if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
         const absenceProofAccessGas = message.accessWitness!.readAccountHeader(
           message.to,
         )
@@ -576,10 +573,7 @@ export class EVM implements EVMInterface {
     let gasLimit = message.gasLimit
     const fromAddress = message.caller
 
-    if (
-      this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-      this.common.isEIPActiveAtHardfork(7864, this.fork)
-    ) {
+    if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
       if (message.depth === 0) {
         const originAccessGas =
           message.accessWitness!.readAccountHeader(fromAddress)
@@ -634,10 +628,7 @@ export class EVM implements EVMInterface {
       toAccount = new Account()
     }
 
-    if (
-      this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-      this.common.isEIPActiveAtHardfork(7864, this.fork)
-    ) {
+    if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
       const contractCreateAccessGas =
         message.accessWitness!.writeAccountBasicData(message.to) +
         message.accessWitness!.readAccountCodeHash(message.to)
@@ -725,10 +716,7 @@ export class EVM implements EVMInterface {
     }
 
     if (exit) {
-      if (
-        this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-        this.common.isEIPActiveAtHardfork(7864, this.fork)
-      ) {
+      if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
         const createCompleteAccessGas =
           message.accessWitness!.writeAccountHeader(message.to)
         gasLimit -= createCompleteAccessGas
@@ -872,8 +860,7 @@ export class EVM implements EVMInterface {
     gasLimit = message.gasLimit - result.executionGasUsed
     if (
       !result.exceptionError &&
-      (this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-        this.common.isEIPActiveAtHardfork(7864, this.fork))
+      this.common.isEIPActiveAtHardfork(6800, this.fork)
     ) {
       const createCompleteAccessGas = message.accessWitness!.writeAccountHeader(
         message.to,
@@ -902,10 +889,7 @@ export class EVM implements EVMInterface {
       result.returnValue.length !== 0
     ) {
       // Add access charges for writing this code to the state
-      if (
-        this.common.isEIPActiveAtHardfork(6800, this.fork) ||
-        this.common.isEIPActiveAtHardfork(7864, this.fork)
-      ) {
+      if (this.common.isEIPActiveAtHardfork(6800, this.fork)) {
         const byteCodeWriteAccessfee =
           message.accessWitness!.writeAccountCodeChunks(
             message.to,

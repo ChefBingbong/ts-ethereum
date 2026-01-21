@@ -54,10 +54,7 @@ export const opBlockhash: ExecuteFunc = async (
     )!
     const key = setLengthLeft(bigIntToBytes(number % historyServeWindow), 32)
 
-    if (
-      common.isEIPActiveAtHardfork(6800, hardfork) ||
-      common.isEIPActiveAtHardfork(7864, hardfork)
-    ) {
+    if (common.isEIPActiveAtHardfork(6800, hardfork)) {
       // create witnesses and charge gas
       const statelessGas = runState.env.accessWitness!.readAccountStorage(
         historyAddress,
