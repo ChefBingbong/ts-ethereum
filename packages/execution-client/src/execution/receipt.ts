@@ -1,6 +1,6 @@
 import type { Block } from '@ts-ethereum/block'
 import { RLP } from '@ts-ethereum/rlp'
-import type { TransactionType, TypedTransaction } from '@ts-ethereum/tx'
+import type { TransactionType, TxManager } from '@ts-ethereum/tx'
 import {
   bigIntToBytes,
   bytesToBigInt,
@@ -51,7 +51,7 @@ type GetReceiptByTxHashReturn = [
 type GetLogsReturn = {
   log: Log
   block: Block
-  tx: TypedTransaction
+  tx: TxManager
   txIndex: number
   logIndex: number
 }[]

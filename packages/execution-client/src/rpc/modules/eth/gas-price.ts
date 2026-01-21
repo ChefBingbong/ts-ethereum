@@ -1,8 +1,4 @@
-import {
-  Capability,
-  type FeeMarket1559Tx,
-  type LegacyTx,
-} from '@ts-ethereum/tx'
+import { Capability, isFeeMarketTxManager } from '@ts-ethereum/tx'
 import { BIGINT_0, bigIntToHex, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { createRpcMethod } from '../../validation'
@@ -26,11 +22,11 @@ export const gasPrice = (node: ExecutionNode) => {
       for (const tx of block.transactions) {
         // Handle both legacy and EIP-1559 transactions
         let txGasPrice: bigint
-        if (tx.supports(Capability.EIP1559FeeMarket)) {
+        if (isFeeMarketTxManager(tx)) {
           // For EIP-1559 txs, use maxFeePerGas as proxy for gas price
-          txGasPrice = (tx as FeeMarket1559Tx).maxFeePerGas
+          txGasPrice = tx.maxFeePerGas!
         } else {
-          txGasPrice = (tx as LegacyTx).gasPrice
+          txGasPrice = tx.gasPrice
         }
         gasPrice += txGasPrice
         txCount++

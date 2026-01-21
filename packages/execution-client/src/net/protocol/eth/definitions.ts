@@ -10,15 +10,15 @@ import {
 import { RLP } from '@ts-ethereum/rlp'
 import {
   createBlob4844TxFromSerializedNetworkWrapper,
-  createTxFromBlockBodyData,
-  createTxFromRLP,
-  isAccessList2930Tx,
-  isBlob4844Tx,
-  isEOACode7702Tx,
-  isFeeMarket1559Tx,
-  isLegacyTx,
+  createTxManagerFromBlockBodyData,
+  createTxManagerFromRLP,
+  isAccessListTxManager,
+  isBlobTxManager,
+  isEOACodeTxManager,
+  isFeeMarketTxManager,
+  isLegacyTxManager,
   TransactionType,
-  type TypedTransaction,
+  type TxManager,
 } from '@ts-ethereum/tx'
 import {
   bigIntToUnpaddedBytes,
@@ -180,11 +180,11 @@ export const ETH_MESSAGES = {
     type: EthMessageType.ANNOUNCEMENT,
     minVersion: ETH_PROTOCOL_VERSIONS.ETH62,
     description: 'Announce new transactions',
-    encode: (txs: TypedTransaction[]) => {
+    encode: (txs: TxManager[]) => {
       const serializedTxs = []
       for (const tx of txs) {
         // Don't automatically broadcast blob transactions - they should only be announced using NewPooledTransactionHashes
-        if (isBlob4844Tx(tx)) continue
+        if (isBlobTxManager(tx)) continue
         serializedTxs.push(tx.serialize())
       }
       return serializedTxs
@@ -212,7 +212,7 @@ export const ETH_MESSAGES = {
       //     config.chain?.headers.latest?.timestamp ??
       //     BigInt(Math.floor(Date.now() / 1000)),
       // })
-      return txs.map((txData) => createTxFromRLP(txData, { common }))
+      return txs.map((txData) => createTxManagerFromRLP(txData, { common }))
     },
   },
   [EthMessageCode.NEW_BLOCK]: {
@@ -483,27 +483,27 @@ export const ETH_MESSAGES = {
     type: EthMessageType.RESPONSE,
     minVersion: ETH_PROTOCOL_VERSIONS.ETH65,
     description: 'Response with pooled transactions',
-    encode: ({ reqId, txs }: { reqId: bigint; txs: TypedTransaction[] }) => {
+    encode: ({ reqId, txs }: { reqId: bigint; txs: TxManager[] }) => {
       const serializedTxs = []
       for (const tx of txs) {
         // serialize txs as per type
-        if (isBlob4844Tx(tx)) {
-          serializedTxs.push(tx.serializeNetworkWrapper())
+        if (isBlobTxManager(tx)) {
+          // For blob transactions, use serialize() - network wrapper handling is done separately
+          serializedTxs.push(tx.serialize())
         } else if (
-          isFeeMarket1559Tx(tx) ||
-          isAccessList2930Tx(tx) ||
-          isEOACode7702Tx(tx)
+          isFeeMarketTxManager(tx) ||
+          isAccessListTxManager(tx) ||
+          isEOACodeTxManager(tx)
         ) {
           serializedTxs.push(tx.serialize())
-        } else if (isLegacyTx(tx)) {
+        } else if (isLegacyTxManager(tx)) {
           serializedTxs.push(tx.raw())
         } else {
           // Dual use for this typeguard:
           // 1. to enable typescript to throw build errors if any tx is missing above
           // 2. to throw error in runtime if some corruption happens
-          exhaustiveTypeGuard(
-            tx,
-            `Invalid transaction type=${(tx as TypedTransaction).type}`,
+          throw EthereumJSErrorWithoutCode(
+            `Invalid transaction type=${tx.type}`,
           )
         }
       }
@@ -540,7 +540,7 @@ export const ETH_MESSAGES = {
               common,
             })
           } else {
-            return createTxFromBlockBodyData(txData, { common })
+            return createTxManagerFromBlockBodyData(txData, { common })
           }
         }),
       ]

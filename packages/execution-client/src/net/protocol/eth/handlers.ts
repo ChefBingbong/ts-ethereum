@@ -1,5 +1,5 @@
 import type { Block } from '@ts-ethereum/block'
-import type { TransactionType, TypedTransaction } from '@ts-ethereum/tx'
+import type { TransactionType, TxManager } from '@ts-ethereum/tx'
 import { concatBytes } from '@ts-ethereum/utils'
 import { encodeReceipt, type TxReceipt } from '@ts-ethereum/vm'
 import type { Chain } from '../../../blockchain/index'
@@ -100,7 +100,7 @@ export function handleNewBlockHashes(
  * Handle Transactions announcement
  */
 export async function handleTransactions(
-  data: TypedTransaction[],
+  data: TxManager[],
   peer: Peer,
   context: EthHandlerContext,
 ) {

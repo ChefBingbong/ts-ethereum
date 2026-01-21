@@ -1,9 +1,5 @@
 import type { Block } from '@ts-ethereum/block'
-import {
-  Capability,
-  type FeeMarket1559Tx,
-  type LegacyTx,
-} from '@ts-ethereum/tx'
+import { isFeeMarketTxManager } from '@ts-ethereum/tx'
 import {
   hexToBytes,
   isHexString,
@@ -60,13 +56,13 @@ export const getBlockReceipts = (node: ExecutionNode) => {
           ] as EIP4844BlobTxReceipt
 
           // Handle both legacy and EIP-1559 transactions
-          const effectiveGasPrice = tx.supports(Capability.EIP1559FeeMarket)
-            ? (tx as FeeMarket1559Tx).maxPriorityFeePerGas <
-              (tx as FeeMarket1559Tx).maxFeePerGas - block.header.baseFeePerGas!
-              ? (tx as FeeMarket1559Tx).maxPriorityFeePerGas +
+          const effectiveGasPrice = isFeeMarketTxManager(tx)
+            ? tx.maxPriorityFeePerGas! <
+              tx.maxFeePerGas! - block.header.baseFeePerGas!
+              ? tx.maxPriorityFeePerGas! +
                 block.header.baseFeePerGas!
-              : (tx as FeeMarket1559Tx).maxFeePerGas
-            : (tx as LegacyTx).gasPrice
+              : tx.maxFeePerGas!
+            : tx.gasPrice
 
           return toJSONRPCReceipt(
             r,

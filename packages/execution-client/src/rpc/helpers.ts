@@ -1,5 +1,5 @@
 import type { Block } from '@ts-ethereum/block'
-import type { JSONRPCTx, TypedTransaction } from '@ts-ethereum/tx'
+import type { JSONRPCTx, TxManager } from '@ts-ethereum/tx'
 import { BIGINT_0, bigIntToHex, bytesToHex, intToHex } from '@ts-ethereum/utils'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status.js'
@@ -11,7 +11,7 @@ import type { RPCError, RpcApiEnv } from './types'
  * Returns tx formatted to the standard JSON-RPC fields (legacy transactions only)
  */
 export const toJSONRPCTx = (
-  tx: TypedTransaction,
+  tx: TxManager,
   block?: Block,
   txIndex?: number,
 ): JSONRPCTx => {

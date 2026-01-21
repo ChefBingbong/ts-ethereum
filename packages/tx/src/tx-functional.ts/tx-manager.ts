@@ -1,10 +1,16 @@
 import type {
+  AccessListBytes,
   Capability,
   TransactionType,
   TxOptions,
   TxValuesArray,
 } from '../types'
+import { TransactionType as TxType } from '../types'
 import * as helpers from './helpers'
+import type { AccessListTxData } from './tx-access-list'
+import type { BlobTxData } from './tx-blob'
+import type { DynamicFeeTxData } from './tx-dynamic-fee'
+import type { SetCodeTxData } from './tx-set-code'
 import type { FrozenTx, Signer, TxData, TxManager } from './types'
 
 /**
@@ -142,7 +148,7 @@ export function createTxManagerFromTx<T extends TransactionType>(
 
     getIntrinsicGas: () => helpers.getIntrinsicGas(tx),
     getDataGas: () => helpers.getDataGas(tx),
-    getUpfrontCost: () => helpers.getUpfrontCost(tx),
+    getUpfrontCost: (baseFee?: bigint) => helpers.getUpfrontCost(tx, baseFee),
 
     // ============================================================================
     // Serialization
@@ -174,6 +180,78 @@ export function createTxManagerFromTx<T extends TransactionType>(
 
     toJSON: () => helpers.toJSON(tx),
     errorStr: () => helpers.errorStr(tx),
+
+    // ============================================================================
+    // Type-specific accessors
+    // ============================================================================
+
+    get gasPrice() {
+      return tx.inner.gasPrice()
+    },
+    get maxPriorityFeePerGas() {
+      if (
+        tx.inner.type === TxType.FeeMarketEIP1559 ||
+        tx.inner.type === TxType.BlobEIP4844 ||
+        tx.inner.type === TxType.EOACodeEIP7702
+      ) {
+        return (tx.inner as unknown as DynamicFeeTxData).maxPriorityFeePerGas
+      }
+      return undefined
+    },
+    get maxFeePerGas() {
+      if (
+        tx.inner.type === TxType.FeeMarketEIP1559 ||
+        tx.inner.type === TxType.BlobEIP4844 ||
+        tx.inner.type === TxType.EOACodeEIP7702
+      ) {
+        return (tx.inner as unknown as DynamicFeeTxData).maxFeePerGas
+      }
+      return undefined
+    },
+    get accessList(): AccessListBytes {
+      const list = tx.inner.accessList()
+      return list ?? []
+    },
+    get maxFeePerBlobGas() {
+      if (tx.inner.type === TxType.BlobEIP4844) {
+        return (tx.inner as unknown as BlobTxData).maxFeePerBlobGas
+      }
+      return undefined
+    },
+    get blobVersionedHashes() {
+      if (tx.inner.type === TxType.BlobEIP4844) {
+        return (tx.inner as unknown as BlobTxData).blobVersionedHashes
+      }
+      return undefined
+    },
+    numBlobs() {
+      if (tx.inner.type === TxType.BlobEIP4844) {
+        return (tx.inner as unknown as BlobTxData).blobVersionedHashes.length
+      }
+      return 0
+    },
+    get authorizationList(): import('@ts-ethereum/utils').EOACode7702AuthorizationListBytes | undefined {
+      if (tx.inner.type === TxType.EOACodeEIP7702) {
+        return (tx.inner as unknown as SetCodeTxData).authorizationList as import('@ts-ethereum/utils').EOACode7702AuthorizationListBytes
+      }
+      return undefined
+    },
+    getEffectivePriorityFee(baseFee?: bigint): bigint {
+      const fee = baseFee ?? 0n
+      if (
+        tx.inner.type === TxType.FeeMarketEIP1559 ||
+        tx.inner.type === TxType.BlobEIP4844 ||
+        tx.inner.type === TxType.EOACodeEIP7702
+      ) {
+        const inner = tx.inner as unknown as DynamicFeeTxData
+        // min(maxPriorityFeePerGas, maxFeePerGas - baseFee)
+        const maxPriority = inner.maxPriorityFeePerGas
+        const maxMinusBase = inner.maxFeePerGas - fee
+        return maxPriority < maxMinusBase ? maxPriority : maxMinusBase
+      }
+      // Legacy/access list - return gasPrice - baseFee
+      return tx.inner.gasPrice() - fee
+    },
   }
 
   return Object.freeze(manager)

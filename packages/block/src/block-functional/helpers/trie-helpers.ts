@@ -1,6 +1,6 @@
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import {
   EthereumJSErrorWithoutCode,
   equalsBytes,
@@ -16,7 +16,7 @@ import { isEIPActive } from './getters'
 
 export async function genTxTrie(block: FrozenBlock): Promise<Uint8Array> {
   return genTransactionsTrieRoot(
-    block.transactions as TypedTransaction[],
+    block.transactions as TxManager[],
     new MerklePatriciaTrie({ common: block.hardforkManager }),
   )
 }

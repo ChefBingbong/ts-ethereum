@@ -1,12 +1,10 @@
 import type { Block } from '@ts-ethereum/block'
 import {
-  type Blob4844Tx,
-  isAccessList2930Tx,
-  isBlob4844Tx,
-  isFeeMarket1559Tx,
-  isLegacyTx,
-  type LegacyTx,
-  type TypedTransaction,
+  isAccessListTxManager,
+  isBlobTxManager,
+  isFeeMarketTxManager,
+  isLegacyTxManager,
+  type TxManager,
 } from '@ts-ethereum/tx'
 import {
   Account,
@@ -57,7 +55,7 @@ export interface TxPoolOptions {
 }
 
 type TxPoolObject = {
-  tx: TypedTransaction
+  tx: TxManager
   hash: UnprefixedHash
   added: number
   error?: Error
@@ -292,7 +290,7 @@ export class TxPool {
    * @returns 'pending' if executable, 'queued' if future
    */
   private async classifyTransaction(
-    tx: TypedTransaction,
+    tx: TxManager,
     senderAddress: UnprefixedAddress,
   ): Promise<'pending' | 'queued'> {
     // Get account nonce from cache or state
@@ -382,8 +380,8 @@ export class TxPool {
   }
 
   private validateTxGasBump(
-    existingTx: TypedTransaction,
-    addedTx: TypedTransaction,
+    existingTx: TxManager,
+    addedTx: TxManager,
   ) {
     const existingTxGasPrice = this.txGasPrice(existingTx)
     const newGasPrice = this.txGasPrice(addedTx)
@@ -403,16 +401,14 @@ export class TxPool {
     }
 
     // EIP-4844: Also check blob gas bump for blob transactions
-    if (isBlob4844Tx(addedTx) && isBlob4844Tx(existingTx)) {
-      const existingBlobTx = existingTx as Blob4844Tx
-      const addedBlobTx = addedTx as Blob4844Tx
+    if (isBlobTxManager(addedTx) && isBlobTxManager(existingTx)) {
       const minBlobGasFee =
-        existingBlobTx.maxFeePerBlobGas +
-        (existingBlobTx.maxFeePerBlobGas * BigInt(MIN_GAS_PRICE_BUMP_PERCENT)) /
+        existingTx.maxFeePerBlobGas! +
+        (existingTx.maxFeePerBlobGas! * BigInt(MIN_GAS_PRICE_BUMP_PERCENT)) /
           BigInt(100)
-      if (addedBlobTx.maxFeePerBlobGas < minBlobGasFee) {
+      if (addedTx.maxFeePerBlobGas! < minBlobGasFee) {
         throw EthereumJSErrorWithoutCode(
-          `replacement blob gas too low, got: ${addedBlobTx.maxFeePerBlobGas}, min: ${minBlobGasFee}`,
+          `replacement blob gas too low, got: ${addedTx.maxFeePerBlobGas}, min: ${minBlobGasFee}`,
         )
       }
     }
@@ -476,7 +472,7 @@ export class TxPool {
    * Validates a transaction against the pool and other constraints
    * @param tx The tx to validate
    */
-  private async validate(tx: TypedTransaction, isLocalTransaction = false) {
+  private async validate(tx: TxManager, isLocalTransaction = false) {
     if (!tx.isSigned()) {
       throw EthereumJSErrorWithoutCode(
         'Attempting to add tx to txpool which is not signed',
@@ -601,7 +597,7 @@ export class TxPool {
    * @param tx Transaction
    * @param isLocalTransaction if this is a local transaction (loosens some constraints) (default: false)
    */
-  async add(tx: TypedTransaction, isLocalTransaction = false) {
+  async add(tx: TxManager, isLocalTransaction = false) {
     const hash: UnprefixedHash = bytesToUnprefixedHex(tx.hash())
     const added = Date.now()
     const address: UnprefixedAddress = tx.getSenderAddress().toString().slice(2)
@@ -660,13 +656,16 @@ export class TxPool {
       this.hashIndex.set(hash, { address, poolType: pool })
 
       // EIP-4844: Cache blobs and proofs for blob transactions
-      if (isBlob4844Tx(tx)) {
-        const blobTx = tx as Blob4844Tx
-        if (blobTx.blobs !== undefined && blobTx.kzgProofs !== undefined) {
-          for (let i = 0; i < blobTx.blobVersionedHashes.length; i++) {
-            const versionedHash = blobTx.blobVersionedHashes[i]
-            const blob = blobTx.blobs[i]
-            const proof = blobTx.kzgProofs[i]
+      if (isBlobTxManager(tx)) {
+        // Access sidecar data from inner BlobTxData
+        const blobTxData = tx.tx.inner as import('@ts-ethereum/tx').BlobTxData
+        const sidecar = blobTxData.sidecar
+        if (sidecar?.blobs !== undefined && sidecar?.proofs !== undefined) {
+          const versionedHashes = tx.blobVersionedHashes!
+          for (let i = 0; i < versionedHashes.length; i++) {
+            const versionedHash = versionedHashes[i] as `0x${string}`
+            const blob = sidecar.blobs[i]
+            const proof = sidecar.proofs[i]
             this.blobAndProofByHash.set(versionedHash, { blob, proof })
           }
           this.pruneBlobsAndProofsCache()
@@ -1016,8 +1015,8 @@ export class TxPool {
    * @param txHashes
    * @returns Array of tx objects
    */
-  getByHash(txHashes: Uint8Array[]): TypedTransaction[] {
-    const found: TypedTransaction[] = []
+  getByHash(txHashes: Uint8Array[]): TxManager[] {
+    const found: TxManager[] = []
     for (const txHash of txHashes) {
       const txHashStr = bytesToUnprefixedHex(txHash)
       const handled = this.handled.get(txHashStr)
@@ -1046,7 +1045,7 @@ export class TxPool {
    * Removes the given tx from the pool
    * @param txHash Hash of the transaction
    */
-  removeByHash(txHash: UnprefixedHash, tx: TypedTransaction) {
+  removeByHash(txHash: UnprefixedHash, tx: TxManager) {
     const handled = this.handled.get(txHash)
     if (!handled) return
     const { address } = handled
@@ -1096,7 +1095,7 @@ export class TxPool {
    * @param txs Transactions to broadcast
    * @param peers Optional peer list (defaults to all connected peers)
    */
-  broadcastTransactions(txs: TypedTransaction[], peers?: Peer[]) {
+  broadcastTransactions(txs: TxManager[], peers?: Peer[]) {
     if (txs.length === 0) return
 
     const targetPeers = peers ?? this.pool.getConnectedPeers()
@@ -1129,7 +1128,7 @@ export class TxPool {
   /**
    * Send full transactions to specific peers (internal use)
    */
-  sendTransactions(txs: TypedTransaction[], peers: Peer[]) {
+  sendTransactions(txs: TxManager[], peers: Peer[]) {
     if (txs.length === 0 || peers.length === 0) return
 
     const hashes = txs.map((tx) => tx.hash())
@@ -1223,7 +1222,7 @@ export class TxPool {
   }
 
   async handleAnnouncedTxs(
-    txs: TypedTransaction[],
+    txs: TxManager[],
     peer: Peer,
     peerPool: PeerPoolLike,
   ) {
@@ -1458,19 +1457,19 @@ export class TxPool {
    * @param baseFee Provide a baseFee to subtract from the legacy
    * gasPrice to determine the leftover priority tip.
    */
-  protected normalizedGasPrice(tx: TypedTransaction, baseFee?: bigint): bigint {
-    const supports1559 = isFeeMarket1559Tx(tx) || isBlob4844Tx(tx)
+  protected normalizedGasPrice(tx: TxManager, baseFee?: bigint): bigint {
+    const supports1559 = isFeeMarketTxManager(tx) || isBlobTxManager(tx)
     if (typeof baseFee === 'bigint' && baseFee !== BIGINT_0) {
       if (supports1559) {
-        return (tx as any).maxPriorityFeePerGas as bigint
+        return tx.maxPriorityFeePerGas!
       } else {
-        return (tx as LegacyTx).gasPrice - baseFee
+        return tx.gasPrice - baseFee
       }
     } else {
       if (supports1559) {
-        return (tx as any).maxFeePerGas as bigint
+        return tx.maxFeePerGas!
       } else {
-        return (tx as LegacyTx).gasPrice
+        return tx.gasPrice
       }
     }
   }
@@ -1480,29 +1479,29 @@ export class TxPool {
    * @param tx Tx to use
    * @returns Gas price (both tip and max fee)
    */
-  private txGasPrice(tx: TypedTransaction): GasPrice {
-    if (isLegacyTx(tx)) {
+  private txGasPrice(tx: TxManager): GasPrice {
+    if (isLegacyTxManager(tx)) {
       return {
         maxFee: tx.gasPrice,
         tip: tx.gasPrice,
       }
     }
 
-    if (isAccessList2930Tx(tx)) {
+    if (isAccessListTxManager(tx)) {
       return {
         maxFee: tx.gasPrice,
         tip: tx.gasPrice,
       }
     }
 
-    if (isFeeMarket1559Tx(tx) || isBlob4844Tx(tx)) {
+    if (isFeeMarketTxManager(tx) || isBlobTxManager(tx)) {
       return {
-        maxFee: tx.maxFeePerGas,
-        tip: tx.maxPriorityFeePerGas,
+        maxFee: tx.maxFeePerGas!,
+        tip: tx.maxPriorityFeePerGas!,
       }
     } else {
       throw EthereumJSErrorWithoutCode(
-        `tx of type ${(tx as TypedTransaction).type} unknown`,
+        `tx of type ${tx.type} unknown`,
       )
     }
   }

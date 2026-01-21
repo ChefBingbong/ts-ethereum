@@ -8,7 +8,7 @@ import type {
   Log,
 } from '@ts-ethereum/evm'
 import type { StateManagerInterface } from '@ts-ethereum/state-manager'
-import type { AccessList, TypedTransaction } from '@ts-ethereum/tx'
+import type { AccessList, TxManager } from '@ts-ethereum/tx'
 import type {
   BigIntLike,
   BlockContext,
@@ -88,7 +88,7 @@ export type EVMProfilerOpts = {
 export type VMEvent = {
   beforeBlock: (data: Block, resolve?: (result?: any) => void) => void
   afterBlock: (data: AfterBlockEvent, resolve?: (result?: any) => void) => void
-  beforeTx: (data: TypedTransaction, resolve?: (result?: any) => void) => void
+  beforeTx: (data: TxManager, resolve?: (result?: any) => void) => void
   afterTx: (data: AfterTxEvent, resolve?: (result?: any) => void) => void
 }
 
@@ -402,7 +402,7 @@ export interface RunTxOpts {
   /**
    * An `@ethereumjs/tx` to run
    */
-  tx: TypedTransaction
+  tx: TxManager
   /**
    * If true, skips the nonce check
    */
@@ -512,5 +512,5 @@ export interface AfterTxEvent extends RunTxResult {
   /**
    * The transaction which just got finished
    */
-  transaction: TypedTransaction
+  transaction: TxManager
 }

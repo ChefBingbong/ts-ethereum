@@ -46,7 +46,7 @@ export type EngineRpcServerModules = RpcServerModules & {
  */
 export class EngineRpcServer extends RpcServerBase {
   readonly modules: EngineRpcServerModules
-  private jwtSecret?: string | Uint8Array
+  private jwtSecret?: string
   private jwtAuthEnabled: boolean
 
   constructor(

@@ -1,8 +1,7 @@
 import {
-  Blob4844Tx,
   Capability,
-  type FeeMarket1559Tx,
-  type LegacyTx,
+  isBlobTxManager,
+  isFeeMarketTxManager,
 } from '@ts-ethereum/tx'
 import { BIGINT_0 } from '@ts-ethereum/utils'
 import type { FrozenBlock } from '../types'
@@ -12,17 +11,14 @@ export function getTransactionsValidationErrors(block: FrozenBlock): string[] {
   const errors: string[] = []
   let blobGasUsed = BIGINT_0
 
-  // eslint-disable-next-line prefer-const
-  for (let [i, tx] of block.transactions.entries()) {
+  for (const [i, tx] of block.transactions.entries()) {
     const errs = tx.getValidationErrors()
     if (isEIPActive(block, 1559)) {
-      if (tx.supports(Capability.EIP1559FeeMarket)) {
-        tx = tx as FeeMarket1559Tx
-        if (tx.maxFeePerGas < block.header.data.baseFeePerGas!) {
+      if (isFeeMarketTxManager(tx)) {
+        if (tx.maxFeePerGas! < block.header.data.baseFeePerGas!) {
           errs.push('tx unable to pay base fee (EIP-1559 tx)')
         }
       } else {
-        tx = tx as LegacyTx
         if (tx.gasPrice < block.header.data.baseFeePerGas!) {
           errs.push('tx unable to pay base fee (non EIP-1559 tx)')
         }
@@ -31,7 +27,7 @@ export function getTransactionsValidationErrors(block: FrozenBlock): string[] {
     if (isEIPActive(block, 4844)) {
       const blobGasLimit = getParam(block, 'maxBlobGasPerBlock') ?? BIGINT_0
       const blobGasPerBlob = getParam(block, 'blobGasPerBlob') ?? 131072n
-      if (tx instanceof Blob4844Tx) {
+      if (isBlobTxManager(tx)) {
         blobGasUsed += BigInt(tx.numBlobs()) * blobGasPerBlob
         if (blobGasUsed > blobGasLimit) {
           errs.push(

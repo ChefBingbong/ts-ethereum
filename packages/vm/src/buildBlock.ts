@@ -12,12 +12,16 @@ import { ConsensusType, Hardfork } from '@ts-ethereum/chain-config'
 import { createEVM, type EVM, type EVMInterface } from '@ts-ethereum/evm'
 import { MerklePatriciaTrie } from '@ts-ethereum/mpt'
 import { RLP } from '@ts-ethereum/rlp'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager, TypedTransaction } from '@ts-ethereum/tx'
 import {
   Blob4844Tx,
+  isBlobTxManager,
   createMinimal4844TxFromNetworkWrapper,
   NetworkWrapperType,
 } from '@ts-ethereum/tx'
+
+// Union type for transactions during migration - TxManager is preferred
+type BuilderTx = TxManager | TypedTransaction
 import type { Withdrawal } from '@ts-ethereum/utils'
 import {
   Address,
@@ -81,7 +85,7 @@ export class BlockBuilder {
   private readonly vm: VM
   private blockOpts: BuilderOpts
   private headerData: HeaderData
-  private transactions: TypedTransaction[] = []
+  private transactions: BuilderTx[] = []
   private transactionResults: RunTxResult[] = []
   private withdrawals?: Withdrawal[]
   private checkpointed = false
@@ -216,8 +220,9 @@ export class BlockBuilder {
       toType(this.headerData.number ?? 0, TypeOutput.BigInt),
       toType(this.headerData.timestamp ?? 0, TypeOutput.BigInt),
     )
+    // Cast is safe - both TxManager and TypedTransaction implement serialize()
     return genTransactionsTrieRoot(
-      this.transactions,
+      this.transactions as TxManager[],
       new MerklePatriciaTrie({ common: this.vm.hardforkManager }),
     )
   }
@@ -310,7 +315,7 @@ export class BlockBuilder {
    * the remaining gas in the block.
    */
   async addTransaction(
-    tx: TypedTransaction,
+    tx: BuilderTx,
     {
       skipHardForkValidation,
       allowNoBlobs,
@@ -421,7 +426,8 @@ export class BlockBuilder {
     )
 
     const result = await runTx(this.vm, {
-      tx,
+      // Cast to TxManager - both TxManager and TypedTransaction share compatible interfaces for runTx
+      tx: tx as TxManager,
       block,
       blockContext,
       skipHardForkValidation,

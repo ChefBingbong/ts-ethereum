@@ -3,7 +3,7 @@
  * Processes incoming TRANSACTIONS announcements
  */
 
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import debug from 'debug'
 import {
   ETH_MESSAGES,
@@ -38,7 +38,7 @@ export async function handleTransactions(
       const peer = handler.findPeer()
       if (peer) {
         await handleTransactionsExec(
-          decoded as TypedTransaction[],
+          decoded as TxManager[],
           peer,
           handler.context,
         )

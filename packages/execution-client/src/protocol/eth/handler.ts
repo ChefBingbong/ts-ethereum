@@ -1,6 +1,6 @@
 import type { BlockBodyBytes, BlockHeader } from '@ts-ethereum/block'
 import type { RLPxConnection } from '@ts-ethereum/p2p'
-import type { TypedTransaction } from '@ts-ethereum/tx'
+import type { TxManager } from '@ts-ethereum/tx'
 import {
   BIGINT_0,
   bigIntToUnpaddedBytes,
@@ -500,7 +500,7 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
   async getPooledTransactions(opts: {
     reqId?: bigint
     hashes: Uint8Array[]
-  }): Promise<[bigint, TypedTransaction[]]> {
+  }): Promise<[bigint, TxManager[]]> {
     if (!this.ethProtocol) {
       throw new Error('ETH protocol not available')
     }
@@ -545,7 +545,7 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
     )
 
     // Wait for response
-    const promise = new Promise<[bigint, TypedTransaction[]]>(
+    const promise = new Promise<[bigint, TxManager[]]>(
       (resolve, reject) => {
         const timeout = setTimeout(() => {
           if (this.resolvers.has(reqId)) {
@@ -563,7 +563,7 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
           resolve: (value: unknown) => {
             clearTimeout(timeout)
             this.inFlightRequests.delete(requestKey)
-            const result = value as [bigint, TypedTransaction[]]
+            const result = value as [bigint, TxManager[]]
             resolve(result)
           },
           reject: (err) => {
@@ -707,8 +707,8 @@ export class EthHandler extends EventEmitter implements EthProtocolMethods {
         encodedData = encodeFn(args as any[])
       } else if (name === 'Transactions' && Array.isArray(args)) {
         // Transactions: array of transactions - encode takes array
-        const encodeFn = messageDef.encode as (args: TypedTransaction[]) => any
-        encodedData = encodeFn(args as TypedTransaction[])
+        const encodeFn = messageDef.encode as (args: TxManager[]) => any
+        encodedData = encodeFn(args as TxManager[])
       } else if (name === 'NewPooledTransactionHashes' && Array.isArray(args)) {
         // NewPooledTransactionHashes: can be array or tuple
         const encodeFn = messageDef.encode as (

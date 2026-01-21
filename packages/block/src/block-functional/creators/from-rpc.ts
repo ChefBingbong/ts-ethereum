@@ -1,7 +1,7 @@
 import {
-  createTx,
+  createTxManager,
   normalizeTxParams,
-  type TypedTransaction,
+  type TxManager,
 } from '@ts-ethereum/tx'
 import { createWithdrawal, type Withdrawal } from '@ts-ethereum/utils'
 import { createBlockHeaderManagerFromRPC } from '../../header-functional'
@@ -31,11 +31,10 @@ export function fromRPC(
   const frozenHeader = headerManager.header
 
   // Parse transactions
-  const transactions: TypedTransaction[] = []
-  // TODO: Migrate tx package to use hardforkManager
+  const transactions: TxManager[] = []
   for (const _txParams of blockParams.transactions ?? []) {
     const txParams = normalizeTxParams(_txParams)
-    const tx = createTx(txParams, {
+    const tx = createTxManager(txParams, {
       ...opts,
       common: opts.hardforkManager,
     })
@@ -76,7 +75,7 @@ export function fromRPC(
 
   const block: FrozenBlock = {
     header: frozenHeader,
-    transactions: Object.freeze(transactions) as readonly TypedTransaction[],
+    transactions: Object.freeze(transactions) as readonly TxManager[],
     uncleHeaders: Object.freeze(
       uncleHeaders,
     ) as readonly (typeof frozenHeader)[],

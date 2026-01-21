@@ -1,10 +1,35 @@
-import { createTx, type TypedTransaction } from '@ts-ethereum/tx'
+import { createTxManager, type TxManager } from '@ts-ethereum/tx'
 import { createWithdrawal, type Withdrawal } from '@ts-ethereum/utils'
 import { createBlockHeaderManagerFromHeader } from '../../header-functional'
 import { fromHeaderData } from '../../header-functional/creators'
 import type { BlockData } from '../../types'
 import { validateBlockConstructor } from '../../validation/block'
 import type { CreateBlockOptions, FrozenBlock } from '../types'
+
+/**
+ * Check if a value is already a TxManager instance (has 'tx' property)
+ */
+function isTxManager(value: unknown): value is TxManager {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'tx' in value &&
+    typeof (value as TxManager).hash === 'function'
+  )
+}
+
+/**
+ * Check if a value is an already-constructed transaction object
+ * (either TxManager or old TypedTransaction class)
+ */
+function isTransactionObject(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as any).hash === 'function' &&
+    typeof (value as any).serialize === 'function'
+  )
+}
 
 export function fromBlockData(
   blockData: BlockData,
@@ -32,14 +57,27 @@ export function fromBlockData(
   })
 
   // Parse transactions
-  const transactions: TypedTransaction[] = []
+  const transactions: TxManager[] = []
   for (const txData of txsData ?? []) {
-    // TODO: Migrate tx package to use hardforkManager
-    const tx = createTx(txData, {
-      ...opts,
-      common: opts.hardforkManager,
-    })
-    transactions.push(tx)
+    // Check if txData is already a TxManager
+    if (isTxManager(txData)) {
+      transactions.push(txData)
+    }
+    // Check if txData is an already-constructed transaction object (old TypedTransaction)
+    // that needs to be wrapped. Cast to TxManager since both have compatible interfaces.
+    else if (isTransactionObject(txData)) {
+      // TypedTransaction and TxManager share the same runtime interface,
+      // so we can safely cast it for use in the block
+      transactions.push(txData as unknown as TxManager)
+    }
+    // Otherwise, it's raw transaction data
+    else {
+      const tx = createTxManager(txData, {
+        ...opts,
+        common: opts.hardforkManager,
+      })
+      transactions.push(tx)
+    }
   }
 
   // Parse uncle headers
@@ -77,7 +115,7 @@ export function fromBlockData(
 
   const block: FrozenBlock = {
     header: frozenHeader,
-    transactions: Object.freeze(transactions) as readonly TypedTransaction[],
+    transactions: Object.freeze(transactions) as readonly TxManager[],
     uncleHeaders: Object.freeze(
       uncleHeaders,
     ) as readonly (typeof frozenHeader)[],

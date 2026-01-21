@@ -1,5 +1,5 @@
 import { createBlock } from '@ts-ethereum/block'
-import { createTx } from '@ts-ethereum/tx'
+import { createTxManager } from '@ts-ethereum/tx'
 import {
   BIGINT_1,
   createAddressFromString,
@@ -51,9 +51,8 @@ export const estimateGas = (node: ExecutionNode) => {
         { hardforkManager: vmCopy.hardforkManager },
       )
 
-      const tx = createTx(txData, {
+      const tx = createTxManager(txData, {
         common: vmCopy.hardforkManager,
-        freeze: false,
       })
 
       const from =

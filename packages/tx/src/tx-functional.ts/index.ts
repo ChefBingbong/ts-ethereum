@@ -45,6 +45,14 @@ export {
   // Validation
   getValidationErrors,
   hash,
+  // TxManager type guards
+  isAccessListCompatibleTxManager,
+  isAccessListTxManager,
+  isBlobTxManager,
+  isEOACodeTxManager,
+  isFeeMarketCompatibleTxManager,
+  isFeeMarketTxManager,
+  isLegacyTxManager,
   // Go-style type checks (preferred)
   isProtected,
   isProtectedV,
@@ -64,6 +72,28 @@ export {
   toJSON,
   verifySignature,
 } from './helpers'
+
+// Factory functions
+export {
+  // Generic factories
+  createTxManager,
+  createTxManagerFromBlockBodyData,
+  createTxManagerFromJSONRPCProvider,
+  createTxManagerFromRLP,
+  createTxManagerFromRPC,
+  // Type-specific factories
+  createAccessListTxManager,
+  createAccessListTxManagerFromRLP,
+  createBlobTxManager,
+  createBlobTxManagerFromRLP,
+  createDynamicFeeTxManager,
+  createDynamicFeeTxManagerFromRLP,
+  createLegacyTxManager,
+  createLegacyTxManagerFromBytesArray,
+  createLegacyTxManagerFromRLP,
+  createSetCodeTxManager,
+  createSetCodeTxManagerFromRLP,
+} from './factory'
 // Signer factory functions
 export {
   latestSigner,

@@ -18,7 +18,64 @@ import type { BlobTxData } from './tx-blob'
 import type { DynamicFeeTxData } from './tx-dynamic-fee'
 import { createTxManagerFromTx } from './tx-manager'
 import type { SetCodeTxData } from './tx-set-code'
-import type { FrozenTx, Signer } from './types'
+import type { FrozenTx, Signer, TxManager } from './types'
+
+// ============================================================================
+// TxManager Type Guards
+// ============================================================================
+
+/**
+ * Type guard to check if a TxManager wraps a legacy transaction.
+ */
+export function isLegacyTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.Legacy
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-2930 access list transaction.
+ */
+export function isAccessListTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.AccessListEIP2930
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-1559 dynamic fee transaction.
+ */
+export function isFeeMarketTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.FeeMarketEIP1559
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-4844 blob transaction.
+ */
+export function isBlobTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.BlobEIP4844
+}
+
+/**
+ * Type guard to check if a TxManager wraps an EIP-7702 set code transaction.
+ */
+export function isEOACodeTxManager(tx: TxManager): boolean {
+  return tx.type === TransactionType.EOACodeEIP7702
+}
+
+/**
+ * Type guard to check if a TxManager supports EIP-1559 fee market.
+ */
+export function isFeeMarketCompatibleTxManager(tx: TxManager): boolean {
+  return (
+    tx.type === TransactionType.FeeMarketEIP1559 ||
+    tx.type === TransactionType.BlobEIP4844 ||
+    tx.type === TransactionType.EOACodeEIP7702
+  )
+}
+
+/**
+ * Type guard to check if a TxManager supports access lists.
+ */
+export function isAccessListCompatibleTxManager(tx: TxManager): boolean {
+  return tx.type !== TransactionType.Legacy
+}
 
 // ============================================================================
 // Transaction Type Checks (Go-style)
