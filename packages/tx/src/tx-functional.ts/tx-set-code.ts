@@ -1,5 +1,8 @@
-import { RLP, type Input } from '@ts-ethereum/rlp'
-import type { Address, EOACode7702AuthorizationListBytes } from '@ts-ethereum/utils'
+import { type Input, RLP } from '@ts-ethereum/rlp'
+import type {
+  Address,
+  EOACode7702AuthorizationListBytes,
+} from '@ts-ethereum/utils'
 import { bigIntToUnpaddedBytes, concatBytes } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
 import type { AccessListBytes } from '../types'
@@ -76,8 +79,9 @@ export class SetCodeTxData implements TxData {
         new Uint8Array(addr),
         keys.map((k) => new Uint8Array(k)),
       ]),
-      authorizationList: this.authorizationList.map((auth) =>
-        auth.map((item) => new Uint8Array(item as Uint8Array)) as typeof auth,
+      authorizationList: this.authorizationList.map(
+        (auth) =>
+          auth.map((item) => new Uint8Array(item as Uint8Array)) as typeof auth,
       ),
       v: this.v,
       r: this.r,

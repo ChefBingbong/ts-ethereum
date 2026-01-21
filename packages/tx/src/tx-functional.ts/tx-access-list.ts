@@ -1,4 +1,4 @@
-import { RLP, type Input } from '@ts-ethereum/rlp'
+import { type Input, RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import { bigIntToUnpaddedBytes, concatBytes } from '@ts-ethereum/utils'
 import { keccak256 } from 'ethereum-cryptography/keccak'
