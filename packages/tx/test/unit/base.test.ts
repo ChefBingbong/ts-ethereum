@@ -61,7 +61,7 @@ describe('[BaseTransaction]', () => {
       let tx = txType.create.txData({}, { common, blockNumber, timestamp })
       assert.strictEqual(
         tx.common.getHardforkByBlock(blockNumber, timestamp),
-        Hardfork.Chainstart,
+        Hardfork.Prague,
         `${txType.name}: should initialize with correct HF provided`,
       )
       assert.isFrozen(tx, `${txType.name}: tx should be frozen by default`)
@@ -73,7 +73,7 @@ describe('[BaseTransaction]', () => {
       )
       assert.strictEqual(
         tx.common.getHardforkByBlock(blockNumber, timestamp),
-        Hardfork.Chainstart,
+        Hardfork.Prague,
         `${txType.name}: should initialize with correct HF provided`,
       )
 
@@ -88,7 +88,7 @@ describe('[BaseTransaction]', () => {
 
       tx = txType.create.txData({}, { common, blockNumber, timestamp })
       assert.strictEqual(
-        tx.common.getParamAtHardfork('txGas', Hardfork.Chainstart),
+        tx.common.getParamAtHardfork('txGas', Hardfork.Prague),
         BigInt(21000),
         'should use default parameters',
       )

@@ -357,7 +357,7 @@ describe('[Transaction]', () => {
     const signedTxn = txn.sign(pkey)
     assert.strictEqual(
       signedTxn.common.getHardforkByBlock(blockNumber, timestamp),
-      Hardfork.Chainstart,
+      Hardfork.Prague,
       'signed tx common is taken from tx.common',
     )
   })

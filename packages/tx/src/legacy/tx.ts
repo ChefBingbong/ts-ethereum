@@ -1,4 +1,4 @@
-import { Hardfork, type HardforkManager } from '@ts-ethereum/chain-config'
+import type { Hardfork, HardforkManager } from '@ts-ethereum/chain-config'
 import { RLP } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import {
@@ -44,6 +44,7 @@ function meetsEIP155(_v: bigint, chainId: bigint) {
  */
 function validateVAndExtractChainID(
   common: HardforkManager,
+  hf: Hardfork,
   _v?: bigint,
 ): bigint | undefined {
   let chainIdBigInt
@@ -59,7 +60,6 @@ function validateVAndExtractChainID(
     }
   }
 
-  const hf = Hardfork.Chainstart
   // Extract chainId from EIP-155 signed txs (v >= 37)
   // NOTE: We do this regardless of hardfork because:
   // 1. Modern wallets (like viem) always sign with EIP-155
@@ -143,8 +143,9 @@ export class LegacyTx
     // TODO: this is not needed for legacy txs
     // Everything from BaseTransaction done here
     // this.common.updateBatchParams(opts.params ?? paramsTx) // TODO should this move higher?
+    const hf = this.common.getHardforkFromContext(this.fork) as Hardfork
 
-    const chainId = validateVAndExtractChainID(this.common, this.v)
+    const chainId = validateVAndExtractChainID(this.common, hf, this.v)
     if (chainId !== undefined && chainId !== this.common.chainId()) {
       throw EthereumJSErrorWithoutCode(
         `HardforkManager chain ID ${this.common.chainId} not matching the derived chain ID ${chainId}`,
@@ -159,7 +160,6 @@ export class LegacyTx
       )
     }
 
-    const hf = Hardfork.Chainstart
     // EIP-155 replay protection capability
     // NOTE: We recognize EIP-155 signed txs regardless of hardfork because:
     // 1. Modern wallets always sign with EIP-155 (chainId in v)

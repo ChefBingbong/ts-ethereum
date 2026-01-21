@@ -308,6 +308,7 @@ export function sign(
     throw EthereumJSErrorWithoutCode(msg)
   }
   const hardfork = tx.fork
+
   // TODO (Jochem, 05 nov 2024): figure out what this hack does and clean it up
 
   // Hack for the constellation that we have got a legacy tx after spuriousDragon with a non-EIP155 conforming signature
