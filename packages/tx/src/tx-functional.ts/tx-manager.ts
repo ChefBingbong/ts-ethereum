@@ -7,7 +7,6 @@ import type {
 } from '../types'
 import { TransactionType as TxType } from '../types'
 import * as helpers from './helpers'
-import type { AccessListTxData } from './tx-access-list'
 import type { BlobTxData } from './tx-blob'
 import type { DynamicFeeTxData } from './tx-dynamic-fee'
 import type { SetCodeTxData } from './tx-set-code'

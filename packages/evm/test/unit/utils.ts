@@ -1,5 +1,5 @@
+import path from 'node:path'
 import { Account } from '@ts-ethereum/utils'
-import path from 'path'
 
 export function createAccount(nonce = BigInt(0), balance = BigInt(0xfff384)) {
   return new Account(nonce, balance)

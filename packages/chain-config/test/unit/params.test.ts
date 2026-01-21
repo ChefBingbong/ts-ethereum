@@ -1,4 +1,4 @@
-/** biome-ignore-all assist/source/organizeImports: <explanation> */
+/** biome-ignore-all assist/source/organizeImports: test file import order intentional */
 import { describe, expect, it } from 'vitest'
 import { EIP } from '../../src/hardforks/eips'
 import {

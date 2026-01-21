@@ -234,8 +234,8 @@ export class StatefulBinaryTreeStateManager implements StateManagerInterface {
       this._debug(
         `putAccount address=${address} nonce=${account?.nonce} balance=${
           account?.balance
-        } contract=${account && account.isContract() ? 'yes' : 'no'} empty=${
-          account && account.isEmpty() ? 'yes' : 'no'
+        } contract=${account?.isContract() ? 'yes' : 'no'} empty=${
+          account?.isEmpty() ? 'yes' : 'no'
         }`,
       )
     }

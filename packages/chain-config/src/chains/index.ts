@@ -14,8 +14,6 @@ export const getPresetChainConfig = (chain: string | number) => {
     case 'sepolia':
     case 11155111:
       return Sepolia
-    case 'mainnet':
-    case 1:
     default:
       return Mainnet
   }

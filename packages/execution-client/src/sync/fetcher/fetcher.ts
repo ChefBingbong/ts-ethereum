@@ -1,6 +1,6 @@
+import { Readable, Writable } from 'node:stream'
 import type { Debugger } from 'debug'
 import debug from 'debug'
-import { Readable, Writable } from 'stream'
 import type { Config } from '../../config/index'
 import type { QHeap } from '../../ext/qheap'
 import { Heap } from '../../ext/qheap'

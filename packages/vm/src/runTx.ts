@@ -15,9 +15,7 @@ import type { AccessList, AccessListItem, TxManager } from '@ts-ethereum/tx'
 import {
   Capability,
   isBlobTxManager,
-  isEOACodeTxManager,
   isFeeMarketTxManager,
-  isLegacyTxManager,
 } from '@ts-ethereum/tx'
 import type { BlockContext } from '@ts-ethereum/utils'
 import {

@@ -375,7 +375,7 @@ export class TransportManager implements TransportManagerInterface {
         })
 
         listener.addEventListener('close', () => {
-          const index = listeners!.findIndex((l) => l === listener)
+          const index = listeners!.indexOf(listener)
 
           if (index !== -1) {
             listeners!.splice(index, 1)

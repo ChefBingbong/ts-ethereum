@@ -303,7 +303,7 @@ export class CLConnectionManager {
       this.config.superMsg('Consensus client connection established')
     }
     this.connectionStatus = ConnectionStatus.Connected
-    this.lastRequestTimestamp = new Date().getTime()
+    this.lastRequestTimestamp = Date.now()
   }
 
   /**
@@ -312,7 +312,7 @@ export class CLConnectionManager {
   private connectionCheck() {
     if (this.connectionStatus === ConnectionStatus.Connected) {
       this.disconnectedCheckIndex = 0
-      const now = new Date().getTime()
+      const now = Date.now()
       const timeDiff = now - this.lastRequestTimestamp
 
       if (timeDiff <= this.DISCONNECTED_THRESHOLD) {

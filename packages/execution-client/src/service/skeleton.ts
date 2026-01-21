@@ -131,8 +131,6 @@ export class Skeleton extends MetaDBManager {
   private lastFcuTime = 0
   private lastsyncedAt = 0
 
-  private STATUS_LOG_INTERVAL = 8000 /** How often to log sync status (in ms) */
-
   /**
    * safeBlock as indicated by engine api, set
    */
@@ -180,7 +178,7 @@ export class Skeleton extends MetaDBManager {
     await this.runWithLock<void>(async () => {
       await this.getSyncStatus()
       this.logSyncStatus('Read')
-      this.started = new Date().getTime()
+      this.started = Date.now()
     })
   }
 
@@ -1829,7 +1827,7 @@ export class Skeleton extends MetaDBManager {
         if (this.status.linked) left = BIGINT_0
         if (left > BIGINT_0) {
           if (this.pulled !== BIGINT_0 && fetching === true) {
-            const sinceStarted = (new Date().getTime() - this.started) / 1000
+            const sinceStarted = (Date.now() - this.started) / 1000
             beaconSyncETA = `${timeDuration((sinceStarted / Number(this.pulled)) * Number(left))}`
             this.config.logger?.debug(
               `Syncing beacon headers downloaded=${this.pulled} left=${left} eta=${beaconSyncETA}`,

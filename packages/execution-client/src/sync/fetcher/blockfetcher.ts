@@ -7,7 +7,7 @@ import {
 } from '@ts-ethereum/utils'
 import type { Peer } from '../../net/peer/peer'
 import { Event } from '../../types'
-import type { BlockFetcherOptions, JobTask } from './blockfetcherbase'
+import type { JobTask } from './blockfetcherbase'
 import { BlockFetcherBase } from './blockfetcherbase'
 import type { Job } from './types'
 
@@ -16,13 +16,6 @@ import type { Job } from './types'
  * @memberof module:sync/fetcher
  */
 export class BlockFetcher extends BlockFetcherBase<Block[], Block> {
-  /**
-   * Create new block fetcher
-   */
-  constructor(options: BlockFetcherOptions) {
-    super(options)
-  }
-
   /**
    * Requests blocks associated with this job
    * @param job
