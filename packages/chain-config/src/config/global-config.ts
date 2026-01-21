@@ -369,10 +369,10 @@ export class GlobalConfig<
     // @ts-nocheck
     const targetIdx = hardforks.findIndex((hf) => hf.name === hardfork)
     if (targetIdx === -1) {
-      const orderCurrentIdx = HARDFORK_ORDER.findIndex(
-        (hf) => hf === this._currentHardfork,
+      const orderCurrentIdx = HARDFORK_ORDER.indexOf(
+        this._currentHardfork as HardforkType,
       )
-      const orderTargetIdx = HARDFORK_ORDER.findIndex((hf) => hf === hardfork)
+      const orderTargetIdx = HARDFORK_ORDER.indexOf(hardfork as HardforkType)
       if (orderTargetIdx === -1) return false
       return orderCurrentIdx >= orderTargetIdx
     }

@@ -1,8 +1,4 @@
-import {
-  Capability,
-  isBlobTxManager,
-  isFeeMarketTxManager,
-} from '@ts-ethereum/tx'
+import { isBlobTxManager, isFeeMarketTxManager } from '@ts-ethereum/tx'
 import { BIGINT_0 } from '@ts-ethereum/utils'
 import type { FrozenBlock } from '../types'
 import { getParam, isEIPActive } from './getters'

@@ -16,7 +16,6 @@ import type { TxManager, TypedTransaction } from '@ts-ethereum/tx'
 import {
   Blob4844Tx,
   createMinimal4844TxFromNetworkWrapper,
-  isBlobTxManager,
   NetworkWrapperType,
 } from '@ts-ethereum/tx'
 

@@ -1,10 +1,10 @@
 // src/kademlia/udp.ts
 // UDP transport for Ethereum-compatible Kademlia discovery protocol
 
+import * as dgram from 'node:dgram'
 import type { HardforkManager } from '@ts-ethereum/chain-config'
 import { bytesToHex, bytesToUnprefixedHex } from '@ts-ethereum/utils'
 import debugDefault from 'debug'
-import * as dgram from 'dgram'
 import { EventEmitter } from 'eventemitter3'
 import { LRUCache } from 'lru-cache'
 

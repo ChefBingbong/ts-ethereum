@@ -1,4 +1,4 @@
-import { Capability, isFeeMarketTxManager } from '@ts-ethereum/tx'
+import { isFeeMarketTxManager } from '@ts-ethereum/tx'
 import { BIGINT_0, bigIntToHex, safeResult } from '@ts-ethereum/utils'
 import type { ExecutionNode } from '../../../node/index'
 import { createRpcMethod } from '../../validation'

@@ -273,7 +273,7 @@ export const ETH_MESSAGES = {
       block: block.length === 32 ? block : bytesToBigInt(block),
       max: bytesToInt(max),
       skip: bytesToInt(skip),
-      reverse: bytesToInt(reverse) === 0 ? false : true,
+      reverse: bytesToInt(reverse) !== 0,
     }),
   },
   [EthMessageCode.BLOCK_HEADERS]: {

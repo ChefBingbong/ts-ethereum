@@ -280,8 +280,8 @@ export class RPCStateManager implements StateManagerInterface {
       this._debug(
         `Save account address=${address} nonce=${account?.nonce} balance=${
           account?.balance
-        } contract=${account && account.isContract() ? 'yes' : 'no'} empty=${
-          account && account.isEmpty() ? 'yes' : 'no'
+        } contract=${account?.isContract() ? 'yes' : 'no'} empty=${
+          account?.isEmpty() ? 'yes' : 'no'
         }`,
       )
     }

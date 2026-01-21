@@ -248,7 +248,7 @@ export class Blob4844Tx
         throw EthereumJSErrorWithoutCode(msg)
       }
       if (
-        Number.parseInt(hash.slice(2, 4)) !==
+        Number.parseInt(hash.slice(2, 4), 16) !==
         this.common.getParamAtHardfork('blobCommitmentVersionKzg', this.fork)
       ) {
         // We check the first "byte" of the hash (starts at position 2 since hash is a PrefixedHexString)

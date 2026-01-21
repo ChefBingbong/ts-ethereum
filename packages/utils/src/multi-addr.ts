@@ -21,7 +21,7 @@ export function ipPortToMultiaddr(
   }
 
   if (typeof port === 'string') {
-    port = Number.parseInt(port)
+    port = Number.parseInt(port, 10)
   }
 
   if (Number.isNaN(port)) {
