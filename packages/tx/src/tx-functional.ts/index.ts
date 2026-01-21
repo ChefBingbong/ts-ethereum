@@ -32,7 +32,13 @@
 // Helper functions
 export {
   errorStr,
+  // Access list gas calculation
+  getAccessListGas,
+  // Authorization list gas calculation (EIP-7702)
+  getAuthorizationListGas,
   getDataGas,
+  // Effective gas price calculation
+  getEffectiveGasPrice,
   getIntrinsicGas,
   getSenderAddress,
   getUpfrontCost,
@@ -77,8 +83,14 @@ export {
 
 // Go-style signing functions
 export { Sender, SignTx, sender, signTx } from './signing'
+
 // Transaction data implementations
 export { LegacyTxData } from './tx-legacy'
+export { AccessListTxData } from './tx-access-list'
+export { DynamicFeeTxData } from './tx-dynamic-fee'
+export { BlobTxData, type BlobTxSidecar } from './tx-blob'
+export { SetCodeTxData } from './tx-set-code'
+
 // Transaction manager functions
 export { createTxManagerFromTx, newTx } from './tx-manager'
 // Core types

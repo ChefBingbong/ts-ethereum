@@ -1,4 +1,5 @@
 import type { HardforkManager } from '@ts-ethereum/chain-config'
+import type { Input } from '@ts-ethereum/rlp'
 import type { Address } from '@ts-ethereum/utils'
 import type {
   AccessListBytes,
@@ -60,8 +61,9 @@ export interface TxData {
 
   /**
    * Returns the raw RLP-encodable array including signature values.
+   * The array may contain nested arrays for access lists, etc.
    */
-  raw(): Uint8Array[]
+  raw(): Input[]
 }
 
 /**
