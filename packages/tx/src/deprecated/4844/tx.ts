@@ -14,9 +14,9 @@ import {
   hexToBytes,
   intToUnpaddedBytes,
   MAX_INTEGER,
+  TypeOutput,
   toBytes,
   toType,
-  TypeOutput,
 } from '@ts-ethereum/utils'
 import type {
   AccessListBytes,

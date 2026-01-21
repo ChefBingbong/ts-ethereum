@@ -42,8 +42,8 @@ export {
   getSenderAddress,
   getUpfrontCost,
   getValidationErrors,
-  hash,
   HomesteadSigner,
+  hash,
   // TxManager type guards
   isAccessListCompatibleTxManager,
   isAccessListTxManager,
@@ -58,20 +58,20 @@ export {
   isSigned,
   isTypedTransaction,
   isValid,
+  LegacyTxData,
+  LondonSigner,
   // Signer factory functions
   latestSigner,
   latestSignerForChainID,
-  LegacyTxData,
-  LondonSigner,
   makeSigner,
   newTx,
   PragueSigner,
   // Go-style signing functions
   Sender,
-  sender,
-  serialize,
   SetCodeTxData,
   SignTx,
+  sender,
+  serialize,
   signTx,
   supports,
   supportsAccessList,
@@ -85,8 +85,8 @@ export type { BlobTxSidecar } from './tx-functional.ts/tx-blob'
 // Export new types with functional prefix to avoid conflicts
 export type {
   FrozenTx,
-  TxData as FunctionalTxData,
   Signer,
+  TxData as FunctionalTxData,
   TxManager,
 } from './tx-functional.ts/types'
 

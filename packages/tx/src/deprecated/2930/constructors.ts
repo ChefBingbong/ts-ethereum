@@ -2,8 +2,8 @@ import { RLP } from '@ts-ethereum/rlp'
 import {
   bytesToBigInt,
   bytesToHex,
-  equalsBytes,
   EthereumJSErrorWithoutCode,
+  equalsBytes,
   validateNoLeadingZeroes,
 } from '@ts-ethereum/utils'
 import type { AccessList, TxOptions } from '../../types'
